@@ -16,6 +16,11 @@ class CustomerSegment(models.TextChoices):
     PUBLIC = "public", "Public"
 
 
+class CustomerPriorityLevel(models.TextChoices):
+    STANDARD = "standard", "Standard"
+    VIP = "vip", "VIP"
+
+
 class CustomerStatus(models.TextChoices):
     ACTIVE = "active", "Active"
     SUSPENDED = "suspended", "Suspended"
@@ -66,6 +71,11 @@ class Customer(TimeStampedModel):
         max_length=24,
         choices=CustomerStatus.choices,
         default=CustomerStatus.ACTIVE,
+    )
+    priority_level = models.CharField(
+        max_length=24,
+        choices=CustomerPriorityLevel.choices,
+        default=CustomerPriorityLevel.STANDARD,
     )
     city = models.ForeignKey(City, on_delete=models.PROTECT, related_name="customers")
     district = models.ForeignKey(

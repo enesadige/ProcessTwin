@@ -12,6 +12,7 @@ from apps.customers.models import (
     CompensationHistory,
     CompensationHistoryStatus,
     Customer,
+    CustomerPriorityLevel,
     CustomerSegment,
     PaymentRecord,
     PaymentStatus,
@@ -164,6 +165,43 @@ def test_active_subscription_connection_reaches_customer_from_bng_line():
     assert subscription.is_valid_at(now)
     assert line.is_valid_at(now)
     assert connection.is_valid_at(now)
+
+
+@pytest.mark.django_db
+def test_customer_priority_level_defaults_to_standard():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+
+    customer = Customer.objects.create(
+        data_snapshot=snapshot,
+        customer_number="CUST-MAL-PRIORITY-001",
+        display_name="Standard Priority Customer",
+        city=city,
+        district=district,
+        neighborhood=neighborhood,
+    )
+
+    assert customer.priority_level == CustomerPriorityLevel.STANDARD
+
+
+@pytest.mark.django_db
+def test_customer_priority_level_can_store_vip_independently_from_segment():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+
+    customer = Customer.objects.create(
+        data_snapshot=snapshot,
+        customer_number="CUST-MAL-VIP-001",
+        display_name="VIP SME Customer",
+        segment=CustomerSegment.SME,
+        priority_level=CustomerPriorityLevel.VIP,
+        city=city,
+        district=district,
+        neighborhood=neighborhood,
+    )
+
+    assert customer.segment == CustomerSegment.SME
+    assert customer.priority_level == CustomerPriorityLevel.VIP
 
 
 @pytest.mark.django_db

@@ -17,11 +17,12 @@ class CustomerAdmin(admin.ModelAdmin):
         "customer_number",
         "display_name",
         "segment",
+        "priority_level",
         "status",
         "district",
         "data_snapshot",
     )
-    list_filter = ("segment", "status", "city", "district")
+    list_filter = ("segment", "priority_level", "status", "city", "district")
     search_fields = ("customer_number", "display_name", "city__name", "district__name")
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = ("data_snapshot", "city", "district", "neighborhood")
