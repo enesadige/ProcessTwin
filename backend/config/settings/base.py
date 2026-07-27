@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "apps.network",
     "apps.customers",
     "apps.operations",
+    "apps.rules",
 ]
 
 MIDDLEWARE = [
