@@ -31,6 +31,7 @@ INSTALLED_APPS = [
     "apps.datasets",
     "apps.geography",
     "apps.network",
+    "apps.customers",
 ]
 
 MIDDLEWARE = [
