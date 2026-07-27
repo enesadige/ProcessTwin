@@ -164,7 +164,25 @@ Durum: `KARAR BEKLİYOR`
         - `BNG-MAL-001`: yaklaşık 150 aktif abonelik
         - `BNG-MAL-002`: yaklaşık 90 aktif abonelik
       - Dağılım cihazlar ve mahalleler arasında eşit olmak zorunda değildir.
-    - Port kapasitesi kararı: `KARAR BEKLİYOR`
+    - Port kapasitesi kararı: `KISMEN KARAR VERİLDİ`
+      - `NetworkPort` anlamı: `KARAR VERİLDİ`
+      - `NetworkPort`, cihaz üzerindeki fiziksel veya sentetik fiziksel portu temsil eder.
+      - `LineConnection`, bu fiziksel port üzerinden sunulan müşteri erişim hattını temsil eder.
+      - `SubscriptionConnection`, aboneliğin belirli zaman aralığında hangi `LineConnection` üzerinden hizmet aldığını temsil eder.
+      - DSLAM / VDSL / ADSL genel davranışı:
+        - 1 fiziksel müşteri portu -> 1 aktif `LineConnection`.
+        - Bir DSLAM müşteri portunda aynı anda birden fazla aktif müşteri hattı bulunmaz.
+      - OLT / GPON genel davranışı:
+        - Bir fiziksel PON portuna birden fazla `LineConnection` bağlanabilir.
+        - GPON abonelikleri için müşteri başına ayrı fiziksel `NetworkPort` üretilmez.
+        - Splitter ve ONT/ONU ilk MVP'de ayrı model olarak eklenmez.
+        - PON portundan birden fazla müşteri hattına geçiş, basitleştirilmiş mantıksal fan-out olarak temsil edilir.
+      - Mevcut model kontrolü:
+        - `LineConnection.port` alanı `NetworkPort` için ForeignKey kullanır.
+        - Mevcut model ve migrationlarda aynı `NetworkPort` üzerinde birden fazla `LineConnection` oluşmasını engelleyen global unique constraint yoktur.
+        - Bu nedenle GPON fan-out için şu aşamada model/migration değişikliği gerekmemektedir.
+        - DSLAM için 1 port -> 1 aktif hat kuralı bütün teknolojilere uygulanan global unique constraint olarak yazılmaz; seed/servis mantığında teknolojiye göre korunur.
+      - Bu karar gerçek fiziksel GPON topolojisinin eksiksiz modeli değil, MVP için basitleştirilmiş mantıksal temsildir.
       - Toplam fiziksel port sayısı henüz sabitlenmez.
       - DSLAM tarafında müşteri hattı çoğunlukla ayrı müşteri portuna karşılık gelebilir.
       - GPON tarafında bir fiziksel PON portu birden fazla aboneliğe hizmet edebileceği için aktif abonelik sayısı ile fiziksel OLT port sayısı birebir eşitlenmez.
