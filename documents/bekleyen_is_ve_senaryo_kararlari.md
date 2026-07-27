@@ -153,7 +153,26 @@ Durum: `KARAR BEKLİYOR`
       - `DSLAM-MAL-ALT-001`
       - `OLT-MAL-CEV-001`
       - `DSLAM-MAL-CEV-001`
-    - Port, hat, abonelik, müşteri ve teknoloji yük dağılımı: `KARAR BEKLİYOR`
+    - Müşteri, abonelik ve aktif hat bağlantısı ölçeği: `KARAR VERİLDİ`
+      - İlk Maltepe seed ölçeği:
+        - 225 benzersiz müşteri
+        - 240 abonelik
+        - 240 aktif `SubscriptionConnection` / aktif hat bağlantısı
+      - 15 müşterinin iki aboneliği olabilir.
+      - Diğer müşterilerin birer aboneliği olur.
+      - BNG dağılımı abonelik üzerinden yapılır:
+        - `BNG-MAL-001`: yaklaşık 150 aktif abonelik
+        - `BNG-MAL-002`: yaklaşık 90 aktif abonelik
+      - Dağılım cihazlar ve mahalleler arasında eşit olmak zorunda değildir.
+    - Port kapasitesi kararı: `KARAR BEKLİYOR`
+      - Toplam fiziksel port sayısı henüz sabitlenmez.
+      - DSLAM tarafında müşteri hattı çoğunlukla ayrı müşteri portuna karşılık gelebilir.
+      - GPON tarafında bir fiziksel PON portu birden fazla aboneliğe hizmet edebileceği için aktif abonelik sayısı ile fiziksel OLT port sayısı birebir eşitlenmez.
+      - OLT PON portu sayısı, DSLAM portu sayısı, port başına abonelik fan-out değeri ve boş/rezerve kapasite teknoloji dağılımı kararından sonra netleştirilir.
+      - Yaklaşık yüzde 10-20 boş veya rezerve kapasite hedeflenebilir; kesin oran sonraki adımda belirlenir.
+      - `NetworkPort` kaydının fiziksel port mu yoksa mantıksal müşteri servis uç noktası mı temsil ettiği seed başlamadan açıkça belgelenmelidir.
+      - `NetworkPort` fiziksel port olarak kullanılacaksa GPON'da müşteri başına port üretilmez.
+    - Teknoloji yük dağılımı: `KARAR BEKLİYOR`
 - Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR VERİLDİ`
   - Kontrollü B yaklaşımı seçildi.
   - İlk MVP'nin ana ve karar üreten senaryosu tam kesintidir:
