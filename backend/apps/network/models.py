@@ -35,6 +35,28 @@ class NetworkLinkStatus(models.TextChoices):
     MAINTENANCE = "maintenance", "Maintenance"
 
 
+class NetworkPortType(models.TextChoices):
+    UPLINK = "uplink", "Uplink"
+    DOWNLINK = "downlink", "Downlink"
+    ACCESS = "access", "Access"
+    CUSTOMER = "customer", "Customer"
+    MANAGEMENT = "management", "Management"
+
+
+class NetworkPortStatus(models.TextChoices):
+    ACTIVE = "active", "Active"
+    RESERVED = "reserved", "Reserved"
+    MAINTENANCE = "maintenance", "Maintenance"
+    DECOMMISSIONED = "decommissioned", "Decommissioned"
+
+
+class LineConnectionStatus(models.TextChoices):
+    ACTIVE = "active", "Active"
+    PLANNED = "planned", "Planned"
+    SUSPENDED = "suspended", "Suspended"
+    TERMINATED = "terminated", "Terminated"
+
+
 def validate_location_chain(
     city: City,
     district: District | None,
@@ -61,6 +83,11 @@ class NetworkDevice(TimeStampedModel):
     name = models.CharField(max_length=160, blank=True)
     device_type = models.CharField(max_length=24, choices=NetworkDeviceType.choices)
     status = models.CharField(
+        max_length=24,
+        choices=NetworkDeviceStatus.choices,
+        default=NetworkDeviceStatus.ACTIVE,
+    )
+    inventory_status = models.CharField(
         max_length=24,
         choices=NetworkDeviceStatus.choices,
         default=NetworkDeviceStatus.ACTIVE,
@@ -117,6 +144,53 @@ class NetworkDevice(TimeStampedModel):
         if self.district:
             return self.district.full_name
         return self.city.name
+
+
+class NetworkPort(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="network_ports",
+    )
+    device = models.ForeignKey(
+        NetworkDevice,
+        on_delete=models.CASCADE,
+        related_name="ports",
+    )
+    port_code = models.CharField(max_length=80)
+    port_type = models.CharField(
+        max_length=24,
+        choices=NetworkPortType.choices,
+        default=NetworkPortType.ACCESS,
+    )
+    inventory_status = models.CharField(
+        max_length=24,
+        choices=NetworkPortStatus.choices,
+        default=NetworkPortStatus.ACTIVE,
+    )
+    capacity_mbps = models.PositiveIntegerField(default=0)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "network_port"
+        ordering = ["data_snapshot", "device__code", "port_code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "device", "port_code"],
+                name="unique_network_port_code_per_device_snapshot",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.device.code}/{self.port_code}"
+
+    def clean(self):
+        if (
+            self.device_id
+            and self.data_snapshot_id
+            and self.device.data_snapshot_id != self.data_snapshot_id
+        ):
+            raise ValidationError({"device": "Port device must belong to the same data snapshot."})
 
 
 class AccessSegment(TimeStampedModel):
@@ -192,6 +266,81 @@ class AccessSegment(TimeStampedModel):
         if not self.slug:
             self.slug = slugify(f"{self.segment_code}-{self.name}")
         super().save(*args, **kwargs)
+
+
+class LineConnection(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="line_connections",
+    )
+    line_code = models.CharField(max_length=80)
+    port = models.ForeignKey(
+        NetworkPort,
+        on_delete=models.PROTECT,
+        related_name="line_connections",
+    )
+    access_segment = models.ForeignKey(
+        AccessSegment,
+        on_delete=models.PROTECT,
+        related_name="line_connections",
+    )
+    technology = models.CharField(max_length=32, choices=AccessTechnology.choices)
+    status = models.CharField(
+        max_length=24,
+        choices=LineConnectionStatus.choices,
+        default=LineConnectionStatus.ACTIVE,
+    )
+    valid_from = models.DateTimeField()
+    valid_to = models.DateTimeField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "network_line_connection"
+        ordering = ["data_snapshot", "line_code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "line_code"],
+                name="unique_line_connection_code_per_snapshot",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(valid_to__isnull=True)
+                | models.Q(valid_to__gt=models.F("valid_from")),
+                name="line_connection_valid_range",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.line_code}: {self.port} -> {self.access_segment.segment_code}"
+
+    def clean(self):
+        errors: dict[str, str] = {}
+        if self.valid_to and self.valid_to <= self.valid_from:
+            errors["valid_to"] = "valid_to must be later than valid_from."
+        if (
+            self.port_id
+            and self.data_snapshot_id
+            and self.port.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["port"] = "Port must belong to the same data snapshot."
+        if (
+            self.access_segment_id
+            and self.data_snapshot_id
+            and self.access_segment.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["access_segment"] = "Access segment must belong to the same data snapshot."
+        if self.access_segment_id and self.technology != self.access_segment.technology:
+            errors["technology"] = "Line technology must match the access segment technology."
+        if errors:
+            raise ValidationError(errors)
+
+    def is_valid_at(self, moment) -> bool:
+        if not self.is_active or self.status != LineConnectionStatus.ACTIVE:
+            return False
+        if moment < self.valid_from:
+            return False
+        return self.valid_to is None or moment < self.valid_to
 
 
 class NetworkLink(TimeStampedModel):

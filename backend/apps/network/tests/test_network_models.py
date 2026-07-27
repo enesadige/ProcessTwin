@@ -1,16 +1,23 @@
+from datetime import timedelta
+
 import pytest
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.utils import timezone
 
 from apps.datasets.models import DatasetVersion, DataSnapshot
 from apps.geography.models import AreaProfileType, City, District, Neighborhood
 from apps.network.models import (
     AccessSegment,
     AccessTechnology,
+    LineConnection,
+    LineConnectionStatus,
     NetworkDevice,
     NetworkDeviceStatus,
     NetworkDeviceType,
     NetworkLink,
+    NetworkPort,
+    NetworkPortType,
 )
 
 
@@ -233,3 +240,163 @@ def test_segment_and_link_snapshot_consistency_is_validated():
         segment.full_clean()
     with pytest.raises(ValidationError):
         link.full_clean()
+
+
+@pytest.mark.django_db
+def test_network_port_belongs_to_device_snapshot():
+    city, district, _neighborhood = create_maltepe_location()
+    first_snapshot = create_snapshot("first-seed")
+    second_snapshot = create_snapshot("second-seed")
+    bng = NetworkDevice.objects.create(
+        data_snapshot=first_snapshot,
+        code="BNG-MAL-001",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+
+    port = NetworkPort.objects.create(
+        data_snapshot=first_snapshot,
+        device=bng,
+        port_code="1/1/1",
+        port_type=NetworkPortType.DOWNLINK,
+        capacity_mbps=10000,
+    )
+    invalid_port = NetworkPort(
+        data_snapshot=second_snapshot,
+        device=bng,
+        port_code="1/1/2",
+        port_type=NetworkPortType.DOWNLINK,
+    )
+
+    assert str(port) == "BNG-MAL-001/1/1/1"
+    assert port.capacity_mbps == 10000
+    with pytest.raises(ValidationError):
+        invalid_port.full_clean()
+
+
+@pytest.mark.django_db
+def test_line_connection_models_port_to_access_segment_validity():
+    snapshot = create_snapshot()
+    city, district, _neighborhood = create_maltepe_location()
+    bng = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="BNG-MAL-001",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+    port = NetworkPort.objects.create(
+        data_snapshot=snapshot,
+        device=bng,
+        port_code="1/1/1",
+        port_type=NetworkPortType.DOWNLINK,
+    )
+    segment = AccessSegment.objects.create(
+        data_snapshot=snapshot,
+        segment_code="SEG-MAL-VDSL-001",
+        name="Maltepe VDSL access",
+        technology=AccessTechnology.VDSL,
+        serving_device=bng,
+        city=city,
+        district=district,
+    )
+    now = timezone.now()
+
+    line = LineConnection.objects.create(
+        data_snapshot=snapshot,
+        line_code="LINE-MAL-VDSL-001",
+        port=port,
+        access_segment=segment,
+        technology=AccessTechnology.VDSL,
+        valid_from=now - timedelta(days=30),
+        valid_to=now + timedelta(days=30),
+    )
+
+    assert str(line) == "LINE-MAL-VDSL-001: BNG-MAL-001/1/1/1 -> SEG-MAL-VDSL-001"
+    assert line.is_valid_at(now)
+    assert not line.is_valid_at(now - timedelta(days=60))
+
+
+@pytest.mark.django_db
+def test_line_connection_validation_rejects_invalid_range_and_technology_mismatch():
+    snapshot = create_snapshot()
+    city, district, _neighborhood = create_maltepe_location()
+    bng = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="BNG-MAL-001",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+    port = NetworkPort.objects.create(
+        data_snapshot=snapshot,
+        device=bng,
+        port_code="1/1/1",
+        port_type=NetworkPortType.DOWNLINK,
+    )
+    segment = AccessSegment.objects.create(
+        data_snapshot=snapshot,
+        segment_code="SEG-MAL-FIBER-001",
+        name="Maltepe fiber access",
+        technology=AccessTechnology.FIBER,
+        serving_device=bng,
+        city=city,
+        district=district,
+    )
+    now = timezone.now()
+
+    invalid_line = LineConnection(
+        data_snapshot=snapshot,
+        line_code="LINE-MAL-BAD-001",
+        port=port,
+        access_segment=segment,
+        technology=AccessTechnology.VDSL,
+        status=LineConnectionStatus.ACTIVE,
+        valid_from=now,
+        valid_to=now - timedelta(days=1),
+    )
+
+    with pytest.raises(ValidationError):
+        invalid_line.full_clean()
+
+
+@pytest.mark.django_db
+def test_line_connection_snapshot_consistency_is_validated():
+    city, district, _neighborhood = create_maltepe_location()
+    first_snapshot = create_snapshot("first-seed")
+    second_snapshot = create_snapshot("second-seed")
+    bng = NetworkDevice.objects.create(
+        data_snapshot=first_snapshot,
+        code="BNG-MAL-001",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+    port = NetworkPort.objects.create(
+        data_snapshot=first_snapshot,
+        device=bng,
+        port_code="1/1/1",
+        port_type=NetworkPortType.DOWNLINK,
+    )
+    segment = AccessSegment.objects.create(
+        data_snapshot=first_snapshot,
+        segment_code="SEG-MAL-FIBER-001",
+        name="Maltepe fiber access",
+        technology=AccessTechnology.FIBER,
+        serving_device=bng,
+        city=city,
+        district=district,
+    )
+
+    invalid_line = LineConnection(
+        data_snapshot=second_snapshot,
+        line_code="LINE-MAL-FIBER-001",
+        port=port,
+        access_segment=segment,
+        technology=AccessTechnology.FIBER,
+        valid_from=timezone.now(),
+    )
+
+    with pytest.raises(ValidationError):
+        invalid_line.full_clean()
