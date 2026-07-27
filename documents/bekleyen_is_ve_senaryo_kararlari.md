@@ -14,7 +14,13 @@ Bu dosya, ProcessTwin projesinde ilerleyen görevlerden önce kullanıcıyla net
 
 Durum: `KARAR BEKLİYOR`
 
-- Cihaz türleri ve topoloji hiyerarşisi: `KARAR BEKLİYOR`
+- Cihaz türleri ve topoloji hiyerarşisi: `KARAR VERİLDİ`
+  - Maltepe MVP seed topolojisi müşteri etkisi hesabı için basitleştirilmiş mantıksal topoloji olarak kabul edilir.
+  - Temel zincir: `BNG -> erişim cihazı -> port -> hat -> abonelik -> müşteri`.
+  - Fiber/GPON erişim zinciri: `BNG -> OLT -> port -> hat -> abonelik -> müşteri`.
+  - VDSL/ADSL erişim zinciri: `BNG -> DSLAM -> port -> hat -> abonelik -> müşteri`.
+  - Bu yapı gerçek fiziksel şebekenin tüm transport katmanlarını birebir temsil etmez; demo ve deterministik müşteri etki hesabı için kullanılan sadeleştirilmiş topolojidir.
+  - Access node, switch veya saha dolabı ana Maltepe seed topolojisinde zorunlu ara katman değildir; gerekiyorsa özel senaryolarda sınırlı kullanılabilir.
 - Switch, saha dolabı ve modem modelleme kararı: `KARAR BEKLİYOR`
 - Yedek bağlantı yapısı: `KARAR BEKLİYOR`
 - Fiber/GPON/VDSL/ADSL teknoloji uyumluluk matrisi: `KARAR BEKLİYOR`
