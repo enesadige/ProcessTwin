@@ -71,7 +71,25 @@ Durum: `KARAR BEKLİYOR`
     - VIP'yi ayrı segment yapmak müşteri türü ile hizmet önceliğini birbirine karıştırır.
   - Görev 019 seed başlamadan önce küçük teknik görev olarak `Customer.priority_level` alanı eklenmelidir.
   - Bu karar kapsamında henüz model, migration veya seed değişikliği yapılmaz.
-- Kalite ölçümlerinin cihaz/abonelik kapsamı: `KARAR BEKLİYOR`
+- Kalite ölçümlerinin cihaz/abonelik kapsamı: `KARAR VERİLDİ`
+  - İlk MVP'nin ana senaryosu BNG kaynaklı tam kesinti olduğu için Görev 019 öncesinde abonelik bazlı kalite modeli eklenmez.
+  - Mevcut `QualityMeasurement -> NetworkDevice` yapısı yalnızca cihaz ve ağ seviyesi telemetriyi temsil eder:
+    - latency
+    - jitter
+    - packet loss
+    - availability
+  - Bu ölçümler belirli bir müşterinin veya aboneliğin hız/kalite sonucu gibi yorumlanmaz.
+  - Cihaz bazlı packet loss değerinden doğrudan “şu müşteri hız kaybı yaşadı” sonucu üretilmez.
+  - İlk MVP'de müşteri etkisi deterministik olarak şu kaynaklardan hesaplanır:
+    - outage
+    - kaynak cihaz
+    - topoloji
+    - olay zamanında aktif hat ve abonelik bağlantıları
+  - Abonelik bazlı hız, gecikme, packet loss ve servis bozulması analizi sonraki kapsamdır.
+  - Teknik kapı: Servis bozulması veya müşteri bazlı kalite senaryosuna başlanmadan önce `SubscriptionQualityMeasurement` veya eşdeğer abonelik/hat bazlı ölçüm modeli tasarlanmalıdır.
+  - Bu teknik kapıda ölçüm kaynağı, hedef hız, gerçekleşen hız, zaman aralığı, örnekleme sıklığı ve kalite eşikleri netleştirilmelidir.
+  - ProcessTwin candidate senaryolarında müşteri bazlı kalite veya hız iyileştirmesi kullanılacaksa bu model Görev 079'dan önce tamamlanmalıdır.
+  - Bu karar kapsamında henüz model, migration veya seed değişikliği yapılmaz.
 - Maltepe mahalle, cihaz, port ve müşteri sayıları: `KARAR BEKLİYOR`
 - Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR BEKLİYOR`
 
