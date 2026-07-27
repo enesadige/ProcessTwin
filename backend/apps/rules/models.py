@@ -57,6 +57,8 @@ class Rule(TimeStampedModel):
     class Meta:
         db_table = "rules_rule"
         ordering = ["data_snapshot", "code"]
+        verbose_name = "Kural"
+        verbose_name_plural = "Kurallar"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "code"],
@@ -102,6 +104,8 @@ class RuleChangeSet(TimeStampedModel):
     class Meta:
         db_table = "rules_change_set"
         ordering = ["data_snapshot", "-created_at", "change_set_code"]
+        verbose_name = "Kural değişiklik seti"
+        verbose_name_plural = "Kural değişiklik setleri"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "change_set_code"],
@@ -149,6 +153,8 @@ class RuleVersion(TimeStampedModel):
     class Meta:
         db_table = "rules_rule_version"
         ordering = ["rule__code", "-version"]
+        verbose_name = "Kural versiyonu"
+        verbose_name_plural = "Kural versiyonları"
         constraints = [
             models.UniqueConstraint(
                 fields=["rule", "version"],
@@ -233,6 +239,8 @@ class RuleTestCase(TimeStampedModel):
     class Meta:
         db_table = "rules_test_case"
         ordering = ["rule__code", "name"]
+        verbose_name = "Kural test senaryosu"
+        verbose_name_plural = "Kural test senaryoları"
         constraints = [
             models.UniqueConstraint(
                 fields=["rule", "name"],

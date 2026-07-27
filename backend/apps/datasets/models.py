@@ -43,6 +43,8 @@ class DatasetVersion(TimeStampedModel):
     class Meta:
         db_table = "datasets_version"
         ordering = ["-created_at", "name"]
+        verbose_name = "Veri seti versiyonu"
+        verbose_name_plural = "Veri seti versiyonları"
 
     def __str__(self) -> str:
         return f"{self.name} ({self.generator_version})"
@@ -81,6 +83,8 @@ class DataSnapshot(TimeStampedModel):
     class Meta:
         db_table = "datasets_snapshot"
         ordering = ["-created_at", "name"]
+        verbose_name = "Veri snapshot'ı"
+        verbose_name_plural = "Veri snapshot'ları"
         constraints = [
             models.UniqueConstraint(
                 fields=["is_active"],

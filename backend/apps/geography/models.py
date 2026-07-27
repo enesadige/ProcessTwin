@@ -22,7 +22,8 @@ class City(TimeStampedModel):
     class Meta:
         db_table = "geography_city"
         ordering = ["name"]
-        verbose_name_plural = "cities"
+        verbose_name = "İl"
+        verbose_name_plural = "İller"
 
     def __str__(self) -> str:
         return self.name
@@ -47,6 +48,8 @@ class District(TimeStampedModel):
     class Meta:
         db_table = "geography_district"
         ordering = ["city__name", "name"]
+        verbose_name = "İlçe"
+        verbose_name_plural = "İlçeler"
         constraints = [
             models.UniqueConstraint(fields=["city", "slug"], name="unique_district_slug_per_city"),
             models.UniqueConstraint(fields=["city", "name"], name="unique_district_name_per_city"),
@@ -80,6 +83,8 @@ class Neighborhood(TimeStampedModel):
     class Meta:
         db_table = "geography_neighborhood"
         ordering = ["district__city__name", "district__name", "name"]
+        verbose_name = "Mahalle"
+        verbose_name_plural = "Mahalleler"
         constraints = [
             models.UniqueConstraint(
                 fields=["district", "slug"],

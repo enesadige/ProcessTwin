@@ -112,6 +112,8 @@ class AlarmType(TimeStampedModel):
     class Meta:
         db_table = "operations_alarm_type"
         ordering = ["data_snapshot", "code"]
+        verbose_name = "Alarm tipi"
+        verbose_name_plural = "Alarm tipleri"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "code"],
@@ -142,6 +144,8 @@ class Alarm(TimeStampedModel):
     class Meta:
         db_table = "operations_alarm"
         ordering = ["data_snapshot", "-detected_at", "alarm_id"]
+        verbose_name = "Alarm"
+        verbose_name_plural = "Alarmlar"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "alarm_id"],
@@ -215,6 +219,8 @@ class Incident(TimeStampedModel):
     class Meta:
         db_table = "operations_incident"
         ordering = ["data_snapshot", "-started_at", "incident_number"]
+        verbose_name = "Olay"
+        verbose_name_plural = "Olaylar"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "incident_number"],
@@ -275,6 +281,8 @@ class IncidentAlarm(TimeStampedModel):
     class Meta:
         db_table = "operations_incident_alarm"
         ordering = ["data_snapshot", "incident__incident_number", "alarm__alarm_id"]
+        verbose_name = "Olay alarmı"
+        verbose_name_plural = "Olay alarmları"
         constraints = [
             models.UniqueConstraint(
                 fields=["incident", "alarm"],
@@ -344,6 +352,8 @@ class Outage(TimeStampedModel):
     class Meta:
         db_table = "operations_outage"
         ordering = ["data_snapshot", "-started_at", "outage_code"]
+        verbose_name = "Kesinti"
+        verbose_name_plural = "Kesintiler"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "outage_code"],
@@ -422,6 +432,8 @@ class OperationalEvent(TimeStampedModel):
     class Meta:
         db_table = "operations_operational_event"
         ordering = ["data_snapshot", "-occurred_at", "event_code"]
+        verbose_name = "Operasyon olayı"
+        verbose_name_plural = "Operasyon olayları"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "event_code"],
@@ -470,6 +482,8 @@ class QualityMeasurement(TimeStampedModel):
     class Meta:
         db_table = "operations_quality_measurement"
         ordering = ["data_snapshot", "-measured_at", "device__code", "metric_type"]
+        verbose_name = "Kalite ölçümü"
+        verbose_name_plural = "Kalite ölçümleri"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "device", "metric_type", "measured_at"],

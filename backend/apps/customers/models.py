@@ -87,6 +87,8 @@ class Customer(TimeStampedModel):
     class Meta:
         db_table = "customers_customer"
         ordering = ["data_snapshot", "customer_number"]
+        verbose_name = "Müşteri"
+        verbose_name_plural = "Müşteriler"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "customer_number"],
@@ -119,6 +121,8 @@ class ServicePackage(TimeStampedModel):
     class Meta:
         db_table = "customers_service_package"
         ordering = ["data_snapshot", "package_code"]
+        verbose_name = "Servis paketi"
+        verbose_name_plural = "Servis paketleri"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "package_code"],
@@ -161,6 +165,8 @@ class Subscription(TimeStampedModel):
     class Meta:
         db_table = "customers_subscription"
         ordering = ["data_snapshot", "subscription_number"]
+        verbose_name = "Abonelik"
+        verbose_name_plural = "Abonelikler"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "subscription_number"],
@@ -236,6 +242,8 @@ class SubscriptionConnection(TimeStampedModel):
     class Meta:
         db_table = "customers_subscription_connection"
         ordering = ["data_snapshot", "subscription__subscription_number", "valid_from"]
+        verbose_name = "Abonelik bağlantısı"
+        verbose_name_plural = "Abonelik bağlantıları"
         constraints = [
             models.CheckConstraint(
                 condition=models.Q(valid_to__isnull=True)
@@ -306,6 +314,8 @@ class PaymentRecord(TimeStampedModel):
     class Meta:
         db_table = "customers_payment_record"
         ordering = ["data_snapshot", "subscription__subscription_number", "period"]
+        verbose_name = "Ödeme kaydı"
+        verbose_name_plural = "Ödeme kayıtları"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "subscription", "period"],
@@ -350,6 +360,8 @@ class CampaignEnrollment(TimeStampedModel):
     class Meta:
         db_table = "customers_campaign_enrollment"
         ordering = ["data_snapshot", "subscription__subscription_number", "campaign_code"]
+        verbose_name = "Kampanya katılımı"
+        verbose_name_plural = "Kampanya katılımları"
 
     def __str__(self) -> str:
         return f"{self.subscription.subscription_number} - {self.campaign_code}"
@@ -389,7 +401,8 @@ class CompensationHistory(TimeStampedModel):
     class Meta:
         db_table = "customers_compensation_history"
         ordering = ["data_snapshot", "subscription__subscription_number", "reference_code"]
-        verbose_name_plural = "compensation history"
+        verbose_name = "Telafi geçmişi"
+        verbose_name_plural = "Telafi geçmişi"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "reference_code"],

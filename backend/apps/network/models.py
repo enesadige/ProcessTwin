@@ -115,6 +115,8 @@ class NetworkDevice(TimeStampedModel):
     class Meta:
         db_table = "network_device"
         ordering = ["data_snapshot", "code"]
+        verbose_name = "Ağ cihazı"
+        verbose_name_plural = "Ağ cihazları"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "code"],
@@ -169,6 +171,8 @@ class NetworkPort(TimeStampedModel):
     class Meta:
         db_table = "network_port"
         ordering = ["data_snapshot", "device__code", "port_code"]
+        verbose_name = "Ağ portu"
+        verbose_name_plural = "Ağ portları"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "device", "port_code"],
@@ -228,6 +232,8 @@ class AccessSegment(TimeStampedModel):
     class Meta:
         db_table = "network_access_segment"
         ordering = ["data_snapshot", "segment_code"]
+        verbose_name = "Erişim segmenti"
+        verbose_name_plural = "Erişim segmentleri"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "segment_code"],
@@ -294,6 +300,8 @@ class LineConnection(TimeStampedModel):
     class Meta:
         db_table = "network_line_connection"
         ordering = ["data_snapshot", "line_code"]
+        verbose_name = "Hat bağlantısı"
+        verbose_name_plural = "Hat bağlantıları"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "line_code"],
@@ -366,6 +374,8 @@ class NetworkLink(TimeStampedModel):
     class Meta:
         db_table = "network_link"
         ordering = ["data_snapshot", "link_code"]
+        verbose_name = "Ağ bağlantısı"
+        verbose_name_plural = "Ağ bağlantıları"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "link_code"],

@@ -17,6 +17,8 @@ class User(AbstractUser, TimeStampedModel):
     class Meta:
         db_table = "accounts_user"
         ordering = ["username"]
+        verbose_name = "Kullanıcı"
+        verbose_name_plural = "Kullanıcılar"
 
     @property
     def is_viewer(self) -> bool:

@@ -67,6 +67,8 @@ class CompensationEvaluation(TimeStampedModel):
     class Meta:
         db_table = "compensation_evaluation"
         ordering = ["data_snapshot", "-created_at", "evaluation_code"]
+        verbose_name = "Telafi değerlendirmesi"
+        verbose_name_plural = "Telafi değerlendirmeleri"
         constraints = [
             models.UniqueConstraint(
                 fields=["data_snapshot", "evaluation_code"],
