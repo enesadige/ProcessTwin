@@ -129,7 +129,31 @@ Durum: `KARAR BEKLİYOR`
     - Veri modelinde “bir mahalle yalnızca bir BNG'ye bağlı olabilir” şeklinde constraint veya hard-code bulunmaz.
     - İlk seed'de dağılım sade tutulabilir; ileride aynı mahallede farklı BNG'lere bağlı erişim cihazları desteklenebilmelidir.
     - İlk MVP'de yedek bağlantı olmadığı için `BNG-MAL-001` altındaki geçerli aktif aboneliklerin ana outage sırasında etkilendiği kabul edilebilir.
-  - Erişim cihazı, port, hat, müşteri ve teknoloji dağılımı: `KARAR BEKLİYOR`
+  - Erişim cihazı, port, hat, müşteri ve teknoloji dağılımı: `KISMEN KARAR VERİLDİ`
+    - OLT/DSLAM sayısı: `KARAR VERİLDİ`
+    - `BNG-MAL-001` dağılımı:
+      - Altayçeşme: 1 OLT, 1 DSLAM
+      - Cevizli: 1 OLT, 1 DSLAM
+      - Küçükyalı: 1 OLT, 1 DSLAM
+    - `BNG-MAL-002` dağılımı:
+      - Zümrütevler: 1 OLT, 1 DSLAM
+      - Fındıklı: 1 OLT, 1 DSLAM
+    - Toplam:
+      - 5 OLT
+      - 5 DSLAM
+      - 10 erişim cihazı
+    - Bu yapı ilk seed için basitleştirilmiş mantıksal topolojidir.
+    - Gerçek şebekede her mahallede yalnızca bir OLT ve bir DSLAM bulunduğu iddia edilmez.
+    - Cihaz sayıları dengeli olsa da port kapasitesi, aktif port sayısı ve müşteri yükü her mahallede eşit olmak zorunda değildir.
+    - OLT'ler fiber/GPON hatlara, DSLAM'lar VDSL/ADSL hatlara hizmet eder.
+    - Her erişim cihazı `NetworkLink` ile ilgili BNG'ye bağlanır.
+    - Mahalle ilişkisi coğrafi konum bilgisidir; modelde mahalle başına tam olarak bir OLT ve bir DSLAM zorunluluğu veya hard-code oluşturulmaz.
+    - Cihaz isimleri tutarlı formatta üretilebilir:
+      - `OLT-MAL-ALT-001`
+      - `DSLAM-MAL-ALT-001`
+      - `OLT-MAL-CEV-001`
+      - `DSLAM-MAL-CEV-001`
+    - Port, hat, abonelik, müşteri ve teknoloji yük dağılımı: `KARAR BEKLİYOR`
 - Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR VERİLDİ`
   - Kontrollü B yaklaşımı seçildi.
   - İlk MVP'nin ana ve karar üreten senaryosu tam kesintidir:
