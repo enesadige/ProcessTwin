@@ -105,7 +105,30 @@ Durum: `KARAR BEKLİYOR`
   - Mahallelerin nüfusu, gerçek müşteri sayısı veya gerçek cihaz sayısı kendiliğinden tahmin edilmez.
   - Her mahallede aynı sayıda cihaz ve müşteri olmak zorunda değildir; dağılım sonraki sorularda belirlenir.
   - Maltepe veya herhangi bir mahalle kod içinde hard-code edilmez; bunlar yalnızca ilk dataset/config girdileri olur.
-  - BNG sayısı ve hizmet kapsamı: `KARAR BEKLİYOR`
+  - BNG sayısı ve hizmet kapsamı: `KARAR VERİLDİ`
+    - İlk Maltepe seed'inde 2 BNG bulunur:
+      - `BNG-MAL-001`
+      - `BNG-MAL-002`
+    - İlk sentetik dağılım:
+      - `BNG-MAL-001`: Altayçeşme, Cevizli, Küçükyalı
+      - `BNG-MAL-002`: Zümrütevler, Fındıklı
+    - Ana demo outage olayı `BNG-MAL-001` üzerinde gerçekleşir.
+    - `BNG-MAL-001` altındaki erişim cihazları ve aktif abonelikler etkilenir.
+    - `BNG-MAL-002` altındaki abonelikler etkilenmez.
+    - Bu yapı etkilenen ve etkilenmeyen müşteriler için güçlü ground truth oluşturur.
+    - Mimari ilişki doğrudan `BNG -> mahalle` şeklinde kurulmaz.
+    - Gerçek hesap zinciri:
+      - `BNG`
+      - `NetworkLink` ile bağlı `OLT/DSLAM`
+      - `NetworkPort`
+      - `LineConnection`
+      - `SubscriptionConnection`
+      - `Subscription`
+      - `Customer`
+    - Mahalle yalnızca cihazın, hattın veya müşterinin coğrafi konum bilgisidir.
+    - Veri modelinde “bir mahalle yalnızca bir BNG'ye bağlı olabilir” şeklinde constraint veya hard-code bulunmaz.
+    - İlk seed'de dağılım sade tutulabilir; ileride aynı mahallede farklı BNG'lere bağlı erişim cihazları desteklenebilmelidir.
+    - İlk MVP'de yedek bağlantı olmadığı için `BNG-MAL-001` altındaki geçerli aktif aboneliklerin ana outage sırasında etkilendiği kabul edilebilir.
   - Erişim cihazı, port, hat, müşteri ve teknoloji dağılımı: `KARAR BEKLİYOR`
 - Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR VERİLDİ`
   - Kontrollü B yaklaşımı seçildi.
