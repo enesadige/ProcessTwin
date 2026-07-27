@@ -91,7 +91,31 @@ Durum: `KARAR BEKLİYOR`
   - ProcessTwin candidate senaryolarında müşteri bazlı kalite veya hız iyileştirmesi kullanılacaksa bu model Görev 079'dan önce tamamlanmalıdır.
   - Bu karar kapsamında henüz model, migration veya seed değişikliği yapılmaz.
 - Maltepe mahalle, cihaz, port ve müşteri sayıları: `KARAR BEKLİYOR`
-- Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR BEKLİYOR`
+- Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR VERİLDİ`
+  - Kontrollü B yaklaşımı seçildi.
+  - İlk MVP'nin ana ve karar üreten senaryosu tam kesintidir:
+    - BNG kaynaklı outage
+    - olay zamanındaki aktif topoloji ve abonelik bağlantıları
+    - etkilenen benzersiz müşteriler
+    - daha sonra uygulanacak deterministik telafi kuralları
+  - Seed verisinde ağ ortamını daha gerçekçi göstermek için en fazla 1-2 cihaz seviyesinde kalite bozulması kaydı bulunabilir:
+    - kısa süreli latency artışı
+    - packet loss yükselmesi
+    - sonradan normale dönen cihaz seviyesi kalite alarmı
+  - Kalite bozulması kayıtları için sınırlar:
+    - müşteri veya abonelik bazlı kalite sonucu üretilmez
+    - etkilenen müşteri sayısı hesaplanmaz
+    - telafi/iade değerlendirmesine girmez
+    - ana “en uzun kesinti” ve BNG müşteri etkisi sorgusuna karışmaz
+    - Decision Evidence içinde müşteri etkisi kanıtı olarak kullanılmaz
+    - yalnızca cihaz telemetrisi ve operasyonel arka plan verisi olarak tutulur
+    - ana BNG outage ile aynı cihaz ve aynı zaman aralığında oluşturulup kafa karışıklığı yaratılmaz
+    - kullanıcı arayüzünde gösterilirse “cihaz seviyesi kalite sinyali” olarak açıkça etiketlenir
+  - Tam kesinti ve servis bozulması ayrı kavramlardır:
+    - Tam kesinti: Outage ve müşteri etki akışına girer.
+    - Servis bozulması: İlk MVP'de yalnızca cihaz seviyesi `QualityMeasurement`/alarm verisidir.
+  - Abonelik bazlı servis bozulması analizi, `SubscriptionQualityMeasurement` ve ilgili eşik/ground truth kuralları tasarlandıktan sonra sonraki kapsama alınır.
+  - Bu karar kapsamında henüz model, migration veya seed değişikliği yapılmaz.
 
 ## 2. Alarm ve Incident Kararları
 
