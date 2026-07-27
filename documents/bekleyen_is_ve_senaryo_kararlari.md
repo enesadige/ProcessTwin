@@ -21,8 +21,17 @@ Durum: `KARAR BEKLİYOR`
   - VDSL/ADSL erişim zinciri: `BNG -> DSLAM -> port -> hat -> abonelik -> müşteri`.
   - Bu yapı gerçek fiziksel şebekenin tüm transport katmanlarını birebir temsil etmez; demo ve deterministik müşteri etki hesabı için kullanılan sadeleştirilmiş topolojidir.
   - Access node, switch veya saha dolabı ana Maltepe seed topolojisinde zorunlu ara katman değildir; gerekiyorsa özel senaryolarda sınırlı kullanılabilir.
-- Switch, saha dolabı ve modem modelleme kararı: `KARAR BEKLİYOR`
-- Yedek bağlantı yapısı: `KARAR BEKLİYOR`
+- Switch, saha dolabı ve modem modelleme kararı: `KARAR VERİLDİ`
+  - Ana müşteri etki zinciri değişmez: `BNG -> OLT/DSLAM -> port -> hat -> abonelik -> müşteri`.
+  - Switch ve saha dolabı ilk MVP'de zorunlu katman değildir.
+  - Gerektiğinde 1-2 örnek topoloji dalında mevcut `access_node` cihaz türü altında temsil edilebilir.
+  - Switch ve saha dolabı için şimdilik ayrı yeni cihaz türü veya model oluşturulmaz.
+  - Opsiyonel access node kayıtları tüm müşterilerin ana bağlantı zincirine zorunlu eklenmez.
+  - Modem/CPE kayıtları ilk MVP seed'inde üretilmez.
+  - Modem kaynaklı arıza, ölçüm ve müşteri cihazı ilişkileri sonraki genişleme kapsamında bırakılır.
+- Yedek bağlantı yapısı: `KARAR VERİLDİ`
+  - İlk MVP seed'inde yedek bağlantı bulunmaz.
+  - Yedek bağlantı senaryosu daha sonra ProcessTwin içinde baseline/candidate karşılaştırması olarak ele alınır.
 - Fiber/GPON/VDSL/ADSL teknoloji uyumluluk matrisi: `KARAR BEKLİYOR`
 - Müşteri segmentleri ve VIP modeli: `KARAR BEKLİYOR`
 - Kalite ölçümlerinin cihaz/abonelik kapsamı: `KARAR BEKLİYOR`
