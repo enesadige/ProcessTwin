@@ -55,7 +55,7 @@ def test_bng_device_can_be_attached_to_maltepe_location():
         code="BNG-MAL-001",
         name="Maltepe BNG 001",
         device_type=NetworkDeviceType.BNG,
-        status=NetworkDeviceStatus.ACTIVE,
+        inventory_status=NetworkDeviceStatus.ACTIVE,
         vendor="Nokia",
         model_name="7750 SR",
         city=city,

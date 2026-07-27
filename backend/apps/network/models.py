@@ -82,11 +82,6 @@ class NetworkDevice(TimeStampedModel):
     code = models.CharField(max_length=80)
     name = models.CharField(max_length=160, blank=True)
     device_type = models.CharField(max_length=24, choices=NetworkDeviceType.choices)
-    status = models.CharField(
-        max_length=24,
-        choices=NetworkDeviceStatus.choices,
-        default=NetworkDeviceStatus.ACTIVE,
-    )
     inventory_status = models.CharField(
         max_length=24,
         choices=NetworkDeviceStatus.choices,
