@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.core",
     "apps.datasets",
+    "apps.geography",
 ]
 
 MIDDLEWARE = [
