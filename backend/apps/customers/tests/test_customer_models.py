@@ -62,10 +62,11 @@ def create_line_connection(
     city: City,
     district: District,
     technology: AccessTechnology = AccessTechnology.VDSL,
+    suffix: str = "001",
 ) -> LineConnection:
     bng = NetworkDevice.objects.create(
         data_snapshot=snapshot,
-        code="BNG-MAL-001",
+        code=f"BNG-MAL-{suffix}",
         device_type=NetworkDeviceType.BNG,
         city=city,
         district=district,
@@ -73,13 +74,13 @@ def create_line_connection(
     port = NetworkPort.objects.create(
         data_snapshot=snapshot,
         device=bng,
-        port_code="1/1/1",
+        port_code=f"1/1/{int(suffix)}",
         port_type=NetworkPortType.DOWNLINK,
     )
     segment = AccessSegment.objects.create(
         data_snapshot=snapshot,
-        segment_code=f"SEG-MAL-{technology.value.upper()}-001",
-        name=f"Maltepe {technology.label} access",
+        segment_code=f"SEG-MAL-{technology.value.upper()}-{suffix}",
+        name=f"Maltepe {technology.label} access {suffix}",
         technology=technology,
         serving_device=bng,
         city=city,
@@ -88,7 +89,7 @@ def create_line_connection(
     )
     return LineConnection.objects.create(
         data_snapshot=snapshot,
-        line_code=f"LINE-MAL-{technology.value.upper()}-001",
+        line_code=f"LINE-MAL-{technology.value.upper()}-{suffix}",
         port=port,
         access_segment=segment,
         technology=technology,
@@ -102,11 +103,12 @@ def create_customer_subscription(
     district: District,
     neighborhood: Neighborhood,
     technology: AccessTechnology = AccessTechnology.VDSL,
+    suffix: str = "0001",
 ) -> tuple[Customer, ServicePackage, Subscription]:
     customer = Customer.objects.create(
         data_snapshot=snapshot,
-        customer_number="CUST-MAL-0001",
-        display_name="Maltepe Test Customer",
+        customer_number=f"CUST-MAL-{suffix}",
+        display_name=f"Maltepe Test Customer {suffix}",
         segment=CustomerSegment.INDIVIDUAL,
         city=city,
         district=district,
@@ -114,8 +116,8 @@ def create_customer_subscription(
     )
     package = ServicePackage.objects.create(
         data_snapshot=snapshot,
-        package_code=f"PKG-{technology.value.upper()}-50",
-        name=f"{technology.label} 50 Mbps",
+        package_code=f"PKG-{technology.value.upper()}-50-{suffix}",
+        name=f"{technology.label} 50 Mbps {suffix}",
         technology=technology,
         download_mbps=50,
         upload_mbps=10,
@@ -124,7 +126,7 @@ def create_customer_subscription(
     )
     subscription = Subscription.objects.create(
         data_snapshot=snapshot,
-        subscription_number="SUB-MAL-0001",
+        subscription_number=f"SUB-MAL-{suffix}",
         customer=customer,
         service_package=package,
         status=SubscriptionStatus.ACTIVE,
@@ -211,6 +213,131 @@ def test_subscription_connection_rejects_cross_snapshot_line():
 
     with pytest.raises(ValidationError):
         connection.full_clean()
+
+
+@pytest.mark.django_db
+def test_subscription_connection_rejects_overlapping_active_connection_for_same_subscription():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    first_line = create_line_connection(snapshot, city, district, suffix="001")
+    second_line = create_line_connection(snapshot, city, district, suffix="002")
+    _customer, _package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+    )
+    now = timezone.now()
+    SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=first_line,
+        valid_from=now - timedelta(days=5),
+        valid_to=now + timedelta(days=5),
+    )
+
+    with pytest.raises(ValidationError):
+        SubscriptionConnection.objects.create(
+            data_snapshot=snapshot,
+            subscription=subscription,
+            line_connection=second_line,
+            valid_from=now,
+            valid_to=now + timedelta(days=10),
+        )
+
+
+@pytest.mark.django_db
+def test_subscription_connection_rejects_overlapping_active_connection_for_same_line():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    line = create_line_connection(snapshot, city, district)
+    _customer, _package, first_subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+        suffix="0001",
+    )
+    _other_customer, _other_package, second_subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+        suffix="0002",
+    )
+    now = timezone.now()
+    SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=first_subscription,
+        line_connection=line,
+        valid_from=now - timedelta(days=5),
+        valid_to=now + timedelta(days=5),
+    )
+
+    with pytest.raises(ValidationError):
+        SubscriptionConnection.objects.create(
+            data_snapshot=snapshot,
+            subscription=second_subscription,
+            line_connection=line,
+            valid_from=now,
+            valid_to=now + timedelta(days=10),
+        )
+
+
+@pytest.mark.django_db
+def test_subscription_connection_allows_adjacent_active_connection_ranges():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    first_line = create_line_connection(snapshot, city, district, suffix="001")
+    second_line = create_line_connection(snapshot, city, district, suffix="002")
+    _customer, _package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+    )
+    now = timezone.now()
+    first_connection = SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=first_line,
+        valid_from=now - timedelta(days=5),
+        valid_to=now,
+    )
+    second_connection = SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=second_line,
+        valid_from=now,
+        valid_to=now + timedelta(days=5),
+    )
+
+    assert first_connection.is_valid_at(now - timedelta(seconds=1))
+    assert not first_connection.is_valid_at(now)
+    assert second_connection.is_valid_at(now)
+
+
+@pytest.mark.django_db
+def test_subscription_connection_must_stay_inside_subscription_and_line_ranges():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    line = create_line_connection(snapshot, city, district)
+    _customer, _package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+    )
+
+    starts_too_early = SubscriptionConnection(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=line,
+        valid_from=subscription.valid_from - timedelta(days=1),
+    )
+
+    with pytest.raises(ValidationError):
+        starts_too_early.full_clean()
 
 
 @pytest.mark.django_db

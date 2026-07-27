@@ -249,7 +249,17 @@ class SubscriptionConnection(TimeStampedModel):
                 condition=models.Q(valid_to__isnull=True)
                 | models.Q(valid_to__gt=models.F("valid_from")),
                 name="subscription_connection_valid_range",
-            )
+            ),
+            models.UniqueConstraint(
+                fields=["subscription"],
+                condition=models.Q(is_active=True, valid_to__isnull=True),
+                name="unique_open_active_connection_per_subscription",
+            ),
+            models.UniqueConstraint(
+                fields=["line_connection"],
+                condition=models.Q(is_active=True, valid_to__isnull=True),
+                name="unique_open_active_connection_per_line",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -279,8 +289,53 @@ class SubscriptionConnection(TimeStampedModel):
             errors["line_connection"] = (
                 "Line connection technology must match the subscription package technology."
             )
+        if self.subscription_id:
+            if self.valid_from < self.subscription.valid_from:
+                errors["valid_from"] = "Connection cannot start before the subscription."
+            if self.subscription.valid_to and (
+                self.valid_to is None or self.valid_to > self.subscription.valid_to
+            ):
+                errors["valid_to"] = "Connection cannot extend beyond the subscription."
+        if self.line_connection_id:
+            if self.valid_from < self.line_connection.valid_from:
+                errors["valid_from"] = "Connection cannot start before the line connection."
+            if self.line_connection.valid_to and (
+                self.valid_to is None or self.valid_to > self.line_connection.valid_to
+            ):
+                errors["valid_to"] = "Connection cannot extend beyond the line connection."
+        if self.is_active:
+            if self._overlaps_existing_active_connection("subscription"):
+                errors["subscription"] = (
+                    "Subscription already has an overlapping active line connection."
+                )
+            if self._overlaps_existing_active_connection("line_connection"):
+                errors["line_connection"] = (
+                    "Line connection already has an overlapping active subscription."
+                )
         if errors:
             raise ValidationError(errors)
+
+    def _overlaps_existing_active_connection(self, field_name: str) -> bool:
+        field_id = getattr(self, f"{field_name}_id")
+        if not field_id:
+            return False
+        connections = SubscriptionConnection.objects.filter(
+            data_snapshot_id=self.data_snapshot_id,
+            is_active=True,
+            **{f"{field_name}_id": field_id},
+        ).exclude(pk=self.pk)
+        for connection in connections:
+            existing_end = connection.valid_to
+            current_end = self.valid_to
+            starts_before_existing_end = (
+                existing_end is None or self.valid_from < existing_end
+            )
+            existing_starts_before_current_end = (
+                current_end is None or connection.valid_from < current_end
+            )
+            if starts_before_existing_end and existing_starts_before_current_end:
+                return True
+        return False
 
     def is_valid_at(self, moment) -> bool:
         if not self.is_active:
@@ -288,6 +343,10 @@ class SubscriptionConnection(TimeStampedModel):
         if moment < self.valid_from:
             return False
         return self.valid_to is None or moment < self.valid_to
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class PaymentRecord(TimeStampedModel):
