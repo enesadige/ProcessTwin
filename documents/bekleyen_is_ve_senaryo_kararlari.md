@@ -45,6 +45,10 @@ Durum: `KARAR BEKLİYOR`
   - Seed verisinde `gpon` isimli müşteri paketi üretilmez.
   - GPON, fiber paketlerin çalışabildiği hat/altyapı teknolojisi olarak kullanılır.
   - VDSL ve ADSL aynı xDSL ailesinde olmasına rağmen MVP'de birbirleriyle uyumlu kabul edilmez.
+  - İlk Maltepe MVP seed'inde Metro Ethernet müşterisi, paketi, hattı veya outage senaryosu üretilmez.
+  - `metro_ethernet` teknoloji seçeneği kodda korunur; kaldırılmaz.
+  - Metro Ethernet sonraki kurumsal genişleme kapsamında ayrı topoloji, SLA, yedeklilik ve telafi kararlarıyla ele alınır.
+  - Gelecekte eklenirken otomatik olarak OLT/DSLAM zincirine bağlanacağı varsayılmaz; ayrı servis/topoloji akışı değerlendirilerek modellenir.
   - Upgrade, downgrade veya teknoloji dönüşümü senaryoları sonraki kapsama bırakılır.
   - Uyumluluk mantığı model içinde dağınık koşullar olarak yazılmaz; ileride ortak `is_package_line_compatible` helper veya servis üzerinden yönetilir ve test edilir.
 - Müşteri segmentleri ve VIP modeli: `KARAR BEKLİYOR`
