@@ -90,7 +90,23 @@ Durum: `KARAR BEKLİYOR`
   - Bu teknik kapıda ölçüm kaynağı, hedef hız, gerçekleşen hız, zaman aralığı, örnekleme sıklığı ve kalite eşikleri netleştirilmelidir.
   - ProcessTwin candidate senaryolarında müşteri bazlı kalite veya hız iyileştirmesi kullanılacaksa bu model Görev 079'dan önce tamamlanmalıdır.
   - Bu karar kapsamında henüz model, migration veya seed değişikliği yapılmaz.
-- Maltepe mahalle, cihaz, port ve müşteri sayıları: `KARAR BEKLİYOR`
+- Maltepe mahalle, cihaz, port ve müşteri sayıları: `KISMEN KARAR VERİLDİ`
+  - Mahalle seçimi: `KARAR VERİLDİ`
+  - İlk Maltepe seed'inde 5 mahalle kullanılır:
+    - Altayçeşme
+    - Cevizli
+    - Küçükyalı
+    - Zümrütevler
+    - Fındıklı
+  - İdealtepe yerine Fındıklı seçildi; amaç birbirine çok benzeyen veya yakın mahalle dalları yerine daha çeşitli sentetik topoloji profilleri oluşturmaktır.
+  - Mahalle isimleri gerçek idari bölgelerdir.
+  - Cihaz, port, hat, müşteri, teknoloji ve arıza dağılımları tamamen sentetik olacaktır.
+  - Seed veya sunum, gerçek Turkcell şebeke topolojisini temsil ettiği iddiasında bulunmaz.
+  - Mahallelerin nüfusu, gerçek müşteri sayısı veya gerçek cihaz sayısı kendiliğinden tahmin edilmez.
+  - Her mahallede aynı sayıda cihaz ve müşteri olmak zorunda değildir; dağılım sonraki sorularda belirlenir.
+  - Maltepe veya herhangi bir mahalle kod içinde hard-code edilmez; bunlar yalnızca ilk dataset/config girdileri olur.
+  - BNG sayısı ve hizmet kapsamı: `KARAR BEKLİYOR`
+  - Erişim cihazı, port, hat, müşteri ve teknoloji dağılımı: `KARAR BEKLİYOR`
 - Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR VERİLDİ`
   - Kontrollü B yaklaşımı seçildi.
   - İlk MVP'nin ana ve karar üreten senaryosu tam kesintidir:
