@@ -51,7 +51,26 @@ Durum: `KARAR BEKLİYOR`
   - Gelecekte eklenirken otomatik olarak OLT/DSLAM zincirine bağlanacağı varsayılmaz; ayrı servis/topoloji akışı değerlendirilerek modellenir.
   - Upgrade, downgrade veya teknoloji dönüşümü senaryoları sonraki kapsama bırakılır.
   - Uyumluluk mantığı model içinde dağınık koşullar olarak yazılmaz; ileride ortak `is_package_line_compatible` helper veya servis üzerinden yönetilir ve test edilir.
-- Müşteri segmentleri ve VIP modeli: `KARAR BEKLİYOR`
+- Müşteri segmentleri ve VIP modeli: `KARAR VERİLDİ`
+  - `Customer.segment` şu değerlerle devam eder:
+    - `individual`
+    - `sme`
+    - `enterprise`
+    - `public`
+  - VIP müşteri segmenti değildir.
+  - Aynı segment içindeki bazı müşteriler VIP olabilir.
+  - VIP bilgisi serbest `metadata` içinde tutulmaz.
+  - Segmentten ayrı, açık ve doğrulanabilir bir `Customer.priority_level` alanı kullanılacak şekilde planlanır.
+  - İlk MVP `priority_level` değerleri:
+    - `standard`
+    - `vip`
+  - Gerekçe:
+    - Bireysel, KOBİ, kurumsal veya kamu müşterilerinin her biri gerektiğinde VIP olabilir.
+    - İş kuralları, filtreleme, ground truth ve Decision Evidence bu alanı güvenilir şekilde kullanabilir.
+    - `metadata["priority"]` gibi serbest yapı iş açısından kritik bir değer için fazla gevşek kalır.
+    - VIP'yi ayrı segment yapmak müşteri türü ile hizmet önceliğini birbirine karıştırır.
+  - Görev 019 seed başlamadan önce küçük teknik görev olarak `Customer.priority_level` alanı eklenmelidir.
+  - Bu karar kapsamında henüz model, migration veya seed değişikliği yapılmaz.
 - Kalite ölçümlerinin cihaz/abonelik kapsamı: `KARAR BEKLİYOR`
 - Maltepe mahalle, cihaz, port ve müşteri sayıları: `KARAR BEKLİYOR`
 - Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR BEKLİYOR`
