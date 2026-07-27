@@ -172,7 +172,32 @@ Durum: `KARAR BEKLİYOR`
       - Yaklaşık yüzde 10-20 boş veya rezerve kapasite hedeflenebilir; kesin oran sonraki adımda belirlenir.
       - `NetworkPort` kaydının fiziksel port mu yoksa mantıksal müşteri servis uç noktası mı temsil ettiği seed başlamadan açıkça belgelenmelidir.
       - `NetworkPort` fiziksel port olarak kullanılacaksa GPON'da müşteri başına port üretilmez.
-    - Teknoloji yük dağılımı: `KARAR BEKLİYOR`
+    - Teknoloji yük dağılımı: `KARAR VERİLDİ`
+      - 240 aktif aboneliğin paket teknolojisi dağılımı:
+        - Fiber: 130
+        - VDSL: 90
+        - ADSL: 20
+        - Metro Ethernet: 0
+        - GPON paket: 0
+      - `BNG-MAL-001` toplam 150 abonelik:
+        - Fiber: 80
+        - VDSL: 55
+        - ADSL: 15
+      - `BNG-MAL-002` toplam 90 abonelik:
+        - Fiber: 50
+        - VDSL: 35
+        - ADSL: 5
+      - Toplam kontrolü:
+        - Fiber: 130
+        - VDSL: 90
+        - ADSL: 20
+        - Genel toplam: 240
+      - Bu değerlerin Maltepe'nin veya Turkcell şebekesinin gerçek müşteri dağılımı olduğu iddia edilmez.
+      - Değerler güncel genişbant eğilimine uygun, sentetik ve kontrollü demo değerleridir.
+      - Her OLT yalnız fiber/GPON fiziksel hatlara hizmet eder.
+      - Her DSLAM yalnız VDSL/ADSL hatlara hizmet eder.
+      - Fiber aboneliklerin kaçının GPON, kaçının genel fiber hat üzerinde olacağı henüz belirlenmemiştir.
+      - Fiziksel OLT port sayısı, PON portu başına abonelik fan-out değeri ve boş/rezerve kapasite bir sonraki port kapasitesi kararında netleştirilir.
 - Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR VERİLDİ`
   - Kontrollü B yaklaşımı seçildi.
   - İlk MVP'nin ana ve karar üreten senaryosu tam kesintidir:
