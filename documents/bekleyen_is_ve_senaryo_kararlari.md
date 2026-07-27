@@ -12,7 +12,7 @@ Bu dosya, ProcessTwin projesinde ilerleyen görevlerden önce kullanıcıyla net
 
 ## 1. Görev 019 Öncesi Zorunlu Kararlar
 
-Durum: `KARAR BEKLİYOR`
+Durum: `KARAR VERİLDİ`
 
 - Cihaz türleri ve topoloji hiyerarşisi: `KARAR VERİLDİ`
   - Maltepe MVP seed topolojisi müşteri etkisi hesabı için basitleştirilmiş mantıksal topoloji olarak kabul edilir.
@@ -90,7 +90,7 @@ Durum: `KARAR BEKLİYOR`
   - Bu teknik kapıda ölçüm kaynağı, hedef hız, gerçekleşen hız, zaman aralığı, örnekleme sıklığı ve kalite eşikleri netleştirilmelidir.
   - ProcessTwin candidate senaryolarında müşteri bazlı kalite veya hız iyileştirmesi kullanılacaksa bu model Görev 079'dan önce tamamlanmalıdır.
   - Bu karar kapsamında henüz model, migration veya seed değişikliği yapılmaz.
-- Maltepe mahalle, cihaz, port ve müşteri sayıları: `KISMEN KARAR VERİLDİ`
+- Maltepe mahalle, cihaz, port ve müşteri sayıları: `KARAR VERİLDİ`
   - Mahalle seçimi: `KARAR VERİLDİ`
   - İlk Maltepe seed'inde 5 mahalle kullanılır:
     - Altayçeşme
@@ -129,7 +129,7 @@ Durum: `KARAR BEKLİYOR`
     - Veri modelinde “bir mahalle yalnızca bir BNG'ye bağlı olabilir” şeklinde constraint veya hard-code bulunmaz.
     - İlk seed'de dağılım sade tutulabilir; ileride aynı mahallede farklı BNG'lere bağlı erişim cihazları desteklenebilmelidir.
     - İlk MVP'de yedek bağlantı olmadığı için `BNG-MAL-001` altındaki geçerli aktif aboneliklerin ana outage sırasında etkilendiği kabul edilebilir.
-  - Erişim cihazı, port, hat, müşteri ve teknoloji dağılımı: `KISMEN KARAR VERİLDİ`
+  - Erişim cihazı, port, hat, müşteri ve teknoloji dağılımı: `KARAR VERİLDİ`
     - OLT/DSLAM sayısı: `KARAR VERİLDİ`
     - `BNG-MAL-001` dağılımı:
       - Altayçeşme: 1 OLT, 1 DSLAM
@@ -164,7 +164,7 @@ Durum: `KARAR BEKLİYOR`
         - `BNG-MAL-001`: yaklaşık 150 aktif abonelik
         - `BNG-MAL-002`: yaklaşık 90 aktif abonelik
       - Dağılım cihazlar ve mahalleler arasında eşit olmak zorunda değildir.
-    - Port kapasitesi kararı: `KISMEN KARAR VERİLDİ`
+    - Port kapasitesi kararı: `KARAR VERİLDİ`
       - `NetworkPort` anlamı: `KARAR VERİLDİ`
       - `NetworkPort`, cihaz üzerindeki fiziksel veya sentetik fiziksel portu temsil eder.
       - `LineConnection`, bu fiziksel port üzerinden sunulan müşteri erişim hattını temsil eder.
@@ -183,13 +183,63 @@ Durum: `KARAR BEKLİYOR`
         - Bu nedenle GPON fan-out için şu aşamada model/migration değişikliği gerekmemektedir.
         - DSLAM için 1 port -> 1 aktif hat kuralı bütün teknolojilere uygulanan global unique constraint olarak yazılmaz; seed/servis mantığında teknolojiye göre korunur.
       - Bu karar gerçek fiziksel GPON topolojisinin eksiksiz modeli değil, MVP için basitleştirilmiş mantıksal temsildir.
-      - Toplam fiziksel port sayısı henüz sabitlenmez.
-      - DSLAM tarafında müşteri hattı çoğunlukla ayrı müşteri portuna karşılık gelebilir.
-      - GPON tarafında bir fiziksel PON portu birden fazla aboneliğe hizmet edebileceği için aktif abonelik sayısı ile fiziksel OLT port sayısı birebir eşitlenmez.
-      - OLT PON portu sayısı, DSLAM portu sayısı, port başına abonelik fan-out değeri ve boş/rezerve kapasite teknoloji dağılımı kararından sonra netleştirilir.
-      - Yaklaşık yüzde 10-20 boş veya rezerve kapasite hedeflenebilir; kesin oran sonraki adımda belirlenir.
-      - `NetworkPort` kaydının fiziksel port mu yoksa mantıksal müşteri servis uç noktası mı temsil ettiği seed başlamadan açıkça belgelenmelidir.
-      - `NetworkPort` fiziksel port olarak kullanılacaksa GPON'da müşteri başına port üretilmez.
+      - Fiber/GPON fiziksel hat dağılımı:
+        - GPON fiziksel hat: 100 abonelik
+        - Genel fiber / noktadan noktaya fiber hat: 30 abonelik
+        - Toplam fiber paket aboneliği: 130
+      - `BNG-MAL-001` fiber fiziksel erişim dağılımı:
+        - 62 GPON
+        - 18 genel fiber
+        - Toplam 80 fiber abonelik
+      - `BNG-MAL-002` fiber fiziksel erişim dağılımı:
+        - 38 GPON
+        - 12 genel fiber
+        - Toplam 50 fiber abonelik
+      - GPON müşteri paketi değildir; fiber paketleri taşıyan fiziksel erişim teknolojisi olarak kalır.
+      - GPON PON port kapasitesi:
+        - 100 GPON aboneliği
+        - 10 aktif fiziksel PON portu
+        - 2 boş/rezerve PON portu
+        - Toplam 12 PON portu
+        - Aktif PON portu başına ortalama 10 abonelik
+      - Her PON portunda tam olarak 10 abonelik bulunmak zorunda değildir.
+      - Gerçekçi ve dengesiz dağılım kullanılabilir:
+        - bazı portlarda 8 abonelik
+        - bazı portlarda 9 abonelik
+        - bazı portlarda 11 abonelik
+        - bazı portlarda 12 abonelik
+      - Genel ortalama yaklaşık 10 abonelik/PON port olur.
+      - 5 OLT'nin her birinde 2 aktif PON portu bulunur.
+      - İki boş/rezerve PON porttan biri `BNG-MAL-001` tarafındaki bir OLT'ye, diğeri `BNG-MAL-002` tarafındaki bir OLT'ye verilebilir.
+      - DSLAM VDSL/ADSL port kapasitesi:
+        - 110 aktif DSLAM müşteri portu
+        - 20 boş/rezerve DSLAM portu
+        - Toplam 130 DSLAM portu
+      - 5 DSLAM için başlangıç kapasitesi:
+        - Her DSLAM: 22 aktif port
+        - Her DSLAM: 4 boş/rezerve port
+        - Her DSLAM toplam: 26 port
+      - DSLAM toplam kontrolü:
+        - 5 x 22 = 110 aktif port
+        - 5 x 4 = 20 boş/rezerve port
+        - Genel toplam 130 port
+      - VDSL ve ADSL portları teknoloji tipine göre açık şekilde ayrılır.
+      - Boş/rezerve portların tamamının teknoloji ataması zorunlu değilse `unassigned/reserved` tutulabilir.
+      - Mevcut model buna izin vermiyorsa seed başlamadan önce çözüm önerisi sunulur.
+      - DSLAM tarafında genel davranış:
+        - 1 aktif fiziksel müşteri portu
+        - 1 aktif `LineConnection`
+        - 1 aktif abonelik bağlantısı
+      - Genel fiber port kapasitesi:
+        - 30 aktif genel fiber portu
+        - 5 boş/rezerve genel fiber portu
+        - Toplam 35 fiziksel port
+      - Genel fiber bağlantıları OLT üzerindeki PON portları gibi gösterilmez.
+      - GPON dışındaki noktadan noktaya genel fiber hatlar, `access_node` veya switch rolündeki erişim cihazları üzerinden temsil edilir.
+      - İlk seed'de 2 adet opsiyonel access node kullanılabilir:
+        - Access node 1: 15 aktif + 3 boş/rezerve port
+        - Access node 2: 15 aktif + 2 boş/rezerve port
+      - Bu access node cihazları ana GPON veya DSL zincirinin zorunlu katmanı değildir; yalnızca 30 genel fiber hattın fiziksel erişim noktasıdır.
     - Teknoloji yük dağılımı: `KARAR VERİLDİ`
       - 240 aktif aboneliğin paket teknolojisi dağılımı:
         - Fiber: 130
@@ -214,8 +264,7 @@ Durum: `KARAR BEKLİYOR`
       - Değerler güncel genişbant eğilimine uygun, sentetik ve kontrollü demo değerleridir.
       - Her OLT yalnız fiber/GPON fiziksel hatlara hizmet eder.
       - Her DSLAM yalnız VDSL/ADSL hatlara hizmet eder.
-      - Fiber aboneliklerin kaçının GPON, kaçının genel fiber hat üzerinde olacağı henüz belirlenmemiştir.
-      - Fiziksel OLT port sayısı, PON portu başına abonelik fan-out değeri ve boş/rezerve kapasite bir sonraki port kapasitesi kararında netleştirilir.
+      - Fiber aboneliklerin fiziksel erişim dağılımı ve port kapasitesi port kapasitesi kararında netleştirilmiştir.
 - Tam kesinti, servis bozulması ve kademeli geri dönüş yapısı: `KARAR VERİLDİ`
   - Kontrollü B yaklaşımı seçildi.
   - İlk MVP'nin ana ve karar üreten senaryosu tam kesintidir:
@@ -240,6 +289,38 @@ Durum: `KARAR BEKLİYOR`
     - Tam kesinti: Outage ve müşteri etki akışına girer.
     - Servis bozulması: İlk MVP'de yalnızca cihaz seviyesi `QualityMeasurement`/alarm verisidir.
   - Abonelik bazlı servis bozulması analizi, `SubscriptionQualityMeasurement` ve ilgili eşik/ground truth kuralları tasarlandıktan sonra sonraki kapsama alınır.
+  - Ana demo outage zamanı:
+    - Kaynak cihaz: `BNG-MAL-001`
+    - Süre: 3 saat 20 dakika
+    - Dataset reference datetime: `2026-08-01T00:00:00+03:00`
+    - Ana outage başlangıcı: `2026-07-20T10:15:00+03:00`
+    - Ana outage bitişi: `2026-07-20T13:35:00+03:00`
+    - Zaman dilimi: Europe/Istanbul
+  - Tarih üretim kuralı:
+    - Ana sorgu “geçen ay en uzun kesinti” olacağı için seed config içinde açık bir `reference_datetime` veya eşdeğer dataset referans zamanı bulunur.
+    - Outage, bu referans zamanın bir önceki takvim ayında üretilir.
+    - Seed generator başka bir reference date ile çalıştırılırsa olay tarihleri bir önceki aya göre hesaplanabilir olmalıdır.
+    - Böylece “geçen ay” sorgusu zaman geçince bozulmaz.
+  - Kademeli hizmet dönüşü:
+    - Ana outage tek kayıt olarak başlar ve biter.
+    - Operasyonel event kayıtlarında toparlanma sinyalleri bulunabilir.
+    - Örnek sinyaller: alarm yoğunluğunun azalması, cihaz erişim sinyalinin dönmesi, teknik müdahale notu.
+    - İlk MVP'de belirli müşteri gruplarının daha erken hizmet aldığı iddia edilmez.
+    - Kısmi müşteri restorasyonu hesaplanmaz.
+    - Etkilenen müşteri sayısı outage tamamlanana kadar tek ground truth olarak kalır.
+    - Operasyonel eventler telafi tutarını veya müşteri etki hesabını değiştirmez.
+    - Gerçek kademeli müşteri dönüşü daha sonra zaman aralıklı impact/restoration modeliyle ele alınır.
+  - Aynı önceki takvim ayı içinde iki kısa outage daha üretilir:
+    - Bir OLT kaynaklı yaklaşık 45 dakikalık outage
+    - Bir DSLAM kaynaklı yaklaşık 70 dakikalık outage
+  - Kısa outage kuralları:
+    - Ana BNG outage ile zaman olarak çakışmazlar.
+    - Farklı cihazlarda gerçekleşirler.
+    - En az biri `BNG-MAL-002` tarafında olur.
+    - Ana `BNG-MAL-001` outage her durumda ayın en uzun outage kaydı olur.
+    - Bu kısa outage kayıtları kendi topoloji dallarındaki müşterileri etkileyebilir.
+    - Kesin müşteri sayıları ground truth aşamasında hesaplanıp kaydedilir.
+    - Bunlar servis bozulması değil, kısa tam outage kayıtlarıdır.
   - Bu karar kapsamında henüz model, migration veya seed değişikliği yapılmaz.
 
 ## 2. Alarm ve Incident Kararları
