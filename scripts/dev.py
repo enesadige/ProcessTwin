@@ -188,13 +188,33 @@ def parse_args() -> argparse.Namespace:
         default=["backend", "frontend", "celery"],
         help="Services to start.",
     )
+    parser.add_argument("--backend-port", type=int, help="Override BACKEND_PORT for this run.")
+    parser.add_argument("--frontend-port", type=int, help="Override FRONTEND_PORT for this run.")
+    parser.add_argument(
+        "--api-base-url",
+        help="Override VITE_API_BASE_URL passed to the frontend process.",
+    )
     parser.add_argument("--health", action="store_true", help="Run native service health checks.")
     return parser.parse_args()
+
+
+def apply_cli_overrides(args: argparse.Namespace, env: dict[str, str]) -> None:
+    if args.backend_port is not None:
+        env["BACKEND_PORT"] = str(args.backend_port)
+    if args.frontend_port is not None:
+        env["FRONTEND_PORT"] = str(args.frontend_port)
+
+    backend_port = env.get("BACKEND_PORT", "8000")
+    if args.api_base_url:
+        env["VITE_API_BASE_URL"] = args.api_base_url
+    elif args.backend_port is not None or not env.get("VITE_API_BASE_URL"):
+        env["VITE_API_BASE_URL"] = f"http://127.0.0.1:{backend_port}"
 
 
 def main() -> int:
     args = parse_args()
     env = load_env_file()
+    apply_cli_overrides(args, env)
 
     if args.health:
         return subprocess.call(

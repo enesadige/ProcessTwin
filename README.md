@@ -162,3 +162,11 @@ Servisleri baslatma:
 .venv/bin/python scripts/dev.py --services backend frontend celery
 .venv/bin/python scripts/dev.py --health
 ```
+
+Port override:
+
+```bash
+.venv/bin/python scripts/dev.py --services backend frontend --backend-port 8010 --frontend-port 5174
+```
+
+Backend portu override edilirse frontend process'ine `VITE_API_BASE_URL` otomatik olarak ayni backend portuna gore verilir.
