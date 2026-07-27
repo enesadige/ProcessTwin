@@ -229,6 +229,29 @@ def test_subscription_connection_rejects_package_line_technology_mismatch():
 
 
 @pytest.mark.django_db
+def test_subscription_connection_accepts_fiber_package_on_gpon_line():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    line = create_line_connection(snapshot, city, district, AccessTechnology.GPON)
+    _customer, _package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+        AccessTechnology.FIBER,
+    )
+
+    connection = SubscriptionConnection(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=line,
+        valid_from=timezone.now(),
+    )
+
+    connection.full_clean()
+
+
+@pytest.mark.django_db
 def test_subscription_connection_rejects_cross_snapshot_line():
     first_snapshot = create_snapshot("first-seed")
     second_snapshot = create_snapshot("second-seed")

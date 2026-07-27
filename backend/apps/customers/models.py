@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.core.models import TimeStampedModel
+from apps.customers.services.technology_compatibility import is_package_line_compatible
 from apps.datasets.models import DataSnapshot
 from apps.geography.models import City, District, Neighborhood
 from apps.network.models import AccessTechnology, LineConnection, validate_location_chain
@@ -294,10 +295,14 @@ class SubscriptionConnection(TimeStampedModel):
         if (
             self.subscription_id
             and self.line_connection_id
-            and self.subscription.service_package.technology != self.line_connection.technology
+            and not is_package_line_compatible(
+                self.subscription.service_package.technology,
+                self.line_connection.technology,
+            )
         ):
             errors["line_connection"] = (
-                "Line connection technology must match the subscription package technology."
+                "Line connection technology must be compatible with the subscription package "
+                "technology."
             )
         if self.subscription_id:
             if self.valid_from < self.subscription.valid_from:
