@@ -3,6 +3,6 @@ def test_health_endpoint(client):
 
     assert response.status_code == 200
     assert response.json() == {
-        "status": "ok",
+        "status": "exact",
         "service": "backend",
     }
