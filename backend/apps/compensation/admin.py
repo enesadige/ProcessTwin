@@ -26,3 +26,6 @@ class CompensationEvaluationAdmin(admin.ModelAdmin):
         "rule_version__rule__code",
     )
     readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot", "outage", "customer", "subscription", "rule_version")
+    list_select_related = ("data_snapshot", "outage", "customer", "subscription", "rule_version")
+    date_hierarchy = "created_at"
