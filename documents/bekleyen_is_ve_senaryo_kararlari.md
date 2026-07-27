@@ -32,7 +32,21 @@ Durum: `KARAR BEKLİYOR`
 - Yedek bağlantı yapısı: `KARAR VERİLDİ`
   - İlk MVP seed'inde yedek bağlantı bulunmaz.
   - Yedek bağlantı senaryosu daha sonra ProcessTwin içinde baseline/candidate karşılaştırması olarak ele alınır.
-- Fiber/GPON/VDSL/ADSL teknoloji uyumluluk matrisi: `KARAR BEKLİYOR`
+- Fiber/GPON/VDSL/ADSL teknoloji uyumluluk matrisi: `KARAR VERİLDİ`
+  - `ServicePackage.technology`, müşteriye sunulan erişim/ürün ailesini temsil eder.
+  - `LineConnection.technology`, fiziksel veya teknik erişim türünü temsil eder.
+  - MVP uyumluluk matrisi:
+    - `fiber` paket -> `fiber` hat: uyumlu
+    - `fiber` paket -> `gpon` hat: uyumlu
+    - `vdsl` paket -> `vdsl` hat: uyumlu
+    - `adsl` paket -> `adsl` hat: uyumlu
+    - `metro_ethernet` paket -> `metro_ethernet` hat: uyumlu
+    - diğer kombinasyonlar: uyumsuz
+  - Seed verisinde `gpon` isimli müşteri paketi üretilmez.
+  - GPON, fiber paketlerin çalışabildiği hat/altyapı teknolojisi olarak kullanılır.
+  - VDSL ve ADSL aynı xDSL ailesinde olmasına rağmen MVP'de birbirleriyle uyumlu kabul edilmez.
+  - Upgrade, downgrade veya teknoloji dönüşümü senaryoları sonraki kapsama bırakılır.
+  - Uyumluluk mantığı model içinde dağınık koşullar olarak yazılmaz; ileride ortak `is_package_line_compatible` helper veya servis üzerinden yönetilir ve test edilir.
 - Müşteri segmentleri ve VIP modeli: `KARAR BEKLİYOR`
 - Kalite ölçümlerinin cihaz/abonelik kapsamı: `KARAR BEKLİYOR`
 - Maltepe mahalle, cihaz, port ve müşteri sayıları: `KARAR BEKLİYOR`
