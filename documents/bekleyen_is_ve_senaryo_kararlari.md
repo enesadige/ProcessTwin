@@ -366,6 +366,21 @@ Durum: `MVP İÇİN KARAR VERİLDİ`
   - Ana outage kök neden kategorisi `bng_failure` olarak tutulur.
   - LOS, ilk MVP'de kök neden veya alarm tipi olarak kullanılmaz.
   - LOS gibi belirti alarmları post-MVP alarm katalog genişletmesinde ayrıca değerlendirilecektir.
+- Görev 025 audit notu: `KARAR VERİLDİ`
+  - Görev 019-023 yeniden kapsamlandırıldığı için Görev 025'in üretim kabul kriterleri mevcut implementation içinde önceden karşılanmıştır.
+  - `078d8e0 feat: seed maltepe operations events` commit'iyle:
+    - `BNG-MAL-001` kaynaklı ana outage üretildi.
+    - `INC-MAL-BNG-001` incident kaydı üretildi.
+    - `BNG_UNREACHABLE` primary alarm olarak bağlandı.
+    - `LINK_DOWN` supporting alarm olarak bağlandı.
+    - Outage kapanış ve süre bilgileri üretildi.
+    - Recovery bilgisi alarm olarak değil `OperationalEvent.event_type=auto_recovery` olarak üretildi.
+    - Kısa OLT/DSLAM outage kayıtlarında `ACCESS_DEVICE_UNREACHABLE` kullanıldı.
+  - `0905201 feat: validate maltepe seed output` commit'iyle:
+    - Ana BNG outage'ın snapshot `reference_datetime` değerine göre önceki ayın en uzun outage'ı olduğu validator ile doğrulandı.
+    - Bu doğrulama sistem tarihine bağlı değildir.
+  - Görev 025 kapsamında yeni alarm, incident, outage veya operational event üretilmeyecektir.
+  - Ground truth, customer impact ve telafi/iade değerlendirmesi sonraki görevlerde ele alınacaktır.
 
 ## 3. İş Kuralları ve Telafi
 
