@@ -325,14 +325,47 @@ Durum: `KARAR VERİLDİ`
 
 ## 2. Alarm ve Incident Kararları
 
-Durum: `KARAR BEKLİYOR`
+Durum: `MVP İÇİN KARAR VERİLDİ`
 
-- Alarm kataloğu: `KARAR BEKLİYOR`
-- Severity değerleri: `KARAR BEKLİYOR`
-- Parent-child alarm ilişkileri: `KARAR BEKLİYOR`
-- Korelasyon eşikleri: `KARAR BEKLİYOR`
-- Incident oluşturma koşulları: `KARAR BEKLİYOR`
-- Kök neden ve belirti ayrımı: `KARAR BEKLİYOR`
+- Alarm kataloğu: `KARAR VERİLDİ`
+  - İlk MVP resmi alarm kataloğu yalnızca 3 alarm tipinden oluşur:
+    - `BNG_UNREACHABLE`
+      - severity: `critical`
+      - category: `core`
+    - `ACCESS_DEVICE_UNREACHABLE`
+      - severity: `major`
+      - category: `access`
+    - `LINK_DOWN`
+      - severity: `major`
+      - category: `transport`
+  - Bu katalog, Görev 024 kapsamında resmi MVP alarm kataloğu olarak sabitlenir.
+  - Yaklaşık 27 alarm tipi hedefi post-MVP alarm katalog genişletmesi olarak takip edilir.
+  - Kullanılmayacak alarm tipleri kafadan üretilmez.
+  - `DEVICE_RECOVERY` alarm tipi eklenmez; recovery bilgisi `OperationalEvent.event_type=auto_recovery` olarak tutulur.
+  - `LOS_DETECTED` ilk MVP kataloguna eklenmez.
+  - Kalite alarmı ilk MVP kataloguna eklenmez.
+- Severity değerleri: `KARAR VERİLDİ`
+  - `BNG_UNREACHABLE`: `critical`
+  - `ACCESS_DEVICE_UNREACHABLE`: `major`
+  - `LINK_DOWN`: `major`
+- Parent-child alarm ilişkileri: `MVP İÇİN SINIRLANDIRILDI`
+  - İlk MVP'de ayrı bir parent-child alarm modeli veya geniş alarm ağacı kurulmaz.
+  - Incident ile alarm ilişkisi `IncidentAlarm.role` üzerinden tutulur:
+    - ana alarm: `primary`
+    - destekleyici alarm: `supporting`
+  - Ana BNG outage için `BNG_UNREACHABLE` primary alarmdır.
+  - Gerekli senaryoda `LINK_DOWN` supporting alarm olarak incident'e bağlanabilir.
+- Korelasyon eşikleri: `SONRAKİ KAPSAM`
+  - Zaman penceresi, alarm yoğunluğu veya otomatik korelasyon eşiği bu MVP alarm katalog görevinde tanımlanmaz.
+  - İlk MVP seed'i deterministik senaryo kayıtları üretir; gerçek alarm korelasyon algoritması sonraki kapsamdır.
+- Incident oluşturma koşulları: `MVP İÇİN KARAR VERİLDİ`
+  - Ana BNG outage için bir incident üretilir.
+  - Kısa OLT ve DSLAM outage kayıtları için ayrı incident kayıtları üretilebilir.
+  - Incident kayıtları seed senaryosunun deterministik parçasıdır; otomatik korelasyon motoru bu aşamada yazılmaz.
+- Kök neden ve belirti ayrımı: `MVP İÇİN KARAR VERİLDİ`
+  - Ana outage kök neden kategorisi `bng_failure` olarak tutulur.
+  - LOS, ilk MVP'de kök neden veya alarm tipi olarak kullanılmaz.
+  - LOS gibi belirti alarmları post-MVP alarm katalog genişletmesinde ayrıca değerlendirilecektir.
 
 ## 3. İş Kuralları ve Telafi
 
