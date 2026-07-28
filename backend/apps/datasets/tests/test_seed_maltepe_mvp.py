@@ -5,6 +5,7 @@ from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
 from data_generator.configs import maltepe_mvp_v1 as seed_config
+from data_generator.validators.maltepe_mvp import validate_maltepe_mvp_snapshot
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.db.models import Count
@@ -730,6 +731,119 @@ def test_seed_maltepe_mvp_ground_truth_hashes_and_refund_total_are_deterministic
     assert len(main_case.metadata["subscription_refund_amounts"]) == 150
 
 
+@pytest.mark.django_db
+def test_maltepe_validator_reports_topology_cycle():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+    existing_link = NetworkLink.objects.filter(data_snapshot=snapshot).first()
+
+    NetworkLink.objects.create(
+        data_snapshot=snapshot,
+        link_code="LINK-VALIDATOR-CYCLE",
+        source_device=existing_link.target_device,
+        target_device=existing_link.source_device,
+        capacity_mbps=10000,
+    )
+
+    check = get_validation_check(snapshot, "network_link_topology")
+    assert check["passed"] is False
+    assert check["actual"]["has_cycle"] is True
+
+
+@pytest.mark.django_db
+def test_maltepe_validator_reports_reserved_port_with_active_line():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+    reserved_port = NetworkPort.objects.filter(
+        data_snapshot=snapshot,
+        inventory_status=NetworkPortStatus.RESERVED,
+    ).first()
+    template_line = LineConnection.objects.filter(data_snapshot=snapshot).first()
+
+    LineConnection.objects.create(
+        data_snapshot=snapshot,
+        line_code="LINE-VALIDATOR-RESERVED-001",
+        port=reserved_port,
+        access_segment=template_line.access_segment,
+        technology=template_line.technology,
+        status=template_line.status,
+        valid_from=template_line.valid_from,
+        is_active=True,
+    )
+
+    check = get_validation_check(snapshot, "reserved_port_integrity")
+    assert check["passed"] is False
+    assert check["actual"]["reserved_ports_with_active_lines"] == 1
+
+
+@pytest.mark.django_db
+def test_maltepe_validator_reports_dslam_port_with_multiple_active_lines():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+    template_line = LineConnection.objects.filter(
+        data_snapshot=snapshot,
+        port__device__device_type=NetworkDeviceType.DSLAM,
+    ).select_related("port", "access_segment").first()
+
+    LineConnection.objects.create(
+        data_snapshot=snapshot,
+        line_code="LINE-VALIDATOR-DSLAM-DUP-001",
+        port=template_line.port,
+        access_segment=template_line.access_segment,
+        technology=template_line.technology,
+        status=template_line.status,
+        valid_from=template_line.valid_from,
+        is_active=True,
+    )
+
+    check = get_validation_check(snapshot, "dslam_port_line_cardinality")
+    assert check["passed"] is False
+    assert check["actual"]["active_dslam_ports_with_more_than_one_active_line"] == 1
+
+
+@pytest.mark.django_db
+def test_maltepe_validator_reports_overlapping_rule_versions():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+    rule = Rule.objects.get(data_snapshot=snapshot, code="REFUND-001")
+    existing_version = RuleVersion.objects.get(data_snapshot=snapshot, rule=rule, version=2)
+
+    RuleVersion.objects.create(
+        data_snapshot=snapshot,
+        rule=rule,
+        version=99,
+        status=existing_version.status,
+        valid_from=existing_version.valid_from,
+        valid_to=existing_version.valid_to,
+        condition_tree=existing_version.condition_tree,
+        action_config=existing_version.action_config,
+    )
+
+    check = get_validation_check(snapshot, "rule_version_overlap_integrity")
+    assert check["passed"] is False
+    assert check["actual"]["overlapping_rule_version_pairs"] == 1
+
+
+@pytest.mark.django_db
+def test_maltepe_validator_reports_broken_ground_truth_code():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+    case = GroundTruthCase.objects.get(
+        data_snapshot=snapshot,
+        outage_code="OUT-MAL-BNG-001",
+    )
+    broken_codes = ["SUB-MAL-BROKEN", *case.affected_subscription_codes[1:]]
+
+    GroundTruthCase.objects.filter(pk=case.pk).update(
+        affected_subscription_codes=broken_codes,
+    )
+
+    check = get_validation_check(snapshot, "ground_truth_case_integrity")
+    assert check["passed"] is False
+    assert check["actual"]["references_are_valid"] is False
+    assert check["actual"]["hashes_are_valid"] is False
+
+
 def get_connection_bng_code(connection: SubscriptionConnection) -> str:
     device = connection.line_connection.port.device
     if device.device_type == NetworkDeviceType.BNG:
@@ -786,3 +900,8 @@ def collect_seed_codes() -> dict[str, list[str]]:
 def hash_codes(codes: list[str]) -> str:
     encoded = json.dumps(codes, ensure_ascii=False, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
+
+
+def get_validation_check(snapshot: DataSnapshot, name: str) -> dict:
+    report = validate_maltepe_mvp_snapshot(snapshot)
+    return next(check for check in report["checks"] if check["name"] == name)
