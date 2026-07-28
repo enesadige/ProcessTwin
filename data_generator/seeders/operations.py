@@ -21,7 +21,7 @@ from apps.operations.models import (
 from data_generator.configs import maltepe_mvp_v1 as seed_config
 
 
-def seed_operations(*, snapshot: DataSnapshot) -> dict[str, int]:
+def seed_operations(*, snapshot: DataSnapshot, reference_datetime) -> dict[str, int]:
     alarm_types = create_alarm_types(snapshot)
     devices = {
         device.code: device
@@ -33,7 +33,7 @@ def seed_operations(*, snapshot: DataSnapshot) -> dict[str, int]:
     incident_alarms_created = 0
     operational_events_created = 0
 
-    for scenario in build_outage_scenarios():
+    for scenario in build_outage_scenarios(reference_datetime):
         result = create_outage_scenario(
             snapshot=snapshot,
             devices=devices,
@@ -75,8 +75,40 @@ def create_alarm_types(snapshot: DataSnapshot) -> dict[str, AlarmType]:
     return alarm_types
 
 
-def build_outage_scenarios() -> list[dict]:
-    return [seed_config.OUTAGE_PLAN["main"], *seed_config.OUTAGE_PLAN["secondary"]]
+def build_outage_scenarios(reference_datetime) -> list[dict]:
+    scenarios = [seed_config.OUTAGE_PLAN["main"], *seed_config.OUTAGE_PLAN["secondary"]]
+    return [
+        move_scenario_to_reference_previous_month(scenario, reference_datetime)
+        for scenario in scenarios
+    ]
+
+
+def move_scenario_to_reference_previous_month(scenario: dict, reference_datetime) -> dict:
+    previous_month_year, previous_month = get_previous_month_year_month(reference_datetime)
+    return {
+        **scenario,
+        "started_at": move_datetime_to_year_month(
+            scenario["started_at"],
+            previous_month_year,
+            previous_month,
+        ).isoformat(),
+        "ended_at": move_datetime_to_year_month(
+            scenario["ended_at"],
+            previous_month_year,
+            previous_month,
+        ).isoformat(),
+    }
+
+
+def get_previous_month_year_month(reference_datetime) -> tuple[int, int]:
+    if reference_datetime.month == 1:
+        return reference_datetime.year - 1, 12
+    return reference_datetime.year, reference_datetime.month - 1
+
+
+def move_datetime_to_year_month(value: str, year: int, month: int):
+    parsed = parse_required_datetime(value)
+    return parsed.replace(year=year, month=month)
 
 
 def create_outage_scenario(

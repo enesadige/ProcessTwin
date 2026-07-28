@@ -63,6 +63,13 @@ def test_seed_maltepe_mvp_creates_passive_dataset_snapshot_and_geography():
     assert snapshot.name == seed_config.SNAPSHOT_NAME
     assert snapshot.status == DatasetSnapshotStatus.VALIDATED
     assert snapshot.validation_status == ResultStatus.EXACT
+    assert snapshot.validation_result["seed_stage"] == "023_validation_gate"
+    assert snapshot.validation_result["validated"] is True
+    assert all(
+        {"name", "expected", "actual", "passed"} <= set(check)
+        for check in snapshot.validation_result["checks"]
+    )
+    assert all(check["passed"] is True for check in snapshot.validation_result["checks"])
     assert snapshot.is_active is False
     assert snapshot.activated_at is None
     assert snapshot.row_counts["neighborhoods"] == 5
@@ -111,6 +118,30 @@ def test_seed_maltepe_mvp_reset_recreates_only_target_dataset_and_keeps_geograph
     assert DatasetVersion.objects.filter(id=other_dataset.id).exists()
     assert City.objects.get(name="İstanbul").id == city_id
     assert City.objects.filter(name="İstanbul").count() == 1
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_rolls_back_when_validation_fails(monkeypatch):
+    monkeypatch.setattr(
+        "apps.datasets.management.commands.seed_maltepe_mvp.validate_maltepe_mvp_snapshot",
+        lambda snapshot: {
+            "passed": False,
+            "row_counts": {},
+            "checks": [
+                {
+                    "name": "forced_failure",
+                    "expected": 1,
+                    "actual": 0,
+                    "passed": False,
+                }
+            ],
+        },
+    )
+
+    with pytest.raises(CommandError, match="forced_failure"):
+        call_command("seed_maltepe_mvp")
+
+    assert not DatasetVersion.objects.filter(slug=get_target_dataset_slug()).exists()
 
 
 @pytest.mark.django_db
@@ -280,6 +311,24 @@ def test_seed_maltepe_mvp_reset_recreates_network_without_duplicates():
     assert Customer.objects.filter(data_snapshot=snapshot).count() == 225
     assert Subscription.objects.filter(data_snapshot=snapshot).count() == 240
     assert SubscriptionConnection.objects.filter(data_snapshot=snapshot).count() == 240
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_reset_recreates_deterministic_codes_without_duplicates():
+    call_command("seed_maltepe_mvp")
+    first_codes = collect_seed_codes()
+
+    call_command("seed_maltepe_mvp", "--reset")
+    second_codes = collect_seed_codes()
+
+    assert first_codes == second_codes
+    assert DatasetVersion.objects.filter(slug=get_target_dataset_slug()).count() == 1
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+    assert snapshot.row_counts["network_devices"] == 14
+    assert snapshot.row_counts["network_ports"] == 177
+    assert snapshot.row_counts["customers"] == 225
+    assert snapshot.row_counts["subscription_connections"] == 240
+    assert snapshot.row_counts["outages"] == 3
 
 
 @pytest.mark.django_db
@@ -563,3 +612,34 @@ def count_customers_by_subscription_bng(customers) -> dict[str, int]:
         assert len(bng_codes) == 1
         counts.update(bng_codes)
     return dict(counts)
+
+
+def collect_seed_codes() -> dict[str, list[str]]:
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+    return {
+        "devices": list(
+            NetworkDevice.objects.filter(data_snapshot=snapshot)
+            .order_by("code")
+            .values_list("code", flat=True)
+        ),
+        "ports": list(
+            NetworkPort.objects.filter(data_snapshot=snapshot)
+            .order_by("port_code")
+            .values_list("port_code", flat=True)
+        ),
+        "customers": list(
+            Customer.objects.filter(data_snapshot=snapshot)
+            .order_by("customer_number")
+            .values_list("customer_number", flat=True)
+        ),
+        "subscriptions": list(
+            Subscription.objects.filter(data_snapshot=snapshot)
+            .order_by("subscription_number")
+            .values_list("subscription_number", flat=True)
+        ),
+        "outages": list(
+            Outage.objects.filter(data_snapshot=snapshot)
+            .order_by("outage_code")
+            .values_list("outage_code", flat=True)
+        ),
+    }

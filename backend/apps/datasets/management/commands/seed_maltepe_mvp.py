@@ -4,6 +4,7 @@ from data_generator.configs import maltepe_mvp_v1 as seed_config
 from data_generator.seeders.customers import seed_customer_subscriptions
 from data_generator.seeders.network import seed_network_topology
 from data_generator.seeders.operations import seed_operations
+from data_generator.validators.maltepe_mvp import validate_maltepe_mvp_snapshot
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -97,7 +98,7 @@ class Command(BaseCommand):
             snapshot = DataSnapshot(
                 dataset_version=dataset,
                 name=seed_config.SNAPSHOT_NAME,
-                status=DatasetSnapshotStatus.VALIDATED,
+                status=DatasetSnapshotStatus.DRAFT,
                 is_active=activate,
                 source_started_at=source_started_at,
                 activated_at=source_started_at if activate else None,
@@ -119,33 +120,23 @@ class Command(BaseCommand):
                 neighborhoods_by_name=neighborhoods_by_name,
                 reference_datetime=reference_datetime,
             )
-            operations_counts = seed_operations(snapshot=snapshot)
+            operations_counts = seed_operations(
+                snapshot=snapshot,
+                reference_datetime=reference_datetime,
+            )
 
-            row_counts = {
-                "dataset_versions": 1,
-                "data_snapshots": 1,
-                "cities": 1,
-                "districts": 1,
-                "neighborhoods": len(neighborhoods),
-                "network_devices": network_counts["network_devices"],
-                "network_links": network_counts["network_links"],
-                "network_ports": network_counts["network_ports"],
-                "access_segments": network_counts["access_segments"],
-                "line_connections": network_counts["line_connections"],
-                "customers": customer_counts["customers"],
-                "service_packages": customer_counts["service_packages"],
-                "subscriptions": customer_counts["subscriptions"],
-                "subscription_connections": customer_counts["subscription_connections"],
-                "alarm_types": operations_counts["alarm_types"],
-                "alarms": operations_counts["alarms"],
-                "incidents": operations_counts["incidents"],
-                "incident_alarms": operations_counts["incident_alarms"],
-                "outages": operations_counts["outages"],
-                "operational_events": operations_counts["operational_events"],
-                "quality_measurements": operations_counts["quality_measurements"],
-            }
+            validation_report = validate_maltepe_mvp_snapshot(snapshot)
+            if not validation_report["passed"]:
+                failed_checks = [
+                    check["name"] for check in validation_report["checks"] if not check["passed"]
+                ]
+                raise CommandError(
+                    "Maltepe MVP seed validation failed. Failed checks: "
+                    f"{', '.join(failed_checks)}"
+                )
+
             validation_result = {
-                "seed_stage": "022_operations",
+                "seed_stage": "023_validation_gate",
                 "reference_datetime": reference_datetime_iso,
                 "created_geography": {
                     "city": city_created,
@@ -156,10 +147,12 @@ class Command(BaseCommand):
                 "network_counts": network_counts,
                 "customer_counts": customer_counts,
                 "operations_counts": operations_counts,
+                "checks": validation_report["checks"],
                 "validated": True,
             }
             now = timezone.now()
-            snapshot.row_counts = row_counts
+            snapshot.status = DatasetSnapshotStatus.VALIDATED
+            snapshot.row_counts = validation_report["row_counts"]
             snapshot.validation_status = ResultStatus.EXACT
             snapshot.validation_result = validation_result
             snapshot.source_finished_at = now
