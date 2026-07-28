@@ -25,6 +25,14 @@ NEIGHBORHOODS = [
     "Fındıklı",
 ]
 
+NEIGHBORHOOD_CODES = {
+    "Altayçeşme": "ALT",
+    "Cevizli": "CEV",
+    "Küçükyalı": "KUC",
+    "Zümrütevler": "ZUM",
+    "Fındıklı": "FIN",
+}
+
 BNG_DISTRIBUTION = {
     "BNG-MAL-001": ["Altayçeşme", "Cevizli", "Küçükyalı"],
     "BNG-MAL-002": ["Zümrütevler", "Fındıklı"],
@@ -59,10 +67,42 @@ PORT_CAPACITY_PLAN = {
         "reserved_ports": 5,
         "total_ports": 35,
         "access_nodes": [
-            {"name": "Access node 1", "active_ports": 15, "reserved_ports": 3},
-            {"name": "Access node 2", "active_ports": 15, "reserved_ports": 2},
+            {
+                "code": "AN-MAL-GF-001",
+                "name": "Maltepe General Fiber Access Node 001",
+                "bng_code": "BNG-MAL-001",
+                "neighborhood": "Cevizli",
+                "active_ports": 18,
+                "reserved_ports": 3,
+            },
+            {
+                "code": "AN-MAL-GF-002",
+                "name": "Maltepe General Fiber Access Node 002",
+                "bng_code": "BNG-MAL-002",
+                "neighborhood": "Fındıklı",
+                "active_ports": 12,
+                "reserved_ports": 2,
+            },
         ],
     },
+}
+
+GPON_FAN_OUT_BY_NEIGHBORHOOD = {
+    "Altayçeşme": [10, 11],
+    "Cevizli": [10, 11],
+    "Küçükyalı": [10, 10],
+    "Zümrütevler": [9, 10],
+    "Fındıklı": [9, 10],
+}
+
+GPON_RESERVED_PORT_NEIGHBORHOODS = ["Altayçeşme", "Zümrütevler"]
+
+DSLAM_PORT_DISTRIBUTION = {
+    "Altayçeşme": {"vdsl": 19, "adsl": 5, "reserved": 4},
+    "Cevizli": {"vdsl": 18, "adsl": 5, "reserved": 4},
+    "Küçükyalı": {"vdsl": 18, "adsl": 5, "reserved": 4},
+    "Zümrütevler": {"vdsl": 18, "adsl": 2, "reserved": 4},
+    "Fındıklı": {"vdsl": 17, "adsl": 3, "reserved": 4},
 }
 
 CUSTOMER_PLAN = {
@@ -142,10 +182,14 @@ def build_serializable_config(reference_datetime: str) -> dict:
             "city": CITY,
             "district": DISTRICT,
             "neighborhoods": NEIGHBORHOODS,
+            "neighborhood_codes": NEIGHBORHOOD_CODES,
         },
         "bng_distribution": BNG_DISTRIBUTION,
         "access_device_plan": ACCESS_DEVICE_PLAN,
         "port_capacity_plan": PORT_CAPACITY_PLAN,
+        "gpon_fan_out_by_neighborhood": GPON_FAN_OUT_BY_NEIGHBORHOOD,
+        "gpon_reserved_port_neighborhoods": GPON_RESERVED_PORT_NEIGHBORHOODS,
+        "dslam_port_distribution": DSLAM_PORT_DISTRIBUTION,
         "customer_plan": CUSTOMER_PLAN,
         "subscription_distribution": SUBSCRIPTION_DISTRIBUTION,
         "technology_totals": TECHNOLOGY_TOTALS,

@@ -7,6 +7,15 @@ from apps.core.choices import ResultStatus
 from apps.datasets.management.commands.seed_maltepe_mvp import get_target_dataset_slug
 from apps.datasets.models import DatasetSnapshotStatus, DatasetVersion, DataSnapshot
 from apps.geography.models import City, District, Neighborhood
+from apps.network.models import (
+    AccessTechnology,
+    LineConnection,
+    NetworkDevice,
+    NetworkDeviceType,
+    NetworkLink,
+    NetworkPort,
+    NetworkPortStatus,
+)
 
 
 @pytest.mark.django_db
@@ -34,6 +43,11 @@ def test_seed_maltepe_mvp_creates_passive_dataset_snapshot_and_geography():
     assert snapshot.is_active is False
     assert snapshot.activated_at is None
     assert snapshot.row_counts["neighborhoods"] == 5
+    assert snapshot.row_counts["network_devices"] == 14
+    assert snapshot.row_counts["network_links"] == 12
+    assert snapshot.row_counts["network_ports"] == 177
+    assert snapshot.row_counts["access_segments"] == 17
+    assert snapshot.row_counts["line_connections"] == 240
     assert neighborhoods == sorted(seed_config.NEIGHBORHOODS)
 
 
@@ -119,3 +133,113 @@ def test_seed_maltepe_mvp_stores_custom_reference_datetime_as_istanbul_iso_strin
 
     dataset = DatasetVersion.objects.get(slug=get_target_dataset_slug())
     assert dataset.config["reference_datetime"] == "2026-09-01T00:00:00+03:00"
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_creates_expected_network_topology_counts():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    assert NetworkDevice.objects.filter(data_snapshot=snapshot).count() == 14
+    assert NetworkDevice.objects.filter(
+        data_snapshot=snapshot,
+        device_type=NetworkDeviceType.BNG,
+        code__in=["BNG-MAL-001", "BNG-MAL-002"],
+    ).count() == 2
+    assert NetworkDevice.objects.filter(
+        data_snapshot=snapshot,
+        device_type=NetworkDeviceType.OLT,
+    ).count() == 5
+    assert NetworkDevice.objects.filter(
+        data_snapshot=snapshot,
+        device_type=NetworkDeviceType.DSLAM,
+    ).count() == 5
+    assert NetworkDevice.objects.filter(
+        data_snapshot=snapshot,
+        device_type=NetworkDeviceType.ACCESS_NODE,
+    ).count() == 2
+    assert NetworkLink.objects.filter(data_snapshot=snapshot).count() == 12
+    assert NetworkPort.objects.filter(data_snapshot=snapshot).count() == 177
+    assert LineConnection.objects.filter(data_snapshot=snapshot, is_active=True).count() == 240
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_creates_expected_port_and_line_distribution():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    assert NetworkPort.objects.filter(
+        data_snapshot=snapshot,
+        inventory_status=NetworkPortStatus.ACTIVE,
+        metadata__seed_role="gpon_pon_port",
+    ).count() == 10
+    assert NetworkPort.objects.filter(
+        data_snapshot=snapshot,
+        inventory_status=NetworkPortStatus.RESERVED,
+        metadata__seed_role="reserved_gpon_pon_port",
+    ).count() == 2
+    assert NetworkPort.objects.filter(
+        data_snapshot=snapshot,
+        inventory_status=NetworkPortStatus.ACTIVE,
+        metadata__seed_role__in=["vdsl_customer_port", "adsl_customer_port"],
+    ).count() == 110
+    assert NetworkPort.objects.filter(
+        data_snapshot=snapshot,
+        inventory_status=NetworkPortStatus.RESERVED,
+        metadata__seed_role="reserved_dslam_customer_port",
+    ).count() == 20
+    assert NetworkPort.objects.filter(
+        data_snapshot=snapshot,
+        inventory_status=NetworkPortStatus.ACTIVE,
+        metadata__seed_role="general_fiber_customer_port",
+    ).count() == 30
+    assert NetworkPort.objects.filter(
+        data_snapshot=snapshot,
+        inventory_status=NetworkPortStatus.RESERVED,
+        metadata__seed_role="reserved_general_fiber_customer_port",
+    ).count() == 5
+    assert LineConnection.objects.filter(
+        data_snapshot=snapshot,
+        technology=AccessTechnology.GPON,
+    ).count() == 100
+    assert LineConnection.objects.filter(
+        data_snapshot=snapshot,
+        technology=AccessTechnology.FIBER,
+    ).count() == 30
+    assert LineConnection.objects.filter(
+        data_snapshot=snapshot,
+        technology=AccessTechnology.VDSL,
+    ).count() == 90
+    assert LineConnection.objects.filter(
+        data_snapshot=snapshot,
+        technology=AccessTechnology.ADSL,
+    ).count() == 20
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_supports_gpon_fan_out_without_dslam_port_fan_out():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    gpon_port = NetworkPort.objects.filter(
+        data_snapshot=snapshot,
+        metadata__seed_role="gpon_pon_port",
+    ).first()
+    assert gpon_port.line_connections.count() > 1
+
+    dslam_active_ports = NetworkPort.objects.filter(
+        data_snapshot=snapshot,
+        metadata__seed_role__in=["vdsl_customer_port", "adsl_customer_port"],
+    )
+    assert all(port.line_connections.count() == 1 for port in dslam_active_ports)
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_reset_recreates_network_without_duplicates():
+    call_command("seed_maltepe_mvp")
+    call_command("seed_maltepe_mvp", "--reset")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    assert NetworkDevice.objects.filter(data_snapshot=snapshot).count() == 14
+    assert NetworkPort.objects.filter(data_snapshot=snapshot).count() == 177
+    assert LineConnection.objects.filter(data_snapshot=snapshot).count() == 240

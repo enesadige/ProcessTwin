@@ -1,6 +1,7 @@
 from zoneinfo import ZoneInfo
 
 from data_generator.configs import maltepe_mvp_v1 as seed_config
+from data_generator.seeders.network import seed_network_topology
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -20,7 +21,7 @@ ISTANBUL_TZ = ZoneInfo("Europe/Istanbul")
 
 
 class Command(BaseCommand):
-    help = "Create the base Maltepe MVP dataset, snapshot, and geography records."
+    help = "Create the Maltepe MVP dataset, snapshot, geography, and network topology records."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -63,12 +64,15 @@ class Command(BaseCommand):
                     "deterministic seed dataset."
                 )
             if target_dataset and reset:
-                target_dataset.delete()
+                delete_target_dataset_tree(target_dataset)
 
             source_started_at = timezone.now()
             city, city_created = get_or_create_city()
             district, district_created = get_or_create_district(city)
             neighborhoods, created_neighborhood_count = get_or_create_neighborhoods(district)
+            neighborhoods_by_name = {
+                neighborhood.name: neighborhood for neighborhood in neighborhoods
+            }
 
             reference_datetime_iso = reference_datetime.isoformat()
             dataset = DatasetVersion(
@@ -78,12 +82,31 @@ class Command(BaseCommand):
                 seed=seed_config.DATASET_SEED,
                 config=seed_config.build_serializable_config(reference_datetime_iso),
                 description=(
-                    "Deterministic synthetic base dataset for the Maltepe MVP scenario. "
-                    "This command creates only dataset, snapshot, and geography records."
+                    "Deterministic synthetic dataset for the Maltepe MVP scenario. "
+                    "Current seed stage creates dataset, snapshot, geography, and network "
+                    "topology records."
                 ),
             )
             dataset.full_clean()
             dataset.save()
+            snapshot = DataSnapshot(
+                dataset_version=dataset,
+                name=seed_config.SNAPSHOT_NAME,
+                status=DatasetSnapshotStatus.VALIDATED,
+                is_active=activate,
+                source_started_at=source_started_at,
+                activated_at=source_started_at if activate else None,
+            )
+            snapshot.full_clean()
+            snapshot.save()
+
+            network_counts = seed_network_topology(
+                snapshot=snapshot,
+                city=city,
+                district=district,
+                neighborhoods_by_name=neighborhoods_by_name,
+                reference_datetime=reference_datetime,
+            )
 
             row_counts = {
                 "dataset_versions": 1,
@@ -91,11 +114,11 @@ class Command(BaseCommand):
                 "cities": 1,
                 "districts": 1,
                 "neighborhoods": len(neighborhoods),
-                "network_devices": 0,
-                "network_links": 0,
-                "network_ports": 0,
-                "access_segments": 0,
-                "line_connections": 0,
+                "network_devices": network_counts["network_devices"],
+                "network_links": network_counts["network_links"],
+                "network_ports": network_counts["network_ports"],
+                "access_segments": network_counts["access_segments"],
+                "line_connections": network_counts["line_connections"],
                 "customers": 0,
                 "service_packages": 0,
                 "subscriptions": 0,
@@ -106,7 +129,7 @@ class Command(BaseCommand):
                 "operational_events": 0,
             }
             validation_result = {
-                "seed_stage": "019_base_dataset_geography",
+                "seed_stage": "020_network_topology",
                 "reference_datetime": reference_datetime_iso,
                 "created_geography": {
                     "city": city_created,
@@ -114,21 +137,16 @@ class Command(BaseCommand):
                     "neighborhoods": created_neighborhood_count,
                 },
                 "expected_neighborhoods": seed_config.NEIGHBORHOODS,
+                "network_counts": network_counts,
                 "validated": True,
             }
             now = timezone.now()
-            snapshot = DataSnapshot(
-                dataset_version=dataset,
-                name=seed_config.SNAPSHOT_NAME,
-                status=DatasetSnapshotStatus.VALIDATED,
-                is_active=activate,
-                row_counts=row_counts,
-                validation_status=ResultStatus.EXACT,
-                validation_result=validation_result,
-                source_started_at=source_started_at,
-                source_finished_at=now,
-                activated_at=now if activate else None,
-            )
+            snapshot.row_counts = row_counts
+            snapshot.validation_status = ResultStatus.EXACT
+            snapshot.validation_result = validation_result
+            snapshot.source_finished_at = now
+            if activate:
+                snapshot.activated_at = now
             snapshot.full_clean()
             snapshot.save()
 
@@ -136,7 +154,10 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS(
                 f"Created {seed_config.DATASET_NAME} / {seed_config.SNAPSHOT_NAME} "
-                f"as {state} snapshot with {len(neighborhoods)} neighborhoods."
+                f"as {state} snapshot with {len(neighborhoods)} neighborhoods, "
+                f"{network_counts['network_devices']} devices, "
+                f"{network_counts['network_ports']} ports, and "
+                f"{network_counts['line_connections']} line connections."
             )
         )
 
@@ -154,6 +175,25 @@ def get_target_dataset_slug() -> str:
     return slugify(
         f"{seed_config.DATASET_NAME}-{seed_config.GENERATOR_VERSION}-{seed_config.DATASET_SEED}"
     )
+
+
+def delete_target_dataset_tree(dataset: DatasetVersion) -> None:
+    from apps.network.models import (
+        AccessSegment,
+        LineConnection,
+        NetworkDevice,
+        NetworkLink,
+        NetworkPort,
+    )
+
+    snapshots = list(dataset.snapshots.all())
+    for snapshot in snapshots:
+        LineConnection.objects.filter(data_snapshot=snapshot).delete()
+        NetworkLink.objects.filter(data_snapshot=snapshot).delete()
+        NetworkPort.objects.filter(data_snapshot=snapshot).delete()
+        AccessSegment.objects.filter(data_snapshot=snapshot).delete()
+        NetworkDevice.objects.filter(data_snapshot=snapshot).delete()
+    dataset.delete()
 
 
 def get_or_create_city() -> tuple[City, bool]:
