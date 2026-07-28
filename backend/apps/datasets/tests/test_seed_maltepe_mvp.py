@@ -121,17 +121,34 @@ def test_seed_maltepe_mvp_rejects_duplicate_without_reset():
 def test_seed_maltepe_mvp_reset_recreates_only_target_dataset_and_keeps_geography():
     call_command("seed_maltepe_mvp")
     city_id = City.objects.get(name="İstanbul").id
+    district_id = District.objects.get(city_id=city_id, name="Maltepe").id
+    neighborhood_ids = list(
+        Neighborhood.objects.filter(district_id=district_id)
+        .order_by("name")
+        .values_list("id", flat=True)
+    )
     other_dataset = DatasetVersion.objects.create(
         name="Other Dataset",
         generator_version="other-v1",
         seed="other-seed",
+    )
+    other_snapshot = DataSnapshot.objects.create(
+        dataset_version=other_dataset,
+        name="Other Snapshot",
     )
 
     call_command("seed_maltepe_mvp", "--reset")
 
     assert DatasetVersion.objects.filter(slug=get_target_dataset_slug()).count() == 1
     assert DatasetVersion.objects.filter(id=other_dataset.id).exists()
+    assert DataSnapshot.objects.filter(id=other_snapshot.id).exists()
     assert City.objects.get(name="İstanbul").id == city_id
+    assert District.objects.get(city_id=city_id, name="Maltepe").id == district_id
+    assert list(
+        Neighborhood.objects.filter(district_id=district_id)
+        .order_by("name")
+        .values_list("id", flat=True)
+    ) == neighborhood_ids
     assert City.objects.filter(name="İstanbul").count() == 1
 
 
