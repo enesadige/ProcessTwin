@@ -1,6 +1,7 @@
 from zoneinfo import ZoneInfo
 
 from data_generator.configs import maltepe_mvp_v1 as seed_config
+from data_generator.seeders.customers import seed_customer_subscriptions
 from data_generator.seeders.network import seed_network_topology
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -21,7 +22,10 @@ ISTANBUL_TZ = ZoneInfo("Europe/Istanbul")
 
 
 class Command(BaseCommand):
-    help = "Create the Maltepe MVP dataset, snapshot, geography, and network topology records."
+    help = (
+        "Create the Maltepe MVP dataset, snapshot, geography, network topology, customers, "
+        "service packages, subscriptions, and subscription connections."
+    )
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -107,6 +111,13 @@ class Command(BaseCommand):
                 neighborhoods_by_name=neighborhoods_by_name,
                 reference_datetime=reference_datetime,
             )
+            customer_counts = seed_customer_subscriptions(
+                snapshot=snapshot,
+                city=city,
+                district=district,
+                neighborhoods_by_name=neighborhoods_by_name,
+                reference_datetime=reference_datetime,
+            )
 
             row_counts = {
                 "dataset_versions": 1,
@@ -119,17 +130,17 @@ class Command(BaseCommand):
                 "network_ports": network_counts["network_ports"],
                 "access_segments": network_counts["access_segments"],
                 "line_connections": network_counts["line_connections"],
-                "customers": 0,
-                "service_packages": 0,
-                "subscriptions": 0,
-                "subscription_connections": 0,
+                "customers": customer_counts["customers"],
+                "service_packages": customer_counts["service_packages"],
+                "subscriptions": customer_counts["subscriptions"],
+                "subscription_connections": customer_counts["subscription_connections"],
                 "alarms": 0,
                 "incidents": 0,
                 "outages": 0,
                 "operational_events": 0,
             }
             validation_result = {
-                "seed_stage": "020_network_topology",
+                "seed_stage": "021_customer_subscriptions",
                 "reference_datetime": reference_datetime_iso,
                 "created_geography": {
                     "city": city_created,
@@ -138,6 +149,7 @@ class Command(BaseCommand):
                 },
                 "expected_neighborhoods": seed_config.NEIGHBORHOODS,
                 "network_counts": network_counts,
+                "customer_counts": customer_counts,
                 "validated": True,
             }
             now = timezone.now()
@@ -157,7 +169,7 @@ class Command(BaseCommand):
                 f"as {state} snapshot with {len(neighborhoods)} neighborhoods, "
                 f"{network_counts['network_devices']} devices, "
                 f"{network_counts['network_ports']} ports, and "
-                f"{network_counts['line_connections']} line connections."
+                f"{customer_counts['subscriptions']} subscriptions."
             )
         )
 
@@ -178,6 +190,15 @@ def get_target_dataset_slug() -> str:
 
 
 def delete_target_dataset_tree(dataset: DatasetVersion) -> None:
+    from apps.customers.models import (
+        CampaignEnrollment,
+        CompensationHistory,
+        Customer,
+        PaymentRecord,
+        ServicePackage,
+        Subscription,
+        SubscriptionConnection,
+    )
     from apps.network.models import (
         AccessSegment,
         LineConnection,
@@ -188,6 +209,13 @@ def delete_target_dataset_tree(dataset: DatasetVersion) -> None:
 
     snapshots = list(dataset.snapshots.all())
     for snapshot in snapshots:
+        CompensationHistory.objects.filter(data_snapshot=snapshot).delete()
+        CampaignEnrollment.objects.filter(data_snapshot=snapshot).delete()
+        PaymentRecord.objects.filter(data_snapshot=snapshot).delete()
+        SubscriptionConnection.objects.filter(data_snapshot=snapshot).delete()
+        Subscription.objects.filter(data_snapshot=snapshot).delete()
+        ServicePackage.objects.filter(data_snapshot=snapshot).delete()
+        Customer.objects.filter(data_snapshot=snapshot).delete()
         LineConnection.objects.filter(data_snapshot=snapshot).delete()
         NetworkLink.objects.filter(data_snapshot=snapshot).delete()
         NetworkPort.objects.filter(data_snapshot=snapshot).delete()

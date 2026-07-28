@@ -343,6 +343,11 @@ Durum: `KARAR BEKLİYOR`
 - Alt/üst tutar sınırları: `KARAR BEKLİYOR`
 - Müşteri segmenti farkları: `KARAR BEKLİYOR`
 - Ödeme ve geçmiş telafi etkisi: `KARAR BEKLİYOR`
+  - Görev 021 kapsamında `PaymentRecord`, `CampaignEnrollment` ve `CompensationHistory` seedlenmez.
+  - Bu kayıtlar gerçek iade formülü, fatura dönemi, kampanya indirimi ve geçmiş telafi kontrolleri tasarlanmadan önce zorunlu olarak netleştirilmelidir.
+  - `PaymentRecord` için en az fatura dönemi, ödeme durumu, gecikme/borç etkisi ve tutar üretim mantığı belirlenmelidir.
+  - `CampaignEnrollment` için kampanya indirimi, kampanya birlikte kullanım kuralı, geçerlilik dönemi ve telafiyle etkileşim kararı verilmelidir.
+  - `CompensationHistory` için geçmiş telafi referansı, tutar, karar tarihi, tekrar telafi etkisi ve manuel inceleme koşulu netleştirilmelidir.
 - Kampanya birlikte kullanım kuralları: `KARAR BEKLİYOR`
 - Manuel inceleme koşulları: `KARAR BEKLİYOR`
 - Kural sürümleri ve öncelikler: `KARAR BEKLİYOR`

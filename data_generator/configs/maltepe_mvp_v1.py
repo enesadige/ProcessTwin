@@ -112,6 +112,159 @@ CUSTOMER_PLAN = {
     "multi_subscription_customers": 15,
     "vip_customers": 20,
     "standard_customers": 205,
+    "single_subscription_customers": 210,
+    "segment_distribution": {
+        "individual": 170,
+        "sme": 35,
+        "enterprise": 15,
+        "public": 5,
+    },
+    "priority_distribution": {
+        "standard": 205,
+        "vip": 20,
+    },
+    "vip_segment_distribution": {
+        "individual": 12,
+        "sme": 5,
+        "enterprise": 2,
+        "public": 1,
+    },
+    "vip_bng_distribution": {
+        "BNG-MAL-001": 12,
+        "BNG-MAL-002": 8,
+    },
+    "vip_neighborhood_distribution": {
+        "Altayçeşme": 4,
+        "Cevizli": 4,
+        "Küçükyalı": 4,
+        "Zümrütevler": 4,
+        "Fındıklı": 4,
+    },
+    "bng_customer_distribution": {
+        "BNG-MAL-001": {
+            "unique_customers": 140,
+            "multi_subscription_customers": 10,
+            "subscriptions": 150,
+        },
+        "BNG-MAL-002": {
+            "unique_customers": 85,
+            "multi_subscription_customers": 5,
+            "subscriptions": 90,
+        },
+    },
+    "customer_neighborhood_distribution": {
+        "Altayçeşme": 47,
+        "Cevizli": 47,
+        "Küçükyalı": 46,
+        "Zümrütevler": 43,
+        "Fındıklı": 42,
+    },
+    "customer_segment_by_neighborhood": {
+        "Altayçeşme": {"individual": 36, "sme": 7, "enterprise": 3, "public": 1},
+        "Cevizli": {"individual": 36, "sme": 7, "enterprise": 3, "public": 1},
+        "Küçükyalı": {"individual": 35, "sme": 7, "enterprise": 3, "public": 1},
+        "Zümrütevler": {"individual": 32, "sme": 7, "enterprise": 3, "public": 1},
+        "Fındıklı": {"individual": 31, "sme": 7, "enterprise": 3, "public": 1},
+    },
+    "vip_segment_by_neighborhood": {
+        "Altayçeşme": {"individual": 3, "sme": 1, "enterprise": 0, "public": 0},
+        "Cevizli": {"individual": 3, "sme": 1, "enterprise": 0, "public": 0},
+        "Küçükyalı": {"individual": 2, "sme": 1, "enterprise": 1, "public": 0},
+        "Zümrütevler": {"individual": 2, "sme": 1, "enterprise": 0, "public": 1},
+        "Fındıklı": {"individual": 2, "sme": 1, "enterprise": 1, "public": 0},
+    },
+}
+
+SERVICE_PACKAGE_CATALOG = [
+    {
+        "package_code": "PKG-FIBER-100",
+        "name": "Fiber 100",
+        "technology": "fiber",
+        "download_mbps": 100,
+        "upload_mbps": 20,
+        "monthly_price": "399.90",
+        "commitment_months": 12,
+        "subscription_count": 60,
+    },
+    {
+        "package_code": "PKG-FIBER-200",
+        "name": "Fiber 200",
+        "technology": "fiber",
+        "download_mbps": 200,
+        "upload_mbps": 30,
+        "monthly_price": "499.90",
+        "commitment_months": 12,
+        "subscription_count": 35,
+    },
+    {
+        "package_code": "PKG-FIBER-500",
+        "name": "Fiber 500",
+        "technology": "fiber",
+        "download_mbps": 500,
+        "upload_mbps": 50,
+        "monthly_price": "699.90",
+        "commitment_months": 12,
+        "subscription_count": 20,
+    },
+    {
+        "package_code": "PKG-FIBER-1000",
+        "name": "Fiber 1000",
+        "technology": "fiber",
+        "download_mbps": 1000,
+        "upload_mbps": 100,
+        "monthly_price": "1199.90",
+        "commitment_months": 12,
+        "subscription_count": 15,
+    },
+    {
+        "package_code": "PKG-VDSL-35",
+        "name": "VDSL 35",
+        "technology": "vdsl",
+        "download_mbps": 35,
+        "upload_mbps": 6,
+        "monthly_price": "249.90",
+        "commitment_months": 12,
+        "subscription_count": 35,
+    },
+    {
+        "package_code": "PKG-VDSL-50",
+        "name": "VDSL 50",
+        "technology": "vdsl",
+        "download_mbps": 50,
+        "upload_mbps": 10,
+        "monthly_price": "299.90",
+        "commitment_months": 12,
+        "subscription_count": 35,
+    },
+    {
+        "package_code": "PKG-VDSL-100",
+        "name": "VDSL 100",
+        "technology": "vdsl",
+        "download_mbps": 100,
+        "upload_mbps": 15,
+        "monthly_price": "399.90",
+        "commitment_months": 12,
+        "subscription_count": 20,
+    },
+    {
+        "package_code": "PKG-ADSL-16",
+        "name": "ADSL 16",
+        "technology": "adsl",
+        "download_mbps": 16,
+        "upload_mbps": 2,
+        "monthly_price": "199.90",
+        "commitment_months": 12,
+        "subscription_count": 20,
+    },
+]
+
+SERVICE_PACKAGE_METADATA = {
+    "synthetic_catalog": True,
+    "disclaimer": (
+        "Synthetic demo catalog only. Package names and prices do not represent real "
+        "Turkcell products or current prices."
+    ),
+    "eligibility_rule_defined": False,
 }
 
 SUBSCRIPTION_DISTRIBUTION = {
@@ -191,6 +344,8 @@ def build_serializable_config(reference_datetime: str) -> dict:
         "gpon_reserved_port_neighborhoods": GPON_RESERVED_PORT_NEIGHBORHOODS,
         "dslam_port_distribution": DSLAM_PORT_DISTRIBUTION,
         "customer_plan": CUSTOMER_PLAN,
+        "service_package_catalog": SERVICE_PACKAGE_CATALOG,
+        "service_package_metadata": SERVICE_PACKAGE_METADATA,
         "subscription_distribution": SUBSCRIPTION_DISTRIBUTION,
         "technology_totals": TECHNOLOGY_TOTALS,
         "outage_plan": OUTAGE_PLAN,
