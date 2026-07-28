@@ -39,6 +39,8 @@ from apps.operations.models import (
     QualityMeasurement,
     Severity,
 )
+from apps.rules.models import Rule, RuleVersion
+from apps.rules.services.version_selection import select_rule_version_for_moment
 
 
 @pytest.mark.django_db
@@ -63,7 +65,7 @@ def test_seed_maltepe_mvp_creates_passive_dataset_snapshot_and_geography():
     assert snapshot.name == seed_config.SNAPSHOT_NAME
     assert snapshot.status == DatasetSnapshotStatus.VALIDATED
     assert snapshot.validation_status == ResultStatus.EXACT
-    assert snapshot.validation_result["seed_stage"] == "023_validation_gate"
+    assert snapshot.validation_result["seed_stage"] == "026_refund_rules"
     assert snapshot.validation_result["validated"] is True
     assert all(
         {"name", "expected", "actual", "passed"} <= set(check)
@@ -89,6 +91,8 @@ def test_seed_maltepe_mvp_creates_passive_dataset_snapshot_and_geography():
     assert snapshot.row_counts["outages"] == 3
     assert snapshot.row_counts["operational_events"] == 12
     assert snapshot.row_counts["quality_measurements"] == 0
+    assert snapshot.row_counts["rules"] == 1
+    assert snapshot.row_counts["rule_versions"] == 2
     assert neighborhoods == sorted(seed_config.NEIGHBORHOODS)
 
 
@@ -329,6 +333,8 @@ def test_seed_maltepe_mvp_reset_recreates_deterministic_codes_without_duplicates
     assert snapshot.row_counts["customers"] == 225
     assert snapshot.row_counts["subscription_connections"] == 240
     assert snapshot.row_counts["outages"] == 3
+    assert snapshot.row_counts["rules"] == 1
+    assert snapshot.row_counts["rule_versions"] == 2
 
 
 @pytest.mark.django_db
@@ -595,6 +601,43 @@ def test_seed_maltepe_mvp_links_alarms_incidents_and_operational_events():
         and event.metadata["does_not_claim_partial_restoration"] is True
         for event in OperationalEvent.objects.filter(data_snapshot=snapshot)
     )
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_creates_refund_rule_versions_and_selects_by_outage_date():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    rule = Rule.objects.get(data_snapshot=snapshot, code="REFUND-001")
+    versions = {
+        version.version: version
+        for version in RuleVersion.objects.filter(data_snapshot=snapshot, rule=rule)
+    }
+    main_outage = Outage.objects.get(data_snapshot=snapshot, outage_code="OUT-MAL-BNG-001")
+    v1_outage = Outage.objects.get(data_snapshot=snapshot, outage_code="OUT-MAL-OLT-001")
+    main_selection = select_rule_version_for_moment(
+        snapshot=snapshot,
+        rule_code="REFUND-001",
+        moment=main_outage.started_at,
+    )
+    v1_selection = select_rule_version_for_moment(
+        snapshot=snapshot,
+        rule_code="REFUND-001",
+        moment=v1_outage.started_at,
+    )
+
+    assert rule.metadata["synthetic_demo_policy"] is True
+    assert set(versions) == {1, 2}
+    assert versions[1].condition_tree["conditions"][-1]["value"] == 180
+    assert versions[2].condition_tree["conditions"][-1]["value"] == 120
+    assert versions[1].action_config["refund_formula"]["percentage"] == "0.10"
+    assert versions[2].action_config["refund_formula"]["percentage"] == "0.10"
+    assert versions[1].action_config["result_on_missing_required_data"] == "manual_review"
+    assert versions[2].action_config["result_on_missing_required_data"] == "manual_review"
+    assert main_selection.status == "selected"
+    assert main_selection.selected_version == versions[2]
+    assert v1_selection.status == "selected"
+    assert v1_selection.selected_version == versions[1]
 
 
 def get_connection_bng_code(connection: SubscriptionConnection) -> str:

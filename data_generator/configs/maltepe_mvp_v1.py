@@ -393,6 +393,47 @@ OPERATIONAL_EVENT_TEMPLATES = [
     },
 ]
 
+REFUND_RULE_PLAN = {
+    "code": "REFUND-001",
+    "name": "Synthetic full outage refund eligibility",
+    "rule_type": "compensation",
+    "status": "active",
+    "description": (
+        "Synthetic MVP refund eligibility rule. This is not a real Turkcell policy."
+    ),
+    "versions": [
+        {
+            "version": 1,
+            "status": "active",
+            "valid_from": "2026-01-01T00:00:00+03:00",
+            "valid_to": "2026-07-14T23:59:59+03:00",
+            "minimum_impact_minutes": 180,
+        },
+        {
+            "version": 2,
+            "status": "active",
+            "valid_from": "2026-07-15T00:00:00+03:00",
+            "valid_to": None,
+            "minimum_impact_minutes": 120,
+        },
+    ],
+    "refund_formula": {
+        "type": "monthly_price_percentage",
+        "percentage": "0.10",
+        "currency": "TRY",
+        "decimal_places": 2,
+        "rounding": "ROUND_HALF_UP",
+        "minimum_amount": None,
+        "maximum_amount": None,
+        "synthetic_demo_policy": True,
+    },
+    "deferred_inputs": [
+        "payment_debt_or_late_payment",
+        "campaign_discount",
+        "previous_compensation",
+    ],
+}
+
 
 def build_serializable_config(reference_datetime: str) -> dict:
     return {
@@ -424,4 +465,5 @@ def build_serializable_config(reference_datetime: str) -> dict:
         "outage_plan": OUTAGE_PLAN,
         "alarm_catalog": ALARM_CATALOG,
         "operational_event_templates": OPERATIONAL_EVENT_TEMPLATES,
+        "refund_rule_plan": REFUND_RULE_PLAN,
     }

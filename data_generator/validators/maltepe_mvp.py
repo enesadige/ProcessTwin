@@ -30,6 +30,7 @@ from apps.operations.models import (
     Outage,
     QualityMeasurement,
 )
+from apps.rules.models import Rule, RuleVersion
 
 EXPECTED_COUNTS = {
     "neighborhoods": 5,
@@ -49,6 +50,8 @@ EXPECTED_COUNTS = {
     "outages": 3,
     "operational_events": 12,
     "quality_measurements": 0,
+    "rules": 1,
+    "rule_versions": 2,
 }
 
 EXPECTED_PRIORITY_DISTRIBUTION = {
@@ -140,6 +143,8 @@ def collect_row_counts(snapshot: DataSnapshot) -> dict[str, int]:
         "quality_measurements": QualityMeasurement.objects.filter(
             data_snapshot=snapshot
         ).count(),
+        "rules": Rule.objects.filter(data_snapshot=snapshot).count(),
+        "rule_versions": RuleVersion.objects.filter(data_snapshot=snapshot).count(),
     }
 
 

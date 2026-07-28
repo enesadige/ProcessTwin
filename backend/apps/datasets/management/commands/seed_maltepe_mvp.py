@@ -4,6 +4,7 @@ from data_generator.configs import maltepe_mvp_v1 as seed_config
 from data_generator.seeders.customers import seed_customer_subscriptions
 from data_generator.seeders.network import seed_network_topology
 from data_generator.seeders.operations import seed_operations
+from data_generator.seeders.rules import seed_rules
 from data_generator.validators.maltepe_mvp import validate_maltepe_mvp_snapshot
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -26,7 +27,8 @@ ISTANBUL_TZ = ZoneInfo("Europe/Istanbul")
 class Command(BaseCommand):
     help = (
         "Create the Maltepe MVP dataset, snapshot, geography, network topology, customers, "
-        "service packages, subscriptions, subscription connections, and operations records."
+        "service packages, subscriptions, subscription connections, operations records, and "
+        "rule versions."
     )
 
     def add_arguments(self, parser):
@@ -90,7 +92,7 @@ class Command(BaseCommand):
                 description=(
                     "Deterministic synthetic dataset for the Maltepe MVP scenario. "
                     "Current seed stage creates dataset, snapshot, geography, network topology, "
-                    "customer subscription, and operations records."
+                    "customer subscription, operations, and rule records."
                 ),
             )
             dataset.full_clean()
@@ -124,6 +126,7 @@ class Command(BaseCommand):
                 snapshot=snapshot,
                 reference_datetime=reference_datetime,
             )
+            rule_counts = seed_rules(snapshot=snapshot)
 
             validation_report = validate_maltepe_mvp_snapshot(snapshot)
             if not validation_report["passed"]:
@@ -136,7 +139,7 @@ class Command(BaseCommand):
                 )
 
             validation_result = {
-                "seed_stage": "023_validation_gate",
+                "seed_stage": "026_refund_rules",
                 "reference_datetime": reference_datetime_iso,
                 "created_geography": {
                     "city": city_created,
@@ -147,6 +150,7 @@ class Command(BaseCommand):
                 "network_counts": network_counts,
                 "customer_counts": customer_counts,
                 "operations_counts": operations_counts,
+                "rule_counts": rule_counts,
                 "checks": validation_report["checks"],
                 "validated": True,
             }
@@ -169,7 +173,8 @@ class Command(BaseCommand):
                 f"{network_counts['network_devices']} devices, "
                 f"{network_counts['network_ports']} ports, and "
                 f"{customer_counts['subscriptions']} subscriptions, "
-                f"{operations_counts['outages']} outages."
+                f"{operations_counts['outages']} outages, "
+                f"{rule_counts['rule_versions']} rule versions."
             )
         )
 
@@ -215,9 +220,14 @@ def delete_target_dataset_tree(dataset: DatasetVersion) -> None:
         Outage,
         QualityMeasurement,
     )
+    from apps.rules.models import Rule, RuleChangeSet, RuleTestCase, RuleVersion
 
     snapshots = list(dataset.snapshots.all())
     for snapshot in snapshots:
+        RuleTestCase.objects.filter(data_snapshot=snapshot).delete()
+        RuleVersion.objects.filter(data_snapshot=snapshot).delete()
+        RuleChangeSet.objects.filter(data_snapshot=snapshot).delete()
+        Rule.objects.filter(data_snapshot=snapshot).delete()
         QualityMeasurement.objects.filter(data_snapshot=snapshot).delete()
         Outage.objects.filter(data_snapshot=snapshot).delete()
         OperationalEvent.objects.filter(data_snapshot=snapshot).delete()

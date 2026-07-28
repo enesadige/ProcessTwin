@@ -16,6 +16,7 @@ from apps.rules.models import (
     RuleVersion,
     RuleVersionStatus,
 )
+from apps.rules.services.version_selection import select_rule_version_for_moment
 
 
 def create_snapshot(seed: str = "rule-seed-001") -> DataSnapshot:
@@ -196,3 +197,82 @@ def test_rule_identifiers_are_unique_per_snapshot():
                 rule=rule,
                 name="basic placeholder scenario",
             )
+
+
+@pytest.mark.django_db
+def test_rule_version_selection_returns_single_active_version_for_moment():
+    snapshot = create_snapshot()
+    rule = create_refund_rule(snapshot)
+    moment = timezone.now()
+    version = RuleVersion.objects.create(
+        data_snapshot=snapshot,
+        rule=rule,
+        version=1,
+        status=RuleVersionStatus.ACTIVE,
+        valid_from=moment - timedelta(days=1),
+        valid_to=moment + timedelta(days=1),
+    )
+
+    selection = select_rule_version_for_moment(
+        snapshot=snapshot,
+        rule_code="REFUND-001",
+        moment=moment,
+    )
+
+    assert selection.status == "selected"
+    assert selection.selected_version == version
+    assert selection.reason == "single_active_version_for_moment"
+
+
+@pytest.mark.django_db
+def test_rule_version_selection_returns_manual_review_when_no_version_matches():
+    snapshot = create_snapshot()
+    create_refund_rule(snapshot)
+    moment = timezone.now()
+
+    selection = select_rule_version_for_moment(
+        snapshot=snapshot,
+        rule_code="REFUND-001",
+        moment=moment,
+    )
+
+    assert selection.status == "manual_review"
+    assert selection.selected_version is None
+    assert selection.reason == "no_active_version_for_moment"
+
+
+@pytest.mark.django_db
+def test_rule_version_selection_returns_manual_review_for_multiple_matches():
+    snapshot = create_snapshot()
+    rule = create_refund_rule(snapshot)
+    moment = timezone.now()
+    RuleVersion.objects.bulk_create(
+        [
+            RuleVersion(
+                data_snapshot=snapshot,
+                rule=rule,
+                version=1,
+                status=RuleVersionStatus.ACTIVE,
+                valid_from=moment - timedelta(days=2),
+                valid_to=moment + timedelta(days=2),
+            ),
+            RuleVersion(
+                data_snapshot=snapshot,
+                rule=rule,
+                version=2,
+                status=RuleVersionStatus.ACTIVE,
+                valid_from=moment - timedelta(days=1),
+                valid_to=moment + timedelta(days=1),
+            ),
+        ]
+    )
+
+    selection = select_rule_version_for_moment(
+        snapshot=snapshot,
+        rule_code="REFUND-001",
+        moment=moment,
+    )
+
+    assert selection.status == "manual_review"
+    assert selection.selected_version is None
+    assert selection.reason == "multiple_active_versions_for_moment"

@@ -384,21 +384,60 @@ Durum: `MVP İÇİN KARAR VERİLDİ`
 
 ## 3. İş Kuralları ve Telafi
 
-Durum: `KARAR BEKLİYOR`
+Durum: `MVP İÇİN KARAR VERİLDİ`
 
-- İade eşikleri: `KARAR BEKLİYOR`
-- Hesaplama formülü: `KARAR BEKLİYOR`
-- Alt/üst tutar sınırları: `KARAR BEKLİYOR`
-- Müşteri segmenti farkları: `KARAR BEKLİYOR`
-- Ödeme ve geçmiş telafi etkisi: `KARAR BEKLİYOR`
+- İade eşikleri: `KARAR VERİLDİ`
+  - `REFUND-001` v1:
+    - geçerlilik başlangıcı: `2026-01-01T00:00:00+03:00`
+    - geçerlilik bitişi: `2026-07-14T23:59:59+03:00`
+    - minimum etki süresi: 180 dakika
+  - `REFUND-001` v2:
+    - geçerlilik başlangıcı: `2026-07-15T00:00:00+03:00`
+    - geçerlilik bitişi: açık
+    - minimum etki süresi: 120 dakika
+  - Ana BNG outage `2026-07-20` tarihinde olduğu için v2 seçilmelidir.
+  - Mevcut kısa outage tarihleri değiştirilmez; v1 seçimi unit test ile ayrıca doğrulanır.
+- Uygunluk koşulları: `KARAR VERİLDİ`
+  - outage türü `full_outage` olmalıdır
+  - abonelik outage sırasında aktif olmalıdır
+  - `SubscriptionConnection` outage zamanıyla çakışmalıdır
+  - hesaplanan etki süresi ilgili kural sürümünün eşiğine eşit veya büyük olmalıdır
+- Hesaplama formülü: `KARAR VERİLDİ`
+  - Sentetik MVP formülü: `refund_amount = subscription.monthly_price * 0.10`
+  - İki ondalığa yuvarlanır.
+  - Para birimi: TRY
+  - Minimum tutar yoktur.
+  - Ek üst sınır yoktur; tutar aylık ücretin yüzde 10'udur.
+  - Bu formül gerçek Turkcell politikası olarak sunulmaz; sentetik demo kuralıdır.
+  - v1 ve v2'de formül aynıdır; yalnızca süre eşiği değişir.
+- Alt/üst tutar sınırları: `KARAR VERİLDİ`
+  - Minimum tutar yok.
+  - Ek üst sınır yok.
+- Müşteri segmenti ve VIP farkları: `KARAR VERİLDİ`
+  - `standard` ve `vip` aynı kuralı kullanır.
+  - `individual`, `sme`, `enterprise` ve `public` aynı kuralı kullanır.
+  - VIP'ye özel oran, öncelik veya SLA bu görevde eklenmez.
+- Ödeme, kampanya ve geçmiş telafi etkisi: `SONRAKİ KAPSAM`
+  - Bu görevde eligibility koşuluna dahil edilmez:
+    - ödeme borcu/gecikme
+    - kampanya indirimi
+    - daha önce telafi alınması
   - Görev 021 kapsamında `PaymentRecord`, `CampaignEnrollment` ve `CompensationHistory` seedlenmez.
   - Bu kayıtlar gerçek iade formülü, fatura dönemi, kampanya indirimi ve geçmiş telafi kontrolleri tasarlanmadan önce zorunlu olarak netleştirilmelidir.
   - `PaymentRecord` için en az fatura dönemi, ödeme durumu, gecikme/borç etkisi ve tutar üretim mantığı belirlenmelidir.
   - `CampaignEnrollment` için kampanya indirimi, kampanya birlikte kullanım kuralı, geçerlilik dönemi ve telafiyle etkileşim kararı verilmelidir.
   - `CompensationHistory` için geçmiş telafi referansı, tutar, karar tarihi, tekrar telafi etkisi ve manuel inceleme koşulu netleştirilmelidir.
-- Kampanya birlikte kullanım kuralları: `KARAR BEKLİYOR`
-- Manuel inceleme koşulları: `KARAR BEKLİYOR`
-- Kural sürümleri ve öncelikler: `KARAR BEKLİYOR`
+- Kampanya birlikte kullanım kuralları: `SONRAKİ KAPSAM`
+- Manuel inceleme koşulları: `KARAR VERİLDİ`
+  - Zorunlu veri eksikse otomatik red verilmez.
+  - Sonuç `manual_review` olur.
+  - Eksik `monthly_price`, outage zamanı, bağlantı veya kural sürümü gibi durumlarda hesaplama yapılmaz.
+- Kural sürümleri ve öncelikler: `KARAR VERİLDİ`
+  - RuleVersion seçimi `Outage.started_at` tarihine göre yapılır.
+  - Aynı tarihte birden fazla geçerli RuleVersion bulunmasına izin verilmez.
+  - Sürüm tarih aralıkları çakışmaz.
+  - Hiç sürüm bulunamazsa veya birden fazla sürüm bulunursa güvenli `manual_review` sonucu oluşur.
+  - Kafadan “en yeni sürümü seç” davranışı yazılmaz.
 
 ## 4. Ground Truth
 
