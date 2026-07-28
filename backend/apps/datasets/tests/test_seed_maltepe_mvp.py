@@ -1,4 +1,7 @@
+import hashlib
+import json
 from collections import Counter
+from decimal import ROUND_HALF_UP, Decimal
 
 import pytest
 from data_generator.configs import maltepe_mvp_v1 as seed_config
@@ -15,7 +18,13 @@ from apps.customers.models import (
     SubscriptionConnection,
 )
 from apps.datasets.management.commands.seed_maltepe_mvp import get_target_dataset_slug
-from apps.datasets.models import DatasetSnapshotStatus, DatasetVersion, DataSnapshot
+from apps.datasets.models import (
+    DatasetSnapshotStatus,
+    DatasetVersion,
+    DataSnapshot,
+    GroundTruthCase,
+    GroundTruthEligibility,
+)
 from apps.geography.models import City, District, Neighborhood
 from apps.network.models import (
     AccessTechnology,
@@ -65,7 +74,7 @@ def test_seed_maltepe_mvp_creates_passive_dataset_snapshot_and_geography():
     assert snapshot.name == seed_config.SNAPSHOT_NAME
     assert snapshot.status == DatasetSnapshotStatus.VALIDATED
     assert snapshot.validation_status == ResultStatus.EXACT
-    assert snapshot.validation_result["seed_stage"] == "026_refund_rules"
+    assert snapshot.validation_result["seed_stage"] == "027_ground_truth"
     assert snapshot.validation_result["validated"] is True
     assert all(
         {"name", "expected", "actual", "passed"} <= set(check)
@@ -93,6 +102,7 @@ def test_seed_maltepe_mvp_creates_passive_dataset_snapshot_and_geography():
     assert snapshot.row_counts["quality_measurements"] == 0
     assert snapshot.row_counts["rules"] == 1
     assert snapshot.row_counts["rule_versions"] == 2
+    assert snapshot.row_counts["ground_truth_cases"] == 3
     assert neighborhoods == sorted(seed_config.NEIGHBORHOODS)
 
 
@@ -335,6 +345,7 @@ def test_seed_maltepe_mvp_reset_recreates_deterministic_codes_without_duplicates
     assert snapshot.row_counts["outages"] == 3
     assert snapshot.row_counts["rules"] == 1
     assert snapshot.row_counts["rule_versions"] == 2
+    assert snapshot.row_counts["ground_truth_cases"] == 3
 
 
 @pytest.mark.django_db
@@ -640,6 +651,85 @@ def test_seed_maltepe_mvp_creates_refund_rule_versions_and_selects_by_outage_dat
     assert v1_selection.selected_version == versions[1]
 
 
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_creates_ground_truth_cases_for_all_outages():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    cases = {
+        case.outage_code: case
+        for case in GroundTruthCase.objects.filter(data_snapshot=snapshot)
+    }
+    main_case = cases["OUT-MAL-BNG-001"]
+    olt_case = cases["OUT-MAL-OLT-001"]
+    dslam_case = cases["OUT-MAL-DSLAM-001"]
+
+    assert set(cases) == {
+        "OUT-MAL-BNG-001",
+        "OUT-MAL-OLT-001",
+        "OUT-MAL-DSLAM-001",
+    }
+    assert main_case.expected_source_device_code == "BNG-MAL-001"
+    assert main_case.expected_incident_code == "INC-MAL-BNG-001"
+    assert main_case.expected_alarm_type_codes == ["BNG_UNREACHABLE", "LINK_DOWN"]
+    assert main_case.expected_duration_minutes == 200
+    assert main_case.expected_rule_code == "REFUND-001"
+    assert main_case.expected_rule_version == 2
+    assert main_case.expected_eligibility == GroundTruthEligibility.ELIGIBLE
+    assert main_case.expected_reason_code == "duration_threshold_met"
+    assert main_case.affected_subscription_count == 150
+    assert main_case.affected_subscription_count >= main_case.affected_customer_count
+    assert main_case.unaffected_subscription_count == 90
+    assert main_case.unaffected_customer_count == 85
+    assert main_case.currency == "TRY"
+    assert all(code.startswith("SUB-MAL-") for code in main_case.affected_subscription_codes)
+    assert all(code.startswith("CUST-MAL-") for code in main_case.affected_customer_codes)
+    assert olt_case.expected_rule_version == 1
+    assert olt_case.expected_eligibility == GroundTruthEligibility.INELIGIBLE
+    assert olt_case.expected_reason_code == "duration_below_threshold"
+    assert str(olt_case.expected_total_refund_amount) == "0.00"
+    assert dslam_case.expected_rule_version == 2
+    assert dslam_case.expected_eligibility == GroundTruthEligibility.INELIGIBLE
+    assert dslam_case.expected_reason_code == "duration_below_threshold"
+    assert str(dslam_case.expected_total_refund_amount) == "0.00"
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_ground_truth_hashes_and_refund_total_are_deterministic():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    main_case = GroundTruthCase.objects.get(
+        data_snapshot=snapshot,
+        outage_code="OUT-MAL-BNG-001",
+    )
+    affected_subscriptions = Subscription.objects.filter(
+        data_snapshot=snapshot,
+        subscription_number__in=main_case.affected_subscription_codes,
+    )
+    expected_total = sum(
+        (
+            subscription.monthly_price
+            * Decimal(seed_config.REFUND_RULE_PLAN["refund_formula"]["percentage"])
+        ).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+        for subscription in affected_subscriptions
+    )
+
+    assert main_case.affected_subscription_codes == sorted(
+        main_case.affected_subscription_codes
+    )
+    assert main_case.affected_customer_codes == sorted(main_case.affected_customer_codes)
+    assert main_case.affected_subscription_hash == hash_codes(
+        main_case.affected_subscription_codes
+    )
+    assert main_case.affected_customer_hash == hash_codes(main_case.affected_customer_codes)
+    assert main_case.expected_total_refund_amount == expected_total
+    assert len(main_case.metadata["subscription_refund_amounts"]) == 150
+
+
 def get_connection_bng_code(connection: SubscriptionConnection) -> str:
     device = connection.line_connection.port.device
     if device.device_type == NetworkDeviceType.BNG:
@@ -685,4 +775,14 @@ def collect_seed_codes() -> dict[str, list[str]]:
             .order_by("outage_code")
             .values_list("outage_code", flat=True)
         ),
+        "ground_truth_cases": list(
+            GroundTruthCase.objects.filter(data_snapshot=snapshot)
+            .order_by("case_code")
+            .values_list("case_code", flat=True)
+        ),
     }
+
+
+def hash_codes(codes: list[str]) -> str:
+    encoded = json.dumps(codes, ensure_ascii=False, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()

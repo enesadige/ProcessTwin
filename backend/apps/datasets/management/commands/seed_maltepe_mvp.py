@@ -2,6 +2,7 @@ from zoneinfo import ZoneInfo
 
 from data_generator.configs import maltepe_mvp_v1 as seed_config
 from data_generator.seeders.customers import seed_customer_subscriptions
+from data_generator.seeders.ground_truth import seed_ground_truth
 from data_generator.seeders.network import seed_network_topology
 from data_generator.seeders.operations import seed_operations
 from data_generator.seeders.rules import seed_rules
@@ -28,7 +29,7 @@ class Command(BaseCommand):
     help = (
         "Create the Maltepe MVP dataset, snapshot, geography, network topology, customers, "
         "service packages, subscriptions, subscription connections, operations records, and "
-        "rule versions."
+        "rule versions, and ground truth cases."
     )
 
     def add_arguments(self, parser):
@@ -92,7 +93,7 @@ class Command(BaseCommand):
                 description=(
                     "Deterministic synthetic dataset for the Maltepe MVP scenario. "
                     "Current seed stage creates dataset, snapshot, geography, network topology, "
-                    "customer subscription, operations, and rule records."
+                    "customer subscription, operations, rule, and ground truth records."
                 ),
             )
             dataset.full_clean()
@@ -127,6 +128,7 @@ class Command(BaseCommand):
                 reference_datetime=reference_datetime,
             )
             rule_counts = seed_rules(snapshot=snapshot)
+            ground_truth_counts = seed_ground_truth(snapshot=snapshot)
 
             validation_report = validate_maltepe_mvp_snapshot(snapshot)
             if not validation_report["passed"]:
@@ -139,7 +141,7 @@ class Command(BaseCommand):
                 )
 
             validation_result = {
-                "seed_stage": "026_refund_rules",
+                "seed_stage": "027_ground_truth",
                 "reference_datetime": reference_datetime_iso,
                 "created_geography": {
                     "city": city_created,
@@ -151,6 +153,7 @@ class Command(BaseCommand):
                 "customer_counts": customer_counts,
                 "operations_counts": operations_counts,
                 "rule_counts": rule_counts,
+                "ground_truth_counts": ground_truth_counts,
                 "checks": validation_report["checks"],
                 "validated": True,
             }
@@ -174,7 +177,8 @@ class Command(BaseCommand):
                 f"{network_counts['network_ports']} ports, and "
                 f"{customer_counts['subscriptions']} subscriptions, "
                 f"{operations_counts['outages']} outages, "
-                f"{rule_counts['rule_versions']} rule versions."
+                f"{rule_counts['rule_versions']} rule versions, "
+                f"{ground_truth_counts['ground_truth_cases']} ground truth cases."
             )
         )
 
@@ -204,6 +208,7 @@ def delete_target_dataset_tree(dataset: DatasetVersion) -> None:
         Subscription,
         SubscriptionConnection,
     )
+    from apps.datasets.models import GroundTruthCase
     from apps.network.models import (
         AccessSegment,
         LineConnection,
@@ -224,6 +229,7 @@ def delete_target_dataset_tree(dataset: DatasetVersion) -> None:
 
     snapshots = list(dataset.snapshots.all())
     for snapshot in snapshots:
+        GroundTruthCase.objects.filter(data_snapshot=snapshot).delete()
         RuleTestCase.objects.filter(data_snapshot=snapshot).delete()
         RuleVersion.objects.filter(data_snapshot=snapshot).delete()
         RuleChangeSet.objects.filter(data_snapshot=snapshot).delete()

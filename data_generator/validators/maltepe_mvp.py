@@ -1,3 +1,5 @@
+import hashlib
+import json
 from collections import Counter
 from datetime import datetime, timedelta
 from typing import Any
@@ -11,7 +13,7 @@ from apps.customers.models import (
     Subscription,
     SubscriptionConnection,
 )
-from apps.datasets.models import DataSnapshot
+from apps.datasets.models import DataSnapshot, GroundTruthCase
 from apps.geography.models import Neighborhood
 from apps.network.models import (
     AccessSegment,
@@ -52,6 +54,7 @@ EXPECTED_COUNTS = {
     "quality_measurements": 0,
     "rules": 1,
     "rule_versions": 2,
+    "ground_truth_cases": 3,
 }
 
 EXPECTED_PRIORITY_DISTRIBUTION = {
@@ -110,6 +113,18 @@ def validate_maltepe_mvp_snapshot(snapshot: DataSnapshot) -> dict[str, Any]:
             },
             actual=collect_main_outage_previous_month_status(snapshot),
         ),
+        build_check(
+            name="ground_truth_case_integrity",
+            expected={
+                "case_count": 3,
+                "references_are_valid": True,
+                "hashes_are_valid": True,
+                "affected_unaffected_counts_are_valid": True,
+                "source_devices_are_valid": True,
+                "main_bng_affected_subscriptions": 150,
+            },
+            actual=collect_ground_truth_integrity(snapshot),
+        ),
     ]
     row_counts = next(check["actual"] for check in checks if check["name"] == "row_counts")
     return {
@@ -145,6 +160,7 @@ def collect_row_counts(snapshot: DataSnapshot) -> dict[str, int]:
         ).count(),
         "rules": Rule.objects.filter(data_snapshot=snapshot).count(),
         "rule_versions": RuleVersion.objects.filter(data_snapshot=snapshot).count(),
+        "ground_truth_cases": GroundTruthCase.objects.filter(data_snapshot=snapshot).count(),
     }
 
 
@@ -212,6 +228,66 @@ def collect_main_outage_previous_month_status(snapshot: DataSnapshot) -> dict[st
     }
 
 
+def collect_ground_truth_integrity(snapshot: DataSnapshot) -> dict[str, Any]:
+    cases = list(GroundTruthCase.objects.filter(data_snapshot=snapshot).order_by("outage_code"))
+    outage_codes = set(
+        Outage.objects.filter(data_snapshot=snapshot).values_list("outage_code", flat=True)
+    )
+    incident_codes = set(
+        Incident.objects.filter(data_snapshot=snapshot).values_list("incident_number", flat=True)
+    )
+    alarm_type_codes = set(
+        AlarmType.objects.filter(data_snapshot=snapshot).values_list("code", flat=True)
+    )
+    source_device_codes = set(
+        NetworkDevice.objects.filter(data_snapshot=snapshot).values_list("code", flat=True)
+    )
+    customer_codes = set(
+        Customer.objects.filter(data_snapshot=snapshot).values_list("customer_number", flat=True)
+    )
+    subscription_codes = set(
+        Subscription.objects.filter(data_snapshot=snapshot).values_list(
+            "subscription_number",
+            flat=True,
+        )
+    )
+    total_customers = len(customer_codes)
+    total_subscriptions = len(subscription_codes)
+    references_are_valid = all(
+        case.outage_code in outage_codes
+        and case.expected_incident_code in incident_codes
+        and set(case.expected_alarm_type_codes).issubset(alarm_type_codes)
+        and set(case.affected_customer_codes).issubset(customer_codes)
+        and set(case.affected_subscription_codes).issubset(subscription_codes)
+        for case in cases
+    )
+    hashes_are_valid = all(
+        case.affected_customer_hash == hash_codes(case.affected_customer_codes)
+        and case.affected_subscription_hash == hash_codes(case.affected_subscription_codes)
+        for case in cases
+    )
+    affected_unaffected_counts_are_valid = all(
+        case.affected_customer_count + case.unaffected_customer_count == total_customers
+        and case.affected_subscription_count + case.unaffected_subscription_count
+        == total_subscriptions
+        and case.affected_subscription_count >= case.affected_customer_count
+        for case in cases
+    )
+    main_case = next((case for case in cases if case.outage_code == MAIN_OUTAGE_CODE), None)
+    return {
+        "case_count": len(cases),
+        "references_are_valid": references_are_valid,
+        "hashes_are_valid": hashes_are_valid,
+        "affected_unaffected_counts_are_valid": affected_unaffected_counts_are_valid,
+        "source_devices_are_valid": all(
+            case.expected_source_device_code in source_device_codes for case in cases
+        ),
+        "main_bng_affected_subscriptions": (
+            main_case.affected_subscription_count if main_case else None
+        ),
+    }
+
+
 def get_previous_calendar_month_bounds(reference_datetime: datetime) -> tuple[datetime, datetime]:
     current_month_start = reference_datetime.replace(
         day=1,
@@ -256,3 +332,8 @@ def build_check(*, name: str, expected, actual) -> dict[str, Any]:
 
 def normalize_counter(counter: Counter) -> dict[str, int]:
     return dict(sorted(counter.items()))
+
+
+def hash_codes(codes: list[str]) -> str:
+    encoded = json.dumps(codes, ensure_ascii=False, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()

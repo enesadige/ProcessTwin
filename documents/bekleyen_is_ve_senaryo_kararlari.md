@@ -441,14 +441,76 @@ Durum: `MVP İÇİN KARAR VERİLDİ`
 
 ## 4. Ground Truth
 
-Durum: `KARAR BEKLİYOR`
+Durum: `KARAR VERİLDİ`
 
-- Gerçek kök neden: `KARAR BEKLİYOR`
-- Alarm grupları: `KARAR BEKLİYOR`
-- Etkilenen ve etkilenmeyen müşteriler: `KARAR BEKLİYOR`
-- Beklenen müşteri sayıları: `KARAR BEKLİYOR`
-- Beklenen kural ve telafi sonuçları: `KARAR BEKLİYOR`
-- Negatif ve bozuk veri senaryoları: `KARAR BEKLİYOR`
+- Kapsam: `KARAR VERİLDİ`
+  - Ground truth üç outage için üretilir:
+    - ana BNG outage
+    - kısa OLT outage
+    - kısa DSLAM outage
+  - Ana BNG outage pozitif telafi senaryosudur.
+  - Kısa OLT ve DSLAM outage kayıtları süre eşiğini geçmeyen negatif senaryolardır.
+- Saklanacak etki kayıtları: `KARAR VERİLDİ`
+  - Her outage için ayrı ground truth kaydı tutulur.
+  - Kaydedilecek alanlar:
+    - outage code
+    - beklenen kaynak cihaz kodu
+    - beklenen incident kodu
+    - beklenen alarm type kodları
+    - beklenen süre dakika değeri
+    - beklenen rule code ve rule version
+    - etkilenen subscription kodları ve sayısı
+    - etkilenen customer kodları ve sayısı
+    - etkilenen segment sayımları
+    - etkilenen priority sayımları
+    - beklenen eligibility
+    - beklenen reason code
+    - beklenen toplam iade tutarı
+    - currency
+  - DB primary key saklanmaz.
+  - `CUST-MAL-*`, `SUB-MAL-*`, `OUT-MAL-*` gibi deterministik business code değerleri saklanır.
+  - Etkilenen müşteri ve abonelik listeleri sıralı ve deterministik tutulur.
+  - Etkilenen müşteri ve abonelik listeleri için ayrıca SHA-256 hash değeri saklanır.
+- Etkilenmeyen kayıtlar: `KARAR VERİLDİ`
+  - Etkilenmeyen müşteri ve aboneliklerin tam listesi saklanmaz.
+  - Yalnız `unaffected_customer_count` ve `unaffected_subscription_count` tutulur.
+  - Etkilenmeyen set snapshot toplamından affected set çıkarılarak doğrulanır.
+- Beklenen kural ve telafi sonuçları: `KARAR VERİLDİ`
+  - Ana BNG outage için:
+    - expected eligibility: `eligible`
+    - expected rule: `REFUND-001`
+    - expected rule version: `v2`
+    - iade abonelik başına hesaplanır.
+    - formül: `subscription.monthly_price * 0.10`
+    - iki ondalığa yuvarlanır.
+    - currency: `TRY`
+    - toplam beklenen iade tutarı saklanır.
+  - Aynı müşterinin iki etkilenen aboneliği varsa iki ayrı abonelik sonucu olabilir.
+  - Kısa OLT ve DSLAM outage için:
+    - expected eligibility: `ineligible`
+    - expected reason: `duration_below_threshold`
+    - expected refund amount: `0.00`
+    - olay tarihinde geçerli beklenen RuleVersion açıkça saklanır.
+- Ground truth bağımsızlığı: `KARAR VERİLDİ`
+  - Ground truth üretimi ileride yazılacak servisleri kullanmaz:
+    - CustomerImpactService
+    - CompensationService
+    - MCP tool
+    - production rule evaluation service
+  - Ground truth, seed config, deterministik business code dağılımları ve bilinen senaryo kararlarından üretilen bağımsız oracle kabul edilir.
+  - Aynı hesaplama kodu hem ground truth hem production serviste ortak kullanılmaz.
+- Negatif ve bozuk veri senaryoları: `SONRAKİ KAPSAM`
+  - Bu görevde eksik bağlantı, bozuk müşteri, yanlış cihaz veya duplicate olay eklenmez.
+  - Ana dataset temiz ve validated kalır.
+  - Eksik/bozuk veri senaryoları sonraki servis unit testlerinde fixture olarak oluşturulur.
+- Snapshot ve validation: `KARAR VERİLDİ`
+  - Ground truth kayıtları `DataSnapshot` kaydına bağlıdır.
+  - `--reset` ile deterministik biçimde yeniden oluşur.
+  - Duplicate kayıt oluşmaz.
+  - Validator ground truth kayıtlarının outage, source device, incident, alarm, customer ve subscription kodlarıyla tutarlı olduğunu doğrular.
+  - Affected ve unaffected sayıları snapshot toplamlarıyla tutarlı olmalıdır.
+  - `affected_subscription_count`, `affected_customer_count` değerinden küçük olamaz.
+  - Ana BNG outage için affected subscription sayısı BNG-MAL-001 tarafındaki 150 bağlantıyla uyumlu olmalıdır.
 
 ## 5. RAG Kaynakları
 

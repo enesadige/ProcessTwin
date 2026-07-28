@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.datasets.models import DatasetVersion, DataSnapshot
+from apps.datasets.models import DatasetVersion, DataSnapshot, GroundTruthCase
 
 
 @admin.register(DatasetVersion)
@@ -28,3 +28,27 @@ class DataSnapshotAdmin(admin.ModelAdmin):
     autocomplete_fields = ("dataset_version",)
     list_select_related = ("dataset_version",)
     date_hierarchy = "created_at"
+
+
+@admin.register(GroundTruthCase)
+class GroundTruthCaseAdmin(admin.ModelAdmin):
+    list_display = (
+        "case_code",
+        "outage_code",
+        "expected_source_device_code",
+        "expected_eligibility",
+        "affected_subscription_count",
+        "affected_customer_count",
+        "expected_total_refund_amount",
+        "currency",
+    )
+    list_filter = ("expected_eligibility", "currency")
+    search_fields = (
+        "case_code",
+        "outage_code",
+        "expected_source_device_code",
+        "expected_incident_code",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot",)
+    list_select_related = ("data_snapshot",)
