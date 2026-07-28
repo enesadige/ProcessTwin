@@ -26,6 +26,19 @@ from apps.network.models import (
     NetworkPort,
     NetworkPortStatus,
 )
+from apps.operations.models import (
+    Alarm,
+    AlarmCategory,
+    AlarmType,
+    Incident,
+    IncidentAlarm,
+    IncidentAlarmRole,
+    OperationalEvent,
+    OperationalEventType,
+    Outage,
+    QualityMeasurement,
+    Severity,
+)
 
 
 @pytest.mark.django_db
@@ -62,6 +75,13 @@ def test_seed_maltepe_mvp_creates_passive_dataset_snapshot_and_geography():
     assert snapshot.row_counts["service_packages"] == 8
     assert snapshot.row_counts["subscriptions"] == 240
     assert snapshot.row_counts["subscription_connections"] == 240
+    assert snapshot.row_counts["alarm_types"] == 3
+    assert snapshot.row_counts["alarms"] == 4
+    assert snapshot.row_counts["incidents"] == 3
+    assert snapshot.row_counts["incident_alarms"] == 4
+    assert snapshot.row_counts["outages"] == 3
+    assert snapshot.row_counts["operational_events"] == 12
+    assert snapshot.row_counts["quality_measurements"] == 0
     assert neighborhoods == sorted(seed_config.NEIGHBORHOODS)
 
 
@@ -415,6 +435,117 @@ def test_seed_maltepe_mvp_creates_expected_double_subscription_customers():
         bng_codes = {get_connection_bng_code(connection) for connection in connections}
         assert len(line_ids) == 2
         assert len(bng_codes) == 1
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_creates_minimal_alarm_catalog_without_quality_measurements():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    alarm_types = {
+        alarm_type.code: alarm_type
+        for alarm_type in AlarmType.objects.filter(data_snapshot=snapshot)
+    }
+
+    assert set(alarm_types) == {
+        "BNG_UNREACHABLE",
+        "ACCESS_DEVICE_UNREACHABLE",
+        "LINK_DOWN",
+    }
+    assert alarm_types["BNG_UNREACHABLE"].severity == Severity.CRITICAL
+    assert alarm_types["BNG_UNREACHABLE"].category == AlarmCategory.CORE
+    assert alarm_types["ACCESS_DEVICE_UNREACHABLE"].severity == Severity.MAJOR
+    assert alarm_types["ACCESS_DEVICE_UNREACHABLE"].category == AlarmCategory.ACCESS
+    assert alarm_types["LINK_DOWN"].severity == Severity.MAJOR
+    assert alarm_types["LINK_DOWN"].category == AlarmCategory.TRANSPORT
+    assert QualityMeasurement.objects.filter(data_snapshot=snapshot).count() == 0
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_creates_expected_outages_and_longest_bng_scenario():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    outages = {
+        outage.outage_code: outage
+        for outage in Outage.objects.filter(data_snapshot=snapshot).select_related(
+            "source_device"
+        )
+    }
+    main_outage = outages["OUT-MAL-BNG-001"]
+    secondary_outages = [
+        outages["OUT-MAL-OLT-001"],
+        outages["OUT-MAL-DSLAM-001"],
+    ]
+
+    assert set(outages) == {
+        "OUT-MAL-BNG-001",
+        "OUT-MAL-OLT-001",
+        "OUT-MAL-DSLAM-001",
+    }
+    assert main_outage.source_device.code == "BNG-MAL-001"
+    assert main_outage.duration_seconds == 200 * 60
+    assert outages["OUT-MAL-OLT-001"].duration_seconds == 45 * 60
+    assert outages["OUT-MAL-DSLAM-001"].duration_seconds == 70 * 60
+    assert main_outage.duration_seconds == max(
+        outage.duration_seconds for outage in outages.values()
+    )
+    assert all(
+        outage.ended_at <= main_outage.started_at or outage.started_at >= main_outage.ended_at
+        for outage in secondary_outages
+    )
+    assert any(
+        outage.source_device.metadata["parent_bng"] == "BNG-MAL-002"
+        for outage in secondary_outages
+    )
+    assert main_outage.impact_scope["customer_impact_calculated"] is False
+    assert main_outage.metadata["customer_impact_deferred"] is True
+
+
+@pytest.mark.django_db
+def test_seed_maltepe_mvp_links_alarms_incidents_and_operational_events():
+    call_command("seed_maltepe_mvp")
+    snapshot = DatasetVersion.objects.get(slug=get_target_dataset_slug()).snapshots.get()
+
+    main_incident = Incident.objects.get(
+        data_snapshot=snapshot,
+        incident_number="INC-MAL-BNG-001",
+    )
+    incident_alarm_counts = dict(
+        IncidentAlarm.objects.filter(data_snapshot=snapshot)
+        .values_list("incident__incident_number")
+        .annotate(count=Count("id"))
+    )
+    main_alarm_roles = set(
+        main_incident.incident_alarms.values_list("role", flat=True)
+    )
+
+    assert Alarm.objects.filter(data_snapshot=snapshot).count() == 4
+    assert Incident.objects.filter(data_snapshot=snapshot).count() == 3
+    assert IncidentAlarm.objects.filter(data_snapshot=snapshot).count() == 4
+    assert incident_alarm_counts == {
+        "INC-MAL-BNG-001": 2,
+        "INC-MAL-OLT-001": 1,
+        "INC-MAL-DSLAM-001": 1,
+    }
+    assert main_alarm_roles == {
+        IncidentAlarmRole.PRIMARY,
+        IncidentAlarmRole.SUPPORTING,
+    }
+    assert OperationalEvent.objects.filter(data_snapshot=snapshot).count() == 12
+    assert OperationalEvent.objects.filter(
+        data_snapshot=snapshot,
+        event_type=OperationalEventType.AUTO_RECOVERY,
+    ).count() == 3
+    assert all(
+        incident.operational_events.count() == 4
+        for incident in Incident.objects.filter(data_snapshot=snapshot)
+    )
+    assert all(
+        event.metadata["does_not_change_customer_impact"] is True
+        and event.metadata["does_not_claim_partial_restoration"] is True
+        for event in OperationalEvent.objects.filter(data_snapshot=snapshot)
+    )
 
 
 def get_connection_bng_code(connection: SubscriptionConnection) -> str:

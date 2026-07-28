@@ -3,6 +3,7 @@ from zoneinfo import ZoneInfo
 from data_generator.configs import maltepe_mvp_v1 as seed_config
 from data_generator.seeders.customers import seed_customer_subscriptions
 from data_generator.seeders.network import seed_network_topology
+from data_generator.seeders.operations import seed_operations
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -24,7 +25,7 @@ ISTANBUL_TZ = ZoneInfo("Europe/Istanbul")
 class Command(BaseCommand):
     help = (
         "Create the Maltepe MVP dataset, snapshot, geography, network topology, customers, "
-        "service packages, subscriptions, and subscription connections."
+        "service packages, subscriptions, subscription connections, and operations records."
     )
 
     def add_arguments(self, parser):
@@ -87,8 +88,8 @@ class Command(BaseCommand):
                 config=seed_config.build_serializable_config(reference_datetime_iso),
                 description=(
                     "Deterministic synthetic dataset for the Maltepe MVP scenario. "
-                    "Current seed stage creates dataset, snapshot, geography, and network "
-                    "topology records."
+                    "Current seed stage creates dataset, snapshot, geography, network topology, "
+                    "customer subscription, and operations records."
                 ),
             )
             dataset.full_clean()
@@ -118,6 +119,7 @@ class Command(BaseCommand):
                 neighborhoods_by_name=neighborhoods_by_name,
                 reference_datetime=reference_datetime,
             )
+            operations_counts = seed_operations(snapshot=snapshot)
 
             row_counts = {
                 "dataset_versions": 1,
@@ -134,13 +136,16 @@ class Command(BaseCommand):
                 "service_packages": customer_counts["service_packages"],
                 "subscriptions": customer_counts["subscriptions"],
                 "subscription_connections": customer_counts["subscription_connections"],
-                "alarms": 0,
-                "incidents": 0,
-                "outages": 0,
-                "operational_events": 0,
+                "alarm_types": operations_counts["alarm_types"],
+                "alarms": operations_counts["alarms"],
+                "incidents": operations_counts["incidents"],
+                "incident_alarms": operations_counts["incident_alarms"],
+                "outages": operations_counts["outages"],
+                "operational_events": operations_counts["operational_events"],
+                "quality_measurements": operations_counts["quality_measurements"],
             }
             validation_result = {
-                "seed_stage": "021_customer_subscriptions",
+                "seed_stage": "022_operations",
                 "reference_datetime": reference_datetime_iso,
                 "created_geography": {
                     "city": city_created,
@@ -150,6 +155,7 @@ class Command(BaseCommand):
                 "expected_neighborhoods": seed_config.NEIGHBORHOODS,
                 "network_counts": network_counts,
                 "customer_counts": customer_counts,
+                "operations_counts": operations_counts,
                 "validated": True,
             }
             now = timezone.now()
@@ -169,7 +175,8 @@ class Command(BaseCommand):
                 f"as {state} snapshot with {len(neighborhoods)} neighborhoods, "
                 f"{network_counts['network_devices']} devices, "
                 f"{network_counts['network_ports']} ports, and "
-                f"{customer_counts['subscriptions']} subscriptions."
+                f"{customer_counts['subscriptions']} subscriptions, "
+                f"{operations_counts['outages']} outages."
             )
         )
 
@@ -206,9 +213,25 @@ def delete_target_dataset_tree(dataset: DatasetVersion) -> None:
         NetworkLink,
         NetworkPort,
     )
+    from apps.operations.models import (
+        Alarm,
+        AlarmType,
+        Incident,
+        IncidentAlarm,
+        OperationalEvent,
+        Outage,
+        QualityMeasurement,
+    )
 
     snapshots = list(dataset.snapshots.all())
     for snapshot in snapshots:
+        QualityMeasurement.objects.filter(data_snapshot=snapshot).delete()
+        Outage.objects.filter(data_snapshot=snapshot).delete()
+        OperationalEvent.objects.filter(data_snapshot=snapshot).delete()
+        IncidentAlarm.objects.filter(data_snapshot=snapshot).delete()
+        Alarm.objects.filter(data_snapshot=snapshot).delete()
+        Incident.objects.filter(data_snapshot=snapshot).delete()
+        AlarmType.objects.filter(data_snapshot=snapshot).delete()
         CompensationHistory.objects.filter(data_snapshot=snapshot).delete()
         CampaignEnrollment.objects.filter(data_snapshot=snapshot).delete()
         PaymentRecord.objects.filter(data_snapshot=snapshot).delete()

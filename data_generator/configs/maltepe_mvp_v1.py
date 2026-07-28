@@ -298,20 +298,38 @@ TECHNOLOGY_TOTALS = {
 
 OUTAGE_PLAN = {
     "main": {
+        "outage_code": "OUT-MAL-BNG-001",
+        "incident_number": "INC-MAL-BNG-001",
         "source_device": "BNG-MAL-001",
         "started_at": "2026-07-20T10:15:00+03:00",
         "ended_at": "2026-07-20T13:35:00+03:00",
         "duration_minutes": 200,
+        "alarm_type": "BNG_UNREACHABLE",
+        "supporting_alarm_type": "LINK_DOWN",
+        "root_cause_category": "bng_failure",
+        "root_cause_summary": "Synthetic BNG control-plane outage for Maltepe MVP.",
     },
     "secondary": [
         {
+            "outage_code": "OUT-MAL-OLT-001",
+            "incident_number": "INC-MAL-OLT-001",
             "source_type": "olt",
+            "source_device": "OLT-MAL-ZUM-001",
+            "started_at": "2026-07-10T09:20:00+03:00",
+            "ended_at": "2026-07-10T10:05:00+03:00",
             "duration_minutes": 45,
+            "alarm_type": "ACCESS_DEVICE_UNREACHABLE",
             "must_not_overlap_main": True,
         },
         {
+            "outage_code": "OUT-MAL-DSLAM-001",
+            "incident_number": "INC-MAL-DSLAM-001",
             "source_type": "dslam",
+            "source_device": "DSLAM-MAL-FIN-001",
+            "started_at": "2026-07-25T16:40:00+03:00",
+            "ended_at": "2026-07-25T17:50:00+03:00",
             "duration_minutes": 70,
+            "alarm_type": "ACCESS_DEVICE_UNREACHABLE",
             "must_not_overlap_main": True,
             "at_least_one_on_bng": "BNG-MAL-002",
         },
@@ -319,6 +337,61 @@ OUTAGE_PLAN = {
     "timezone": "Europe/Istanbul",
     "date_rule": "previous_calendar_month_of_reference_datetime",
 }
+
+ALARM_CATALOG = [
+    {
+        "code": "BNG_UNREACHABLE",
+        "name": "BNG unreachable",
+        "severity": "critical",
+        "category": "core",
+        "description": "Synthetic BNG reachability loss alarm for the MVP outage scenario.",
+    },
+    {
+        "code": "ACCESS_DEVICE_UNREACHABLE",
+        "name": "Access device unreachable",
+        "severity": "major",
+        "category": "access",
+        "description": "Synthetic OLT/DSLAM reachability loss alarm for short outage scenarios.",
+    },
+    {
+        "code": "LINK_DOWN",
+        "name": "Link down",
+        "severity": "major",
+        "category": "transport",
+        "description": "Synthetic supporting transport link alarm attached to relevant incidents.",
+    },
+]
+
+OPERATIONAL_EVENT_TEMPLATES = [
+    {
+        "suffix": "DETECTED",
+        "event_type": "note",
+        "offset_minutes": 2,
+        "source": "noc",
+        "summary": "Synthetic NOC detection event.",
+    },
+    {
+        "suffix": "INVESTIGATION",
+        "event_type": "manual_intervention",
+        "offset_minutes": 35,
+        "source": "noc",
+        "summary": "Synthetic operation investigation event.",
+    },
+    {
+        "suffix": "RECOVERY",
+        "event_type": "auto_recovery",
+        "offset_minutes_from_end": -5,
+        "source": "network",
+        "summary": "Synthetic auto recovery signal; not a partial customer restoration claim.",
+    },
+    {
+        "suffix": "CLOSED",
+        "event_type": "note",
+        "offset_minutes_from_end": 10,
+        "source": "noc",
+        "summary": "Synthetic closure note.",
+    },
+]
 
 
 def build_serializable_config(reference_datetime: str) -> dict:
@@ -349,4 +422,6 @@ def build_serializable_config(reference_datetime: str) -> dict:
         "subscription_distribution": SUBSCRIPTION_DISTRIBUTION,
         "technology_totals": TECHNOLOGY_TOTALS,
         "outage_plan": OUTAGE_PLAN,
+        "alarm_catalog": ALARM_CATALOG,
+        "operational_event_templates": OPERATIONAL_EVENT_TEMPLATES,
     }
