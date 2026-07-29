@@ -19,7 +19,6 @@ class AccessTechnology(models.TextChoices):
     GPON = "gpon", "GPON"
     VDSL = "vdsl", "VDSL"
     ADSL = "adsl", "ADSL"
-    METRO_ETHERNET = "metro_ethernet", "Metro Ethernet"
 
 
 class NetworkDeviceStatus(models.TextChoices):

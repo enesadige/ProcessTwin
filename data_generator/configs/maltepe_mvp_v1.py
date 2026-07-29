@@ -290,7 +290,7 @@ TECHNOLOGY_TOTALS = {
     "fiber_packages": 130,
     "vdsl_packages": 90,
     "adsl_packages": 20,
-    "metro_ethernet_packages": 0,
+    "metro_ethernet_service_packages": 0,
     "gpon_packages": 0,
     "gpon_physical_lines": 100,
     "general_fiber_physical_lines": 30,

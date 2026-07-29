@@ -542,3 +542,675 @@ Durum: `KARAR BEKLİYOR`
 - Candidate değişiklikleri: `KARAR BEKLİYOR`
 - Karşılaştırılacak KPI'lar: `KARAR BEKLİYOR`
 - Beklenen sonuç farkları: `KARAR BEKLİYOR`
+
+## 8. Faz 039.5 - Gerçekçi Simülasyon Verisi ve İş Kuralları Genişletme
+
+Durum: `KARAR BEKLİYOR`
+
+Bu faz, mevcut Maltepe MVP dataset'inin yalnız teknik altyapıyı doğrulayan minimal
+sentetik örnek olduğunu kabul eder. Bu karar kapıları tamamlanmadan Network MCP,
+Customer MCP, Rule MCP, Compensation MCP, RAG veya orchestrator görevlerine geçilmez.
+
+### 8.1 Mevcut Gerçekçilik Gap Analizi
+
+Durum: `KARAR VERİLDİ`
+
+- Mevcut dataset yalnız İstanbul / Maltepe / 5 mahalle kapsamındadır.
+- Mevcut alarm kataloğu yalnız 3 teknik alarm tipinden oluşur:
+  - `BNG_UNREACHABLE`
+  - `ACCESS_DEVICE_UNREACHABLE`
+  - `LINK_DOWN`
+- Mevcut outage kütüphanesi 3 outage kaydıdır.
+- Mevcut iş kuralı yalnız `REFUND-001` v1/v2 teknik örneğidir.
+- Mevcut telafi formülü gerçek politika değildir; sentetik MVP demo kuralıdır.
+- PaymentRecord, CampaignEnrollment ve CompensationHistory modelleri vardır ancak seed
+  kapsamında üretilmemiştir.
+- QualityMeasurement modeli cihaz bazlıdır; abonelik bazlı kalite ölçümü henüz yoktur.
+- RAG, Decision Evidence ve ProcessTwin kararları ayrıca beklemektedir.
+- Kod, model, migration, seed, MCP veya RAG değişikliği yapılmadan gap analizi
+  tamamlanmıştır.
+
+### 8.2 Coğrafya ve Topoloji Profilleri
+
+Durum: `KISMEN KARAR VERİLDİ`
+
+- Simülasyon şehir sayısı: `KARAR VERİLDİ`
+  - Simülasyon 4 şehir içerecek:
+    - İstanbul
+    - Ankara
+    - İzmir
+    - Kocaeli
+  - Bu karar “daha fazla şehir daha iyidir” mantığıyla verilmemiştir; dört şehrin
+    birbirinden farklı simülasyon profilleri üretmesi nedeniyle seçilmiştir.
+  - İstanbul:
+    - yüksek yoğunluk
+    - karma eski/yeni altyapı
+    - toplu müşteri etkisi
+  - Ankara:
+    - kamu
+    - kurumsal müşteri
+    - SLA profili
+  - İzmir:
+    - konut ve ticari kullanım dengesi
+    - orta-yüksek yoğunluk profili
+  - Kocaeli:
+    - sanayi
+    - KOBİ
+    - enterprise
+    - kritik hizmet profili
+  - Bursa ve Kocaeli birlikte kullanılmayacak; sanayi profilini Kocaeli temsil edecek.
+  - Antalya, Konya, Gaziantep veya başka şehirler şimdilik eklenmeyecek.
+  - Şehir sayısı daha sonra kendiliğinden artırılmayacak.
+  - Bu şehirler gerçek Turkcell envanteri veya gerçek cihaz dağılımı iddiası
+    taşımayacak.
+  - Veriler gerçeğe yakın fakat tamamen sentetik olacak.
+  - Mevcut Maltepe dataset'i silinmeyecek; İstanbul içindeki temel regression/demo
+    senaryosu olarak korunacak.
+  - Henüz ilçe, mahalle, cihaz, müşteri, abonelik veya teknoloji adetleri belirlenmedi.
+- İstanbul ilçe seçimleri: `KARAR VERİLDİ`
+  - İstanbul için seçilen ilçeler:
+    - Maltepe
+    - Şişli
+    - Esenyurt
+  - Maltepe mevcut regression ve ana demo ilçesi olarak korunacak.
+  - Şişli merkezi iş alanı, ticari/kurumsal müşteri, yüksek SLA hassasiyeti ve yoğun
+    gündüz kullanımı profilini temsil edecek.
+  - Esenyurt yüksek konut yoğunluğu, kapasite baskısı, port doluluğu ve çok sayıda
+    müşteriyi etkileyen geniş kesinti senaryolarını temsil edecek.
+  - Tuzla seçilmedi; sanayi, lojistik ve enterprise profilini Kocaeli şehri temsil
+    edecek.
+  - Kadıköy seçilmedi; konut ve ticari karma profil Maltepe ve İzmir tarafında kısmen
+    temsil edilecek.
+  - Başakşehir ve Ümraniye modern altyapı açısından faydalı olabilir ancak Şişli +
+    Esenyurt kombinasyonu operasyonel senaryolar açısından daha güçlü ve daha farklı
+    iki uç profil sağlıyor.
+  - Bu ilçeler gerçek Turkcell altyapısını temsil ettiği iddiasıyla kullanılmayacak.
+  - İlçelerin genel kent profillerinden esinlenen tamamen sentetik altyapı ve müşteri
+    dağılımları oluşturulacak.
+- İstanbul mahalle seçimleri: `KARAR VERİLDİ`
+  - Maltepe:
+    - Altayçeşme
+    - Cevizli
+    - Küçükyalı
+    - Zümrütevler
+    - Fındıklı
+  - Şişli:
+    - Mecidiyeköy
+    - Esentepe
+    - Halaskargazi
+    - Teşvikiye
+  - Esenyurt:
+    - Akçaburgaz
+    - Mehterçeşme
+    - Pınar
+    - Saadetdere
+    - Talatpaşa
+- Ankara, İzmir ve Kocaeli ilçe/mahalle seçimleri: `KARAR VERİLDİ`
+  - Ankara:
+    - Çankaya:
+      - Kızılay
+      - Kavaklıdere
+      - Çukurambar
+      - Söğütözü
+      - Bahçelievler
+    - Yenimahalle:
+      - Ostim
+      - İvedikköy
+      - Serhat
+      - Macun
+      - Ergazi
+    - Etimesgut:
+      - Eryaman
+      - Bağlıca
+      - Elvan
+      - Süvari
+      - Yapracık
+  - İzmir:
+    - Konak:
+      - Alsancak
+      - Göztepe
+      - Güzelyalı
+      - Kültür
+      - İsmet Kaptan
+    - Bornova:
+      - Kazımdirik
+      - Erzene
+      - Evka 3
+      - Atatürk
+      - Yeşilova
+    - Karşıyaka:
+      - Bostanlı
+      - Mavişehir
+      - Yalı
+      - Alaybey
+      - Şemikler
+  - Kocaeli:
+    - İzmit:
+      - Yenişehir
+      - Yahyakaptan
+      - Alikahya Atatürk
+      - Yeşilova
+      - Sanayi
+    - Gebze:
+      - Arapçeşme
+      - Osman Yılmaz
+      - Barış
+      - Tatlıkuyu
+      - İstasyon
+    - Körfez:
+      - Güney
+      - Mimar Sinan
+      - Yukarı Hereke
+      - Kirazlıyalı
+      - Hacı Osman
+  - İdari isim düzeltmeleri:
+    - `Ostim OSB` ve `İvedik OSB` ayrı mahalle gibi kullanılmayacak.
+    - Bu sanayi profilleri ilgili mahallelerin metadata/profile bilgisinde temsil
+      edilebilir.
+    - Genel `Alikahya` adı kullanılmayacak; resmî mahalle adı `Alikahya Atatürk`
+      olacak.
+    - `Yarımca`, `Tütünçiftlik` ve genel `Hereke` mahalle adı olarak kullanılmayacak.
+    - Bu profiller Körfez içindeki onaylı mahallelerin metadata/profile bilgisinde
+      temsil edilebilir.
+- İlçe seçim stratejisi ne olacak?
+- Bölge profilleri nasıl tanımlanacak?
+  - merkez
+  - yoğun yerleşim
+  - düşük yoğunluk
+  - kurumsal bölge
+  - karma bölge
+- Şehir/ilçe yoğunluğuna göre müşteri ve cihaz dağılımı nasıl değişecek?
+- İlçe altyapı profil etiketleri: `KARAR VERİLDİ`
+  - Bu seviyeler henüz yüzde veya adet değildir; yalnızca göreli profil etiketleridir.
+  - İstanbul / Maltepe:
+    - Mevcut regression datası aynen korunur.
+    - GPON: orta-yüksek
+    - Noktadan noktaya fiber: düşük-orta
+    - VDSL: orta
+    - ADSL: düşük
+    - Kapasite baskısı: orta
+    - Yedeklilik ihtiyacı: orta
+  - İstanbul / Şişli:
+    - GPON: yüksek
+    - Noktadan noktaya fiber / Metro Ethernet: yüksek
+    - VDSL: düşük-orta
+    - ADSL: çok düşük
+    - Müşteri sayısından ziyade trafik ve servis yoğunluğu çok yüksek kabul edilir.
+    - Kapasite baskısı: yüksek
+    - Yedeklilik ve SLA ihtiyacı: çok yüksek
+    - Metro Ethernet yalnız kurumsal/uygun ticari aboneliklerde kullanılır.
+  - İstanbul / Esenyurt:
+    - GPON: orta-yüksek
+    - VDSL: yüksek
+    - ADSL: düşük-orta
+    - Metro Ethernet: çok düşük, yalnız sınırlı SME/enterprise
+    - Müşteri yoğunluğu: çok yüksek
+    - Kapasite baskısı: çok yüksek
+    - Yedeklilik ihtiyacı: düşük-orta
+    - Ana özelliği toplu müşteri etkisi ve port doluluğudur.
+  - Ankara / Çankaya:
+    - GPON: yüksek
+    - Noktadan noktaya fiber / Metro Ethernet: yüksek
+    - VDSL: orta
+    - ADSL: çok düşük
+    - Kamu/enterprise/SLA yoğunluğu: yüksek
+    - Kapasite baskısı: orta-yüksek
+    - Yedeklilik ihtiyacı: çok yüksek
+  - Ankara / Yenimahalle:
+    - GPON: orta
+    - Noktadan noktaya fiber / Metro Ethernet: orta-yüksek, özellikle sanayi profilli
+      mahallelerde
+    - VDSL: orta
+    - ADSL: düşük
+    - Kapasite baskısı: yüksek
+    - Yedeklilik ihtiyacı: yüksek
+  - Ankara / Etimesgut:
+    - GPON: yüksek
+    - VDSL: düşük-orta
+    - ADSL: çok düşük
+    - Metro Ethernet: çok düşük, yalnız sınırlı kurumsal kullanım
+    - Yeni yerleşim profili nedeniyle boş/rezerve kapasite diğer yoğun ilçelere göre
+      daha yüksek olur.
+    - Kapasite baskısı: orta
+    - Yedeklilik ihtiyacı: düşük-orta
+  - İzmir / Konak:
+    - GPON: orta
+    - Noktadan noktaya fiber / Metro Ethernet: düşük-orta
+    - VDSL: orta-yüksek
+    - ADSL: düşük-orta
+    - Eski ve yeni altyapı birlikte bulunur.
+    - Kapasite baskısı: orta-yüksek
+    - Yedeklilik ihtiyacı: orta-yüksek
+  - İzmir / Bornova:
+    - GPON: orta-yüksek
+    - Noktadan noktaya fiber / Metro Ethernet: orta
+    - VDSL: orta
+    - ADSL: düşük
+    - Üniversite, ticari ve konut profilleri birlikte temsil edilir.
+    - Kapasite baskısı: yüksek
+    - Yedeklilik ihtiyacı: orta-yüksek
+  - İzmir / Karşıyaka:
+    - GPON: yüksek
+    - VDSL: düşük-orta
+    - ADSL: çok düşük
+    - Metro Ethernet: düşük
+    - Kapasite baskısı: orta-yüksek
+    - Yedeklilik ihtiyacı: orta
+  - Kocaeli / İzmit:
+    - GPON: orta-yüksek
+    - Noktadan noktaya fiber / Metro Ethernet: orta
+    - VDSL: orta
+    - ADSL: düşük
+    - Kapasite baskısı: orta-yüksek
+    - Yedeklilik ihtiyacı: yüksek
+  - Kocaeli / Gebze:
+    - GPON: orta-yüksek
+    - Noktadan noktaya fiber / Metro Ethernet: çok yüksek
+    - VDSL: düşük
+    - ADSL: çok düşük
+    - Enterprise/SME yoğunluğu ve kritik servis ihtiyacı yüksek olur.
+    - Kapasite baskısı: yüksek
+    - Yedeklilik ihtiyacı: çok yüksek
+  - Kocaeli / Körfez:
+    - Konut alanlarında GPON: orta
+    - Kritik işletmelerde noktadan noktaya fiber / Metro Ethernet: çok yüksek
+    - VDSL: düşük-orta
+    - ADSL: çok düşük
+    - Kapasite baskısı: orta-yüksek
+    - Yedeklilik ve iş sürekliliği ihtiyacı: çok yüksek
+- Altyapı profili genel kuralları: `KARAR VERİLDİ`
+  - GPON erişim teknolojisi, Metro Ethernet ise kurumsal/özel erişim profili olarak
+    ayrı değerlendirilir.
+  - Metro Ethernet konut müşterilerine rastgele dağıtılmaz.
+  - ADSL bütün ilçelerde küçük bir legacy katman olarak kalır; ana teknoloji yapılmaz.
+  - Kritik/yedekli profil kararı şimdilik tasarım gereksinimi olarak kaydedilir.
+  - NetworkLink modeline hemen alan veya migration eklenmez.
+  - Bu profiller gerçek Turkcell altyapısı iddiası taşımayan sentetik simülasyon
+    kararlarıdır.
+  - Mevcut Maltepe regression datasının sayıları henüz değiştirilmez.
+- Farklı BNG dalları, OLT/DSLAM kapasiteleri, port dolulukları ve yedek kapasite
+  oranları nasıl belirlenecek?
+- Yedek bağlantı ve alternatif topoloji senaryoları bu fazda nasıl ele alınacak?
+- Arayüz yapılacakları: `KARAR NOTU`
+  - Şehir, ilçe ve cihazların gösterileceği coğrafi harita.
+  - BNG, OLT, DSLAM ve access node için mantıksal topoloji görünümü.
+  - Alarm ve kesintilerin zaman çizelgesi veya canlı simülasyon şeklinde gösterimi.
+  - Cihaza tıklanınca alarm, kesinti, müşteri etkisi ve topoloji detaylarının açılması.
+  - Daha sonra kullanıcının sağlayabileceği koordinatların sisteme eklenebilmesi.
+  - Şimdilik koordinat modeli veya migration oluşturulmayacak.
+  - Koordinat konusu arayüz/coğrafya karar kapısında ayrıca ele alınacak.
+
+### 8.3 Alarm Kataloğu ve Olay Senaryoları
+
+Durum: `KARAR BEKLİYOR`
+
+- 20-30 gerçeğe yakın sentetik alarm tipi üretilecek mi?
+- Alarm katalog alanları nasıl tutulacak?
+  - alarm code
+  - alarm name
+  - category
+  - severity
+  - kaynak cihaz tipi
+  - desteklenen teknolojiler
+  - probable cause
+  - clear/recovery davranışı
+  - parent/root alarm ilişkisi
+  - suppression kuralları
+  - deduplication anahtarı
+  - correlation time window
+  - incident oluşturma etkisi
+  - servis etkisi seviyesi
+- Hangi olay aileleri üretilecek?
+  - fiber kesisi
+  - cihaz erişilemezliği
+  - link arızası
+  - enerji problemi
+  - planlı bakım
+  - kısmi kesinti
+  - tam kesinti
+  - aralıklı kesinti
+  - servis kalitesi bozulması
+  - tekrar eden arıza
+- Gerçek kurum alarm kodu veya gizli veri iddiası oluşturulmayacaktır.
+
+### 8.4 Müşteri, Paket, Ödeme ve Kampanya Dağılımları
+
+Durum: `KISMEN KARAR VERİLDİ`
+
+- Dataset ayrımı: `KARAR VERİLDİ`
+  - Mevcut 225 müşteri / 240 abonelik içeren Maltepe dataset'i regression dataset'i
+    olarak aynen korunur.
+  - Yeni gerçekçi çok şehirli dataset ayrı oluşturulur:
+    - ayrı DatasetVersion
+    - ayrı DataSnapshot
+    - ayrı generator version
+    - ayrı deterministik kod alanı
+  - Yeni gerçekçi dataset içinde Maltepe ayrıca genişletilmiş biçimde bulunur.
+  - Mevcut regression kayıtları büyütülmez ve regression test sayıları değiştirilmez.
+  - Küçük Maltepe regression dataset'i normal testlerde kullanılmaya devam eder.
+  - 14.400 müşterilik dataset her unit testte yeniden seedlenmez.
+  - Büyük dataset için ayrı acceptance/smoke test profili planlanır.
+  - Seed süresi ve servis performansı ölçülür.
+  - Cihaz sayıları henüz belirlenmez; abonelik teknolojileri, port kapasitesi ve
+    yedeklilik kararlarından sonra türetilir.
+- Temel ölçek: `KARAR VERİLDİ`
+  - Seçilen ölçek: B - dengeli simülasyon.
+  - Yeni gerçekçi çok şehirli dataset:
+    - 14.400 müşteri.
+    - 16.200 abonelik.
+  - C seçeneğine çıkılmaz.
+  - Gerçekçilik yalnız satır sayısıyla değil; ilçe, müşteri, teknoloji, ödeme,
+    kampanya, alarm ve olay çeşitliliğiyle sağlanır.
+- İlçe bazında kesin ölçek: `KARAR VERİLDİ`
+  - İstanbul:
+    - Maltepe: 1.400 müşteri / 1.550 abonelik.
+    - Şişli: 1.100 müşteri / 1.320 abonelik.
+    - Esenyurt: 2.200 müşteri / 2.350 abonelik.
+  - Ankara:
+    - Çankaya: 1.400 müşteri / 1.650 abonelik.
+    - Yenimahalle: 1.100 müşteri / 1.260 abonelik.
+    - Etimesgut: 1.000 müşteri / 1.080 abonelik.
+  - İzmir:
+    - Konak: 1.000 müşteri / 1.100 abonelik.
+    - Bornova: 1.100 müşteri / 1.230 abonelik.
+    - Karşıyaka: 900 müşteri / 990 abonelik.
+  - Kocaeli:
+    - İzmit: 1.000 müşteri / 1.110 abonelik.
+    - Gebze: 1.300 müşteri / 1.500 abonelik.
+    - Körfez: 900 müşteri / 1.060 abonelik.
+  - Toplam:
+    - 14.400 müşteri.
+    - 16.200 abonelik.
+- Müşteri segment dağılımları: `KARAR VERİLDİ`
+  - Sıralama: individual / SME / enterprise / public.
+  - Maltepe: %78 / %15 / %5 / %2.
+  - Şişli: %35 / %35 / %25 / %5.
+  - Esenyurt: %88 / %10 / %1,5 / %0,5.
+  - Çankaya: %50 / %22 / %18 / %10.
+  - Yenimahalle: %55 / %32 / %10 / %3.
+  - Etimesgut: %82 / %13 / %3 / %2.
+  - Konak: %68 / %24 / %6 / %2.
+  - Bornova: %72 / %20 / %5 / %3.
+  - Karşıyaka: %82 / %14 / %3 / %1.
+  - İzmit: %60 / %27 / %10 / %3.
+  - Gebze: %35 / %38 / %25 / %2.
+  - Körfez: %45 / %32 / %20 / %3.
+  - Yuvarlama deterministik olur ve her ilçenin toplamı kesin müşteri sayısına
+    eşitlenir.
+- Priority dağılımları: `KARAR VERİLDİ`
+  - VIP nadir ve anlamlı bir öncelik etiketi olarak kalır.
+  - Maltepe: %5.
+  - Şişli: %9.
+  - Esenyurt: %3.
+  - Çankaya: %9.
+  - Yenimahalle: %6.
+  - Etimesgut: %4.
+  - Konak: %5.
+  - Bornova: %5.
+  - Karşıyaka: %6.
+  - İzmit: %6.
+  - Gebze: %8.
+  - Körfez: %8.
+  - Toplam yaklaşık 862 VIP müşteri oluşur.
+  - VIP müşteriler yalnız enterprise/public içinde bulunmaz; bütün segmentlerde
+    bulunabilir.
+  - Enterprise, public ve kritik SME profillerinde VIP ağırlığı daha yüksek olabilir.
+  - VIP şimdilik telafi davranışını değiştirmez.
+- Abonelik durumu ve olay zamanı geçerliliği: `KARAR VERİLDİ`
+  - "Olay tarihinde geçersiz" bir subscription status olarak kullanılmaz.
+  - Güncel abonelik durumu ile olay zamanındaki geçerlilik ayrı kavramlardır.
+  - Güncel abonelik durumu:
+    - active
+    - suspended
+    - terminated/cancelled veya mevcut modeldeki eşdeğeri
+  - Genel hedef:
+    - active: yaklaşık %93-95.
+    - suspended: yaklaşık %2-4.
+    - kapalı/geçmiş kayıt: yaklaşık %2-4.
+  - İlçe profiline göre küçük farklar olabilir ancak toplamlar açıkça raporlanır.
+  - Olay zamanındaki geçerlilik `valid_from`, `valid_to`, SubscriptionConnection tarih
+    aralığı ve LineConnection tarih aralığı üzerinden değerlendirilir.
+  - Belirli test olaylarında aboneliklerin küçük bir kısmı zaman aralığı çakışmadığı
+    için etkisiz kalabilir.
+  - Bu durum güncel status yüzdesine karıştırılmaz.
+- Çok abonelikli müşteri oranı: `KARAR VERİLDİ`
+  - İlçe bazlı rastgele yüzde uygulanmaz.
+  - Çok abonelik ihtimali segmentle ilişkili olur:
+    - individual: düşük.
+    - SME: orta.
+    - enterprise: yüksek.
+    - public: orta-yüksek.
+  - Sonuç, kesin toplamlar olan 14.400 müşteri ve 16.200 aboneliği sağlamalıdır.
+  - Aynı müşterinin abonelikleri farklı hizmet noktalarında ve uygun senaryolarda
+    farklı teknolojilerde olabilir.
+- Teknoloji kavram ayrımı: `KARAR VERİLDİ`
+  - GPON erişim/hat teknolojisidir.
+  - Genel noktadan noktaya fiber erişim/hat teknolojisidir.
+  - Metro Ethernet kurumsal hizmet/erişim profilidir.
+  - ServicePackage technology ve LineConnection technology ayrı kavramlar olarak
+    değerlendirilir.
+  - Mevcut uyumluluk yaklaşımı korunur.
+  - Metro Ethernet GPON/OLT müşteri hattı gibi zorla mevcut zincire sokulmaz.
+  - Model eksikliği varsa seed yazmadan önce gap olarak raporlanır.
+- Fiziksel erişim dağılımı: `KARAR VERİLDİ`
+  - Metro Ethernet, GPON/P2P fiber/VDSL/ADSL ile aynı seviyede birbirini dışlayan
+    beşinci fiziksel teknoloji olarak sayılmaz.
+  - Metro Ethernet, P2P/dedicated fiber erişim üzerinden sunulan kurumsal hizmet
+    profili olarak ele alınır.
+  - Metro Ethernet abonelikleri P2P fiber hatların alt kümesi olur ve toplam abonelik
+    hesabına ikinci kez eklenmez.
+  - Fiziksel erişim sırası: GPON / P2P fiber / VDSL / ADSL.
+  - Maltepe, 1.550 abonelik:
+    - %48 / %8 / %38 / %6.
+    - 744 / 124 / 589 / 93.
+  - Şişli, 1.320 abonelik:
+    - %50 / %22 / %26 / %2.
+    - 660 / 290 / 343 / 27.
+  - Esenyurt, 2.350 abonelik:
+    - %46 / %4 / %44 / %6.
+    - 1.081 / 94 / 1.034 / 141.
+  - Çankaya, 1.650 abonelik:
+    - %52 / %18 / %28 / %2.
+    - 858 / 297 / 462 / 33.
+  - Yenimahalle, 1.260 abonelik:
+    - %42 / %14 / %39 / %5.
+    - 529 / 177 / 491 / 63.
+  - Etimesgut, 1.080 abonelik:
+    - %62 / %5 / %31 / %2.
+    - 670 / 54 / 335 / 21.
+  - Konak, 1.100 abonelik:
+    - %36 / %8 / %46 / %10.
+    - 396 / 88 / 506 / 110.
+  - Bornova, 1.230 abonelik:
+    - %45 / %10 / %40 / %5.
+    - 554 / 123 / 492 / 61.
+  - Karşıyaka, 990 abonelik:
+    - %60 / %6 / %32 / %2.
+    - 594 / 59 / 317 / 20.
+  - İzmit, 1.110 abonelik:
+    - %44 / %10 / %41 / %5.
+    - 488 / 111 / 455 / 56.
+  - Gebze, 1.500 abonelik:
+    - %40 / %24 / %34 / %2.
+    - 600 / 360 / 510 / 30.
+  - Körfez, 1.060 abonelik:
+    - %38 / %25 / %34 / %3.
+    - 403 / 265 / 360 / 32.
+  - Toplam fiziksel erişim:
+    - GPON: 7.577.
+    - P2P fiber: 2.042.
+    - VDSL: 5.894.
+    - ADSL: 687.
+    - Genel toplam: 16.200.
+  - Yaklaşık genel oran:
+    - GPON: %46,8.
+    - P2P fiber: %12,6.
+    - VDSL: %36,4.
+    - ADSL: %4,2.
+- Metro Ethernet hizmet profili: `KARAR VERİLDİ`
+  - Metro Ethernet, P2P fiber aboneliklerinin alt kümesidir.
+  - İlçe bazında Metro Ethernet hizmet profili sayıları:
+    - Maltepe: 0.
+    - Şişli: 106.
+    - Esenyurt: 5.
+    - Çankaya: 116.
+    - Yenimahalle: 38.
+    - Etimesgut: 5.
+    - Konak: 11.
+    - Bornova: 18.
+    - Karşıyaka: 5.
+    - İzmit: 22.
+    - Gebze: 120.
+    - Körfez: 74.
+  - Toplam Metro Ethernet hizmeti:
+    - 520 abonelik.
+    - toplam aboneliklerin yaklaşık %3,2'si.
+    - fiziksel olarak P2P fiber toplamının içinde.
+  - Dağıtım kuralları:
+    - individual: Metro Ethernet yok.
+    - enterprise: ana hedef.
+    - public: kritik/kamu profillerinde.
+    - SME: yalnız seçili kritik, ticari veya sanayi müşterilerinde.
+    - Metro Ethernet rastgele konut aboneliğine verilmez.
+    - Her Metro Ethernet aboneliğinin fiziksel hattı P2P fiber olur.
+- Model gap karar kapısı: `KARAR VERİLDİ`
+  - Seçilen tasarım: Seçenek B - tam temizlik.
+  - AccessTechnology yalnız fiziksel erişim teknolojilerini içerir:
+    - gpon.
+    - fiber.
+    - vdsl.
+    - adsl.
+  - ServiceType ayrı hizmet tipi olarak ServicePackage üzerinde tutulur:
+    - broadband.
+    - metro_ethernet.
+  - ServicePackage.service_type kullanılır; Subscription üzerine service_type eklenmez.
+  - Mevcut paketler migration sonucunda broadband olarak korunur.
+  - Metro Ethernet paketi:
+    - ServicePackage.technology = fiber.
+    - ServicePackage.service_type = metro_ethernet.
+    - LineConnection.technology = fiber.
+  - Uyumluluk:
+    - broadband + fiber paket -> fiber veya gpon hat.
+    - metro_ethernet paket -> yalnız fiber hat.
+    - vdsl paket -> yalnız vdsl hat.
+    - adsl paket -> yalnız adsl hat.
+  - Metro Ethernet segment uygunluğu seed/servis tasarımında ayrıca doğrulanır:
+    - individual: uygun değil.
+    - enterprise/public: uygun.
+    - SME: yalnız seçili kurumsal veya kritik profillerde uygun.
+  - SLAProfile, büyük seed veya cihaz/port hesaplaması bu karar sırasında uygulanmadı;
+    sonraki karar kapılarında ele alınacak.
+- Hâlâ karar bekleyen veri grupları:
+  - Paket katalogu.
+  - Farklı aylık ücretler, taahhüt süreleri ve SLA profilleri.
+- PaymentRecord kararları:
+  - fatura dönemi
+  - ödeme durumu
+  - gecikmiş ödeme
+  - borç durumu
+  - tutar üretimi
+- CampaignEnrollment kararları:
+  - aktif/pasif kampanya
+  - kampanyalı/indirimli fiyat
+  - kampanya geçerlilik tarihleri
+  - telafiyle etkileşim
+- CompensationHistory kararları:
+  - önceki telafi
+  - karar tarihi
+  - tekrar telafi etkisi
+  - manuel inceleme koşulu
+
+### 8.5 İş Kuralı Kataloğu
+
+Durum: `KARAR BEKLİYOR`
+
+- `REFUND-001` yalnız teknik örnek olarak kalacaktır.
+- Yeni sentetik kural aileleri netleştirilecek:
+  - tam kesinti telafisi
+  - süre kademelerine göre farklı oranlar
+  - servis bozulması telafisi
+  - tekrar eden kesinti
+  - aynı fatura dönemindeki birden fazla olay
+  - minimum ve maksimum telafi
+  - günlük/saatlik oranlama
+  - kampanyalı fiyat mı abonelik fiyatı mı kullanılacağı
+  - borç veya gecikmiş ödeme davranışı
+  - daha önce telafi alınmış olması
+  - VIP/SLA/segment farklılıkları
+  - kurumsal ve kamu müşterisi davranışı
+  - eksik veride `manual_review`
+  - çakışan kurallarda öncelik
+  - kural sürümleri ve geçerlilik tarihleri
+- Her kural için beklenecek alanlar:
+  - rule code
+  - açıklama
+  - uygunluk koşulları
+  - action/formül
+  - reason codes
+  - geçerlilik dönemi
+  - öncelik
+  - gerekli veri alanları
+  - pozitif/negatif örnek senaryolar
+
+### 8.6 Genişletilmiş Seed Generator
+
+Durum: `KARAR BEKLİYOR`
+
+- Genişletilmiş dataset ayrı config/generator version olarak mı üretilecek?
+- Mevcut Maltepe MVP seed'i nasıl korunacak?
+- Reset, activate, reference datetime ve transaction atomic davranışları nasıl
+  sürdürülecek?
+- Deterministik business code formatları şehir/ilçe genişlemesinde nasıl olacak?
+
+### 8.7 Genişletilmiş Ground Truth
+
+Durum: `KARAR BEKLİYOR`
+
+- Pozitif telafi senaryoları.
+- Negatif telafi senaryoları.
+- Eşik altı, eşik ve eşik üstü senaryolar.
+- Partial outage.
+- Degradation.
+- Tekrar eden kesinti.
+- Alarm gürültüsü ve yanlış korelasyon adayları.
+- Cross-snapshot kayıtlar.
+- Eksik veri / manual review.
+- VIP, segment, kampanya ve ödeme farklılıkları.
+- Bir müşterinin birden fazla aboneliği.
+- Farklı RuleVersion seçimi.
+- Her senaryo için root cause, affected setler, rule version, eligibility, reason code,
+  telafi tutarı ve evidence beklentileri.
+
+### 8.8 Deterministik Servis Uyarlamaları
+
+Durum: `KARAR BEKLİYOR`
+
+- Mevcut servisler korunacaktır:
+  - NetworkTopologyService
+  - OutageService
+  - CustomerImpactService
+  - AlarmCorrelationService
+  - RootCauseService
+  - RuleEvaluationService
+  - CompensationService
+- Yeni veri ve iş kuralları belirlendikten sonra servislerde gereken genişletmeler
+  ayrı görevler halinde planlanacaktır.
+- Mevcut servisler tek Maltepe senaryosuna göre tamamlanmış kabul edilmeyecektir.
+
+### 8.9 Validator ve RAG Karar Kapısı
+
+Durum: `KARAR BEKLİYOR`
+
+- Genişletilmiş dataset için config-driven validator yaklaşımı.
+- Row count, dağılım, topoloji, alarm, outage, payment, campaign, rule ve ground truth
+  kontrolleri.
+- RAG kararları:
+  - hangi prosedür ve politika dokümanları kullanılacak
+  - gerçek kurum dokümanı mı, sentetik doküman mı
+  - doküman metadata alanları
+  - geçerlilik tarihleri
+  - doküman versiyonları
+  - hangi sorular RAG ile yanıtlanacak
+  - hangi bilgiler deterministik servislerden, hangileri dokümandan gelecek
+  - örnek kullanıcı sorguları
+  - citation ve evidence davranışı

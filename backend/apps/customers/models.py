@@ -35,6 +35,11 @@ class SubscriptionStatus(models.TextChoices):
     PENDING = "pending", "Pending"
 
 
+class ServiceType(models.TextChoices):
+    BROADBAND = "broadband", "Broadband"
+    METRO_ETHERNET = "metro_ethernet", "Metro Ethernet"
+
+
 class PaymentStatus(models.TextChoices):
     PAID = "paid", "Paid"
     DUE = "due", "Due"
@@ -123,6 +128,11 @@ class ServicePackage(TimeStampedModel):
     package_code = models.CharField(max_length=80)
     name = models.CharField(max_length=160)
     technology = models.CharField(max_length=32, choices=AccessTechnology.choices)
+    service_type = models.CharField(
+        max_length=32,
+        choices=ServiceType.choices,
+        default=ServiceType.BROADBAND,
+    )
     download_mbps = models.PositiveIntegerField(default=0)
     upload_mbps = models.PositiveIntegerField(default=0)
     monthly_price = models.DecimalField(max_digits=10, decimal_places=2)
@@ -298,6 +308,7 @@ class SubscriptionConnection(TimeStampedModel):
             and not is_package_line_compatible(
                 self.subscription.service_package.technology,
                 self.line_connection.technology,
+                self.subscription.service_package.service_type,
             )
         ):
             errors["line_connection"] = (

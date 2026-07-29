@@ -36,12 +36,13 @@ class ServicePackageAdmin(admin.ModelAdmin):
         "package_code",
         "name",
         "technology",
+        "service_type",
         "download_mbps",
         "upload_mbps",
         "monthly_price",
         "data_snapshot",
     )
-    list_filter = ("technology", "commitment_months")
+    list_filter = ("technology", "service_type", "commitment_months")
     search_fields = ("package_code", "name")
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = ("data_snapshot",)

@@ -17,6 +17,7 @@ from apps.customers.models import (
     PaymentRecord,
     PaymentStatus,
     ServicePackage,
+    ServiceType,
     Subscription,
     SubscriptionConnection,
     SubscriptionStatus,
@@ -205,6 +206,23 @@ def test_customer_priority_level_can_store_vip_independently_from_segment():
 
 
 @pytest.mark.django_db
+def test_service_package_service_type_defaults_to_broadband():
+    snapshot = create_snapshot()
+    package = ServicePackage.objects.create(
+        data_snapshot=snapshot,
+        package_code="PKG-FIBER-100",
+        name="Fiber 100",
+        technology=AccessTechnology.FIBER,
+        download_mbps=100,
+        upload_mbps=20,
+        monthly_price=Decimal("399.90"),
+        commitment_months=12,
+    )
+
+    assert package.service_type == ServiceType.BROADBAND
+
+
+@pytest.mark.django_db
 def test_subscription_connection_rejects_package_line_technology_mismatch():
     snapshot = create_snapshot()
     city, district, neighborhood = create_maltepe_location()
@@ -249,6 +267,57 @@ def test_subscription_connection_accepts_fiber_package_on_gpon_line():
     )
 
     connection.full_clean()
+
+
+@pytest.mark.django_db
+def test_subscription_connection_accepts_metro_ethernet_package_on_fiber_line():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    line = create_line_connection(snapshot, city, district, AccessTechnology.FIBER)
+    _customer, package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+        AccessTechnology.FIBER,
+    )
+    package.service_type = ServiceType.METRO_ETHERNET
+    package.save(update_fields=["service_type"])
+
+    connection = SubscriptionConnection(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=line,
+        valid_from=timezone.now(),
+    )
+
+    connection.full_clean()
+
+
+@pytest.mark.django_db
+def test_subscription_connection_rejects_metro_ethernet_package_on_gpon_line():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    line = create_line_connection(snapshot, city, district, AccessTechnology.GPON)
+    _customer, package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+        AccessTechnology.FIBER,
+    )
+    package.service_type = ServiceType.METRO_ETHERNET
+    package.save(update_fields=["service_type"])
+
+    connection = SubscriptionConnection(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=line,
+        valid_from=timezone.now(),
+    )
+
+    with pytest.raises(ValidationError):
+        connection.full_clean()
 
 
 @pytest.mark.django_db
