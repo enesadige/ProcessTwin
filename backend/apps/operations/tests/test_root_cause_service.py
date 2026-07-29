@@ -9,11 +9,13 @@ from apps.datasets.models import DatasetVersion, DataSnapshot
 from apps.network.models import NetworkDevice
 from apps.operations.models import (
     Alarm,
+    AlarmCategory,
     AlarmStatus,
     AlarmType,
     Outage,
     OutageStatus,
     OutageType,
+    ServiceImpactClass,
     Severity,
 )
 from apps.operations.services.root_cause import RootCauseInputError, RootCauseService
@@ -122,9 +124,7 @@ def test_root_cause_service_excludes_cross_snapshot_alarm():
     results = RootCauseService().analyze(outage=outage, snapshot=snapshot)
 
     assert other_alarm.alarm_id not in [
-        alarm_code
-        for result in results
-        for alarm_code in result.supporting_alarm_codes
+        alarm_code for result in results for alarm_code in result.supporting_alarm_codes
     ]
     assert results[0].classification == "unknown"
 
@@ -211,9 +211,62 @@ def test_root_cause_service_handles_ongoing_outage_with_explicit_evaluation_time
 
     assert result.candidate_device_code == "BNG-MAL-001"
     assert result.classification == "confirmed"
-    assert result.evaluation_window["ended_at"] == (
-        outage.started_at + timedelta(minutes=45)
-    ).isoformat()
+    assert (
+        result.evaluation_window["ended_at"]
+        == (outage.started_at + timedelta(minutes=45)).isoformat()
+    )
+
+
+@pytest.mark.django_db
+def test_root_cause_service_uses_structured_root_candidate_alarm_type():
+    snapshot = seed_snapshot()
+    source_device = NetworkDevice.objects.get(data_snapshot=snapshot, code="OLT-MAL-ALT-001")
+    started_at = timezone.datetime(
+        2026,
+        7,
+        20,
+        15,
+        0,
+        tzinfo=timezone.get_current_timezone(),
+    )
+    alarm_type = AlarmType.objects.create(
+        data_snapshot=snapshot,
+        code="OLT_UNREACHABLE",
+        name="OLT unreachable",
+        severity=Severity.MAJOR,
+        category=AlarmCategory.ACCESS,
+        service_impact_class=ServiceImpactClass.PARTIAL_OUTAGE,
+        correlation_family="device_unreachable",
+        is_root_candidate=True,
+    )
+    Alarm.objects.create(
+        data_snapshot=snapshot,
+        alarm_id="ALM-RCA-OLT-STRUCTURED",
+        alarm_type=alarm_type,
+        device=source_device,
+        severity=Severity.MAJOR,
+        status=AlarmStatus.OPEN,
+        detected_at=started_at,
+    )
+    outage = Outage.objects.create(
+        data_snapshot=snapshot,
+        outage_code="OUT-RCA-OLT-STRUCTURED",
+        source_device=source_device,
+        outage_type=OutageType.DEVICE,
+        status=OutageStatus.OPEN,
+        detected_at=started_at,
+        started_at=started_at,
+    )
+
+    result = RootCauseService().analyze(
+        outage=outage,
+        snapshot=snapshot,
+        evaluation_time=started_at + timedelta(minutes=10),
+    )[0]
+
+    assert result.candidate_device_code == "OLT-MAL-ALT-001"
+    assert result.evidence_score == 85
+    assert result.classification == "confirmed"
 
 
 def seed_snapshot() -> DataSnapshot:

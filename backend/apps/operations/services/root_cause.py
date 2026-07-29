@@ -114,8 +114,7 @@ class RootCauseService:
             raise RootCauseInputError("Outage must be a persisted Outage.")
         if outage.data_snapshot_id != snapshot.id:
             raise RootCauseInputError(
-                f"Outage {outage.outage_code} does not belong to snapshot "
-                f"{snapshot.snapshot_key}."
+                f"Outage {outage.outage_code} does not belong to snapshot {snapshot.snapshot_key}."
             )
         if not outage.source_device_id:
             raise RootCauseInputError(f"Outage {outage.outage_code} has no source device.")
@@ -142,13 +141,16 @@ class RootCauseService:
             window_end=window_end,
         )
         for alarm in alarms:
+            alarm_device = alarm.get_source_device()
+            if alarm_device is None:
+                continue
             relation = self._get_topology_relation(
                 outage.source_device,
-                alarm.device,
+                alarm_device,
                 snapshot,
             )
             if relation != "unrelated":
-                devices_by_id[alarm.device_id] = alarm.device
+                devices_by_id[alarm_device.id] = alarm_device
         return sorted(devices_by_id.values(), key=lambda device: device.code)
 
     def _score_candidate(
@@ -165,8 +167,9 @@ class RootCauseService:
                 snapshot=snapshot,
                 window_start=window_start,
                 window_end=window_end,
-            ).filter(device=candidate_device)
+            )
         )
+        alarms = [alarm for alarm in alarms if alarm.get_source_device() == candidate_device]
         source_match = candidate_device.id == outage.source_device_id
         source_match_score = 40 if source_match else 0
         strong_alarm_score = self._score_alarm_support(alarms)
@@ -186,7 +189,7 @@ class RootCauseService:
         missing_evidence = self._get_missing_evidence(
             source_match=source_match,
             direct_source_alarm=direct_source_alarm,
-            has_strong_alarm=any(alarm.alarm_type.code in STRONG_ALARM_TYPES for alarm in alarms),
+            has_strong_alarm=any(is_strong_root_alarm(alarm) for alarm in alarms),
             has_near_start_alarm=time_score > 0,
             topology_relation=topology_relation,
         )
@@ -243,16 +246,32 @@ class RootCauseService:
                 detected_at__gte=window_start - ROOT_CAUSE_ALARM_WINDOW,
                 detected_at__lte=window_end,
             )
-            .select_related("alarm_type", "device", "device__district")
+            .select_related(
+                "alarm_type",
+                "device",
+                "device__district",
+                "network_link",
+                "network_link__source_device",
+                "network_link__target_device",
+                "network_port",
+                "network_port__device",
+                "line_connection",
+                "line_connection__port",
+                "line_connection__port__device",
+                "failure_domain",
+                "subscription_connection",
+                "subscription_connection__line_connection",
+                "subscription_connection__line_connection__port",
+                "subscription_connection__line_connection__port__device",
+            )
             .order_by("alarm_id")
         )
 
     def _score_alarm_support(self, alarms: list[Alarm]) -> int:
-        alarm_type_codes = {alarm.alarm_type.code for alarm in alarms}
         score = 0
-        if alarm_type_codes & STRONG_ALARM_TYPES:
+        if any(is_strong_root_alarm(alarm) for alarm in alarms):
             score += 25
-        if SUPPORTING_LINK_ALARM_TYPE in alarm_type_codes:
+        if any(is_supporting_link_alarm(alarm) for alarm in alarms):
             score += 15
         return score
 
@@ -264,8 +283,7 @@ class RootCauseService:
         if not alarms:
             return 0, None
         nearest_seconds = min(
-            abs(int((alarm.detected_at - outage_started_at).total_seconds()))
-            for alarm in alarms
+            abs(int((alarm.detected_at - outage_started_at).total_seconds())) for alarm in alarms
         )
         if nearest_seconds <= 5 * 60:
             return 10, nearest_seconds
@@ -355,3 +373,16 @@ class RootCauseService:
         if evidence_score >= 50 and not missing_evidence:
             return "probable"
         return "unknown"
+
+
+def is_strong_root_alarm(alarm: Alarm) -> bool:
+    return alarm.alarm_type.code in STRONG_ALARM_TYPES or (
+        alarm.alarm_type.is_root_candidate and alarm.alarm_type.severity in {"critical", "major"}
+    )
+
+
+def is_supporting_link_alarm(alarm: Alarm) -> bool:
+    return alarm.alarm_type.code == SUPPORTING_LINK_ALARM_TYPE or (
+        alarm.alarm_type.correlation_family in {"link_down", "fiber_route", "protection"}
+        and alarm.alarm_type.code not in STRONG_ALARM_TYPES
+    )

@@ -34,8 +34,13 @@ from apps.network.models import (
 from apps.operations.models import (
     Alarm,
     AlarmType,
+    AlarmTypeAllowedSourceKind,
+    AlarmTypeSupportedDeviceType,
     Incident,
     IncidentAlarm,
+    MaintenanceWindow,
+    MaintenanceWindowDevice,
+    MaintenanceWindowNetworkLink,
     OperationalEvent,
     Outage,
     QualityMeasurement,
@@ -55,12 +60,17 @@ EXPECTED_COUNTS = {
     "subscriptions": 240,
     "subscription_connections": 240,
     "alarm_types": 3,
+    "alarm_type_allowed_source_kinds": 0,
+    "alarm_type_supported_device_types": 0,
     "alarms": 4,
     "incidents": 3,
     "incident_alarms": 4,
     "outages": 3,
     "operational_events": 12,
     "quality_measurements": 0,
+    "maintenance_windows": 0,
+    "maintenance_window_devices": 0,
+    "maintenance_window_network_links": 0,
     "rules": 1,
     "rule_versions": 2,
     "ground_truth_cases": 3,
@@ -144,6 +154,11 @@ def validate_maltepe_mvp_snapshot(snapshot: DataSnapshot) -> dict[str, Any]:
                 "device_failure_domain_memberships": True,
                 "network_link_failure_domain_memberships": True,
                 "line_connection_failure_domain_memberships": True,
+                "alarms": True,
+                "quality_measurements": True,
+                "maintenance_windows": True,
+                "maintenance_window_devices": True,
+                "maintenance_window_network_links": True,
             },
             actual=collect_snapshot_reference_integrity(snapshot),
         ),
@@ -261,12 +276,23 @@ def collect_row_counts(snapshot: DataSnapshot) -> dict[str, int]:
             data_snapshot=snapshot
         ).count(),
         "alarm_types": AlarmType.objects.filter(data_snapshot=snapshot).count(),
+        "alarm_type_allowed_source_kinds": AlarmTypeAllowedSourceKind.objects.filter(
+            data_snapshot=snapshot
+        ).count(),
+        "alarm_type_supported_device_types": AlarmTypeSupportedDeviceType.objects.filter(
+            data_snapshot=snapshot
+        ).count(),
         "alarms": Alarm.objects.filter(data_snapshot=snapshot).count(),
         "incidents": Incident.objects.filter(data_snapshot=snapshot).count(),
         "incident_alarms": IncidentAlarm.objects.filter(data_snapshot=snapshot).count(),
         "outages": Outage.objects.filter(data_snapshot=snapshot).count(),
         "operational_events": OperationalEvent.objects.filter(data_snapshot=snapshot).count(),
-        "quality_measurements": QualityMeasurement.objects.filter(
+        "quality_measurements": QualityMeasurement.objects.filter(data_snapshot=snapshot).count(),
+        "maintenance_windows": MaintenanceWindow.objects.filter(data_snapshot=snapshot).count(),
+        "maintenance_window_devices": MaintenanceWindowDevice.objects.filter(
+            data_snapshot=snapshot
+        ).count(),
+        "maintenance_window_network_links": MaintenanceWindowNetworkLink.objects.filter(
             data_snapshot=snapshot
         ).count(),
         "rules": Rule.objects.filter(data_snapshot=snapshot).count(),
@@ -310,8 +336,9 @@ def collect_subscription_package_technology_distribution(snapshot: DataSnapshot)
 def collect_subscription_connection_role_distribution(snapshot: DataSnapshot) -> dict[str, int]:
     return normalize_counter(
         Counter(
-            SubscriptionConnection.objects.filter(data_snapshot=snapshot, is_active=True)
-            .values_list("connection_role", flat=True)
+            SubscriptionConnection.objects.filter(
+                data_snapshot=snapshot, is_active=True
+            ).values_list("connection_role", flat=True)
         )
     )
 
@@ -352,9 +379,7 @@ def collect_main_outage_previous_month_status(snapshot: DataSnapshot) -> dict[st
         "outage_code": main_outage.outage_code if main_outage else None,
         "duration_minutes": duration_minutes,
         "is_previous_month_longest": bool(
-            main_outage
-            and longest_outage
-            and longest_outage.outage_code == main_outage.outage_code
+            main_outage and longest_outage and longest_outage.outage_code == main_outage.outage_code
         ),
     }
 
@@ -419,6 +444,27 @@ def collect_snapshot_reference_integrity(snapshot: DataSnapshot) -> dict[str, bo
             )
             .exists()
         ),
+        "alarms": collect_alarm_source_snapshot_integrity(snapshot),
+        "quality_measurements": collect_quality_measurement_source_snapshot_integrity(snapshot),
+        "maintenance_windows": not MaintenanceWindow.objects.filter(data_snapshot=snapshot)
+        .filter(Q(linked_incident__isnull=False) & ~Q(linked_incident__data_snapshot=snapshot))
+        .exists(),
+        "maintenance_window_devices": not MaintenanceWindowDevice.objects.filter(
+            data_snapshot=snapshot
+        )
+        .exclude(
+            maintenance_window__data_snapshot=snapshot,
+            device__data_snapshot=snapshot,
+        )
+        .exists(),
+        "maintenance_window_network_links": not MaintenanceWindowNetworkLink.objects.filter(
+            data_snapshot=snapshot
+        )
+        .exclude(
+            maintenance_window__data_snapshot=snapshot,
+            network_link__data_snapshot=snapshot,
+        )
+        .exists(),
     }
 
 
@@ -442,9 +488,7 @@ def collect_active_subscription_connection_integrity(snapshot: DataSnapshot) -> 
     )
     return {
         "active_subscriptions": active_subscriptions.count(),
-        "with_exactly_one_active_connection": annotated.filter(
-            active_connection_count=1
-        ).count(),
+        "with_exactly_one_active_connection": annotated.filter(active_connection_count=1).count(),
         "with_invalid_active_connection_count": annotated.exclude(
             active_connection_count=1
         ).count(),
@@ -470,12 +514,8 @@ def collect_expected_gpon_fan_out_distribution() -> dict[str, Any]:
         for count in fan_out_counts
     )
     return {
-        "active_pon_ports": seed_config.PORT_CAPACITY_PLAN["gpon"][
-            "active_physical_pon_ports"
-        ],
-        "reserved_pon_ports": seed_config.PORT_CAPACITY_PLAN["gpon"][
-            "reserved_physical_pon_ports"
-        ],
+        "active_pon_ports": seed_config.PORT_CAPACITY_PLAN["gpon"]["active_physical_pon_ports"],
+        "reserved_pon_ports": seed_config.PORT_CAPACITY_PLAN["gpon"]["reserved_physical_pon_ports"],
         "fan_out_counts": expected_counts,
     }
 
@@ -541,9 +581,7 @@ def collect_general_fiber_port_line_cardinality(snapshot: DataSnapshot) -> dict[
 
 def collect_alarm_incident_reference_integrity(snapshot: DataSnapshot) -> dict[str, bool]:
     return {
-        "alarms": not Alarm.objects.filter(data_snapshot=snapshot)
-        .exclude(alarm_type__data_snapshot=snapshot, device__data_snapshot=snapshot)
-        .exists(),
+        "alarms": collect_alarm_source_snapshot_integrity(snapshot),
         "incidents": not Incident.objects.filter(data_snapshot=snapshot)
         .exclude(primary_device__data_snapshot=snapshot)
         .exists(),
@@ -557,6 +595,37 @@ def collect_alarm_incident_reference_integrity(snapshot: DataSnapshot) -> dict[s
         )
         .exists(),
     }
+
+
+def collect_alarm_source_snapshot_integrity(snapshot: DataSnapshot) -> bool:
+    for alarm in Alarm.objects.filter(data_snapshot=snapshot).select_related(
+        "alarm_type",
+        "device",
+        "network_link",
+        "network_port",
+        "line_connection",
+        "failure_domain",
+        "subscription_connection",
+    ):
+        if alarm.alarm_type.data_snapshot_id != snapshot.id:
+            return False
+        source = alarm.get_source()
+        if source is None or source.data_snapshot_id != snapshot.id:
+            return False
+    return True
+
+
+def collect_quality_measurement_source_snapshot_integrity(snapshot: DataSnapshot) -> bool:
+    for measurement in QualityMeasurement.objects.filter(data_snapshot=snapshot).select_related(
+        "device",
+        "network_link",
+        "line_connection",
+        "subscription_connection",
+    ):
+        source = measurement.get_source()
+        if source is None or source.data_snapshot_id != snapshot.id:
+            return False
+    return True
 
 
 def collect_outage_time_integrity(snapshot: DataSnapshot) -> dict[str, int]:

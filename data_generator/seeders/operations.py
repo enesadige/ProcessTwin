@@ -8,15 +8,18 @@ from apps.operations.models import (
     Alarm,
     AlarmStatus,
     AlarmType,
+    AutoClearPolicy,
     Incident,
     IncidentAlarm,
     IncidentAlarmRole,
     IncidentStatus,
+    IncidentType,
     OperationalEvent,
     Outage,
     OutageStatus,
     OutageType,
     RootCauseCategory,
+    ServiceImpactClass,
 )
 from data_generator.configs import maltepe_mvp_v1 as seed_config
 
@@ -67,6 +70,25 @@ def create_alarm_types(snapshot: DataSnapshot) -> dict[str, AlarmType]:
                 name=alarm_config["name"],
                 severity=alarm_config["severity"],
                 category=alarm_config["category"],
+                probable_cause_family=alarm_config.get("probable_cause_family", ""),
+                service_impact_class=alarm_config.get(
+                    "service_impact_class",
+                    ServiceImpactClass.UNKNOWN,
+                ),
+                auto_clear_policy=alarm_config.get(
+                    "auto_clear_policy",
+                    AutoClearPolicy.AUTO_OR_MANUAL,
+                ),
+                deduplication_window_seconds=alarm_config.get(
+                    "deduplication_window_seconds",
+                    600,
+                ),
+                correlation_family=alarm_config.get("correlation_family", ""),
+                default_incident_type=alarm_config.get(
+                    "default_incident_type",
+                    IncidentType.UNKNOWN,
+                ),
+                is_root_candidate=alarm_config.get("is_root_candidate", False),
                 description=alarm_config["description"],
                 metadata={"seed_role": "alarm_type", "synthetic": True},
             )
@@ -166,6 +188,9 @@ def create_outage_scenario(
             title=f"{source_device.code} synthetic outage",
             status=IncidentStatus.RESOLVED,
             severity=severity,
+            incident_type=IncidentType.NETWORK_OUTAGE,
+            service_impact_class=ServiceImpactClass.FULL_OUTAGE,
+            correlation_method="deterministic_seed",
             primary_device=source_device,
             root_cause_category=root_cause_category,
             root_cause_summary=root_cause_summary,
@@ -190,9 +215,7 @@ def create_outage_scenario(
                     incident=incident,
                     alarm=alarm,
                     role=(
-                        IncidentAlarmRole.PRIMARY
-                        if index == 0
-                        else IncidentAlarmRole.SUPPORTING
+                        IncidentAlarmRole.PRIMARY if index == 0 else IncidentAlarmRole.SUPPORTING
                     ),
                     metadata={"seed_role": "incident_alarm"},
                 )
@@ -206,6 +229,7 @@ def create_outage_scenario(
             incident=incident,
             source_device=source_device,
             outage_type=OutageType.DEVICE,
+            impact_type=ServiceImpactClass.FULL_OUTAGE,
             status=OutageStatus.RESOLVED,
             root_cause_category=root_cause_category,
             root_cause_summary=root_cause_summary,
@@ -264,7 +288,11 @@ def create_alarm(
             severity=severity,
             status=AlarmStatus.CLEARED,
             detected_at=detected_at,
+            received_at=detected_at,
             cleared_at=cleared_at,
+            last_seen_at=cleared_at,
+            occurrence_count=1,
+            deduplication_key=f"{alarm_type.code}:{device.code}",
             raw_payload={"synthetic": True, "source": "maltepe_mvp_seed"},
             metadata=metadata,
         )

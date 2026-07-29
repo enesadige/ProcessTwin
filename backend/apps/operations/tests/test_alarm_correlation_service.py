@@ -5,8 +5,22 @@ from django.core.management import call_command
 
 from apps.datasets.management.commands.seed_maltepe_mvp import get_target_dataset_slug
 from apps.datasets.models import DatasetVersion, DataSnapshot
-from apps.network.models import NetworkDevice
-from apps.operations.models import Alarm, AlarmStatus, AlarmType, IncidentAlarm, Severity
+from apps.network.models import (
+    FailureDomain,
+    FailureDomainType,
+    NetworkDevice,
+    NetworkLink,
+    NetworkLinkFailureDomainMembership,
+)
+from apps.operations.models import (
+    Alarm,
+    AlarmCategory,
+    AlarmStatus,
+    AlarmType,
+    IncidentAlarm,
+    ServiceImpactClass,
+    Severity,
+)
 from apps.operations.services.alarm_correlation import (
     AlarmCorrelationInputError,
     AlarmCorrelationService,
@@ -227,6 +241,70 @@ def test_alarm_correlation_results_are_sorted_by_score_then_alarm_code():
         "ALM-CORR-A-SAME-SCORE",
         "ALM-CORR-B-SAME-SCORE",
     ]
+
+
+@pytest.mark.django_db
+def test_alarm_correlation_uses_shared_failure_domain_for_fiber_route_evidence():
+    snapshot = seed_snapshot()
+    first_link = NetworkLink.objects.get(
+        data_snapshot=snapshot,
+        link_code="LINK-BNG-MAL-001-OLT-MAL-ALT-001",
+    )
+    second_link = NetworkLink.objects.get(
+        data_snapshot=snapshot,
+        link_code="LINK-BNG-MAL-002-OLT-MAL-ZUM-001",
+    )
+    fiber_route = FailureDomain.objects.create(
+        data_snapshot=snapshot,
+        code="FD-FIBER-CORR-001",
+        name="Synthetic fiber route",
+        domain_type=FailureDomainType.FIBER_ROUTE,
+    )
+    for link in (first_link, second_link):
+        NetworkLinkFailureDomainMembership.objects.create(
+            data_snapshot=snapshot,
+            network_link=link,
+            failure_domain=fiber_route,
+        )
+    fiber_alarm_type = AlarmType.objects.create(
+        data_snapshot=snapshot,
+        code="FIBER_CUT_SUSPECTED",
+        name="Synthetic fiber cut",
+        severity=Severity.CRITICAL,
+        category=AlarmCategory.TRANSPORT,
+        service_impact_class=ServiceImpactClass.PARTIAL_OUTAGE,
+        correlation_family="fiber_route",
+        is_root_candidate=True,
+    )
+    anchor = Alarm.objects.create(
+        data_snapshot=snapshot,
+        alarm_id="ALM-FIBER-ANCHOR",
+        alarm_type=fiber_alarm_type,
+        network_link=first_link,
+        severity=Severity.CRITICAL,
+        status=AlarmStatus.OPEN,
+        detected_at=get_alarm(snapshot, "ALM-OUT-MAL-BNG-001-PRIMARY").detected_at,
+    )
+    candidate = Alarm.objects.create(
+        data_snapshot=snapshot,
+        alarm_id="ALM-FIBER-CANDIDATE",
+        alarm_type=fiber_alarm_type,
+        network_link=second_link,
+        severity=Severity.CRITICAL,
+        status=AlarmStatus.OPEN,
+        detected_at=anchor.detected_at,
+    )
+
+    result = AlarmCorrelationService().score_pair(
+        anchor_alarm=anchor,
+        candidate_alarm=candidate,
+        snapshot=snapshot,
+    )
+
+    assert result.topology_relation == "shared_failure_domain"
+    assert result.type_compatibility == "same_type_with_topology"
+    assert result.evidence_score == 90
+    assert result.correlated is True
 
 
 def seed_snapshot() -> DataSnapshot:

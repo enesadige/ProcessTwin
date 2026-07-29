@@ -40,14 +40,16 @@ Durum: `KARAR VERİLDİ`
     - `fiber` paket -> `gpon` hat: uyumlu
     - `vdsl` paket -> `vdsl` hat: uyumlu
     - `adsl` paket -> `adsl` hat: uyumlu
-    - `metro_ethernet` paket -> `metro_ethernet` hat: uyumlu
+    - `metro_ethernet` service type -> yalnız `fiber` hat: uyumlu
     - diğer kombinasyonlar: uyumsuz
   - Seed verisinde `gpon` isimli müşteri paketi üretilmez.
   - GPON, fiber paketlerin çalışabildiği hat/altyapı teknolojisi olarak kullanılır.
   - VDSL ve ADSL aynı xDSL ailesinde olmasına rağmen MVP'de birbirleriyle uyumlu kabul edilmez.
   - İlk Maltepe MVP seed'inde Metro Ethernet müşterisi, paketi, hattı veya outage senaryosu üretilmez.
-  - `metro_ethernet` teknoloji seçeneği kodda korunur; kaldırılmaz.
-  - Metro Ethernet sonraki kurumsal genişleme kapsamında ayrı topoloji, SLA, yedeklilik ve telafi kararlarıyla ele alınır.
+  - `metro_ethernet`, fiziksel `AccessTechnology` değildir; `ServicePackage.service_type`
+    değeridir.
+  - Metro Ethernet sonraki kurumsal genişleme kapsamında P2P/dedicated fiber, ayrı
+    topoloji, SLA, yedeklilik ve telafi kararlarıyla ele alınır.
   - Gelecekte eklenirken otomatik olarak OLT/DSLAM zincirine bağlanacağı varsayılmaz; ayrı servis/topoloji akışı değerlendirilerek modellenir.
   - Upgrade, downgrade veya teknoloji dönüşümü senaryoları sonraki kapsama bırakılır.
   - Uyumluluk mantığı model içinde dağınık koşullar olarak yazılmaz; ileride ortak `is_package_line_compatible` helper veya servis üzerinden yönetilir ve test edilir.
@@ -842,36 +844,199 @@ Durum: `KISMEN KARAR VERİLDİ`
 
 ### 8.3 Alarm Kataloğu ve Olay Senaryoları
 
-Durum: `KARAR BEKLİYOR`
+Durum: `KARAR VERİLDİ`
 
-- 20-30 gerçeğe yakın sentetik alarm tipi üretilecek mi?
-- Alarm katalog alanları nasıl tutulacak?
-  - alarm code
-  - alarm name
-  - category
-  - severity
-  - kaynak cihaz tipi
-  - desteklenen teknolojiler
-  - probable cause
-  - clear/recovery davranışı
-  - parent/root alarm ilişkisi
-  - suppression kuralları
-  - deduplication anahtarı
-  - correlation time window
-  - incident oluşturma etkisi
-  - servis etkisi seviyesi
-- Hangi olay aileleri üretilecek?
-  - fiber kesisi
-  - cihaz erişilemezliği
-  - link arızası
-  - enerji problemi
-  - planlı bakım
-  - kısmi kesinti
-  - tam kesinti
-  - aralıklı kesinti
-  - servis kalitesi bozulması
-  - tekrar eden arıza
-- Gerçek kurum alarm kodu veya gizli veri iddiası oluşturulmayacaktır.
+- Model yaklaşımı: `KARAR VERİLDİ`
+  - Kontrollü A+ genişletmesi seçildi.
+  - Mevcut `AlarmType`, `Alarm`, `Incident`, `IncidentAlarm`, `Outage`,
+    `OperationalEvent` ve `QualityMeasurement` modelleri korunur.
+  - Kapsamlı event-sourcing refactor yapılmaz.
+  - Gerekli structured alanlar ve küçük `MaintenanceWindow` modeli eklenir.
+  - Kritik domain bilgileri serbest metadata içine gizlenmez.
+- Alarm katalogu: `KARAR VERİLDİ`
+  - Büyük gerçekçi dataset için tam 30 sentetik alarm tipi planlanır.
+  - Bunlar gerçek kurum alarm kodu veya gizli veri değildir.
+  - Mevcut Maltepe 3 alarm tipi minimal regression katalogu olarak korunur:
+    - `BNG_UNREACHABLE`
+    - `ACCESS_DEVICE_UNREACHABLE`
+    - `LINK_DOWN`
+  - Birleştirilen alarm kararları:
+    - `CPU_HIGH` + `MEMORY_HIGH` -> `DEVICE_RESOURCE_HIGH`
+    - `LINE_ATTENUATION_HIGH` + `SNR_LOW` -> `DSL_LINE_QUALITY_DEGRADED`
+    - `BATTERY_ON_DISCHARGE` + `LOW_BATTERY_CAPACITY` -> `BACKUP_POWER_DEGRADED`
+  - Katalogdan çıkarılan ham olmayan alarm kararları:
+    - `METRO_SERVICE_DEGRADED`
+    - `WIDESPREAD_QUALITY_DEGRADATION`
+  - Nihai 30 alarm kodu:
+    - `BNG_UNREACHABLE`
+    - `METRO_AGG_UNREACHABLE`
+    - `OLT_UNREACHABLE`
+    - `DSLAM_UNREACHABLE`
+    - `ACCESS_NODE_UNREACHABLE`
+    - `UPLINK_DOWN`
+    - `FIBER_CUT_SUSPECTED`
+    - `LINK_PACKET_LOSS_HIGH`
+    - `LINK_FLAPPING`
+    - `BACKUP_LINK_UNAVAILABLE`
+    - `PON_PORT_DOWN`
+    - `OPTICAL_SIGNAL_LOW`
+    - `OPTICAL_SIGNAL_LOSS`
+    - `ONT_DISCONNECT_SURGE`
+    - `PON_CAPACITY_THRESHOLD`
+    - `DSL_PORT_DOWN`
+    - `DSL_LINE_QUALITY_DEGRADED`
+    - `DSL_RETRAIN_FREQUENT`
+    - `DSLAM_PORT_SATURATION`
+    - `DEDICATED_PORT_DOWN`
+    - `SLA_LATENCY_BREACH`
+    - `SLA_PACKET_LOSS_BREACH`
+    - `PRIMARY_PATH_DOWN`
+    - `FAILOVER_UNSUCCESSFUL`
+    - `COMMERCIAL_POWER_LOSS`
+    - `BACKUP_POWER_DEGRADED`
+    - `HIGH_TEMPERATURE`
+    - `COOLING_FAILURE`
+    - `DEVICE_RESOURCE_HIGH`
+    - `BANDWIDTH_UTIL_HIGH`
+- Severity ve servis etkisi: `KARAR VERİLDİ`
+  - Severity değerleri:
+    - `critical`
+    - `major`
+    - `minor`
+    - `warning`
+    - `info`
+  - Service impact class değerleri:
+    - `full_outage`
+    - `partial_outage`
+    - `short_interruption`
+    - `degradation`
+    - `protection_loss`
+    - `no_direct_customer_impact`
+    - `unknown`
+  - Severity ile müşteri etkisi aynı kavram değildir.
+- Alarm lifecycle: `KARAR VERİLDİ`
+  - `Alarm.status` yalnız şu değerleri taşır:
+    - `open`
+    - `cleared`
+    - `suppressed`
+  - `acknowledged`, status değildir; `acknowledged_at` ile tutulur.
+  - `correlated`, status değildir; `IncidentAlarm.role` ve correlation evidence ile temsil edilir.
+  - `detected_at`, alarmın kaynakta gerçekleştiği/event zamanıdır; aynı anlamda yeni
+    `event_time` alanı eklenmez.
+  - Ek zaman ve lifecycle alanları:
+    - `received_at`
+    - `acknowledged_at`
+    - `last_seen_at`
+    - `occurrence_count`
+    - `deduplication_key`
+    - `suppression_reason`
+    - `recurrence_group_key`
+- Alarm kaynağı: `KARAR VERİLDİ`
+  - `AlarmType` birden fazla `allowed_source_kinds` ve `supported_device_types`
+    taşıyabilir.
+  - Bir gerçek `Alarm` kaydı tam olarak bir structured source taşır:
+    - `device`
+    - `network_link`
+    - `network_port`
+    - `line_connection`
+    - `failure_domain`
+    - `subscription_connection`
+  - Kaynak port/line/subscription_connection ise bağlı cihaz ve üst topoloji servis
+    tarafından türetilir; aynı bilgi gereksiz FK olarak tekrar edilmez.
+- Deduplication ve flapping: `KARAR VERİLDİ`
+  - Açık alarm tekilliği `data_snapshot + alarm_type + deduplication_key` üzerinden
+    korunur.
+  - Aynı açık alarm tekrar gelirse yeni kayıt açmak yerine `last_seen_at` güncellenir
+    ve `occurrence_count` artar.
+  - Clear sonrası tekrar açılan kayıtlar ayrı alarm olabilir; aynı tekrar ailesi
+    `recurrence_group_key` ile bağlanabilir.
+- Incident ve Outage ayrımı: `KARAR VERİLDİ`
+  - `Incident` alanları:
+    - `incident_type`
+    - `service_impact_class`
+    - `correlation_method`
+    - `failover_result`
+    - `transition_duration_seconds`
+    - `restored_at`
+  - `IncidentType` değerleri:
+    - `network_outage`
+    - `service_degradation`
+    - `protection_event`
+    - `intermittent`
+    - `planned_maintenance`
+    - `unknown`
+  - `FailoverResult` değerleri:
+    - `hitless`
+    - `near_hitless`
+    - `short_interruption`
+    - `degraded`
+    - `failed`
+    - `unknown`
+  - `Outage` yalnız gerçek hizmet erişilebilirliği kaybında oluşturulur:
+    - `full_outage`
+    - `partial_outage`
+    - `short_interruption`
+  - Sadece `degradation`, `protection_loss` veya `no_direct_customer_impact` için
+    Outage kaydı oluşturulmaz.
+- Quality measurement kaynakları: `KARAR VERİLDİ`
+  - `QualityMeasurement` geriye uyumlu şekilde genişletilir.
+  - Tam olarak bir kaynak seçilir:
+    - `device`
+    - `network_link`
+    - `line_connection`
+    - `subscription_connection`
+  - Structured metrikler:
+    - `latency_ms`
+    - `jitter_ms`
+    - `packet_loss_percent`
+    - `availability_percent`
+    - `bandwidth_utilization_percent`
+- Planlı bakım: `KARAR VERİLDİ`
+  - Küçük structured `MaintenanceWindow` modeli eklenir.
+  - Bakım kapsamı structured device ve NetworkLink ilişkileriyle tutulur.
+  - Bakım normal tamamlanırsa planned maintenance olarak kalır.
+  - Bakım süresi aşılır veya beklenmeyen müşteri etkisi oluşursa mevcut plan kaydı
+    plansız olaya dönüştürülmez; MaintenanceWindow'a bağlı ayrı unplanned Incident
+    oluşturulur.
+- Korelasyon ve root cause: `KARAR VERİLDİ`
+  - LLM kullanılmaz; korelasyon deterministik kalır.
+  - Skor alanları:
+    - zaman yakınlığı: 0-30
+    - topoloji/failure-domain ilişkisi: 0-35
+    - alarm family uyumu: 0-25
+    - severity/root-candidate: 0-10
+  - Eşikler:
+    - 70 ve üzeri: strong
+    - 50-69: candidate
+    - 50 altı: unrelated/noise
+  - Mevcut Maltepe davranışı ve ground truth sonucu değişmez.
+- Olay senaryoları: `KARAR VERİLDİ`
+  - Büyük dataset için 22 config-driven senaryo şablonu tanımlanır.
+  - `SCN-NOISE-001` alarm üretir ancak tek başına Incident oluşturmaz.
+  - `SCN-ACCESS-NODE-001` büyük dataset içinde İstanbul / Şişli olarak sabitlenir.
+  - Planned maintenance overrun, MaintenanceWindow'a bağlı ayrı unplanned Incident
+    oluşturur.
+  - Başarılı failover senaryolarında full outage oluşturulmaz.
+  - Büyük dataset bu aşamada seedlenmez; senaryolar 039.5.6 aşamasında kullanılacaktır.
+- Kesin veri hacmi hedefleri: `KARAR VERİLDİ`
+  - AlarmType: 30
+  - Alarm: 2.100
+  - cleared alarm: 1.680
+  - open alarm: 210
+  - suppressed alarm: 210
+  - açık alarmların yaklaşık 105 tanesi acknowledged
+  - Incident: 210
+  - Outage: 78
+  - degradation sınıflı incident: yaklaşık 60
+  - protection-loss incident: yaklaşık 22
+  - MaintenanceWindow: 30
+  - OperationalEvent: 900
+  - QualityMeasurement: 12.000
+  - timeline: 60 gün
+  - yoğun olay günü: 9
+  - planlı bakım yoğun günü: 3
+  - recurring/flapping günü: 4
+  - 039.5.6 seed aşamasında küçük deterministik yuvarlama farkı oluşursa nedeni raporlanır.
 
 ### 8.4 Müşteri, Paket, Ödeme ve Kampanya Dağılımları
 

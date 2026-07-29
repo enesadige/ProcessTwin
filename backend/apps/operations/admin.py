@@ -3,8 +3,13 @@ from django.contrib import admin
 from apps.operations.models import (
     Alarm,
     AlarmType,
+    AlarmTypeAllowedSourceKind,
+    AlarmTypeSupportedDeviceType,
     Incident,
     IncidentAlarm,
+    MaintenanceWindow,
+    MaintenanceWindowDevice,
+    MaintenanceWindowNetworkLink,
     OperationalEvent,
     Outage,
     QualityMeasurement,
@@ -13,13 +18,49 @@ from apps.operations.models import (
 
 @admin.register(AlarmType)
 class AlarmTypeAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "severity", "category", "data_snapshot")
-    list_filter = ("severity", "category")
-    search_fields = ("code", "name", "description")
+    list_display = (
+        "code",
+        "name",
+        "severity",
+        "category",
+        "service_impact_class",
+        "correlation_family",
+        "is_root_candidate",
+        "data_snapshot",
+    )
+    list_filter = (
+        "severity",
+        "category",
+        "service_impact_class",
+        "auto_clear_policy",
+        "default_incident_type",
+        "is_root_candidate",
+    )
+    search_fields = ("code", "name", "description", "probable_cause_family")
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = ("data_snapshot",)
     list_select_related = ("data_snapshot",)
     date_hierarchy = "created_at"
+
+
+@admin.register(AlarmTypeAllowedSourceKind)
+class AlarmTypeAllowedSourceKindAdmin(admin.ModelAdmin):
+    list_display = ("alarm_type", "source_kind", "data_snapshot")
+    list_filter = ("source_kind",)
+    search_fields = ("alarm_type__code", "source_kind")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot", "alarm_type")
+    list_select_related = ("data_snapshot", "alarm_type")
+
+
+@admin.register(AlarmTypeSupportedDeviceType)
+class AlarmTypeSupportedDeviceTypeAdmin(admin.ModelAdmin):
+    list_display = ("alarm_type", "device_type", "data_snapshot")
+    list_filter = ("device_type",)
+    search_fields = ("alarm_type__code", "device_type")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot", "alarm_type")
+    list_select_related = ("data_snapshot", "alarm_type")
 
 
 @admin.register(Alarm)
@@ -27,18 +68,54 @@ class AlarmAdmin(admin.ModelAdmin):
     list_display = (
         "alarm_id",
         "alarm_type",
-        "device",
+        "source_kind",
+        "source_label",
         "severity",
         "status",
+        "occurrence_count",
+        "acknowledged_at",
         "detected_at",
+        "last_seen_at",
         "data_snapshot",
     )
-    list_filter = ("severity", "status", "alarm_type__category")
-    search_fields = ("alarm_id", "alarm_type__code", "device__code")
+    list_filter = ("severity", "status", "alarm_type__category", "alarm_type__correlation_family")
+    search_fields = (
+        "alarm_id",
+        "alarm_type__code",
+        "device__code",
+        "network_link__link_code",
+        "network_port__port_code",
+        "line_connection__line_code",
+        "subscription_connection__subscription__subscription_number",
+        "deduplication_key",
+        "recurrence_group_key",
+    )
     readonly_fields = ("created_at", "updated_at")
-    autocomplete_fields = ("data_snapshot", "alarm_type", "device")
-    list_select_related = ("data_snapshot", "alarm_type", "device")
+    autocomplete_fields = (
+        "data_snapshot",
+        "alarm_type",
+        "device",
+        "network_link",
+        "network_port",
+        "line_connection",
+        "failure_domain",
+        "subscription_connection",
+    )
+    list_select_related = (
+        "data_snapshot",
+        "alarm_type",
+        "device",
+        "network_link",
+        "network_port",
+        "line_connection",
+        "failure_domain",
+        "subscription_connection",
+    )
     date_hierarchy = "detected_at"
+
+    @admin.display(description="Kaynak türü")
+    def source_kind(self, obj: Alarm):
+        return obj.get_source_kind()
 
 
 @admin.register(Incident)
@@ -48,12 +125,22 @@ class IncidentAdmin(admin.ModelAdmin):
         "title",
         "status",
         "severity",
+        "incident_type",
+        "service_impact_class",
+        "failover_result",
         "primary_device",
         "root_cause_category",
         "started_at",
         "data_snapshot",
     )
-    list_filter = ("status", "severity", "root_cause_category")
+    list_filter = (
+        "status",
+        "severity",
+        "incident_type",
+        "service_impact_class",
+        "failover_result",
+        "root_cause_category",
+    )
     search_fields = ("incident_number", "title", "primary_device__code", "root_cause_summary")
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = ("data_snapshot", "primary_device")
@@ -78,13 +165,14 @@ class OutageAdmin(admin.ModelAdmin):
         "outage_code",
         "source_device",
         "outage_type",
+        "impact_type",
         "status",
         "root_cause_category",
         "started_at",
         "ended_at",
         "data_snapshot",
     )
-    list_filter = ("outage_type", "status", "root_cause_category")
+    list_filter = ("outage_type", "impact_type", "status", "root_cause_category")
     search_fields = ("outage_code", "source_device__code", "root_cause_summary")
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = ("data_snapshot", "incident", "source_device")
@@ -113,10 +201,79 @@ class OperationalEventAdmin(admin.ModelAdmin):
 
 @admin.register(QualityMeasurement)
 class QualityMeasurementAdmin(admin.ModelAdmin):
-    list_display = ("device", "metric_type", "measured_at", "value", "unit", "data_snapshot")
+    list_display = (
+        "source_kind",
+        "source_label",
+        "metric_type",
+        "measured_at",
+        "value",
+        "unit",
+        "data_snapshot",
+    )
     list_filter = ("metric_type", "unit")
-    search_fields = ("device__code", "metric_type")
+    search_fields = (
+        "device__code",
+        "network_link__link_code",
+        "line_connection__line_code",
+        "subscription_connection__subscription__subscription_number",
+        "metric_type",
+    )
     readonly_fields = ("created_at", "updated_at")
-    autocomplete_fields = ("data_snapshot", "device")
-    list_select_related = ("data_snapshot", "device")
+    autocomplete_fields = (
+        "data_snapshot",
+        "device",
+        "network_link",
+        "line_connection",
+        "subscription_connection",
+    )
+    list_select_related = (
+        "data_snapshot",
+        "device",
+        "network_link",
+        "line_connection",
+        "subscription_connection",
+    )
     date_hierarchy = "measured_at"
+
+    @admin.display(description="Kaynak türü")
+    def source_kind(self, obj: QualityMeasurement):
+        return obj.get_source_kind()
+
+
+@admin.register(MaintenanceWindow)
+class MaintenanceWindowAdmin(admin.ModelAdmin):
+    list_display = (
+        "reference_code",
+        "status",
+        "expected_impact_class",
+        "actual_impact_class",
+        "planned_start_at",
+        "planned_end_at",
+        "overrun_minutes",
+        "linked_incident",
+        "data_snapshot",
+    )
+    list_filter = ("status", "expected_impact_class", "actual_impact_class")
+    search_fields = ("reference_code", "description", "linked_incident__incident_number")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot", "linked_incident")
+    list_select_related = ("data_snapshot", "linked_incident")
+    date_hierarchy = "planned_start_at"
+
+
+@admin.register(MaintenanceWindowDevice)
+class MaintenanceWindowDeviceAdmin(admin.ModelAdmin):
+    list_display = ("maintenance_window", "device", "data_snapshot")
+    search_fields = ("maintenance_window__reference_code", "device__code")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot", "maintenance_window", "device")
+    list_select_related = ("data_snapshot", "maintenance_window", "device")
+
+
+@admin.register(MaintenanceWindowNetworkLink)
+class MaintenanceWindowNetworkLinkAdmin(admin.ModelAdmin):
+    list_display = ("maintenance_window", "network_link", "data_snapshot")
+    search_fields = ("maintenance_window__reference_code", "network_link__link_code")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot", "maintenance_window", "network_link")
+    list_select_related = ("data_snapshot", "maintenance_window", "network_link")
