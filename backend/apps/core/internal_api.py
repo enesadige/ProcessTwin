@@ -4,7 +4,8 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.http import JsonResponse
-from mcp_servers.shared.correlation import is_valid_correlation_id
+
+from apps.core.correlation import is_valid_correlation_id
 
 AUTHORIZATION_HEADER = "HTTP_AUTHORIZATION"
 BEARER_PREFIX = "Bearer "
