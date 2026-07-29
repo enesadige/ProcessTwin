@@ -114,12 +114,19 @@ class SubscriptionAdmin(admin.ModelAdmin):
         "service_package",
         "sla_profile",
         "status",
+        "suspension_reason",
         "is_active",
         "valid_from",
         "valid_to",
         "data_snapshot",
     )
-    list_filter = ("status", "is_active", "service_package__technology", "sla_profile")
+    list_filter = (
+        "status",
+        "suspension_reason",
+        "is_active",
+        "service_package__technology",
+        "sla_profile",
+    )
     search_fields = (
         "subscription_number",
         "customer__customer_number",
@@ -253,6 +260,7 @@ class CompensationHistoryAdmin(admin.ModelAdmin):
         "incident",
         "outage",
         "rule_version",
+        "compensation_conflict_group",
         "amount",
         "currency",
         "decision_status",
@@ -261,7 +269,12 @@ class CompensationHistoryAdmin(admin.ModelAdmin):
         "settled_at",
         "data_snapshot",
     )
-    list_filter = ("decision_status", "settlement_status", "currency")
+    list_filter = (
+        "decision_status",
+        "settlement_status",
+        "currency",
+        "compensation_conflict_group",
+    )
     search_fields = ("reference_code", "subscription__subscription_number", "reason")
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = (

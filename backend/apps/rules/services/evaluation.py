@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from typing import Any
 
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.datasets.models import DataSnapshot
 from apps.operations.models import Outage
-from apps.rules.models import RuleVersion
+from apps.rules.models import RuleSet, RuleVersion
 from apps.rules.services.version_selection import select_rule_version_for_moment
 
 SUPPORTED_OPERATORS = frozenset({"eq", "not_eq", "gte", "gt", "lte", "lt", "in", "not_in"})
@@ -56,6 +57,36 @@ class RuleEvaluationResult:
     selected_rule_version: dict[str, Any] | None
     action_config: dict[str, Any]
     errors: list[str]
+
+
+@dataclass(frozen=True)
+class PolicyRuleCandidate:
+    rule_code: str
+    rule_version: int
+    priority: int
+    specific_condition_count: int
+    action_type: str
+    price_basis: str
+    stackable: bool
+    conflict_group: str
+    evaluation_status: str
+    matched: bool
+    matched_conditions: list[dict[str, Any]]
+    unmatched_conditions: list[dict[str, Any]]
+    action_config: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PolicyEvaluationResult:
+    rule_set_code: str
+    rule_set_version: int | None
+    event_datetime: str
+    selected_base_rule: PolicyRuleCandidate | None
+    candidate_base_rules: list[PolicyRuleCandidate]
+    applied_modifiers: list[PolicyRuleCandidate]
+    excluded_rules: list[dict[str, Any]]
+    manual_review_reasons: list[str]
+    evaluation_status: str
 
 
 class RuleEvaluationService:
@@ -149,14 +180,135 @@ class RuleEvaluationService:
             raise RuleEvaluationInputError("Outage must be a persisted Outage.")
         if outage.data_snapshot_id != snapshot.id:
             raise RuleEvaluationInputError(
-                f"Outage {outage.outage_code} does not belong to snapshot "
-                f"{snapshot.snapshot_key}."
+                f"Outage {outage.outage_code} does not belong to snapshot {snapshot.snapshot_key}."
             )
         return self.evaluate(
             snapshot=snapshot,
             rule_code=rule_code,
             event_datetime=outage.started_at,
             context=context,
+        )
+
+    def evaluate_rule_set(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        rule_set_code: str,
+        event_datetime,
+        context: dict[str, Any],
+    ) -> PolicyEvaluationResult:
+        self._validate_inputs(
+            snapshot=snapshot,
+            rule_code=rule_set_code,
+            event_datetime=event_datetime,
+            context=context,
+        )
+        rule_set = select_rule_set_for_moment(
+            snapshot=snapshot,
+            rule_set_code=rule_set_code,
+            event_datetime=event_datetime,
+        )
+        if rule_set is None:
+            return PolicyEvaluationResult(
+                rule_set_code=rule_set_code,
+                rule_set_version=None,
+                event_datetime=event_datetime.isoformat(),
+                selected_base_rule=None,
+                candidate_base_rules=[],
+                applied_modifiers=[],
+                excluded_rules=[],
+                manual_review_reasons=["no_active_rule_set_for_event_time"],
+                evaluation_status="manual_review",
+            )
+
+        candidates: list[PolicyRuleCandidate] = []
+        modifiers: list[PolicyRuleCandidate] = []
+        exclusions: list[dict[str, Any]] = []
+        manual_review_reasons: list[str] = []
+        versions = (
+            RuleVersion.objects.filter(
+                data_snapshot=snapshot,
+                rule__rule_set=rule_set,
+                status="active",
+                active=True,
+                valid_from__lte=event_datetime,
+            )
+            .filter(Q(valid_to__isnull=True) | Q(valid_to__gt=event_datetime))
+            .select_related("rule")
+            .order_by("priority", "rule__code")
+        )
+        for version in versions:
+            result = self.evaluate(
+                snapshot=snapshot,
+                rule_code=version.rule.code,
+                event_datetime=event_datetime,
+                context=context,
+            )
+            if result.evaluation_status == "manual_review":
+                if result.errors or result.unsupported_operators:
+                    manual_review_reasons.extend(
+                        result.errors
+                        or result.unsupported_operators
+                        or [f"{version.rule.code}:manual_review"]
+                    )
+                continue
+            if not result.matched:
+                continue
+            candidate = PolicyRuleCandidate(
+                rule_code=version.rule.code,
+                rule_version=version.version,
+                priority=version.priority,
+                specific_condition_count=len(result.matched_conditions),
+                action_type=version.action_type,
+                price_basis=version.price_basis,
+                stackable=version.stackable,
+                conflict_group=version.rule.conflict_group,
+                evaluation_status=result.evaluation_status,
+                matched=result.matched,
+                matched_conditions=result.matched_conditions,
+                unmatched_conditions=result.unmatched_conditions,
+                action_config=result.action_config,
+            )
+            if version.rule.family == "modifier":
+                modifiers.append(candidate)
+            elif version.action_type in {
+                "tiered_percentage",
+                "prorated",
+                "sla_matrix",
+            }:
+                candidates.append(candidate)
+            elif version.action_type in {"ineligible", "manual_review", "evidence_only"}:
+                exclusions.append(
+                    {
+                        "rule_code": version.rule.code,
+                        "action_type": version.action_type,
+                        "reason": version.action_config.get("reason_code", version.rule.code),
+                    }
+                )
+
+        selected = select_primary_base_rule(candidates)
+        excluded_rules = list(exclusions)
+        for candidate in candidates:
+            if selected and candidate.rule_code != selected.rule_code:
+                excluded_rules.append(
+                    {
+                        "rule_code": candidate.rule_code,
+                        "reason": "conflict_lower_priority",
+                    }
+                )
+        status = (
+            "manual_review" if manual_review_reasons else "matched" if selected else "unmatched"
+        )
+        return PolicyEvaluationResult(
+            rule_set_code=rule_set.code,
+            rule_set_version=rule_set.version,
+            event_datetime=event_datetime.isoformat(),
+            selected_base_rule=selected,
+            candidate_base_rules=candidates,
+            applied_modifiers=modifiers,
+            excluded_rules=excluded_rules,
+            manual_review_reasons=sorted(set(manual_review_reasons)),
+            evaluation_status=status,
         )
 
     def _validate_inputs(
@@ -334,6 +486,10 @@ class RuleEvaluationService:
             "rule_code": version.rule.code,
             "version": version.version,
             "status": version.status,
+            "priority": version.priority,
+            "action_type": version.action_type,
+            "price_basis": version.price_basis,
+            "stackable": version.stackable,
             "valid_from": version.valid_from.isoformat(),
             "valid_to": version.valid_to.isoformat() if version.valid_to else None,
         }
@@ -370,3 +526,37 @@ def apply_operator(*, operator: str, actual: Any, expected: Any) -> bool:
     if operator == "not_in":
         return actual not in expected
     raise ValueError(f"Unsupported operator: {operator}")
+
+
+def select_rule_set_for_moment(
+    *,
+    snapshot: DataSnapshot,
+    rule_set_code: str,
+    event_datetime,
+) -> RuleSet | None:
+    candidates = [
+        rule_set
+        for rule_set in RuleSet.objects.filter(
+            data_snapshot=snapshot,
+            code=rule_set_code,
+            active=True,
+            effective_from__lte=event_datetime,
+        ).order_by("version")
+        if rule_set.effective_to is None or event_datetime < rule_set.effective_to
+    ]
+    if len(candidates) != 1:
+        return None
+    return candidates[0]
+
+
+def select_primary_base_rule(candidates: list[PolicyRuleCandidate]) -> PolicyRuleCandidate | None:
+    if not candidates:
+        return None
+    return sorted(
+        candidates,
+        key=lambda candidate: (
+            candidate.priority,
+            -candidate.specific_condition_count,
+            candidate.rule_code,
+        ),
+    )[0]

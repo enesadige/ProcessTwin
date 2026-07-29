@@ -41,6 +41,14 @@ class SubscriptionStatus(models.TextChoices):
     PENDING = "pending", "Pending"
 
 
+class SuspensionReason(models.TextChoices):
+    CUSTOMER_REQUEST = "customer_request", "Customer request"
+    PAYMENT_RELATED = "payment_related", "Payment related"
+    ADMINISTRATIVE = "administrative", "Administrative"
+    PROVIDER_FAULT = "provider_fault", "Provider fault"
+    UNKNOWN = "unknown", "Unknown"
+
+
 class ServiceType(models.TextChoices):
     BROADBAND = "broadband", "Broadband"
     METRO_ETHERNET = "metro_ethernet", "Metro Ethernet"
@@ -476,6 +484,11 @@ class Subscription(TimeStampedModel):
         choices=SubscriptionStatus.choices,
         default=SubscriptionStatus.ACTIVE,
     )
+    suspension_reason = models.CharField(
+        max_length=32,
+        choices=SuspensionReason.choices,
+        blank=True,
+    )
     valid_from = models.DateTimeField()
     valid_to = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
@@ -508,6 +521,12 @@ class Subscription(TimeStampedModel):
             errors["valid_to"] = "valid_to must be later than valid_from."
         if self.monthly_price < Decimal("0.00"):
             errors["monthly_price"] = "Monthly price cannot be negative."
+        if self.status == SubscriptionStatus.SUSPENDED and not self.suspension_reason:
+            errors["suspension_reason"] = "Suspended subscriptions require a suspension reason."
+        if self.status != SubscriptionStatus.SUSPENDED and self.suspension_reason:
+            errors["suspension_reason"] = (
+                "suspension_reason must be empty unless the subscription is suspended."
+            )
         if (
             self.customer_id
             and self.data_snapshot_id
@@ -1218,6 +1237,7 @@ class CompensationHistory(TimeStampedModel):
         blank=True,
         related_name="compensation_history",
     )
+    compensation_conflict_group = models.CharField(max_length=80, blank=True)
     reference_code = models.CharField(max_length=80)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     decision_status = models.CharField(
@@ -1262,6 +1282,20 @@ class CompensationHistory(TimeStampedModel):
                 name="unique_final_compensation_per_sub_incident_rule",
             ),
             models.UniqueConstraint(
+                fields=["subscription", "incident", "compensation_conflict_group"],
+                condition=(
+                    models.Q(incident__isnull=False)
+                    & ~models.Q(compensation_conflict_group="")
+                    & models.Q(
+                        decision_status__in=[
+                            CompensationDecisionStatus.APPROVED,
+                            CompensationDecisionStatus.REJECTED,
+                        ]
+                    )
+                ),
+                name="unique_final_compensation_per_sub_incident_group",
+            ),
+            models.UniqueConstraint(
                 fields=["data_snapshot", "idempotency_key"],
                 condition=~models.Q(idempotency_key=""),
                 name="unique_compensation_history_idempotency_key",
@@ -1299,6 +1333,8 @@ class CompensationHistory(TimeStampedModel):
             and self.rule_version.data_snapshot_id != self.data_snapshot_id
         ):
             errors["rule_version"] = "Rule version must belong to the same data snapshot."
+        if self.rule_version_id and not self.compensation_conflict_group:
+            self.compensation_conflict_group = self.rule_version.rule.conflict_group
         if self.subscription_id:
             if not self.customer_id:
                 self.customer = self.subscription.customer

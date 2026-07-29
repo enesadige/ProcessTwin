@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from apps.compensation.models import CompensationEvaluation
+from apps.compensation.models import CompensationEvaluation, DecisionEvidence
 
 
 @admin.register(CompensationEvaluation)
@@ -28,4 +28,34 @@ class CompensationEvaluationAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = ("data_snapshot", "outage", "customer", "subscription", "rule_version")
     list_select_related = ("data_snapshot", "outage", "customer", "subscription", "rule_version")
+    date_hierarchy = "created_at"
+
+
+@admin.register(DecisionEvidence)
+class DecisionEvidenceAdmin(admin.ModelAdmin):
+    list_display = (
+        "decision",
+        "selected_rule_version",
+        "rule_set",
+        "price_basis",
+        "final_amount",
+        "currency",
+        "finalized",
+        "data_snapshot",
+    )
+    list_filter = ("decision", "price_basis", "currency", "finalized")
+    search_fields = ("evidence_hash", "selected_rule_version__rule__code", "rule_set__code")
+    readonly_fields = ("created_at", "updated_at", "evidence_hash")
+    autocomplete_fields = (
+        "data_snapshot",
+        "compensation_evaluation",
+        "rule_set",
+        "selected_rule_version",
+    )
+    list_select_related = (
+        "data_snapshot",
+        "compensation_evaluation",
+        "rule_set",
+        "selected_rule_version",
+    )
     date_hierarchy = "created_at"

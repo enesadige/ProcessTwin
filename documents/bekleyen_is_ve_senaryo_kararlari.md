@@ -1626,35 +1626,153 @@ Durum: `KARAR VERİLDİ`
 
 ### 8.5 İş Kuralı Kataloğu
 
-Durum: `KARAR BEKLİYOR`
+Durum: `KARAR VERİLDİ`
 
 - `REFUND-001` yalnız teknik örnek olarak kalacaktır.
-- Yeni sentetik kural aileleri netleştirilecek:
-  - tam kesinti telafisi
-  - süre kademelerine göre farklı oranlar
-  - servis bozulması telafisi
-  - tekrar eden kesinti
-  - aynı fatura dönemindeki birden fazla olay
-  - minimum ve maksimum telafi
-  - günlük/saatlik oranlama
-  - kampanyalı fiyat mı abonelik fiyatı mı kullanılacağı
-  - borç veya gecikmiş ödeme davranışı
-  - daha önce telafi alınmış olması
-  - VIP/SLA/segment farklılıkları
-  - kurumsal ve kamu müşterisi davranışı
-  - eksik veride `manual_review`
-  - çakışan kurallarda öncelik
-  - kural sürümleri ve geçerlilik tarihleri
-- Her kural için beklenecek alanlar:
-  - rule code
-  - açıklama
-  - uygunluk koşulları
-  - action/formül
-  - reason codes
-  - geçerlilik dönemi
-  - öncelik
-  - gerekli veri alanları
-  - pozitif/negatif örnek senaryolar
+- Yeni büyük dataset kural seti:
+  - RuleSet code: `SYN-COMP-2026`
+  - version: 1
+  - effective_from: `2026-07-01T00:00:00+03:00`
+  - tamamen sentetik politika katalogudur; gerçek Turkcell veya operatör politikası
+    iddiası taşımaz.
+- Mimari karar:
+  - Mevcut güvenli JSON `condition_tree` ve `action_config` korunur.
+  - `eval`, Python script veya serbest çalıştırılabilir DSL kullanılmaz.
+  - Kritik seçim alanları structured modellerde tutulur:
+    - RuleSet
+    - Rule.family
+    - Rule.conflict_group
+    - RuleVersion.priority
+    - RuleVersion.action_type
+    - RuleVersion.price_basis
+    - RuleVersion.stackable
+    - RuleVersion.active
+    - RuleVersion.change_note
+- SuspensionReason:
+  - customer_request: otomatik telafi yok.
+  - payment_related: otomatik telafi yok.
+  - administrative: manual_review.
+  - provider_fault: normal uygunluk değerlendirmesi.
+  - unknown: manual_review.
+  - Yalnız overdue/late/partial PaymentRecord bulunması telafiyi tek başına
+    engellemez.
+- Nihai 25 kural:
+  1. `ELIG-SUBSCRIPTION-VALID`
+  2. `ELIG-CUSTOMER-IMPACT-CONFIRMED`
+  3. `EXCL-PENDING-CANCELLED`
+  4. `EXCL-SUSPENSION-POLICY`
+  5. `EXCL-PLANNED-MAINTENANCE-NORMAL`
+  6. `EXCL-PROTECTION-LOSS-ONLY`
+  7. `EXCL-DUPLICATE-COMPENSATION`
+  8. `BB-FULL-OUTAGE-TIERED`
+  9. `BB-PARTIAL-OUTAGE-PRORATED`
+  10. `BB-DEGRADATION-QUALITY`
+  11. `ME-SHORT-FAILOVER-INTERRUPTION`
+  12. `ME-AVAILABILITY-BREACH`
+  13. `ME-LATENCY-BREACH`
+  14. `ME-JITTER-BREACH`
+  15. `ME-PACKET-LOSS-BREACH`
+  16. `ME-FAILED-FAILOVER`
+  17. `ME-DEGRADED-FAILOVER`
+  18. `MOD-GRADED-RESTORATION`
+  19. `MOD-RECURRING-INCIDENT`
+  20. `MOD-MAINTENANCE-OVERRUN`
+  21. `MOD-RESTORATION-TARGET-BREACH`
+  22. `SLA-PATH-DIVERSITY-BREACH`
+  23. `SLA-BACKUP-MISSING`
+  24. `MR-UNKNOWN-MISSING-EVIDENCE`
+  25. `CAP-FLOOR-CONFLICT`
+- PriceBasis:
+  - `contracted_monthly_price`
+  - `billed_recurring_amount`
+  - `campaign_adjusted_recurring_amount`
+  - `package_list_price`
+  - Katalog v1 varsayılanı `contracted_monthly_price`.
+  - Seçilen price basis yoksa fallback yapılmaz; sonuç `manual_review`.
+- Para ve rounding:
+  - currency: TRY.
+  - Decimal.
+  - iki ondalık.
+  - ROUND_HALF_UP.
+  - negatif tutar yasak.
+  - gerçek billing period saniyesi kullanılır; sabit 30 gün varsayılmaz.
+- Broadband full outage tier:
+  - 0 <= süre < 30 dk: ineligible, 0 TRY.
+  - 30 dk <= süre < 2 saat: basis x %2.
+  - 2 saat <= süre < 6 saat: basis x %8.
+  - 6 saat <= süre < 24 saat: basis x %20.
+  - süre >= 24 saat: basis x %35.
+  - minimum positive credit: 10 TRY.
+  - incident cap: basis x %40.
+- Partial outage:
+  - amount = price_basis x affected_duration_seconds / billing_period_seconds x
+    affected_capacity_ratio.
+  - affected_capacity_ratio structured evidence'dan gelir; yoksa manual_review.
+  - incident cap: basis x %25.
+- Degradation:
+  - QualityMeasurement ve SLA threshold üzerinden mild/moderate/severe türetilir.
+  - rate: %2 / %5 / %8.
+  - incident cap: basis x %20.
+- Metro failover:
+  - hitless: 0-1 sn, 0 TRY.
+  - near_hitless: >1-5 sn, evidence only.
+  - kısa geçiş: >5-30 sn, evidence only.
+  - SLA'yı aşan kısa interruption: >30-60 sn, basis x %0,5, floor 10 TRY,
+    cap 50 TRY.
+  - >60 sn degraded veya failed failover rule'una yönlenir.
+- Metro SLA matrix:
+  - latency/jitter/packet-loss exceedance_ratio:
+    - >1,00 ve <=1,25: %3.
+    - >1,25 ve <=2,00: %7.
+    - >2,00: %12.
+  - Aynı incident içinde latency, jitter ve packet-loss tutarları toplanmaz; en yüksek
+    rate'e sahip primary base rule seçilir.
+  - Metro/SLA incident cap: basis x %60.
+- Modifier:
+  - GRADED_RESTORATION: +%10.
+  - RECURRING_INCIDENT: 3. olay +%10, 4. olay +%15, 5+ olay +%25.
+  - MAINTENANCE_OVERRUN: plan dışı overrun etkisi için +%10.
+  - RESTORATION_TARGET_BREACH: contractual SLA target aşımı için +%10.
+  - Modifier'lar bileşik uygulanmaz; toplam modifier rate %40'ı geçmez.
+- Final policy:
+  - Floor yalnız pozitif monetary sonuçta uygulanır.
+  - Ineligible veya evidence-only sonuç floor ile parasal karara dönüşmez.
+  - Broadband incident cap: basis x %40.
+  - Metro/SLA incident cap: basis x %60.
+  - Billing-period cumulative cap: basis x %75.
+  - Pre-cap amount basis'in %100'ünü veya 10.000 TRY'yi aşarsa manual_review.
+- Duplicate/idempotency:
+  - Evaluation idempotency key snapshot, subscription, incident, conflict group ve
+    RuleSet version anlamından türetilir.
+  - Aynı incident için farklı RuleVersion ile sessiz ikinci final compensation
+    oluşturulamaz.
+  - CompensationHistory final duplicate kontrolü conflict group seviyesinde yapılır.
+- Decision Evidence:
+  - Durable ve immutable DecisionEvidence yapısı kullanılacaktır.
+  - Business logic evidence JSON içinden serbest biçimde çalıştırılmaz.
+  - LLM ileride yalnız evidence'ı açıklayabilir; yeni sayı, kural veya gerekçe
+    üretemez.
+- 039.5.7 için ground-truth adayları config seviyesinde hazır tutulur:
+  - eligible full outage
+  - ineligible under-30-minute outage
+  - partial outage
+  - broadband degradation
+  - Metro latency breach
+  - 45-second successful failover
+  - failed failover
+  - protection loss only
+  - planned maintenance normal
+  - maintenance overrun
+  - recurring incident
+  - duplicate prevention
+  - monthly cap
+  - payment-related suspension
+  - provider-fault suspension
+  - missing price
+  - unknown root cause
+  - shared-risk diversity breach
+  - missing mandatory backup
+- Büyük müşteri/olay seed'i bu görevde üretilmez; 039.5.6'ya bırakılır.
 
 ### 8.6 Genişletilmiş Seed Generator
 

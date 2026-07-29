@@ -25,6 +25,7 @@ def select_rule_version_for_moment(
             data_snapshot=snapshot,
             rule__code=rule_code,
             status=RuleVersionStatus.ACTIVE,
+            active=True,
             valid_from__lte=moment,
         )
         .filter(Q(valid_to__isnull=True) | Q(valid_to__gt=moment))

@@ -1,3 +1,5 @@
+import hashlib
+import json
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
@@ -5,18 +7,28 @@ from typing import Any
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.customers.models import Subscription, SubscriptionConnection, SubscriptionStatus
+from apps.compensation.models import DecisionEvidence
+from apps.customers.models import (
+    CompensationDecisionStatus,
+    CompensationHistory,
+    Subscription,
+    SubscriptionConnection,
+    SubscriptionStatus,
+    SuspensionReason,
+)
 from apps.customers.services.impact import CustomerImpactService
 from apps.datasets.models import DataSnapshot
 from apps.network.models import LineConnectionStatus, NetworkPortStatus
 from apps.operations.models import Outage
 from apps.operations.services.outages import OutageService, OutageServiceInputError
+from apps.rules.models import RuleActionType
 from apps.rules.services.evaluation import RuleEvaluationResult, RuleEvaluationService
 
 SUPPORTED_REFUND_FORMULA_TYPES = frozenset({"monthly_price_percentage"})
 DEFAULT_RULE_CODE = "REFUND-001"
 MVP_OUTAGE_TYPE_CONTEXT = "full_outage"
 MONEY_QUANT = Decimal("0.01")
+EVIDENCE_SCHEMA_VERSION = 1
 DEFERRED_CHECKS = (
     "PaymentRecord",
     "CampaignEnrollment",
@@ -54,6 +66,17 @@ class CompensationCalculationResult:
     deferred_checks: list[dict[str, Any]]
     calculation_trace: list[dict[str, Any]]
     snapshot: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class PolicyAmountResult:
+    status: str
+    reason_code: str
+    unrounded_amount: Decimal
+    final_amount: Decimal
+    currency: str
+    calculation_trace: list[dict[str, Any]]
+    manual_review_reasons: list[str]
 
 
 class CompensationService:
@@ -266,6 +289,200 @@ class CompensationService:
             snapshot=self._snapshot_dict(snapshot),
         )
 
+    def evaluate_subscription_policy_preconditions(
+        self,
+        *,
+        subscription: Subscription,
+    ) -> dict[str, Any]:
+        if subscription.status == SubscriptionStatus.PENDING:
+            return {"status": "ineligible", "reason_code": "pending_subscription"}
+        if subscription.status == SubscriptionStatus.CANCELLED:
+            return {"status": "ineligible", "reason_code": "cancelled_subscription"}
+        if subscription.status != SubscriptionStatus.SUSPENDED:
+            return {"status": "eligible", "reason_code": "subscription_status_allowed"}
+        if subscription.suspension_reason in {
+            SuspensionReason.CUSTOMER_REQUEST,
+            SuspensionReason.PAYMENT_RELATED,
+        }:
+            return {
+                "status": "ineligible",
+                "reason_code": f"suspended_{subscription.suspension_reason}",
+            }
+        if subscription.suspension_reason == SuspensionReason.PROVIDER_FAULT:
+            return {"status": "eligible", "reason_code": "provider_fault_suspension"}
+        return {
+            "status": "manual_review",
+            "reason_code": f"suspended_{subscription.suspension_reason or 'unknown'}",
+        }
+
+    def calculate_policy_amount(
+        self,
+        *,
+        action_type: str,
+        action_config: dict[str, Any],
+        price_basis_amount: Decimal | None,
+        context: dict[str, Any],
+    ) -> PolicyAmountResult:
+        price = normalize_monthly_price(price_basis_amount)
+        if price is None and action_type not in {
+            RuleActionType.INELIGIBLE,
+            RuleActionType.MANUAL_REVIEW,
+            RuleActionType.EVIDENCE_ONLY,
+            RuleActionType.CAP_FLOOR,
+        }:
+            return policy_manual_review("missing_price_basis", ["price_basis_amount"])
+        if action_type == RuleActionType.INELIGIBLE:
+            return policy_zero("ineligible", action_config.get("reason_code", "ineligible"))
+        if action_type == RuleActionType.MANUAL_REVIEW:
+            return policy_manual_review(action_config.get("reason_code", "manual_review"), [])
+        if action_type == RuleActionType.EVIDENCE_ONLY:
+            return policy_zero("evidence_only", action_config.get("reason_code", "evidence_only"))
+        if action_type == RuleActionType.TIERED_PERCENTAGE:
+            duration_field = action_config.get("duration_field", "outage_duration_seconds")
+            return calculate_tiered_percentage(
+                price=price,
+                duration_seconds=int(context.get(duration_field, 0)),
+                action_config=action_config,
+            )
+        if action_type == RuleActionType.PRORATED:
+            return calculate_prorated(
+                price=price,
+                affected_duration_seconds=context.get("affected_duration_seconds")
+                or context.get("outage_duration_seconds"),
+                billing_period_seconds=context.get("billing_period_seconds"),
+                affected_capacity_ratio=context.get("affected_capacity_ratio"),
+                action_config=action_config,
+            )
+        if action_type == RuleActionType.SLA_MATRIX:
+            return calculate_sla_matrix(
+                price=price,
+                exceedance_ratio=context.get("exceedance_ratio"),
+                action_config=action_config,
+            )
+        if action_type == RuleActionType.MULTIPLIER:
+            return calculate_multiplier(
+                base_amount=context.get("base_amount"),
+                action_config=action_config,
+            )
+        if action_type == RuleActionType.CAP_FLOOR:
+            return apply_cap_floor_policy(
+                amount=context.get("amount"),
+                price_basis_amount=context.get("price_basis_amount"),
+                monthly_cumulative_amount=context.get("billing_period_cumulative_amount", 0),
+                action_config=action_config,
+            )
+        return policy_manual_review("unsupported_action_type", ["action_type"])
+
+    def create_decision_evidence(
+        self,
+        *,
+        data_snapshot: DataSnapshot,
+        compensation_evaluation=None,
+        rule_set=None,
+        selected_rule_version=None,
+        price_basis: str = "",
+        selected_price: Decimal | None = None,
+        unrounded_amount: Decimal | None = None,
+        final_amount: Decimal = Decimal("0.00"),
+        currency: str = "TRY",
+        decision: str,
+        matched_conditions: list[dict[str, Any]] | None = None,
+        failed_conditions: list[dict[str, Any]] | None = None,
+        excluded_rules: list[dict[str, Any]] | None = None,
+        candidate_base_rules: list[dict[str, Any]] | None = None,
+        applied_modifiers: list[dict[str, Any]] | None = None,
+        formula_inputs: dict[str, Any] | None = None,
+        cap_floor_trace: list[dict[str, Any]] | None = None,
+        manual_review_reasons: list[str] | None = None,
+        context_snapshot: dict[str, Any] | None = None,
+    ) -> DecisionEvidence:
+        payload = {
+            "rule_set": str(rule_set) if rule_set else None,
+            "selected_rule_version": (
+                f"{selected_rule_version.rule.code}:v{selected_rule_version.version}"
+                if selected_rule_version
+                else None
+            ),
+            "price_basis": price_basis,
+            "selected_price": str(selected_price) if selected_price is not None else None,
+            "unrounded_amount": str(unrounded_amount) if unrounded_amount is not None else None,
+            "final_amount": str(final_amount),
+            "currency": currency,
+            "decision": decision,
+            "matched_conditions": matched_conditions or [],
+            "failed_conditions": failed_conditions or [],
+            "excluded_rules": excluded_rules or [],
+            "candidate_base_rules": candidate_base_rules or [],
+            "applied_modifiers": applied_modifiers or [],
+            "formula_inputs": formula_inputs or {},
+            "cap_floor_trace": cap_floor_trace or [],
+            "manual_review_reasons": manual_review_reasons or [],
+            "context_snapshot": context_snapshot or {},
+        }
+        evidence_hash = build_decision_evidence_hash(payload)
+        return DecisionEvidence.objects.create(
+            data_snapshot=data_snapshot,
+            compensation_evaluation=compensation_evaluation,
+            rule_set=rule_set,
+            selected_rule_version=selected_rule_version,
+            price_basis=price_basis,
+            selected_price=selected_price,
+            unrounded_amount=unrounded_amount,
+            final_amount=final_amount,
+            currency=currency,
+            decision=decision,
+            evidence_schema_version=EVIDENCE_SCHEMA_VERSION,
+            evidence_hash=evidence_hash,
+            matched_conditions=matched_conditions or [],
+            failed_conditions=failed_conditions or [],
+            excluded_rules=excluded_rules or [],
+            candidate_base_rules=candidate_base_rules or [],
+            applied_modifiers=applied_modifiers or [],
+            formula_inputs=formula_inputs or {},
+            cap_floor_trace=cap_floor_trace or [],
+            manual_review_reasons=manual_review_reasons or [],
+            context_snapshot=context_snapshot or {},
+            finalized=True,
+        )
+
+    def build_evaluation_idempotency_key(
+        self,
+        *,
+        snapshot_identifier: str,
+        subscription_code: str,
+        incident_code: str,
+        conflict_group: str,
+        rule_set_code: str,
+        rule_set_version: int,
+    ) -> str:
+        payload = {
+            "snapshot": snapshot_identifier,
+            "subscription": subscription_code,
+            "incident": incident_code,
+            "conflict_group": conflict_group,
+            "rule_set": rule_set_code,
+            "rule_set_version": rule_set_version,
+        }
+        return build_decision_evidence_hash(payload)
+
+    def has_final_compensation_for_conflict_group(
+        self,
+        *,
+        subscription: Subscription,
+        incident,
+        conflict_group: str,
+    ) -> bool:
+        return CompensationHistory.objects.filter(
+            data_snapshot=subscription.data_snapshot,
+            subscription=subscription,
+            incident=incident,
+            decision_status__in=[
+                CompensationDecisionStatus.APPROVED,
+                CompensationDecisionStatus.REJECTED,
+            ],
+            rule_version__rule__conflict_group=conflict_group,
+        ).exists()
+
     def _validate_inputs(
         self,
         *,
@@ -291,8 +508,7 @@ class CompensationService:
             raise CompensationInputError("rule_code must be provided.")
         if outage.data_snapshot_id != snapshot.id:
             raise CompensationInputError(
-                f"Outage {outage.outage_code} does not belong to snapshot "
-                f"{snapshot.snapshot_key}."
+                f"Outage {outage.outage_code} does not belong to snapshot {snapshot.snapshot_key}."
             )
         if subscription.data_snapshot_id != snapshot.id:
             raise CompensationInputError(
@@ -567,6 +783,268 @@ def parse_refund_formula(action_config: dict[str, Any]) -> dict[str, Any]:
 
 def calculate_refund_amount(*, monthly_price: Decimal, refund_rate: Decimal) -> Decimal:
     return (monthly_price * refund_rate).quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+
+
+def calculate_tiered_percentage(
+    *,
+    price: Decimal | None,
+    duration_seconds: int,
+    action_config: dict[str, Any],
+) -> PolicyAmountResult:
+    if price is None:
+        return policy_manual_review("missing_price_basis", ["price_basis_amount"])
+    tiers = sorted(action_config.get("tiers", []), key=lambda item: int(item["min_seconds"]))
+    selected_rate = Decimal("0")
+    selected_tier: dict[str, Any] | None = None
+    for tier in tiers:
+        min_seconds = int(tier["min_seconds"])
+        max_seconds = tier.get("max_seconds")
+        if duration_seconds < min_seconds:
+            continue
+        if max_seconds is not None and duration_seconds >= int(max_seconds):
+            continue
+        selected_rate = Decimal(str(tier["rate"]))
+        selected_tier = tier
+        break
+    if selected_tier is None or selected_rate == Decimal("0"):
+        return policy_zero("ineligible", "duration_below_threshold")
+    unrounded = price * selected_rate
+    final = apply_positive_floor_and_cap(
+        amount=unrounded,
+        price=price,
+        floor=Decimal(str(action_config.get("minimum_positive_amount", "0.00"))),
+        cap_percent=Decimal(str(action_config.get("incident_cap_percent", "1.00"))),
+        absolute_cap=optional_decimal(action_config.get("absolute_cap_amount")),
+    )
+    return policy_amount(
+        reason_code="tiered_percentage_matched",
+        unrounded_amount=unrounded,
+        final_amount=final,
+        trace=[{"step": "selected_tier", "details": selected_tier}],
+    )
+
+
+def calculate_prorated(
+    *,
+    price: Decimal | None,
+    affected_duration_seconds,
+    billing_period_seconds,
+    affected_capacity_ratio,
+    action_config: dict[str, Any],
+) -> PolicyAmountResult:
+    if price is None:
+        return policy_manual_review("missing_price_basis", ["price_basis_amount"])
+    if affected_duration_seconds is None or billing_period_seconds is None:
+        return policy_manual_review("missing_duration_context", ["affected_duration_seconds"])
+    if affected_capacity_ratio is None:
+        return policy_manual_review("missing_affected_capacity_ratio", ["affected_capacity_ratio"])
+    duration = Decimal(str(affected_duration_seconds))
+    period = Decimal(str(billing_period_seconds))
+    ratio = Decimal(str(affected_capacity_ratio))
+    if period <= 0 or duration < 0 or ratio < 0 or ratio > 1:
+        return policy_manual_review("invalid_proration_context", [])
+    minimum_duration = Decimal(str(action_config.get("minimum_duration_seconds", "0")))
+    if duration < minimum_duration:
+        return policy_zero("ineligible", "duration_below_threshold")
+    unrounded = price * duration / period * ratio
+    final = apply_positive_floor_and_cap(
+        amount=unrounded,
+        price=price,
+        floor=Decimal(str(action_config.get("minimum_positive_amount", "0.00"))),
+        cap_percent=Decimal(str(action_config.get("incident_cap_percent", "1.00"))),
+        absolute_cap=optional_decimal(action_config.get("absolute_cap_amount")),
+    )
+    return policy_amount(
+        reason_code="prorated_matched",
+        unrounded_amount=unrounded,
+        final_amount=final,
+        trace=[
+            {
+                "step": "proration",
+                "details": {
+                    "affected_duration_seconds": str(duration),
+                    "billing_period_seconds": str(period),
+                    "affected_capacity_ratio": str(ratio),
+                },
+            }
+        ],
+    )
+
+
+def calculate_sla_matrix(
+    *,
+    price: Decimal | None,
+    exceedance_ratio,
+    action_config: dict[str, Any],
+) -> PolicyAmountResult:
+    if price is None:
+        return policy_manual_review("missing_price_basis", ["price_basis_amount"])
+    if exceedance_ratio is None:
+        return policy_manual_review("missing_exceedance_ratio", ["exceedance_ratio"])
+    ratio = Decimal(str(exceedance_ratio))
+    selected_rate = Decimal("0")
+    selected_tier: dict[str, Any] | None = None
+    for tier in sorted(
+        action_config.get("exceedance_tiers", []),
+        key=lambda item: Decimal(str(item["min_ratio_exclusive"])),
+    ):
+        lower = Decimal(str(tier["min_ratio_exclusive"]))
+        upper = tier.get("max_ratio_inclusive")
+        if ratio <= lower:
+            continue
+        if upper is not None and ratio > Decimal(str(upper)):
+            continue
+        selected_rate = Decimal(str(tier["rate"]))
+        selected_tier = tier
+        break
+    if selected_tier is None:
+        return policy_zero("ineligible", "threshold_not_breached")
+    unrounded = price * selected_rate
+    final = apply_positive_floor_and_cap(
+        amount=unrounded,
+        price=price,
+        floor=Decimal(str(action_config.get("minimum_positive_amount", "0.00"))),
+        cap_percent=Decimal(str(action_config.get("incident_cap_percent", "1.00"))),
+        absolute_cap=optional_decimal(action_config.get("absolute_cap_amount")),
+    )
+    return policy_amount(
+        reason_code="sla_matrix_matched",
+        unrounded_amount=unrounded,
+        final_amount=final,
+        trace=[{"step": "selected_sla_tier", "details": selected_tier}],
+    )
+
+
+def calculate_multiplier(
+    *,
+    base_amount,
+    action_config: dict[str, Any],
+) -> PolicyAmountResult:
+    if base_amount is None:
+        return policy_manual_review("missing_base_amount", ["base_amount"])
+    base = Decimal(str(base_amount))
+    rate = Decimal(str(action_config.get("modifier_rate", "0")))
+    unrounded = base * rate
+    return policy_amount(
+        reason_code="modifier_matched",
+        unrounded_amount=unrounded,
+        final_amount=money(unrounded),
+        trace=[{"step": "modifier", "details": {"rate": str(rate)}}],
+    )
+
+
+def apply_cap_floor_policy(
+    *,
+    amount,
+    price_basis_amount,
+    monthly_cumulative_amount,
+    action_config: dict[str, Any],
+) -> PolicyAmountResult:
+    if amount is None or price_basis_amount is None:
+        return policy_manual_review("missing_cap_context", ["amount", "price_basis_amount"])
+    raw_amount = Decimal(str(amount))
+    price = Decimal(str(price_basis_amount))
+    if raw_amount <= 0:
+        return policy_zero("ineligible", "non_positive_amount")
+    if raw_amount > price or raw_amount > Decimal("10000.00"):
+        return policy_manual_review("high_amount_manual_review", [])
+    floor = Decimal(str(action_config.get("minimum_positive_amount", "0.00")))
+    incident_cap = price * Decimal(str(action_config.get("incident_cap_percent", "1.00")))
+    monthly_cap = price * Decimal(str(action_config.get("monthly_cumulative_cap_percent", "1.00")))
+    remaining_monthly_cap = monthly_cap - Decimal(str(monthly_cumulative_amount))
+    capped = min(max(raw_amount, floor), incident_cap, remaining_monthly_cap)
+    return policy_amount(
+        reason_code="cap_floor_applied",
+        unrounded_amount=raw_amount,
+        final_amount=max(Decimal("0.00"), money(capped)),
+        trace=[
+            {
+                "step": "cap_floor",
+                "details": {
+                    "floor": str(floor),
+                    "incident_cap": str(money(incident_cap)),
+                    "monthly_cap": str(money(monthly_cap)),
+                },
+            }
+        ],
+    )
+
+
+def apply_positive_floor_and_cap(
+    *,
+    amount: Decimal,
+    price: Decimal,
+    floor: Decimal,
+    cap_percent: Decimal,
+    absolute_cap: Decimal | None = None,
+) -> Decimal:
+    if amount <= Decimal("0.00"):
+        return Decimal("0.00")
+    cap_values = [price * cap_percent]
+    if absolute_cap is not None:
+        cap_values.append(absolute_cap)
+    capped = min(max(amount, floor), *cap_values)
+    return money(capped)
+
+
+def optional_decimal(value) -> Decimal | None:
+    if value is None:
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+
+
+def policy_amount(
+    *,
+    reason_code: str,
+    unrounded_amount: Decimal,
+    final_amount: Decimal,
+    trace: list[dict[str, Any]],
+) -> PolicyAmountResult:
+    return PolicyAmountResult(
+        status="eligible",
+        reason_code=reason_code,
+        unrounded_amount=unrounded_amount,
+        final_amount=final_amount,
+        currency="TRY",
+        calculation_trace=trace,
+        manual_review_reasons=[],
+    )
+
+
+def policy_zero(status: str, reason_code: str) -> PolicyAmountResult:
+    return PolicyAmountResult(
+        status=status,
+        reason_code=reason_code,
+        unrounded_amount=Decimal("0.00"),
+        final_amount=Decimal("0.00"),
+        currency="TRY",
+        calculation_trace=[],
+        manual_review_reasons=[],
+    )
+
+
+def policy_manual_review(reason_code: str, missing_fields: list[str]) -> PolicyAmountResult:
+    return PolicyAmountResult(
+        status="manual_review",
+        reason_code=reason_code,
+        unrounded_amount=Decimal("0.00"),
+        final_amount=Decimal("0.00"),
+        currency="TRY",
+        calculation_trace=[],
+        manual_review_reasons=[reason_code, *missing_fields],
+    )
+
+
+def money(value: Decimal) -> Decimal:
+    return value.quantize(MONEY_QUANT, rounding=ROUND_HALF_UP)
+
+
+def build_decision_evidence_hash(payload: dict[str, Any]) -> str:
+    serialized = json.dumps(payload, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
 def derive_unmatched_reason(rule_result: RuleEvaluationResult) -> str:

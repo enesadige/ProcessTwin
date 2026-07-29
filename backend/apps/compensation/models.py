@@ -7,7 +7,7 @@ from apps.core.models import TimeStampedModel
 from apps.customers.models import Customer, Subscription
 from apps.datasets.models import DataSnapshot
 from apps.operations.models import Outage
-from apps.rules.models import RuleVersion
+from apps.rules.models import RulePriceBasis, RuleSet, RuleVersion
 
 
 class CompensationResultType(models.TextChoices):
@@ -23,6 +23,13 @@ class CompensationEvaluationStatus(models.TextChoices):
     APPROVED = "approved", "Approved"
     REJECTED = "rejected", "Rejected"
     PAID = "paid", "Paid"
+
+
+class DecisionEvidenceDecision(models.TextChoices):
+    ELIGIBLE = "eligible", "Eligible"
+    INELIGIBLE = "ineligible", "Ineligible"
+    MANUAL_REVIEW = "manual_review", "Manual review"
+    EVIDENCE_ONLY = "evidence_only", "Evidence only"
 
 
 class CompensationEvaluation(TimeStampedModel):
@@ -125,3 +132,122 @@ class CompensationEvaluation(TimeStampedModel):
             errors["subscription"] = "Subscription must belong to the selected customer."
         if errors:
             raise ValidationError(errors)
+
+
+class DecisionEvidence(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="decision_evidence_records",
+    )
+    compensation_evaluation = models.OneToOneField(
+        CompensationEvaluation,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="decision_evidence",
+    )
+    rule_set = models.ForeignKey(
+        RuleSet,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="decision_evidence_records",
+    )
+    selected_rule_version = models.ForeignKey(
+        RuleVersion,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="decision_evidence_records",
+    )
+    price_basis = models.CharField(
+        max_length=48,
+        choices=RulePriceBasis.choices,
+        blank=True,
+    )
+    selected_price = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+    )
+    unrounded_amount = models.DecimalField(
+        max_digits=14,
+        decimal_places=6,
+        null=True,
+        blank=True,
+    )
+    final_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
+    currency = models.CharField(max_length=3, default="TRY")
+    decision = models.CharField(max_length=32, choices=DecisionEvidenceDecision.choices)
+    evidence_schema_version = models.PositiveIntegerField(default=1)
+    evidence_hash = models.CharField(max_length=64)
+    matched_conditions = models.JSONField(default=list, blank=True)
+    failed_conditions = models.JSONField(default=list, blank=True)
+    excluded_rules = models.JSONField(default=list, blank=True)
+    candidate_base_rules = models.JSONField(default=list, blank=True)
+    applied_modifiers = models.JSONField(default=list, blank=True)
+    formula_inputs = models.JSONField(default=dict, blank=True)
+    cap_floor_trace = models.JSONField(default=list, blank=True)
+    manual_review_reasons = models.JSONField(default=list, blank=True)
+    context_snapshot = models.JSONField(default=dict, blank=True)
+    finalized = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "compensation_decision_evidence"
+        ordering = ["data_snapshot", "-created_at"]
+        verbose_name = "Karar kanıtı"
+        verbose_name_plural = "Karar kanıtları"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "evidence_hash"],
+                name="unique_decision_evidence_hash_per_snapshot",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(final_amount__gte=Decimal("0.00")),
+                name="decision_evidence_final_amount_non_negative",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.decision} - {self.evidence_hash[:12]}"
+
+    def clean(self):
+        errors: dict[str, str] = {}
+        if len(self.currency) != 3:
+            errors["currency"] = "Currency must be a three-letter ISO code."
+        if self.final_amount < Decimal("0.00"):
+            errors["final_amount"] = "Final amount cannot be negative."
+        if (
+            self.compensation_evaluation_id
+            and self.data_snapshot_id
+            and self.compensation_evaluation.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["compensation_evaluation"] = (
+                "Compensation evaluation must belong to the same data snapshot."
+            )
+        if (
+            self.rule_set_id
+            and self.data_snapshot_id
+            and self.rule_set.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["rule_set"] = "Rule set must belong to the same data snapshot."
+        if (
+            self.selected_rule_version_id
+            and self.data_snapshot_id
+            and self.selected_rule_version.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["selected_rule_version"] = (
+                "Selected rule version must belong to the same data snapshot."
+            )
+        if self.pk:
+            existing = DecisionEvidence.objects.only("finalized").get(pk=self.pk)
+            if existing.finalized:
+                errors["finalized"] = "Finalized decision evidence is immutable."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean(validate_unique=False, validate_constraints=False)
+        super().save(*args, **kwargs)
