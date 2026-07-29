@@ -267,6 +267,23 @@ SERVICE_PACKAGE_METADATA = {
     "eligibility_rule_defined": False,
 }
 
+DEFAULT_SLA_PROFILE = {
+    "code": "best_effort",
+    "name": "Best Effort Synthetic SLA",
+    "availability_target_percent": "99.00",
+    "support_window": "8x5",
+    "response_target_minutes": 1440,
+    "restoration_target_minutes": 4320,
+    "latency_threshold_ms": 80,
+    "jitter_threshold_ms": 30,
+    "packet_loss_threshold_percent": "2.00",
+    "backup_requirement": "none",
+    "required_path_diversity": "not_required",
+    "monitoring_level": "standard",
+    "is_contractual": False,
+    "active": True,
+}
+
 SUBSCRIPTION_DISTRIBUTION = {
     "BNG-MAL-001": {
         "total": 150,

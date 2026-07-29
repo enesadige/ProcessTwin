@@ -136,8 +136,7 @@ class Command(BaseCommand):
                     check["name"] for check in validation_report["checks"] if not check["passed"]
                 ]
                 raise CommandError(
-                    "Maltepe MVP seed validation failed. Failed checks: "
-                    f"{', '.join(failed_checks)}"
+                    f"Maltepe MVP seed validation failed. Failed checks: {', '.join(failed_checks)}"
                 )
 
             validation_result = {
@@ -200,11 +199,18 @@ def get_target_dataset_slug() -> str:
 
 def delete_target_dataset_tree(dataset: DatasetVersion) -> None:
     from apps.customers.models import (
+        Campaign,
+        CampaignAllowedSegment,
+        CampaignAllowedServiceType,
+        CampaignAllowedTechnology,
         CampaignEnrollment,
         CompensationHistory,
         Customer,
         PaymentRecord,
         ServicePackage,
+        ServicePackageAllowedSegment,
+        ServicePackagePriceVersion,
+        SLAProfile,
         Subscription,
         SubscriptionConnection,
     )
@@ -243,10 +249,17 @@ def delete_target_dataset_tree(dataset: DatasetVersion) -> None:
         AlarmType.objects.filter(data_snapshot=snapshot).delete()
         CompensationHistory.objects.filter(data_snapshot=snapshot).delete()
         CampaignEnrollment.objects.filter(data_snapshot=snapshot).delete()
+        CampaignAllowedSegment.objects.filter(data_snapshot=snapshot).delete()
+        CampaignAllowedServiceType.objects.filter(data_snapshot=snapshot).delete()
+        CampaignAllowedTechnology.objects.filter(data_snapshot=snapshot).delete()
+        Campaign.objects.filter(data_snapshot=snapshot).delete()
         PaymentRecord.objects.filter(data_snapshot=snapshot).delete()
         SubscriptionConnection.objects.filter(data_snapshot=snapshot).delete()
         Subscription.objects.filter(data_snapshot=snapshot).delete()
+        ServicePackageAllowedSegment.objects.filter(data_snapshot=snapshot).delete()
+        ServicePackagePriceVersion.objects.filter(data_snapshot=snapshot).delete()
         ServicePackage.objects.filter(data_snapshot=snapshot).delete()
+        SLAProfile.objects.filter(data_snapshot=snapshot).delete()
         Customer.objects.filter(data_snapshot=snapshot).delete()
         LineConnection.objects.filter(data_snapshot=snapshot).delete()
         NetworkLink.objects.filter(data_snapshot=snapshot).delete()

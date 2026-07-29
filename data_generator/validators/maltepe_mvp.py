@@ -11,6 +11,9 @@ from apps.customers.models import (
     Customer,
     CustomerPriorityLevel,
     ServicePackage,
+    ServicePackageAllowedSegment,
+    ServicePackagePriceVersion,
+    SLAProfile,
     Subscription,
     SubscriptionConnection,
     SubscriptionConnectionRole,
@@ -56,7 +59,10 @@ EXPECTED_COUNTS = {
     "access_segments": 17,
     "line_connections": 240,
     "customers": 225,
+    "sla_profiles": 1,
     "service_packages": 8,
+    "service_package_allowed_segments": 32,
+    "service_package_price_versions": 8,
     "subscriptions": 240,
     "subscription_connections": 240,
     "alarm_types": 3,
@@ -270,7 +276,14 @@ def collect_row_counts(snapshot: DataSnapshot) -> dict[str, int]:
         "access_segments": AccessSegment.objects.filter(data_snapshot=snapshot).count(),
         "line_connections": LineConnection.objects.filter(data_snapshot=snapshot).count(),
         "customers": Customer.objects.filter(data_snapshot=snapshot).count(),
+        "sla_profiles": SLAProfile.objects.filter(data_snapshot=snapshot).count(),
         "service_packages": ServicePackage.objects.filter(data_snapshot=snapshot).count(),
+        "service_package_allowed_segments": ServicePackageAllowedSegment.objects.filter(
+            data_snapshot=snapshot
+        ).count(),
+        "service_package_price_versions": ServicePackagePriceVersion.objects.filter(
+            data_snapshot=snapshot
+        ).count(),
         "subscriptions": Subscription.objects.filter(data_snapshot=snapshot).count(),
         "subscription_connections": SubscriptionConnection.objects.filter(
             data_snapshot=snapshot

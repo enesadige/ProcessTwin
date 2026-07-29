@@ -1038,9 +1038,9 @@ Durum: `KARAR VERİLDİ`
   - recurring/flapping günü: 4
   - 039.5.6 seed aşamasında küçük deterministik yuvarlama farkı oluşursa nedeni raporlanır.
 
-### 8.4 Müşteri, Paket, Ödeme ve Kampanya Dağılımları
+### 8.4 Müşteri, Paket, SLA, Ödeme ve Kampanya Dağılımları
 
-Durum: `KISMEN KARAR VERİLDİ`
+Durum: `KARAR VERİLDİ`
 
 - Dataset ayrımı: `KARAR VERİLDİ`
   - Mevcut 225 müşteri / 240 abonelik içeren Maltepe dataset'i regression dataset'i
@@ -1399,25 +1399,230 @@ Durum: `KISMEN KARAR VERİLDİ`
   - Büyük dataset seed'i henüz oluşturulmayacak.
   - Gerçek backup SubscriptionConnection sayısı SLA/paket aşamasında kesinleşecek.
   - Kapsamlı SRLG modeli post-MVP/ileri kurumsal SLA kapsamına bırakıldı.
-- Hâlâ karar bekleyen veri grupları:
-  - Paket katalogu.
-  - Farklı aylık ücretler, taahhüt süreleri ve SLA profilleri.
-- PaymentRecord kararları:
-  - fatura dönemi
-  - ödeme durumu
-  - gecikmiş ödeme
-  - borç durumu
-  - tutar üretimi
-- CampaignEnrollment kararları:
-  - aktif/pasif kampanya
-  - kampanyalı/indirimli fiyat
-  - kampanya geçerlilik tarihleri
-  - telafiyle etkileşim
-- CompensationHistory kararları:
-  - önceki telafi
-  - karar tarihi
-  - tekrar telafi etkisi
-  - manuel inceleme koşulu
+- 039.5.4 ticari/SLA model kararları: `KARAR VERİLDİ`
+  - Seçilen yaklaşım kontrollü A+ genişletmesidir.
+  - Kapsamlı ProductCatalog, BillingAccount, Invoice veya CRM/faturalama domain'i
+    kurulmaz.
+  - Eklenen/planlanan structured modeller ve alanlar:
+    - `SLAProfile`.
+    - `ServicePackage.default_sla_profile`.
+    - `Subscription.sla_profile`.
+    - `ServicePackagePriceVersion`.
+    - `Campaign`.
+    - `ServicePackageAllowedSegment`.
+    - `CampaignAllowedSegment`.
+    - `CampaignAllowedServiceType`.
+    - `CampaignAllowedTechnology`.
+    - PaymentRecord fatura dönemi ve tutar kırılımı.
+    - CompensationHistory decision/settlement lifecycle ayrımı.
+  - ServicePackage.default_sla_profile paket katalog varsayılanıdır.
+  - Subscription.sla_profile müşterinin sözleşilmiş gerçek SLA profilidir.
+  - Kural motoru ve müşteri etki servisleri gerektiğinde Subscription.sla_profile
+    değerini esas alacaktır.
+- Kesin müşteri/abonelik toplamları: `KARAR VERİLDİ`
+  - Müşteri: 14.400.
+  - Abonelik: 16.200.
+  - Segment toplamları:
+    - individual: 9.208.
+    - SME: 3.243.
+    - enterprise: 1.517.
+    - public: 432.
+  - Priority toplamları:
+    - VIP: 862.
+    - standard: 13.538.
+  - Müşteri abonelik sayısı:
+    - tek abonelikli: 12.830.
+    - iki abonelikli: 1.340.
+    - üç abonelikli: 230.
+    - 4+ abonelikli müşteri v1 dataset'inde üretilmez.
+  - Abonelik status toplamları:
+    - active: 15.256.
+    - suspended: 465.
+    - cancelled: 306.
+    - pending: 173.
+- SubscriptionConnection sayıları: `KARAR VERİLDİ`
+  - Reference datetime anındaki açık primary bağlantı:
+    - active: 15.256.
+    - suspended: 465.
+    - toplam: 15.721.
+  - Geçmişte kapanmış cancelled primary bağlantı: 306.
+  - Toplam primary SubscriptionConnection kaydı: 16.027.
+  - Pending abonelikler SubscriptionConnection taşımaz ve aktif fiziksel porta bağlanmaz.
+  - Gerçek backup SubscriptionConnection sayısı: 208.
+  - Toplam SubscriptionConnection kaydı: 16.235.
+- Paket katalogu: `KARAR VERİLDİ`
+  - Toplam 27 sentetik paket tanımlanır.
+  - ADSL:
+    - `ADSL-16-SYN`
+    - `ADSL-24-SYN`
+  - VDSL:
+    - `VDSL-35-SYN`
+    - `VDSL-50-SYN`
+    - `VDSL-100-SYN`
+    - `SME-VDSL-50-SYN`
+    - `SME-VDSL-100-SYN`
+    - `PUB-VDSL-50-SYN`
+  - Fiber broadband:
+    - `FIBER-100-SYN`
+    - `FIBER-200-SYN`
+    - `FIBER-500-SYN`
+    - `FIBER-1000-SYN`
+    - `FIBER-NC-100-SYN`
+    - `SME-FIBER-100-SYN`
+    - `SME-FIBER-300-SYN`
+    - `SME-FIBER-500-SYN`
+    - `ENT-FIBER-500-SYN`
+    - `ENT-FIBER-1000-SYN`
+    - `ENT-FIBER-2000-SYN`
+    - `PUB-FIBER-200-SYN`
+    - `PUB-FIBER-500-SYN`
+    - `PUB-FIBER-1000-SYN`
+  - Metro Ethernet:
+    - `METRO-50-SYN`
+    - `METRO-100-SYN`
+    - `METRO-200-SYN`
+    - `METRO-500-SYN`
+    - `METRO-1000-SYN`
+  - Paketler tamamen sentetiktir; gerçek kurum ürünü veya fiyatı iddiası taşımaz.
+  - Metro Ethernet paketleri:
+    - service_type = `metro_ethernet`.
+    - technology = `fiber`.
+    - yalnız SME, enterprise veya public segmentleri.
+    - LineConnection.technology = `fiber`.
+    - corporate_fiber_aggregation access node üzerinden bağlanır.
+- SLA profilleri: `KARAR VERİLDİ`
+  - Kesin 5 profil:
+    - `best_effort`.
+    - `business_standard`.
+    - `business_plus`.
+    - `mission_critical`.
+    - `public_critical`.
+  - Süre hedefleri dakika cinsinden structured saklanır.
+  - Telafi oranı veya formülü SLAProfile içine konmaz; 039.5.5 iş kurallarında
+    ayrıca belirlenecektir.
+- Backup dağılımı: `KARAR VERİLDİ`
+  - Gerçek backup sayısı: 208.
+  - İlçe dağılımı:
+    - Maltepe: 0.
+    - Şişli: 46.
+    - Esenyurt: 1.
+    - Çankaya: 50.
+    - Yenimahalle: 8.
+    - Etimesgut: 1.
+    - Konak: 2.
+    - Bornova: 4.
+    - Karşıyaka: 1.
+    - İzmit: 7.
+    - Gebze: 55.
+    - Körfez: 33.
+  - Segment dağılımı:
+    - enterprise: 145.
+    - public: 34.
+    - kritik SME: 29.
+    - individual: 0.
+  - Actual path-diversity dağılımı:
+    - fully_diverse: 112.
+    - partially_diverse: 60.
+    - shared_risk: 24.
+    - unknown: 12.
+  - Mission/public critical SLA'nın fully_diverse istemesine rağmen shared_risk veya
+    unknown çıkan kayıtlar intentional SLA violation / realism senaryosu olarak
+    işaretlenebilir; yanlışlıkla uygun kabul edilmez.
+- Fiyat semantiği: `KARAR VERİLDİ`
+  - ServicePackage.monthly_price güncel katalog liste fiyatıdır.
+  - Subscription.monthly_price abonelik kurulurken sözleşilmiş recurring aylık ücrettir.
+  - CampaignEnrollment dönemsel indirim hakkıdır; paket veya subscription fiyatını
+    mutasyona uğratmaz.
+  - PaymentRecord.billed_amount ilgili fatura döneminde gerçekten faturalanan toplamdır.
+  - PaymentRecord.paid_amount tahsil edilen tutardır.
+  - PaymentRecord.outstanding_amount kalan borçtur.
+  - Tek seferlik ücretler monthly_price içine karıştırılmaz.
+  - Paket fiyat geçmişi `ServicePackagePriceVersion` ile tutulur.
+  - Hedef fiyat versiyonu kaydı: 72.
+- PaymentRecord semantiği: `KARAR VERİLDİ`
+  - PaymentRecord ham banka işlemi değil, bir aboneliğin bir fatura dönemindeki
+    tahakkuk/tahsilat durumudur.
+  - Structured alanlar:
+    - billing_period_start.
+    - billing_period_end.
+    - due_date.
+    - recurring_amount.
+    - one_time_amount.
+    - discount_amount.
+    - billed_amount.
+    - paid_amount.
+    - outstanding_amount.
+    - currency.
+    - paid_at.
+    - status.
+  - Tutar denklemi:
+    - billed_amount = recurring_amount + one_time_amount - discount_amount.
+  - Vergi ve ayrıntılı invoice-line sistemi bu fazda modellenmez.
+  - Kesin PaymentRecord hedefi: 59.600.
+  - Status dağılımı:
+    - paid_on_time: 48.000.
+    - paid_late: 6.200.
+    - overdue: 2.700.
+    - partial: 1.500.
+    - failed: 600.
+    - reversed: 300.
+    - voided: 300.
+  - Timeline: Nisan-Temmuz 2026.
+  - Pending abonelik ödeme kaydı üretmez.
+  - Ödeme durumu 039.5.5'e kadar telafi uygunluğunu değiştirmez.
+- Kampanya kararları: `KARAR VERİLDİ`
+  - 10 sentetik Campaign kaydı:
+    - `NEW_CUSTOMER_DISCOUNT`.
+    - `COMMITMENT_12M`.
+    - `FIBER_MIGRATION`.
+    - `LOYALTY_RETENTION`.
+    - `MULTI_SUBSCRIPTION`.
+    - `SME_START`.
+    - `ENTERPRISE_VOLUME`.
+    - `PUBLIC_FRAMEWORK`.
+    - `Q3_SEASONAL`.
+    - `METRO_SLA_UPGRADE`.
+  - CampaignEnrollment hedefi: 4.050.
+  - Status dağılımı:
+    - active: 2.650.
+    - completed: 950.
+    - cancelled: 200.
+    - expired: 250.
+  - Kampanya indirimi liste veya sözleşme fiyatını değiştirmez; fatura dönemindeki
+    discount_amount hesabına yansır.
+- CompensationHistory kararları: `KARAR VERİLDİ`
+  - CompensationEvaluation motorun deterministik değerlendirme sonucudur.
+  - CompensationHistory geçmişte kesinleşmiş karar ve settlement kaydıdır.
+  - DecisionStatus:
+    - approved.
+    - rejected.
+    - manual_review.
+  - SettlementStatus:
+    - not_applicable.
+    - pending.
+    - credited.
+    - paid.
+  - Toplam CompensationHistory hedefi: 1.100.
+  - Decision dağılımı:
+    - approved: 620.
+    - rejected: 300.
+    - manual_review: 180.
+  - Approved 620 kayıt içindeki settlement dağılımı:
+    - credited: 400.
+    - paid: 140.
+    - pending: 80.
+  - Rejected ve manual_review kayıtlarında settlement_status = not_applicable olur.
+  - Incident zorunlu, outage nullable olur.
+  - Aynı subscription + incident + rule_version için duplicate final compensation
+    engellenir.
+  - 039.5.5'e kadar CompensationHistory yeni kararları etkilemez.
+- Bu görevde büyük veri üretilmez:
+  - 14.400 müşteri üretilmedi.
+  - 16.200 abonelik üretilmedi.
+  - 59.600 PaymentRecord üretilmedi.
+  - 4.050 CampaignEnrollment üretilmedi.
+  - 1.100 CompensationHistory üretilmedi.
+  - Bunlar 039.5.6 büyük seed aşamasında oluşturulacaktır.
 
 ### 8.5 İş Kuralı Kataloğu
 

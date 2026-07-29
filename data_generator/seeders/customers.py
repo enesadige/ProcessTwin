@@ -7,6 +7,9 @@ from apps.customers.models import (
     Customer,
     CustomerPriorityLevel,
     ServicePackage,
+    ServicePackageAllowedSegment,
+    ServicePackagePriceVersion,
+    SLAProfile,
     Subscription,
     SubscriptionConnection,
     SubscriptionStatus,
@@ -32,7 +35,12 @@ def seed_customer_subscriptions(
     neighborhoods_by_name: dict[str, Neighborhood],
     reference_datetime,
 ) -> dict[str, int]:
-    packages_by_technology = create_service_packages(snapshot)
+    default_sla_profile = create_default_sla_profile(snapshot)
+    packages_by_technology = create_service_packages(
+        snapshot,
+        default_sla_profile=default_sla_profile,
+        reference_datetime=reference_datetime,
+    )
     customer_specs = create_customers(snapshot, city, district, neighborhoods_by_name)
     lines_by_bng_and_package_technology = group_lines_by_bng_and_package_technology(snapshot)
     package_queues = expand_package_queues(packages_by_technology)
@@ -47,6 +55,10 @@ def seed_customer_subscriptions(
     return {
         "customers": len(customer_specs),
         "service_packages": sum(len(packages) for packages in packages_by_technology.values()),
+        "sla_profiles": 1,
+        "service_package_price_versions": ServicePackagePriceVersion.objects.filter(
+            data_snapshot=snapshot,
+        ).count(),
         "subscriptions": subscriptions_created,
         "subscription_connections": connections_created,
         "vip_customers": Customer.objects.filter(
@@ -56,8 +68,42 @@ def seed_customer_subscriptions(
     }
 
 
-def create_service_packages(snapshot: DataSnapshot) -> dict[str, list[ServicePackage]]:
+def create_default_sla_profile(snapshot: DataSnapshot) -> SLAProfile:
+    profile_config = seed_config.DEFAULT_SLA_PROFILE
+    return save_clean(
+        SLAProfile(
+            data_snapshot=snapshot,
+            code=profile_config["code"],
+            name=profile_config["name"],
+            availability_target_percent=Decimal(profile_config["availability_target_percent"]),
+            support_window=profile_config["support_window"],
+            response_target_minutes=profile_config["response_target_minutes"],
+            restoration_target_minutes=profile_config["restoration_target_minutes"],
+            latency_threshold_ms=profile_config["latency_threshold_ms"],
+            jitter_threshold_ms=profile_config["jitter_threshold_ms"],
+            packet_loss_threshold_percent=Decimal(profile_config["packet_loss_threshold_percent"]),
+            backup_requirement=profile_config["backup_requirement"],
+            required_path_diversity=profile_config["required_path_diversity"],
+            monitoring_level=profile_config["monitoring_level"],
+            is_contractual=profile_config["is_contractual"],
+            active=profile_config["active"],
+            metadata={
+                "seed_role": "sla_profile",
+                "synthetic": True,
+                "regression_dataset_default": True,
+            },
+        )
+    )
+
+
+def create_service_packages(
+    snapshot: DataSnapshot,
+    *,
+    default_sla_profile: SLAProfile,
+    reference_datetime,
+) -> dict[str, list[ServicePackage]]:
     packages_by_technology: dict[str, list[ServicePackage]] = defaultdict(list)
+    valid_from = reference_datetime - timedelta(days=365)
     for package_config in seed_config.SERVICE_PACKAGE_CATALOG:
         package = save_clean(
             ServicePackage(
@@ -69,10 +115,38 @@ def create_service_packages(snapshot: DataSnapshot) -> dict[str, list[ServicePac
                 upload_mbps=package_config["upload_mbps"],
                 monthly_price=Decimal(package_config["monthly_price"]),
                 commitment_months=package_config["commitment_months"],
+                default_sla_profile=default_sla_profile,
+                symmetric=False,
+                backup_eligible=False,
+                valid_from=valid_from,
                 metadata={
                     **seed_config.SERVICE_PACKAGE_METADATA,
                     "seed_role": "service_package",
                     "subscription_count_target": package_config["subscription_count"],
+                },
+            )
+        )
+        for segment in seed_config.CUSTOMER_PLAN["segment_distribution"]:
+            save_clean(
+                ServicePackageAllowedSegment(
+                    data_snapshot=snapshot,
+                    service_package=package,
+                    segment=segment,
+                )
+            )
+        save_clean(
+            ServicePackagePriceVersion(
+                data_snapshot=snapshot,
+                service_package=package,
+                amount=package.monthly_price,
+                currency="TRY",
+                valid_from=valid_from,
+                version_number=1,
+                active=True,
+                metadata={
+                    "seed_role": "service_package_price_version",
+                    "synthetic": True,
+                    "reference_datetime_price": True,
                 },
             )
         )
@@ -196,9 +270,10 @@ def validate_customer_rows(rows: list[dict[str, str]]) -> None:
         != seed_config.CUSTOMER_PLAN["vip_neighborhood_distribution"]
     ):
         raise ValueError("VIP neighborhood distribution does not match config.")
-    if Counter(row["bng_code"] for row in vip_rows) != seed_config.CUSTOMER_PLAN[
-        "vip_bng_distribution"
-    ]:
+    if (
+        Counter(row["bng_code"] for row in vip_rows)
+        != seed_config.CUSTOMER_PLAN["vip_bng_distribution"]
+    ):
         raise ValueError("VIP BNG distribution does not match config.")
 
 
@@ -292,6 +367,7 @@ def create_subscriptions_and_connections(
                     subscription_number=f"SUB-MAL-{subscription_count:04d}",
                     customer=customer,
                     service_package=package,
+                    sla_profile=package.default_sla_profile,
                     status=SubscriptionStatus.ACTIVE,
                     valid_from=valid_from,
                     is_active=True,
