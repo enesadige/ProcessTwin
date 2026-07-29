@@ -80,13 +80,14 @@ class SubscriptionConnectionAdmin(admin.ModelAdmin):
     list_display = (
         "subscription",
         "line_connection",
+        "connection_role",
         "is_active",
         "valid_from",
         "valid_to",
         "port_identifier",
         "data_snapshot",
     )
-    list_filter = ("is_active", "line_connection__technology")
+    list_filter = ("connection_role", "is_active", "line_connection__technology")
     search_fields = (
         "subscription__subscription_number",
         "line_connection__line_code",

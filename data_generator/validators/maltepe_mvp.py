@@ -13,6 +13,7 @@ from apps.customers.models import (
     ServicePackage,
     Subscription,
     SubscriptionConnection,
+    SubscriptionConnectionRole,
 )
 from apps.datasets.models import DataSnapshot, GroundTruthCase
 from apps.geography.models import Neighborhood
@@ -20,6 +21,7 @@ from apps.network.models import (
     AccessSegment,
     LineConnection,
     NetworkDevice,
+    NetworkDeviceAccessRole,
     NetworkDeviceType,
     NetworkLink,
     NetworkPort,
@@ -106,6 +108,16 @@ def validate_maltepe_mvp_snapshot(snapshot: DataSnapshot) -> dict[str, Any]:
                 data_snapshot=snapshot,
                 is_active=True,
             ).count(),
+        ),
+        build_check(
+            name="subscription_connection_role_distribution",
+            expected={SubscriptionConnectionRole.PRIMARY: 240},
+            actual=collect_subscription_connection_role_distribution(snapshot),
+        ),
+        build_check(
+            name="access_node_role_distribution",
+            expected={NetworkDeviceAccessRole.STANDARD_ACCESS: 2},
+            actual=collect_access_node_role_distribution(snapshot),
         ),
         build_check(
             name="network_link_topology",
@@ -283,6 +295,26 @@ def collect_subscription_package_technology_distribution(snapshot: DataSnapshot)
             SubscriptionConnection.objects.filter(data_snapshot=snapshot, is_active=True)
             .select_related("subscription__service_package")
             .values_list("subscription__service_package__technology", flat=True)
+        )
+    )
+
+
+def collect_subscription_connection_role_distribution(snapshot: DataSnapshot) -> dict[str, int]:
+    return normalize_counter(
+        Counter(
+            SubscriptionConnection.objects.filter(data_snapshot=snapshot, is_active=True)
+            .values_list("connection_role", flat=True)
+        )
+    )
+
+
+def collect_access_node_role_distribution(snapshot: DataSnapshot) -> dict[str, int]:
+    return normalize_counter(
+        Counter(
+            NetworkDevice.objects.filter(
+                data_snapshot=snapshot,
+                device_type=NetworkDeviceType.ACCESS_NODE,
+            ).values_list("access_role", flat=True)
         )
     )
 

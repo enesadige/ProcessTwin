@@ -4,7 +4,11 @@ from typing import Any
 
 from django.db.models import Q
 
-from apps.customers.models import SubscriptionConnection, SubscriptionStatus
+from apps.customers.models import (
+    SubscriptionConnection,
+    SubscriptionConnectionRole,
+    SubscriptionStatus,
+)
 from apps.datasets.models import DataSnapshot
 from apps.network.models import LineConnectionStatus, NetworkPortStatus
 from apps.network.services.topology import NetworkTopologyService
@@ -33,6 +37,9 @@ class CustomerImpactResult:
     package_technology_counts: dict[str, int]
     customer_segment_counts: dict[str, int]
     customer_priority_counts: dict[str, int]
+    failover_protected_subscription_codes: list[str]
+    failover_protected_subscription_count: int
+    failover_warnings: list[dict[str, str]]
 
 
 class CustomerImpactService:
@@ -64,16 +71,19 @@ class CustomerImpactService:
             snapshot=snapshot,
             evaluation_time=window_end,
         )
-        topology_device_ids = [device.id for device in subgraph.devices]
-        connections = list(
-            self._get_affected_connections(
+        topology_device_ids = {device.id for device in subgraph.devices}
+        valid_connections = list(
+            self._get_valid_connections(
                 snapshot=snapshot,
-                topology_device_ids=topology_device_ids,
                 window_start=window_start,
                 window_end=window_end,
             )
         )
-        subscriptions = [connection.subscription for connection in connections]
+        impact = self._resolve_connection_impact(
+            valid_connections=valid_connections,
+            impacted_device_ids=topology_device_ids,
+        )
+        subscriptions = [connection.subscription for connection in impact["affected_connections"]]
         customers_by_code = {
             subscription.customer.customer_number: subscription.customer
             for subscription in subscriptions
@@ -111,6 +121,13 @@ class CustomerImpactService:
             customer_priority_counts=normalize_counter(
                 Counter(customer.priority_level for customer in customers_by_code.values())
             ),
+            failover_protected_subscription_codes=impact[
+                "failover_protected_subscription_codes"
+            ],
+            failover_protected_subscription_count=len(
+                impact["failover_protected_subscription_codes"]
+            ),
+            failover_warnings=impact["failover_warnings"],
         )
 
     def _validate_inputs(self, *, outage: Outage, snapshot: DataSnapshot) -> None:
@@ -132,11 +149,10 @@ class CustomerImpactService:
                 f"Outage {outage.outage_code} has no source device."
             )
 
-    def _get_affected_connections(
+    def _get_valid_connections(
         self,
         *,
         snapshot: DataSnapshot,
-        topology_device_ids: list[int],
         window_start,
         window_end,
     ):
@@ -149,7 +165,6 @@ class CustomerImpactService:
                 line_connection__status=LineConnectionStatus.ACTIVE,
                 line_connection__port__data_snapshot=snapshot,
                 line_connection__port__inventory_status=NetworkPortStatus.ACTIVE,
-                line_connection__port__device_id__in=topology_device_ids,
                 subscription__data_snapshot=snapshot,
                 subscription__is_active=True,
                 subscription__status=SubscriptionStatus.ACTIVE,
@@ -176,8 +191,139 @@ class CustomerImpactService:
                 "line_connection__port",
                 "line_connection__port__device",
             )
-            .order_by("subscription__subscription_number")
+            .order_by("subscription__subscription_number", "connection_role")
         )
+
+    def _resolve_connection_impact(
+        self,
+        *,
+        valid_connections: list[SubscriptionConnection],
+        impacted_device_ids: set[int],
+    ) -> dict[str, Any]:
+        connections_by_subscription: dict[int, list[SubscriptionConnection]] = {}
+        for connection in valid_connections:
+            connections_by_subscription.setdefault(connection.subscription_id, []).append(
+                connection
+            )
+
+        affected_connections: list[SubscriptionConnection] = []
+        failover_protected_subscription_codes: list[str] = []
+        failover_warnings: list[dict[str, str]] = []
+
+        for connections in connections_by_subscription.values():
+            primary = next(
+                (
+                    connection
+                    for connection in connections
+                    if connection.connection_role == SubscriptionConnectionRole.PRIMARY
+                ),
+                None,
+            )
+            backups = [
+                connection
+                for connection in connections
+                if connection.connection_role == SubscriptionConnectionRole.BACKUP
+            ]
+            if primary is None:
+                continue
+
+            primary_impacted = self._connection_is_impacted(
+                primary,
+                impacted_device_ids=impacted_device_ids,
+            )
+            if not primary_impacted:
+                continue
+
+            healthy_backup = next(
+                (
+                    backup
+                    for backup in backups
+                    if not self._connection_is_impacted(
+                        backup,
+                        impacted_device_ids=impacted_device_ids,
+                    )
+                ),
+                None,
+            )
+            if healthy_backup is not None:
+                failover_protected_subscription_codes.append(
+                    primary.subscription.subscription_number
+                )
+                failover_warnings.extend(
+                    self._build_failover_warnings(
+                        primary=primary,
+                        backup=healthy_backup,
+                    )
+                )
+                continue
+
+            affected_connections.append(primary)
+
+        return {
+            "affected_connections": sorted(
+                affected_connections,
+                key=lambda connection: connection.subscription.subscription_number,
+            ),
+            "failover_protected_subscription_codes": sorted(
+                failover_protected_subscription_codes
+            ),
+            "failover_warnings": sorted(
+                failover_warnings,
+                key=lambda warning: (
+                    warning["subscription_code"],
+                    warning["code"],
+                ),
+            ),
+        }
+
+    def _connection_is_impacted(
+        self,
+        connection: SubscriptionConnection,
+        *,
+        impacted_device_ids: set[int],
+    ) -> bool:
+        return connection.line_connection.port.device_id in impacted_device_ids
+
+    def _build_failover_warnings(
+        self,
+        *,
+        primary: SubscriptionConnection,
+        backup: SubscriptionConnection,
+    ) -> list[dict[str, str]]:
+        warnings: list[dict[str, str]] = []
+        primary_device = primary.line_connection.port.device
+        backup_device = backup.line_connection.port.device
+        if primary_device.id == backup_device.id:
+            warnings.append(
+                {
+                    "code": "shared_access_node",
+                    "subscription_code": primary.subscription.subscription_number,
+                    "message": "Primary and backup paths use the same access node.",
+                    "device_code": primary_device.code,
+                }
+            )
+        primary_upstream = self._get_single_upstream_link_code(primary_device)
+        backup_upstream = self._get_single_upstream_link_code(backup_device)
+        if primary_upstream and primary_upstream == backup_upstream:
+            warnings.append(
+                {
+                    "code": "shared_upstream_link",
+                    "subscription_code": primary.subscription.subscription_number,
+                    "message": "Primary and backup paths share the same upstream link.",
+                    "link_code": primary_upstream,
+                }
+            )
+        return warnings
+
+    def _get_single_upstream_link_code(self, device) -> str:
+        incoming_links = list(
+            device.incoming_links.filter(data_snapshot=device.data_snapshot).order_by(
+                "link_code"
+            )
+        )
+        if len(incoming_links) != 1:
+            return ""
+        return incoming_links[0].link_code
 
 
 def normalize_counter(counter: Counter) -> dict[str, int]:

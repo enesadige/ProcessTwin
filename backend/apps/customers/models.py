@@ -7,7 +7,13 @@ from apps.core.models import TimeStampedModel
 from apps.customers.services.technology_compatibility import is_package_line_compatible
 from apps.datasets.models import DataSnapshot
 from apps.geography.models import City, District, Neighborhood
-from apps.network.models import AccessTechnology, LineConnection, validate_location_chain
+from apps.network.models import (
+    AccessTechnology,
+    LineConnection,
+    NetworkDeviceAccessRole,
+    NetworkDeviceType,
+    validate_location_chain,
+)
 
 
 class CustomerSegment(models.TextChoices):
@@ -38,6 +44,11 @@ class SubscriptionStatus(models.TextChoices):
 class ServiceType(models.TextChoices):
     BROADBAND = "broadband", "Broadband"
     METRO_ETHERNET = "metro_ethernet", "Metro Ethernet"
+
+
+class SubscriptionConnectionRole(models.TextChoices):
+    PRIMARY = "primary", "Primary"
+    BACKUP = "backup", "Backup"
 
 
 class PaymentStatus(models.TextChoices):
@@ -257,6 +268,11 @@ class SubscriptionConnection(TimeStampedModel):
     valid_from = models.DateTimeField()
     valid_to = models.DateTimeField(null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    connection_role = models.CharField(
+        max_length=16,
+        choices=SubscriptionConnectionRole.choices,
+        default=SubscriptionConnectionRole.PRIMARY,
+    )
     port_identifier = models.CharField(max_length=120, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
 
@@ -272,9 +288,9 @@ class SubscriptionConnection(TimeStampedModel):
                 name="subscription_connection_valid_range",
             ),
             models.UniqueConstraint(
-                fields=["subscription"],
+                fields=["subscription", "connection_role"],
                 condition=models.Q(is_active=True, valid_to__isnull=True),
-                name="unique_open_active_connection_per_subscription",
+                name="unique_open_active_connection_per_subscription_role",
             ),
             models.UniqueConstraint(
                 fields=["line_connection"],
@@ -315,6 +331,12 @@ class SubscriptionConnection(TimeStampedModel):
                 "Line connection technology must be compatible with the subscription package "
                 "technology."
             )
+        if (
+            self.subscription_id
+            and self.line_connection_id
+            and self.subscription.service_package.service_type == ServiceType.METRO_ETHERNET
+        ):
+            errors.update(self._validate_metro_ethernet_path())
         if self.subscription_id:
             if self.valid_from < self.subscription.valid_from:
                 errors["valid_from"] = "Connection cannot start before the subscription."
@@ -330,18 +352,34 @@ class SubscriptionConnection(TimeStampedModel):
             ):
                 errors["valid_to"] = "Connection cannot extend beyond the line connection."
         if self.is_active:
-            if self._overlaps_existing_active_connection("subscription"):
-                errors["subscription"] = (
-                    "Subscription already has an overlapping active line connection."
+            if self._overlaps_existing_active_connection(
+                "subscription",
+                same_role=True,
+            ):
+                errors["connection_role"] = (
+                    "Subscription already has an overlapping active connection "
+                    "with the same role."
                 )
             if self._overlaps_existing_active_connection("line_connection"):
                 errors["line_connection"] = (
                     "Line connection already has an overlapping active subscription."
                 )
+            if (
+                self.connection_role == SubscriptionConnectionRole.BACKUP
+                and not self._has_overlapping_primary_connection()
+            ):
+                errors["connection_role"] = (
+                    "A backup connection requires an overlapping active primary connection."
+                )
         if errors:
             raise ValidationError(errors)
 
-    def _overlaps_existing_active_connection(self, field_name: str) -> bool:
+    def _overlaps_existing_active_connection(
+        self,
+        field_name: str,
+        *,
+        same_role: bool = False,
+    ) -> bool:
         field_id = getattr(self, f"{field_name}_id")
         if not field_id:
             return False
@@ -350,6 +388,22 @@ class SubscriptionConnection(TimeStampedModel):
             is_active=True,
             **{f"{field_name}_id": field_id},
         ).exclude(pk=self.pk)
+        if same_role:
+            connections = connections.filter(connection_role=self.connection_role)
+        return self._has_temporal_overlap(connections)
+
+    def _has_overlapping_primary_connection(self) -> bool:
+        if not self.subscription_id:
+            return False
+        connections = SubscriptionConnection.objects.filter(
+            data_snapshot_id=self.data_snapshot_id,
+            subscription_id=self.subscription_id,
+            connection_role=SubscriptionConnectionRole.PRIMARY,
+            is_active=True,
+        ).exclude(pk=self.pk)
+        return self._has_temporal_overlap(connections)
+
+    def _has_temporal_overlap(self, connections) -> bool:
         for connection in connections:
             existing_end = connection.valid_to
             current_end = self.valid_to
@@ -362,6 +416,31 @@ class SubscriptionConnection(TimeStampedModel):
             if starts_before_existing_end and existing_starts_before_current_end:
                 return True
         return False
+
+    def _validate_metro_ethernet_path(self) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        line = self.line_connection
+        device = line.port.device
+        port_active_line_count = line.port.line_connections.filter(
+            data_snapshot_id=self.data_snapshot_id,
+            is_active=True,
+        ).exclude(pk=line.pk).count()
+        if line.technology != AccessTechnology.FIBER:
+            errors["line_connection"] = "Metro Ethernet subscriptions require a fiber line."
+        if device.device_type != NetworkDeviceType.ACCESS_NODE:
+            errors["line_connection"] = (
+                "Metro Ethernet subscriptions must terminate on an access node."
+            )
+        elif device.access_role != NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION:
+            errors["line_connection"] = (
+                "Metro Ethernet subscriptions require a corporate fiber aggregation "
+                "access node."
+            )
+        if port_active_line_count:
+            errors["line_connection"] = (
+                "Metro Ethernet subscriptions require a dedicated port with one active line."
+            )
+        return errors
 
     def is_valid_at(self, moment) -> bool:
         if not self.is_active:

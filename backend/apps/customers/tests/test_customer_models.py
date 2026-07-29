@@ -20,6 +20,7 @@ from apps.customers.models import (
     ServiceType,
     Subscription,
     SubscriptionConnection,
+    SubscriptionConnectionRole,
     SubscriptionStatus,
 )
 from apps.datasets.models import DatasetVersion, DataSnapshot
@@ -29,6 +30,7 @@ from apps.network.models import (
     AccessTechnology,
     LineConnection,
     NetworkDevice,
+    NetworkDeviceAccessRole,
     NetworkDeviceType,
     NetworkPort,
     NetworkPortType,
@@ -95,6 +97,48 @@ def create_line_connection(
         port=port,
         access_segment=segment,
         technology=technology,
+        valid_from=timezone.now() - timedelta(days=30),
+    )
+
+
+def create_access_node_fiber_line(
+    snapshot: DataSnapshot,
+    city: City,
+    district: District,
+    *,
+    suffix: str = "001",
+    access_role: NetworkDeviceAccessRole = NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION,
+) -> LineConnection:
+    device = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code=f"AN-MAL-{suffix}",
+        device_type=NetworkDeviceType.ACCESS_NODE,
+        access_role=access_role,
+        city=city,
+        district=district,
+    )
+    port = NetworkPort.objects.create(
+        data_snapshot=snapshot,
+        device=device,
+        port_code=f"AN-PORT-{suffix}",
+        port_type=NetworkPortType.CUSTOMER,
+    )
+    segment = AccessSegment.objects.create(
+        data_snapshot=snapshot,
+        segment_code=f"SEG-MAL-FIBER-AN-{suffix}",
+        name=f"Maltepe corporate fiber access {suffix}",
+        technology=AccessTechnology.FIBER,
+        serving_device=device,
+        city=city,
+        district=district,
+        estimated_customer_count=1,
+    )
+    return LineConnection.objects.create(
+        data_snapshot=snapshot,
+        line_code=f"LINE-MAL-FIBER-AN-{suffix}",
+        port=port,
+        access_segment=segment,
+        technology=AccessTechnology.FIBER,
         valid_from=timezone.now() - timedelta(days=30),
     )
 
@@ -273,7 +317,7 @@ def test_subscription_connection_accepts_fiber_package_on_gpon_line():
 def test_subscription_connection_accepts_metro_ethernet_package_on_fiber_line():
     snapshot = create_snapshot()
     city, district, neighborhood = create_maltepe_location()
-    line = create_line_connection(snapshot, city, district, AccessTechnology.FIBER)
+    line = create_access_node_fiber_line(snapshot, city, district)
     _customer, package, subscription = create_customer_subscription(
         snapshot,
         city,
@@ -299,6 +343,37 @@ def test_subscription_connection_rejects_metro_ethernet_package_on_gpon_line():
     snapshot = create_snapshot()
     city, district, neighborhood = create_maltepe_location()
     line = create_line_connection(snapshot, city, district, AccessTechnology.GPON)
+    _customer, package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+        AccessTechnology.FIBER,
+    )
+    package.service_type = ServiceType.METRO_ETHERNET
+    package.save(update_fields=["service_type"])
+
+    connection = SubscriptionConnection(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=line,
+        valid_from=timezone.now(),
+    )
+
+    with pytest.raises(ValidationError):
+        connection.full_clean()
+
+
+@pytest.mark.django_db
+def test_subscription_connection_rejects_metro_ethernet_on_standard_access_node():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    line = create_access_node_fiber_line(
+        snapshot,
+        city,
+        district,
+        access_role=NetworkDeviceAccessRole.STANDARD_ACCESS,
+    )
     _customer, package, subscription = create_customer_subscription(
         snapshot,
         city,
@@ -373,6 +448,100 @@ def test_subscription_connection_rejects_overlapping_active_connection_for_same_
             line_connection=second_line,
             valid_from=now,
             valid_to=now + timedelta(days=10),
+        )
+
+
+@pytest.mark.django_db
+def test_subscription_connection_allows_open_primary_and_backup_for_same_subscription():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    primary_line = create_line_connection(snapshot, city, district, suffix="001")
+    backup_line = create_line_connection(snapshot, city, district, suffix="002")
+    _customer, _package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+    )
+    now = timezone.now()
+
+    primary = SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=primary_line,
+        connection_role=SubscriptionConnectionRole.PRIMARY,
+        valid_from=now - timedelta(days=1),
+    )
+    backup = SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=backup_line,
+        connection_role=SubscriptionConnectionRole.BACKUP,
+        valid_from=now,
+    )
+
+    assert primary.connection_role == SubscriptionConnectionRole.PRIMARY
+    assert backup.connection_role == SubscriptionConnectionRole.BACKUP
+
+
+@pytest.mark.django_db
+def test_subscription_connection_rejects_second_open_backup_for_same_subscription():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    primary_line = create_line_connection(snapshot, city, district, suffix="001")
+    first_backup_line = create_line_connection(snapshot, city, district, suffix="002")
+    second_backup_line = create_line_connection(snapshot, city, district, suffix="003")
+    _customer, _package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+    )
+    now = timezone.now()
+    SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=primary_line,
+        connection_role=SubscriptionConnectionRole.PRIMARY,
+        valid_from=now - timedelta(days=1),
+    )
+    SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=subscription,
+        line_connection=first_backup_line,
+        connection_role=SubscriptionConnectionRole.BACKUP,
+        valid_from=now,
+    )
+
+    with pytest.raises(ValidationError):
+        SubscriptionConnection.objects.create(
+            data_snapshot=snapshot,
+            subscription=subscription,
+            line_connection=second_backup_line,
+            connection_role=SubscriptionConnectionRole.BACKUP,
+            valid_from=now,
+        )
+
+
+@pytest.mark.django_db
+def test_subscription_connection_rejects_open_backup_without_primary():
+    snapshot = create_snapshot()
+    city, district, neighborhood = create_maltepe_location()
+    backup_line = create_line_connection(snapshot, city, district)
+    _customer, _package, subscription = create_customer_subscription(
+        snapshot,
+        city,
+        district,
+        neighborhood,
+    )
+
+    with pytest.raises(ValidationError):
+        SubscriptionConnection.objects.create(
+            data_snapshot=snapshot,
+            subscription=subscription,
+            line_connection=backup_line,
+            connection_role=SubscriptionConnectionRole.BACKUP,
+            valid_from=timezone.now(),
         )
 
 

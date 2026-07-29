@@ -9,6 +9,7 @@ from apps.customers.models import (
     ServicePackage,
     Subscription,
     SubscriptionConnection,
+    SubscriptionConnectionRole,
     SubscriptionStatus,
 )
 from apps.customers.services.impact import CustomerImpactInputError, CustomerImpactService
@@ -149,6 +150,102 @@ def test_customer_impact_deduplicates_customer_with_two_affected_subscriptions()
 
 
 @pytest.mark.django_db
+def test_customer_impact_excludes_subscription_when_primary_impacted_and_backup_healthy():
+    snapshot = seed_snapshot()
+    outage = get_outage(snapshot, "OUT-MAL-BNG-001")
+    primary = get_first_connection_by_bng_and_technology(
+        snapshot,
+        bng_code="BNG-MAL-001",
+        technology=AccessTechnology.FIBER,
+    )
+    backup_line = create_additional_fiber_line_on_bng(
+        snapshot,
+        bng_code="BNG-MAL-002",
+        suffix="FAILOVER-HEALTHY",
+    )
+    SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=primary.subscription,
+        line_connection=backup_line,
+        connection_role=SubscriptionConnectionRole.BACKUP,
+        valid_from=outage.started_at - timedelta(days=1),
+    )
+
+    result = CustomerImpactService().calculate_impact(outage=outage, snapshot=snapshot)
+
+    assert primary.subscription.subscription_number not in result.affected_subscription_codes
+    assert primary.subscription.subscription_number in (
+        result.failover_protected_subscription_codes
+    )
+    assert result.failover_protected_subscription_count == 1
+    assert result.affected_subscription_count == 149
+
+
+@pytest.mark.django_db
+def test_customer_impact_counts_subscription_once_when_primary_and_backup_impacted():
+    snapshot = seed_snapshot()
+    outage = get_outage(snapshot, "OUT-MAL-BNG-001")
+    primary = get_first_connection_by_bng_and_technology(
+        snapshot,
+        bng_code="BNG-MAL-001",
+        technology=AccessTechnology.FIBER,
+    )
+    backup_line = create_additional_fiber_line_on_bng(
+        snapshot,
+        bng_code="BNG-MAL-001",
+        suffix="FAILOVER-IMPACTED",
+    )
+    SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=primary.subscription,
+        line_connection=backup_line,
+        connection_role=SubscriptionConnectionRole.BACKUP,
+        valid_from=outage.started_at - timedelta(days=1),
+    )
+
+    result = CustomerImpactService().calculate_impact(outage=outage, snapshot=snapshot)
+
+    assert result.affected_subscription_codes.count(
+        primary.subscription.subscription_number
+    ) == 1
+    assert primary.subscription.subscription_number not in (
+        result.failover_protected_subscription_codes
+    )
+    assert result.affected_subscription_count == 150
+
+
+@pytest.mark.django_db
+def test_customer_impact_ignores_subscription_when_only_backup_is_impacted():
+    snapshot = seed_snapshot()
+    outage = get_outage(snapshot, "OUT-MAL-BNG-001")
+    primary = get_first_connection_by_bng_and_technology(
+        snapshot,
+        bng_code="BNG-MAL-002",
+        technology=AccessTechnology.FIBER,
+    )
+    backup_line = create_additional_fiber_line_on_bng(
+        snapshot,
+        bng_code="BNG-MAL-001",
+        suffix="ONLY-BACKUP-IMPACTED",
+    )
+    SubscriptionConnection.objects.create(
+        data_snapshot=snapshot,
+        subscription=primary.subscription,
+        line_connection=backup_line,
+        connection_role=SubscriptionConnectionRole.BACKUP,
+        valid_from=outage.started_at - timedelta(days=1),
+    )
+
+    result = CustomerImpactService().calculate_impact(outage=outage, snapshot=snapshot)
+
+    assert primary.subscription.subscription_number not in result.affected_subscription_codes
+    assert primary.subscription.subscription_number not in (
+        result.failover_protected_subscription_codes
+    )
+    assert result.affected_subscription_count == 150
+
+
+@pytest.mark.django_db
 def test_customer_impact_rejects_missing_source_device():
     snapshot = seed_snapshot()
     outage = get_outage(snapshot, "OUT-MAL-BNG-001")
@@ -202,6 +299,73 @@ def get_first_affected_connection(snapshot: DataSnapshot, outage: Outage) -> Sub
         .select_related("subscription")
         .order_by("subscription__subscription_number")
         .first()
+    )
+
+
+def get_first_connection_by_bng_and_technology(
+    snapshot: DataSnapshot,
+    *,
+    bng_code: str,
+    technology: AccessTechnology,
+) -> SubscriptionConnection:
+    return (
+        SubscriptionConnection.objects.filter(
+            data_snapshot=snapshot,
+            connection_role=SubscriptionConnectionRole.PRIMARY,
+            subscription__service_package__technology=technology,
+            line_connection__port__device__metadata__parent_bng=bng_code,
+        )
+        .select_related("subscription", "line_connection")
+        .order_by("subscription__subscription_number")
+        .first()
+    )
+
+
+def create_additional_fiber_line_on_bng(
+    snapshot: DataSnapshot,
+    *,
+    bng_code: str,
+    suffix: str,
+) -> LineConnection:
+    device = (
+        NetworkDevice.objects.filter(
+            data_snapshot=snapshot,
+            device_type=NetworkDeviceType.ACCESS_NODE,
+            metadata__parent_bng=bng_code,
+        )
+        .order_by("code")
+        .first()
+    )
+    port = NetworkPort.objects.create(
+        data_snapshot=snapshot,
+        device=device,
+        port_code=f"PORT-{suffix}",
+    )
+    segment = AccessSegment.objects.create(
+        data_snapshot=snapshot,
+        segment_code=f"SEG-{suffix}",
+        name=f"Additional fiber segment {suffix}",
+        technology=AccessTechnology.FIBER,
+        serving_device=device,
+        city=device.city,
+        district=device.district,
+        neighborhood=device.neighborhood,
+        estimated_customer_count=1,
+    )
+    return LineConnection.objects.create(
+        data_snapshot=snapshot,
+        line_code=f"LINE-{suffix}",
+        port=port,
+        access_segment=segment,
+        technology=AccessTechnology.FIBER,
+        valid_from=timezone.datetime(
+            2026,
+            7,
+            1,
+            0,
+            0,
+            tzinfo=timezone.get_current_timezone(),
+        ),
     )
 
 

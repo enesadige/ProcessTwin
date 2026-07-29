@@ -1100,6 +1100,50 @@ Durum: `KISMEN KARAR VERİLDİ`
     - SME: yalnız seçili kurumsal veya kritik profillerde uygun.
   - SLAProfile, büyük seed veya cihaz/port hesaplaması bu karar sırasında uygulanmadı;
     sonraki karar kapılarında ele alınacak.
+- Metro Ethernet primary/backup topoloji kararı: `KARAR VERİLDİ`
+  - SubscriptionConnection üzerinde connection_role kullanılır:
+    - primary.
+    - backup.
+  - Mevcut kayıtlar migration ile primary yapılır.
+  - Aynı Subscription için aynı role değerinde yalnız bir açık aktif bağlantı bulunur.
+  - Aynı Subscription için en fazla bir açık primary ve bir açık backup desteklenir.
+  - LineConnection üzerindeki tek aktif abonelik bağlantısı constraint'i korunur.
+  - Backup bağlantısı açıkken overlapping aktif primary bulunması deterministic
+    validation katmanında zorunlu tutulur.
+  - NetworkDevice üzerinde access_role kullanılır:
+    - standard_access.
+    - corporate_fiber_aggregation.
+  - access_role yalnız ACCESS_NODE cihazlarda dolu olabilir.
+  - ACCESS_NODE cihazlarda access_role zorunludur; diğer cihazlarda null kalır.
+  - Mevcut Maltepe access node kayıtları standard_access olarak korunur.
+  - Metro Ethernet zinciri:
+    - BNG.
+    - NetworkLink.
+    - corporate_fiber_aggregation ACCESS_NODE.
+    - dedicated NetworkPort.
+    - LineConnection(technology=fiber).
+    - SubscriptionConnection(primary veya backup).
+    - Subscription.
+    - ServicePackage(service_type=metro_ethernet, technology=fiber).
+  - NetworkLink üzerine primary/backup veya failover role alanı eklenmedi.
+  - Primary/backup rolünün yol/abonelik bağlantısına ait olduğu kabul edildi.
+  - CustomerImpactService failover-aware hale getirildi:
+    - yalnız primary varsa ve yolu etkilenmişse impacted.
+    - primary sağlamsa backup etkilenmiş olsa bile impacted değil.
+    - primary etkilenmiş, backup sağlamsa full outage değil ve protected sayılır.
+    - primary ve backup birlikte etkilenmişse impacted.
+    - aynı abonelik iki bağlantı yüzünden iki kez sayılmaz.
+  - Sonuç sözleşmesine geriye uyumlu alanlar eklendi:
+    - failover_protected_subscription_codes.
+    - failover_protected_subscription_count.
+    - failover_warnings.
+  - Warning/error ayrımı:
+    - Aynı role için çakışık açık bağlantı, backup without primary, standard access node
+      üzerinden Metro Ethernet ve dedicated port ihlali validation error'dur.
+    - Primary ve backup'ın aynı access node veya aynı upstream link'i paylaşması şimdilik
+      validator/impact warning seviyesindedir.
+  - SRLG/failure-domain modeli, ortak arıza alanı garantisi ve geçiş süresi/degradation
+    hesabı bu görevde eklenmedi; sonraki koruma/failover karar kapısında ele alınacak.
 - Hâlâ karar bekleyen veri grupları:
   - Paket katalogu.
   - Farklı aylık ücretler, taahhüt süreleri ve SLA profilleri.

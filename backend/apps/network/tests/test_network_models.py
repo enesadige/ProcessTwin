@@ -13,6 +13,7 @@ from apps.network.models import (
     LineConnection,
     LineConnectionStatus,
     NetworkDevice,
+    NetworkDeviceAccessRole,
     NetworkDeviceStatus,
     NetworkDeviceType,
     NetworkLink,
@@ -68,6 +69,55 @@ def test_bng_device_can_be_attached_to_maltepe_location():
     assert device.display_name == "Maltepe BNG 001"
     assert device.location_name == "İstanbul / Maltepe / Zümrütevler"
     assert device.metadata == {"mvp_anchor": True}
+
+
+@pytest.mark.django_db
+def test_access_node_requires_access_role():
+    snapshot = create_snapshot()
+    city, district, _neighborhood = create_maltepe_location()
+    device = NetworkDevice(
+        data_snapshot=snapshot,
+        code="AN-MAL-001",
+        device_type=NetworkDeviceType.ACCESS_NODE,
+        city=city,
+        district=district,
+    )
+
+    with pytest.raises(ValidationError):
+        device.full_clean()
+
+
+@pytest.mark.django_db
+def test_non_access_node_rejects_access_role():
+    snapshot = create_snapshot()
+    city, district, _neighborhood = create_maltepe_location()
+    device = NetworkDevice(
+        data_snapshot=snapshot,
+        code="BNG-MAL-ACCESS-ROLE-001",
+        device_type=NetworkDeviceType.BNG,
+        access_role=NetworkDeviceAccessRole.STANDARD_ACCESS,
+        city=city,
+        district=district,
+    )
+
+    with pytest.raises(ValidationError):
+        device.full_clean()
+
+
+@pytest.mark.django_db
+def test_access_node_can_store_corporate_fiber_aggregation_role():
+    snapshot = create_snapshot()
+    city, district, _neighborhood = create_maltepe_location()
+    device = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="AN-MAL-CORP-001",
+        device_type=NetworkDeviceType.ACCESS_NODE,
+        access_role=NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION,
+        city=city,
+        district=district,
+    )
+
+    assert device.access_role == NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION
 
 
 @pytest.mark.django_db

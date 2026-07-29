@@ -14,13 +14,14 @@ class NetworkDeviceAdmin(admin.ModelAdmin):
     list_display = (
         "code",
         "device_type",
+        "access_role",
         "inventory_status",
         "city",
         "district",
         "neighborhood",
         "data_snapshot",
     )
-    list_filter = ("device_type", "inventory_status", "city", "district")
+    list_filter = ("device_type", "access_role", "inventory_status", "city", "district")
     search_fields = ("code", "name", "vendor", "model_name", "city__name", "district__name")
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = ("data_snapshot", "city", "district", "neighborhood")

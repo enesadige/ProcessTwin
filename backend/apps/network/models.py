@@ -14,6 +14,14 @@ class NetworkDeviceType(models.TextChoices):
     ACCESS_NODE = "access_node", "Access node"
 
 
+class NetworkDeviceAccessRole(models.TextChoices):
+    STANDARD_ACCESS = "standard_access", "Standard access"
+    CORPORATE_FIBER_AGGREGATION = (
+        "corporate_fiber_aggregation",
+        "Corporate fiber aggregation",
+    )
+
+
 class AccessTechnology(models.TextChoices):
     FIBER = "fiber", "Fiber"
     GPON = "gpon", "GPON"
@@ -86,6 +94,12 @@ class NetworkDevice(TimeStampedModel):
         choices=NetworkDeviceStatus.choices,
         default=NetworkDeviceStatus.ACTIVE,
     )
+    access_role = models.CharField(
+        max_length=40,
+        choices=NetworkDeviceAccessRole.choices,
+        null=True,
+        blank=True,
+    )
     vendor = models.CharField(max_length=80, blank=True)
     model_name = models.CharField(max_length=120, blank=True)
     software_version = models.CharField(max_length=80, blank=True)
@@ -120,7 +134,18 @@ class NetworkDevice(TimeStampedModel):
             models.UniqueConstraint(
                 fields=["data_snapshot", "code"],
                 name="unique_network_device_code_per_snapshot",
-            )
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        device_type=NetworkDeviceType.ACCESS_NODE,
+                        access_role__isnull=False,
+                    )
+                    | ~models.Q(device_type=NetworkDeviceType.ACCESS_NODE)
+                    & models.Q(access_role__isnull=True)
+                ),
+                name="network_device_access_role_matches_type",
+            ),
         ]
 
     def __str__(self) -> str:
@@ -128,6 +153,13 @@ class NetworkDevice(TimeStampedModel):
 
     def clean(self):
         validate_location_chain(self.city, self.district, self.neighborhood)
+        errors: dict[str, str] = {}
+        if self.device_type == NetworkDeviceType.ACCESS_NODE and not self.access_role:
+            errors["access_role"] = "Access node devices require an access role."
+        if self.device_type != NetworkDeviceType.ACCESS_NODE and self.access_role:
+            errors["access_role"] = "Only access node devices can have an access role."
+        if errors:
+            raise ValidationError(errors)
 
     @property
     def display_name(self) -> str:
