@@ -1,3 +1,8 @@
+from mcp_servers.shared.backend_client import (
+    InternalAPIClient,
+    InternalAPIClientConfig,
+    InternalAPIClientError,
+)
 from mcp_servers.shared.contracts import (
     BaseMCPInput,
     MCPError,
@@ -11,6 +16,9 @@ from mcp_servers.shared.contracts import (
 
 __all__ = [
     "BaseMCPInput",
+    "InternalAPIClient",
+    "InternalAPIClientConfig",
+    "InternalAPIClientError",
     "MCPEvidence",
     "MCPError",
     "MCPErrorCode",
