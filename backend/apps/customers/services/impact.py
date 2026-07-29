@@ -11,6 +11,10 @@ from apps.customers.models import (
 )
 from apps.datasets.models import DataSnapshot
 from apps.network.models import LineConnectionStatus, NetworkPortStatus
+from apps.network.services.path_diversity import (
+    PathDiversityClassification,
+    PathDiversityService,
+)
 from apps.network.services.topology import NetworkTopologyService
 from apps.operations.models import Outage
 from apps.operations.services.outages import OutageService
@@ -48,9 +52,11 @@ class CustomerImpactService:
         *,
         topology_service: NetworkTopologyService | None = None,
         outage_service: OutageService | None = None,
+        path_diversity_service: PathDiversityService | None = None,
     ) -> None:
         self.topology_service = topology_service or NetworkTopologyService()
         self.outage_service = outage_service or OutageService()
+        self.path_diversity_service = path_diversity_service or PathDiversityService()
 
     def calculate_impact(
         self,
@@ -311,6 +317,23 @@ class CustomerImpactService:
                     "subscription_code": primary.subscription.subscription_number,
                     "message": "Primary and backup paths share the same upstream link.",
                     "link_code": primary_upstream,
+                }
+            )
+        diversity = self.path_diversity_service.evaluate(
+            primary_line=primary.line_connection,
+            backup_line=backup.line_connection,
+            snapshot=primary.data_snapshot,
+        )
+        if diversity.classification != PathDiversityClassification.FULLY_DIVERSE:
+            warnings.append(
+                {
+                    "code": "path_diversity_not_fully_verified",
+                    "subscription_code": primary.subscription.subscription_number,
+                    "message": "Backup path is not fully verified as diverse.",
+                    "classification": diversity.classification,
+                    "missing_failure_domain_types": ",".join(
+                        diversity.missing_failure_domain_types
+                    ),
                 }
             )
         return warnings

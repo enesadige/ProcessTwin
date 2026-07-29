@@ -2,9 +2,13 @@ from django.contrib import admin
 
 from apps.network.models import (
     AccessSegment,
+    DeviceFailureDomainMembership,
+    FailureDomain,
     LineConnection,
+    LineConnectionFailureDomainMembership,
     NetworkDevice,
     NetworkLink,
+    NetworkLinkFailureDomainMembership,
     NetworkPort,
 )
 
@@ -114,3 +118,43 @@ class NetworkLinkAdmin(admin.ModelAdmin):
     autocomplete_fields = ("data_snapshot", "source_device", "target_device")
     list_select_related = ("data_snapshot", "source_device", "target_device")
     date_hierarchy = "created_at"
+
+
+@admin.register(FailureDomain)
+class FailureDomainAdmin(admin.ModelAdmin):
+    list_display = ("code", "name", "domain_type", "data_snapshot")
+    list_filter = ("domain_type",)
+    search_fields = ("code", "name", "description")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot",)
+    list_select_related = ("data_snapshot",)
+
+
+@admin.register(DeviceFailureDomainMembership)
+class DeviceFailureDomainMembershipAdmin(admin.ModelAdmin):
+    list_display = ("device", "failure_domain", "data_snapshot")
+    list_filter = ("failure_domain__domain_type", "device__device_type")
+    search_fields = ("device__code", "failure_domain__code", "failure_domain__name")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot", "device", "failure_domain")
+    list_select_related = ("data_snapshot", "device", "failure_domain")
+
+
+@admin.register(NetworkLinkFailureDomainMembership)
+class NetworkLinkFailureDomainMembershipAdmin(admin.ModelAdmin):
+    list_display = ("network_link", "failure_domain", "data_snapshot")
+    list_filter = ("failure_domain__domain_type",)
+    search_fields = ("network_link__link_code", "failure_domain__code", "failure_domain__name")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot", "network_link", "failure_domain")
+    list_select_related = ("data_snapshot", "network_link", "failure_domain")
+
+
+@admin.register(LineConnectionFailureDomainMembership)
+class LineConnectionFailureDomainMembershipAdmin(admin.ModelAdmin):
+    list_display = ("line_connection", "failure_domain", "data_snapshot")
+    list_filter = ("failure_domain__domain_type",)
+    search_fields = ("line_connection__line_code", "failure_domain__code", "failure_domain__name")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = ("data_snapshot", "line_connection", "failure_domain")
+    list_select_related = ("data_snapshot", "line_connection", "failure_domain")

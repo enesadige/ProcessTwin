@@ -1142,8 +1142,98 @@ Durum: `KISMEN KARAR VERİLDİ`
       üzerinden Metro Ethernet ve dedicated port ihlali validation error'dur.
     - Primary ve backup'ın aynı access node veya aynı upstream link'i paylaşması şimdilik
       validator/impact warning seviyesindedir.
-  - SRLG/failure-domain modeli, ortak arıza alanı garantisi ve geçiş süresi/degradation
-    hesabı bu görevde eklenmedi; sonraki koruma/failover karar kapısında ele alınacak.
+- Çok şehirli topoloji ve kapasite kapanışı: `KARAR VERİLDİ`
+  - Büyük gerçekçi dataset, küçük Maltepe regression dataset'inden ayrı olacaktır.
+  - Küçük Maltepe regression dataset'inin doğrudan BNG -> erişim cihazı bağlantıları
+    geriye uyumluluk için korunur.
+  - Büyük gerçekçi dataset'in temel zinciri:
+    - BNG.
+    - metro aggregation.
+    - OLT / DSLAM / ACCESS_NODE.
+    - müşteri erişim hattı.
+  - Onaylanan cihaz kapasite tabanı:
+    - BNG: 8.
+    - metro aggregation: 16.
+    - OLT: 32.
+    - DSLAM: 95.
+    - standard_access node: 51.
+    - corporate_fiber_aggregation node: 33.
+    - toplam cihaz: 235.
+  - Onaylanan servis erişim port kapasitesi:
+    - aktif PON portu: 322.
+    - toplam PON port kapasitesi: 512.
+    - aktif DSL portu: 6.581.
+    - toplam DSL port kapasitesi: 9.120.
+    - dedicated fiber primary portu: 2.042.
+    - backup için ayrılan dedicated port kapasitesi: en fazla 261.
+    - toplam planlanan dedicated fiber kullanılan kapasite: en fazla 2.303.
+  - 13.664 değeri toplam fiziksel port kapasitesi olarak adlandırılmayacak; doğru
+    adlandırma toplam servis erişim port kapasitesidir.
+  - Yaklaşık NetworkLink planı:
+    - BNG -> metro aggregation primary link: 16.
+    - metro aggregation -> erişim cihazı primary link: 211.
+    - kritik corporate yollar için alternatif erişim/aggregation link kapasitesi:
+      yaklaşık 18.
+    - toplam yaklaşık 245 NetworkLink.
+  - 1:64 GPON fan-out ana dataset'te kullanılmayacak; stres senaryosu olarak bekleyen
+    kapsama yazıldı.
+  - Metro Ethernet backup için 261 sayısı aktif backup SubscriptionConnection sayısı
+    değil, provisioned backup port kapasitesidir.
+  - Gerçek backup bağlantı sayısı SLA, paket, müşteri segmenti ve kritik hizmet
+    profili kararlarıyla kesinleşecektir.
+- Minimum failure-domain modeli: `KARAR VERİLDİ`
+  - Kapsamlı SRLG/risk-group modeli şimdilik seçilmedi.
+  - FailureDomain alanları:
+    - data_snapshot.
+    - code.
+    - name.
+    - domain_type:
+      - site.
+      - power_zone.
+      - fiber_route.
+    - description.
+  - Açık üyelik modelleri:
+    - DeviceFailureDomainMembership.
+    - NetworkLinkFailureDomainMembership.
+    - LineConnectionFailureDomainMembership.
+  - Bir cihaz, link veya hat birden fazla failure domain'e üye olabilir.
+  - Duplicate membership unique constraint ile engellenir.
+  - Snapshot tutarlılığı deterministic validation/model clean katmanında kontrol edilir.
+  - GenericForeignKey kullanılmaz.
+  - Failure-domain bilgisi metadata string alanlarına gömülmez.
+  - NetworkPort için şimdilik ayrı membership tablosu oluşturulmaz.
+  - access_node ve upstream_link, FailureDomain.domain_type yapılmaz; doğrudan
+    topolojiden karşılaştırılır.
+- Path-diversity değerlendirmesi: `KARAR VERİLDİ`
+  - Deterministic sınıflar:
+    - fully_diverse.
+    - partially_diverse.
+    - shared_risk.
+    - unknown.
+  - Karşılaştırılan kanıtlar:
+    - primary/backup access device.
+    - metro aggregation node.
+    - BNG dalı.
+    - upstream NetworkLink'ler.
+    - ortak site domain'i.
+    - ortak power_zone domain'i.
+    - ortak fiber_route domain'i.
+    - eksik failure-domain verisi.
+  - Ortak site, power_zone veya fiber_route varsa shared_risk döner.
+  - Aynı access node, aggregation node, upstream link veya BNG dalı tam çeşitlilik
+    sayılmaz.
+  - Failure-domain kayıtları eksikse sistem yanlış şekilde fully_diverse demez;
+    unknown veya partially_diverse üretir.
+  - Şimdilik bütün backup bağlantılarının fully_diverse olması zorunlu değildir.
+  - SLA modeli geldiğinde gereken çeşitlilik seviyesi pakete göre doğrulanacaktır.
+  - CustomerImpactService mevcut failover davranışını korur; path-diversity sonucunu
+    geriye uyumlu warning/evidence olarak kullanabilir.
+- Kapsam dışı/kalan kararlar:
+  - Failover geçiş süresi ve kısa degradation hesabı alarm/olay senaryolarında ele
+    alınacak.
+  - Büyük dataset seed'i henüz oluşturulmayacak.
+  - Gerçek backup SubscriptionConnection sayısı SLA/paket aşamasında kesinleşecek.
+  - Kapsamlı SRLG modeli post-MVP/ileri kurumsal SLA kapsamına bırakıldı.
 - Hâlâ karar bekleyen veri grupları:
   - Paket katalogu.
   - Farklı aylık ücretler, taahhüt süreleri ve SLA profilleri.

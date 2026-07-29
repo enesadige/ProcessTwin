@@ -255,6 +255,10 @@ def test_seed_maltepe_mvp_creates_expected_network_topology_counts():
         data_snapshot=snapshot,
         device_type=NetworkDeviceType.ACCESS_NODE,
     ).count() == 2
+    assert NetworkDevice.objects.filter(
+        data_snapshot=snapshot,
+        device_type=NetworkDeviceType.METRO_AGGREGATION,
+    ).count() == 0
     assert NetworkLink.objects.filter(data_snapshot=snapshot).count() == 12
     assert NetworkPort.objects.filter(data_snapshot=snapshot).count() == 177
     assert LineConnection.objects.filter(data_snapshot=snapshot, is_active=True).count() == 240

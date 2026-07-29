@@ -9,6 +9,7 @@ from apps.geography.models import City, District, Neighborhood
 
 class NetworkDeviceType(models.TextChoices):
     BNG = "bng", "BNG"
+    METRO_AGGREGATION = "metro_aggregation", "Metro aggregation"
     OLT = "olt", "OLT"
     DSLAM = "dslam", "DSLAM"
     ACCESS_NODE = "access_node", "Access node"
@@ -62,6 +63,12 @@ class LineConnectionStatus(models.TextChoices):
     PLANNED = "planned", "Planned"
     SUSPENDED = "suspended", "Suspended"
     TERMINATED = "terminated", "Terminated"
+
+
+class FailureDomainType(models.TextChoices):
+    SITE = "site", "Site"
+    POWER_ZONE = "power_zone", "Power zone"
+    FIBER_ROUTE = "fiber_route", "Fiber route"
 
 
 def validate_location_chain(
@@ -443,3 +450,174 @@ class NetworkLink(TimeStampedModel):
             errors["target_device"] = "Target device must belong to the same data snapshot."
         if errors:
             raise ValidationError(errors)
+
+
+class FailureDomain(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="failure_domains",
+    )
+    code = models.CharField(max_length=80)
+    name = models.CharField(max_length=160)
+    domain_type = models.CharField(max_length=24, choices=FailureDomainType.choices)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        db_table = "network_failure_domain"
+        ordering = ["data_snapshot", "domain_type", "code"]
+        verbose_name = "Arıza alanı"
+        verbose_name_plural = "Arıza alanları"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "code"],
+                name="unique_failure_domain_code_per_snapshot",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.code} ({self.get_domain_type_display()})"
+
+
+class DeviceFailureDomainMembership(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="device_failure_domain_memberships",
+    )
+    device = models.ForeignKey(
+        NetworkDevice,
+        on_delete=models.CASCADE,
+        related_name="failure_domain_memberships",
+    )
+    failure_domain = models.ForeignKey(
+        FailureDomain,
+        on_delete=models.CASCADE,
+        related_name="device_memberships",
+    )
+
+    class Meta:
+        db_table = "network_device_failure_domain_membership"
+        ordering = ["data_snapshot", "device__code", "failure_domain__code"]
+        verbose_name = "Cihaz arıza alanı üyeliği"
+        verbose_name_plural = "Cihaz arıza alanı üyelikleri"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "device", "failure_domain"],
+                name="unique_device_failure_domain_membership",
+            )
+        ]
+
+    def clean(self):
+        validate_failure_domain_membership_snapshot(
+            data_snapshot_id=self.data_snapshot_id,
+            member_snapshot_id=self.device.data_snapshot_id if self.device_id else None,
+            failure_domain_snapshot_id=(
+                self.failure_domain.data_snapshot_id if self.failure_domain_id else None
+            ),
+            member_field="device",
+        )
+
+
+class NetworkLinkFailureDomainMembership(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="network_link_failure_domain_memberships",
+    )
+    network_link = models.ForeignKey(
+        NetworkLink,
+        on_delete=models.CASCADE,
+        related_name="failure_domain_memberships",
+    )
+    failure_domain = models.ForeignKey(
+        FailureDomain,
+        on_delete=models.CASCADE,
+        related_name="network_link_memberships",
+    )
+
+    class Meta:
+        db_table = "network_link_failure_domain_membership"
+        ordering = ["data_snapshot", "network_link__link_code", "failure_domain__code"]
+        verbose_name = "Ağ bağlantısı arıza alanı üyeliği"
+        verbose_name_plural = "Ağ bağlantısı arıza alanı üyelikleri"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "network_link", "failure_domain"],
+                name="unique_network_link_failure_domain_membership",
+            )
+        ]
+
+    def clean(self):
+        validate_failure_domain_membership_snapshot(
+            data_snapshot_id=self.data_snapshot_id,
+            member_snapshot_id=(
+                self.network_link.data_snapshot_id if self.network_link_id else None
+            ),
+            failure_domain_snapshot_id=(
+                self.failure_domain.data_snapshot_id if self.failure_domain_id else None
+            ),
+            member_field="network_link",
+        )
+
+
+class LineConnectionFailureDomainMembership(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="line_connection_failure_domain_memberships",
+    )
+    line_connection = models.ForeignKey(
+        LineConnection,
+        on_delete=models.CASCADE,
+        related_name="failure_domain_memberships",
+    )
+    failure_domain = models.ForeignKey(
+        FailureDomain,
+        on_delete=models.CASCADE,
+        related_name="line_connection_memberships",
+    )
+
+    class Meta:
+        db_table = "network_line_connection_failure_domain_membership"
+        ordering = ["data_snapshot", "line_connection__line_code", "failure_domain__code"]
+        verbose_name = "Hat arıza alanı üyeliği"
+        verbose_name_plural = "Hat arıza alanı üyelikleri"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "line_connection", "failure_domain"],
+                name="unique_line_connection_failure_domain_membership",
+            )
+        ]
+
+    def clean(self):
+        validate_failure_domain_membership_snapshot(
+            data_snapshot_id=self.data_snapshot_id,
+            member_snapshot_id=(
+                self.line_connection.data_snapshot_id if self.line_connection_id else None
+            ),
+            failure_domain_snapshot_id=(
+                self.failure_domain.data_snapshot_id if self.failure_domain_id else None
+            ),
+            member_field="line_connection",
+        )
+
+
+def validate_failure_domain_membership_snapshot(
+    *,
+    data_snapshot_id: int | None,
+    member_snapshot_id: int | None,
+    failure_domain_snapshot_id: int | None,
+    member_field: str,
+) -> None:
+    errors: dict[str, str] = {}
+    if data_snapshot_id and member_snapshot_id and member_snapshot_id != data_snapshot_id:
+        errors[member_field] = "Membership target must belong to the same data snapshot."
+    if (
+        data_snapshot_id
+        and failure_domain_snapshot_id
+        and failure_domain_snapshot_id != data_snapshot_id
+    ):
+        errors["failure_domain"] = "Failure domain must belong to the same data snapshot."
+    if errors:
+        raise ValidationError(errors)

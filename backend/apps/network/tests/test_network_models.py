@@ -1,6 +1,9 @@
 from datetime import timedelta
 
 import pytest
+from data_generator.validators.topology_profiles import (
+    collect_realistic_multi_city_topology_profile,
+)
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -10,6 +13,9 @@ from apps.geography.models import AreaProfileType, City, District, Neighborhood
 from apps.network.models import (
     AccessSegment,
     AccessTechnology,
+    DeviceFailureDomainMembership,
+    FailureDomain,
+    FailureDomainType,
     LineConnection,
     LineConnectionStatus,
     NetworkDevice,
@@ -17,6 +23,7 @@ from apps.network.models import (
     NetworkDeviceStatus,
     NetworkDeviceType,
     NetworkLink,
+    NetworkLinkFailureDomainMembership,
     NetworkPort,
     NetworkPortType,
 )
@@ -105,6 +112,23 @@ def test_non_access_node_rejects_access_role():
 
 
 @pytest.mark.django_db
+def test_metro_aggregation_device_rejects_access_role():
+    snapshot = create_snapshot()
+    city, district, _neighborhood = create_maltepe_location()
+    device = NetworkDevice(
+        data_snapshot=snapshot,
+        code="MAGG-MAL-001",
+        device_type=NetworkDeviceType.METRO_AGGREGATION,
+        access_role=NetworkDeviceAccessRole.STANDARD_ACCESS,
+        city=city,
+        district=district,
+    )
+
+    with pytest.raises(ValidationError):
+        device.full_clean()
+
+
+@pytest.mark.django_db
 def test_access_node_can_store_corporate_fiber_aggregation_role():
     snapshot = create_snapshot()
     city, district, _neighborhood = create_maltepe_location()
@@ -118,6 +142,58 @@ def test_access_node_can_store_corporate_fiber_aggregation_role():
     )
 
     assert device.access_role == NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "target_type,target_access_role",
+    [
+        (NetworkDeviceType.OLT, None),
+        (NetworkDeviceType.DSLAM, None),
+        (NetworkDeviceType.ACCESS_NODE, NetworkDeviceAccessRole.STANDARD_ACCESS),
+    ],
+)
+def test_bng_to_aggregation_to_access_device_chain_is_valid(target_type, target_access_role):
+    snapshot = create_snapshot()
+    city, district, _neighborhood = create_maltepe_location()
+    bng = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="BNG-MAL-001",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+    aggregation = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="MAGG-MAL-001",
+        device_type=NetworkDeviceType.METRO_AGGREGATION,
+        city=city,
+        district=district,
+    )
+    target = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code=f"{target_type.upper()}-MAL-001",
+        device_type=target_type,
+        access_role=target_access_role,
+        city=city,
+        district=district,
+    )
+
+    first_link = NetworkLink(
+        data_snapshot=snapshot,
+        link_code="LINK-BNG-MAGG-001",
+        source_device=bng,
+        target_device=aggregation,
+    )
+    second_link = NetworkLink(
+        data_snapshot=snapshot,
+        link_code="LINK-MAGG-ACCESS-001",
+        source_device=aggregation,
+        target_device=target,
+    )
+
+    first_link.full_clean()
+    second_link.full_clean()
 
 
 @pytest.mark.django_db
@@ -229,6 +305,40 @@ def test_network_link_connects_two_different_devices():
                 source_device=bng,
                 target_device=bng,
             )
+
+
+@pytest.mark.django_db
+def test_realistic_multi_city_profile_reports_direct_bng_access_link():
+    snapshot = create_snapshot()
+    city, district, _neighborhood = create_maltepe_location()
+    bng = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="BNG-MAL-001",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+    olt = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="OLT-MAL-001",
+        device_type=NetworkDeviceType.OLT,
+        city=city,
+        district=district,
+    )
+    NetworkLink.objects.create(
+        data_snapshot=snapshot,
+        link_code="LINK-DIRECT-BNG-OLT-001",
+        source_device=bng,
+        target_device=olt,
+    )
+
+    result = collect_realistic_multi_city_topology_profile(snapshot)
+
+    assert result == {
+        "direct_bng_access_link_count": 1,
+        "direct_bng_access_link_codes": ["LINK-DIRECT-BNG-OLT-001"],
+        "passed": False,
+    }
 
 
 @pytest.mark.django_db
@@ -450,3 +560,97 @@ def test_line_connection_snapshot_consistency_is_validated():
 
     with pytest.raises(ValidationError):
         invalid_line.full_clean()
+
+
+@pytest.mark.django_db
+def test_device_can_join_multiple_failure_domains_and_duplicate_is_rejected():
+    snapshot = create_snapshot()
+    city, district, _neighborhood = create_maltepe_location()
+    device = NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="BNG-MAL-001",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+    site = FailureDomain.objects.create(
+        data_snapshot=snapshot,
+        code="SITE-MAL-001",
+        name="Maltepe site",
+        domain_type=FailureDomainType.SITE,
+    )
+    power_zone = FailureDomain.objects.create(
+        data_snapshot=snapshot,
+        code="PWR-MAL-001",
+        name="Maltepe power zone",
+        domain_type=FailureDomainType.POWER_ZONE,
+    )
+
+    DeviceFailureDomainMembership.objects.create(
+        data_snapshot=snapshot,
+        device=device,
+        failure_domain=site,
+    )
+    DeviceFailureDomainMembership.objects.create(
+        data_snapshot=snapshot,
+        device=device,
+        failure_domain=power_zone,
+    )
+
+    assert device.failure_domain_memberships.count() == 2
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            DeviceFailureDomainMembership.objects.create(
+                data_snapshot=snapshot,
+                device=device,
+                failure_domain=site,
+            )
+
+
+@pytest.mark.django_db
+def test_failure_domain_membership_snapshot_consistency_is_validated():
+    city, district, _neighborhood = create_maltepe_location()
+    first_snapshot = create_snapshot("first")
+    second_snapshot = create_snapshot("second")
+    bng = NetworkDevice.objects.create(
+        data_snapshot=first_snapshot,
+        code="BNG-MAL-001",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+    olt = NetworkDevice.objects.create(
+        data_snapshot=first_snapshot,
+        code="OLT-MAL-001",
+        device_type=NetworkDeviceType.OLT,
+        city=city,
+        district=district,
+    )
+    link = NetworkLink.objects.create(
+        data_snapshot=first_snapshot,
+        link_code="LINK-BNG-OLT-001",
+        source_device=bng,
+        target_device=olt,
+    )
+    failure_domain = FailureDomain.objects.create(
+        data_snapshot=second_snapshot,
+        code="SITE-OTHER-001",
+        name="Other site",
+        domain_type=FailureDomainType.SITE,
+    )
+
+    device_membership = DeviceFailureDomainMembership(
+        data_snapshot=first_snapshot,
+        device=bng,
+        failure_domain=failure_domain,
+    )
+    link_membership = NetworkLinkFailureDomainMembership(
+        data_snapshot=first_snapshot,
+        network_link=link,
+        failure_domain=failure_domain,
+    )
+
+    with pytest.raises(ValidationError):
+        device_membership.full_clean()
+    with pytest.raises(ValidationError):
+        link_membership.full_clean()

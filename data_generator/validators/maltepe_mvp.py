@@ -19,11 +19,15 @@ from apps.datasets.models import DataSnapshot, GroundTruthCase
 from apps.geography.models import Neighborhood
 from apps.network.models import (
     AccessSegment,
+    DeviceFailureDomainMembership,
+    FailureDomain,
     LineConnection,
+    LineConnectionFailureDomainMembership,
     NetworkDevice,
     NetworkDeviceAccessRole,
     NetworkDeviceType,
     NetworkLink,
+    NetworkLinkFailureDomainMembership,
     NetworkPort,
     NetworkPortStatus,
 )
@@ -136,6 +140,10 @@ def validate_maltepe_mvp_snapshot(snapshot: DataSnapshot) -> dict[str, Any]:
                 "line_connections": True,
                 "subscriptions": True,
                 "subscription_connections": True,
+                "failure_domains": True,
+                "device_failure_domain_memberships": True,
+                "network_link_failure_domain_memberships": True,
+                "line_connection_failure_domain_memberships": True,
             },
             actual=collect_snapshot_reference_integrity(snapshot),
         ),
@@ -390,6 +398,27 @@ def collect_snapshot_reference_integrity(snapshot: DataSnapshot) -> dict[str, bo
         )
         .exclude(subscription__data_snapshot=snapshot, line_connection__data_snapshot=snapshot)
         .exists(),
+        "failure_domains": not FailureDomain.objects.filter(data_snapshot=snapshot)
+        .exclude(data_snapshot=snapshot)
+        .exists(),
+        "device_failure_domain_memberships": not DeviceFailureDomainMembership.objects.filter(
+            data_snapshot=snapshot
+        )
+        .exclude(device__data_snapshot=snapshot, failure_domain__data_snapshot=snapshot)
+        .exists(),
+        "network_link_failure_domain_memberships": not (
+            NetworkLinkFailureDomainMembership.objects.filter(data_snapshot=snapshot)
+            .exclude(network_link__data_snapshot=snapshot, failure_domain__data_snapshot=snapshot)
+            .exists()
+        ),
+        "line_connection_failure_domain_memberships": not (
+            LineConnectionFailureDomainMembership.objects.filter(data_snapshot=snapshot)
+            .exclude(
+                line_connection__data_snapshot=snapshot,
+                failure_domain__data_snapshot=snapshot,
+            )
+            .exists()
+        ),
     }
 
 
