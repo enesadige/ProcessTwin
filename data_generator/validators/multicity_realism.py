@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from django.db.models import Count
+
+from apps.core.choices import ResultStatus
 from apps.customers.models import (
     Campaign,
     CampaignEnrollment,
@@ -18,9 +21,16 @@ from apps.customers.models import (
     SubscriptionConnectionRole,
     SubscriptionStatus,
 )
-from apps.datasets.models import DataSnapshot
+from apps.datasets.models import DatasetSnapshotStatus, DataSnapshot, GroundTruthCase
 from apps.geography.models import City, District
-from apps.network.models import LineConnection, NetworkDevice, NetworkLink, NetworkPort
+from apps.network.models import (
+    LineConnection,
+    NetworkDevice,
+    NetworkDeviceType,
+    NetworkLink,
+    NetworkPort,
+    NetworkPortStatus,
+)
 from apps.network.services.path_diversity import PathDiversityService
 from apps.operations.models import (
     Alarm,
@@ -30,13 +40,18 @@ from apps.operations.models import (
     OperationalEvent,
     Outage,
     QualityMeasurement,
+    ServiceImpactClass,
 )
 from apps.rules.models import Rule, RuleSet, RuleVersion
 from data_generator.configs import multi_city_realism_v1 as config
 from data_generator.configs import realistic_commercial_profile_v1 as commercial_config
 
 
-def validate_multicity_realism_snapshot(snapshot: DataSnapshot) -> dict[str, Any]:
+def validate_multicity_realism_snapshot(
+    snapshot: DataSnapshot,
+    *,
+    include_final_gate: bool = True,
+) -> dict[str, Any]:
     row_counts = collect_row_counts(snapshot)
     checks = [
         check(
@@ -75,6 +90,33 @@ def validate_multicity_realism_snapshot(snapshot: DataSnapshot) -> dict[str, Any
         check("maintenance_windows", 30, row_counts["maintenance_windows"]),
         check("operational_events", 900, row_counts["operational_events"]),
         check("quality_measurements", 12000, row_counts["quality_measurements"]),
+        check("snapshot_is_passive", False, snapshot.is_active),
+        check("active_snapshot_is_maltepe", True, collect_active_snapshot_is_maltepe(snapshot)),
+        check("topology_bng_only_to_aggregation", 0, collect_bad_bng_direct_access_links(snapshot)),
+        check(
+            "topology_access_devices_have_aggregation_parent",
+            0,
+            collect_access_devices_without_aggregation_parent(snapshot),
+        ),
+        check(
+            "service_port_capacity_totals",
+            {
+                "pon_total": 512,
+                "pon_active": 322,
+                "dsl_total": 9120,
+                "dsl_active": 6581,
+                "dedicated_fiber_total": 4032,
+                "reserved_backup_capacity": 261,
+            },
+            collect_service_port_capacity_totals(snapshot),
+        ),
+        check("reserved_ports_without_lines", 0, collect_reserved_port_line_count(snapshot)),
+        check("dsl_ports_over_capacity", 0, collect_non_gpon_ports_over_capacity(snapshot, "xdsl")),
+        check(
+            "dedicated_fiber_ports_over_capacity",
+            0,
+            collect_non_gpon_ports_over_capacity(snapshot, "dedicated_fiber"),
+        ),
         check(
             "customer_segments",
             commercial_config.DATASET_SCALE["segments"],
@@ -111,7 +153,10 @@ def validate_multicity_realism_snapshot(snapshot: DataSnapshot) -> dict[str, Any
         ),
         check("alarm_type_coverage", 30, collect_used_alarm_type_count(snapshot)),
         check("scenario_coverage", 22, collect_scenario_coverage(snapshot)),
-        check("active_snapshot_is_maltepe", True, collect_active_snapshot_is_maltepe(snapshot)),
+        check("degradation_incident_outages", 0, collect_non_outage_incident_outages(snapshot)),
+        check("noise_alarm_incidents", 0, collect_noise_incident_count(snapshot)),
+        check("duplicate_final_compensation", 0, collect_duplicate_final_compensation(snapshot)),
+        check("cross_snapshot_fk_errors", 0, collect_cross_snapshot_fk_errors(snapshot)),
     ]
     checks.append(
         check(
@@ -123,6 +168,18 @@ def validate_multicity_realism_snapshot(snapshot: DataSnapshot) -> dict[str, Any
     checks.append(
         check("path_diversity_service_errors", 0, collect_path_diversity_service_errors(snapshot))
     )
+    if include_final_gate:
+        checks.extend(
+            [
+                check("ground_truth_cases", 30, row_counts["ground_truth_cases"]),
+                check("snapshot_status", DatasetSnapshotStatus.VALIDATED, snapshot.status),
+                check(
+                    "snapshot_validation_status",
+                    ResultStatus.EXACT,
+                    snapshot.validation_status,
+                ),
+            ]
+        )
     return {
         "passed": all(item["passed"] for item in checks),
         "row_counts": row_counts,
@@ -160,6 +217,7 @@ def collect_row_counts(snapshot: DataSnapshot) -> dict[str, int]:
         "maintenance_windows": MaintenanceWindow.objects.filter(data_snapshot=snapshot).count(),
         "operational_events": OperationalEvent.objects.filter(data_snapshot=snapshot).count(),
         "quality_measurements": QualityMeasurement.objects.filter(data_snapshot=snapshot).count(),
+        "ground_truth_cases": GroundTruthCase.objects.filter(data_snapshot=snapshot).count(),
     }
 
 
@@ -272,6 +330,141 @@ def collect_scenario_coverage(snapshot: DataSnapshot) -> int:
 def collect_active_snapshot_is_maltepe(snapshot: DataSnapshot) -> bool:
     active = DataSnapshot.objects.filter(is_active=True).select_related("dataset_version").first()
     return bool(active and active.dataset_version.slug.startswith("maltepe-mvp"))
+
+
+def collect_bad_bng_direct_access_links(snapshot: DataSnapshot) -> int:
+    return (
+        NetworkLink.objects.filter(
+            data_snapshot=snapshot,
+            source_device__device_type=NetworkDeviceType.BNG,
+        )
+        .exclude(target_device__device_type=NetworkDeviceType.METRO_AGGREGATION)
+        .count()
+    )
+
+
+def collect_access_devices_without_aggregation_parent(snapshot: DataSnapshot) -> int:
+    return (
+        NetworkDevice.objects.filter(
+            data_snapshot=snapshot,
+            device_type__in=[
+                NetworkDeviceType.OLT,
+                NetworkDeviceType.DSLAM,
+                NetworkDeviceType.ACCESS_NODE,
+            ],
+        )
+        .exclude(
+            incoming_links__data_snapshot=snapshot,
+            incoming_links__source_device__device_type=NetworkDeviceType.METRO_AGGREGATION,
+        )
+        .count()
+    )
+
+
+def collect_service_port_capacity_totals(snapshot: DataSnapshot) -> dict[str, int]:
+    ports = NetworkPort.objects.filter(data_snapshot=snapshot)
+    return {
+        "pon_total": ports.filter(metadata__service_port_role="gpon_pon").count(),
+        "pon_active": ports.filter(
+            metadata__service_port_role="gpon_pon",
+            inventory_status=NetworkPortStatus.ACTIVE,
+        ).count(),
+        "dsl_total": ports.filter(metadata__service_port_role="xdsl").count(),
+        "dsl_active": ports.filter(
+            metadata__service_port_role="xdsl",
+            inventory_status=NetworkPortStatus.ACTIVE,
+        ).count(),
+        "dedicated_fiber_total": ports.filter(
+            metadata__service_port_role="dedicated_fiber"
+        ).count(),
+        "reserved_backup_capacity": ports.filter(
+            metadata__service_port_role="dedicated_fiber",
+            metadata__reserved_backup_capacity=True,
+        ).count(),
+    }
+
+
+def collect_reserved_port_line_count(snapshot: DataSnapshot) -> int:
+    return LineConnection.objects.filter(
+        data_snapshot=snapshot,
+        port__inventory_status=NetworkPortStatus.RESERVED,
+    ).count()
+
+
+def collect_non_gpon_ports_over_capacity(snapshot: DataSnapshot, service_port_role: str) -> int:
+    return (
+        NetworkPort.objects.filter(
+            data_snapshot=snapshot,
+            metadata__service_port_role=service_port_role,
+        )
+        .annotate(line_count=Count("line_connections"))
+        .filter(line_count__gt=1)
+        .count()
+    )
+
+
+def collect_non_outage_incident_outages(snapshot: DataSnapshot) -> int:
+    return Incident.objects.filter(
+        data_snapshot=snapshot,
+        service_impact_class__in=[
+            ServiceImpactClass.DEGRADATION,
+            ServiceImpactClass.PROTECTION_LOSS,
+        ],
+        outages__isnull=False,
+    ).count()
+
+
+def collect_noise_incident_count(snapshot: DataSnapshot) -> int:
+    return Incident.objects.filter(
+        data_snapshot=snapshot,
+        metadata__scenario_code="SCN-NOISE-001",
+    ).count()
+
+
+def collect_duplicate_final_compensation(snapshot: DataSnapshot) -> int:
+    duplicates = (
+        CompensationHistory.objects.filter(
+            data_snapshot=snapshot,
+            incident__isnull=False,
+            compensation_conflict_group__gt="",
+            decision_status__in=["approved", "rejected"],
+        )
+        .values("subscription_id", "incident_id", "compensation_conflict_group")
+        .annotate(total=Count("id"))
+        .filter(total__gt=1)
+    )
+    return duplicates.count()
+
+
+def collect_cross_snapshot_fk_errors(snapshot: DataSnapshot) -> int:
+    return sum(
+        [
+            NetworkLink.objects.filter(data_snapshot=snapshot)
+            .exclude(source_device__data_snapshot=snapshot, target_device__data_snapshot=snapshot)
+            .count(),
+            NetworkPort.objects.filter(data_snapshot=snapshot)
+            .exclude(device__data_snapshot=snapshot)
+            .count(),
+            LineConnection.objects.filter(data_snapshot=snapshot)
+            .exclude(port__data_snapshot=snapshot, access_segment__data_snapshot=snapshot)
+            .count(),
+            Subscription.objects.filter(data_snapshot=snapshot)
+            .exclude(
+                customer__data_snapshot=snapshot,
+                service_package__data_snapshot=snapshot,
+            )
+            .count(),
+            SubscriptionConnection.objects.filter(data_snapshot=snapshot)
+            .exclude(subscription__data_snapshot=snapshot, line_connection__data_snapshot=snapshot)
+            .count(),
+            Alarm.objects.filter(data_snapshot=snapshot)
+            .exclude(alarm_type__data_snapshot=snapshot)
+            .count(),
+            Outage.objects.filter(data_snapshot=snapshot)
+            .exclude(source_device__data_snapshot=snapshot, incident__data_snapshot=snapshot)
+            .count(),
+        ]
+    )
 
 
 def collect_path_diversity(snapshot: DataSnapshot) -> dict[str, int]:

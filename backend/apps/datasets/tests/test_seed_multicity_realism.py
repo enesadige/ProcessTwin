@@ -17,7 +17,7 @@ def test_seed_multicity_realism_creates_passive_snapshot_without_large_fixture(m
             "quality_measurements": 12000,
         }
 
-    def fake_validate(snapshot):
+    def fake_validate(snapshot, **kwargs):
         return {
             "passed": True,
             "row_counts": {"subscriptions": 16200},
@@ -59,7 +59,7 @@ def test_seed_multicity_realism_second_run_validates_without_duplicates(monkeypa
             "quality_measurements": 12000,
         }
 
-    def fake_validate(snapshot):
+    def fake_validate(snapshot, **kwargs):
         return {
             "passed": True,
             "row_counts": {"subscriptions": 16200},
@@ -88,7 +88,7 @@ def test_seed_multicity_realism_rolls_back_on_validation_failure(monkeypatch):
     def fake_seed(*, snapshot, batch_size):
         return {"customers": 0, "subscriptions": 0, "alarms": 0, "quality_measurements": 0}
 
-    def fake_validate(snapshot):
+    def fake_validate(snapshot, **kwargs):
         return {
             "passed": False,
             "row_counts": {},

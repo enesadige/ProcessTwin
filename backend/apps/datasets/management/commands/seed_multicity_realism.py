@@ -106,7 +106,7 @@ class Command(BaseCommand):
                 snapshot=snapshot,
                 batch_size=batch_size,
             )
-            report = validate_multicity_realism_snapshot(snapshot)
+            report = validate_multicity_realism_snapshot(snapshot, include_final_gate=False)
             if not report["passed"]:
                 raise CommandError(format_failed_checks(report))
             snapshot.status = DatasetSnapshotStatus.VALIDATED

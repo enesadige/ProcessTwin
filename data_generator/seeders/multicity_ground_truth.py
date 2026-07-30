@@ -10,7 +10,13 @@ from django.db.models import Q
 
 from apps.customers.models import Customer, Subscription, SubscriptionConnection
 from apps.datasets.models import DataSnapshot, GroundTruthCase, GroundTruthEligibility
-from apps.network.models import LineConnectionStatus, NetworkLink, NetworkPortStatus
+from apps.network.models import (
+    LineConnection,
+    LineConnectionStatus,
+    NetworkLink,
+    NetworkPort,
+    NetworkPortStatus,
+)
 from apps.operations.models import Incident, Outage
 from data_generator.configs import multicity_ground_truth_v1 as config
 
@@ -137,17 +143,30 @@ def collect_oracle_affected_subscriptions(
     device_ids = collect_descendant_device_ids(
         snapshot=snapshot, source_device_id=outage.source_device_id
     )
-    connections = (
+    port_ids = list(
+        NetworkPort.objects.filter(
+            data_snapshot=snapshot,
+            device_id__in=device_ids,
+            inventory_status=NetworkPortStatus.ACTIVE,
+        ).values_list("id", flat=True)
+    )
+    line_ids = list(
+        LineConnection.objects.filter(
+            data_snapshot=snapshot,
+            is_active=True,
+            status=LineConnectionStatus.ACTIVE,
+            port_id__in=port_ids,
+        )
+        .filter(valid_from__lt=outage.ended_at)
+        .filter(Q(valid_to__isnull=True) | Q(valid_to__gt=outage.started_at))
+        .values_list("id", flat=True)
+    )
+    subscription_ids = list(
         SubscriptionConnection.objects.filter(
             data_snapshot=snapshot,
             is_active=True,
             connection_role="primary",
-            line_connection__data_snapshot=snapshot,
-            line_connection__is_active=True,
-            line_connection__status=LineConnectionStatus.ACTIVE,
-            line_connection__port__data_snapshot=snapshot,
-            line_connection__port__inventory_status=NetworkPortStatus.ACTIVE,
-            line_connection__port__device_id__in=device_ids,
+            line_connection_id__in=line_ids,
             subscription__data_snapshot=snapshot,
             subscription__is_active=True,
             subscription__status="active",
@@ -159,15 +178,40 @@ def collect_oracle_affected_subscriptions(
         .filter(
             Q(subscription__valid_to__isnull=True) | Q(subscription__valid_to__gt=outage.started_at)
         )
+        .values_list("subscription_id", flat=True)
+    )
+    backup_protected_ids = set(
+        SubscriptionConnection.objects.filter(
+            data_snapshot=snapshot,
+            is_active=True,
+            connection_role="backup",
+            subscription_id__in=subscription_ids,
+            line_connection__data_snapshot=snapshot,
+            line_connection__is_active=True,
+            line_connection__status=LineConnectionStatus.ACTIVE,
+            line_connection__port__data_snapshot=snapshot,
+            line_connection__port__inventory_status=NetworkPortStatus.ACTIVE,
+        )
+        .exclude(line_connection__port__device_id__in=device_ids)
+        .filter(valid_from__lt=outage.ended_at)
+        .filter(Q(valid_to__isnull=True) | Q(valid_to__gt=outage.started_at))
         .filter(line_connection__valid_from__lt=outage.ended_at)
         .filter(
             Q(line_connection__valid_to__isnull=True)
             | Q(line_connection__valid_to__gt=outage.started_at)
         )
-        .select_related("subscription", "subscription__customer", "subscription__service_package")
-        .order_by("subscription__subscription_number")
+        .values_list("subscription_id", flat=True)
     )
-    return [connection.subscription for connection in connections]
+    impacted_subscription_ids = [
+        subscription_id
+        for subscription_id in subscription_ids
+        if subscription_id not in backup_protected_ids
+    ]
+    return list(
+        Subscription.objects.filter(id__in=impacted_subscription_ids)
+        .select_related("customer", "service_package")
+        .order_by("subscription_number")
+    )
 
 
 def collect_descendant_device_ids(*, snapshot: DataSnapshot, source_device_id: int) -> set[int]:

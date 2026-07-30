@@ -687,10 +687,19 @@ def seed_ports(
     rows: list[NetworkPort] = []
     active_pon_remaining = config.NETWORK_TARGETS["active_pon_ports"]
     active_dsl_remaining = config.NETWORK_TARGETS["active_dsl_ports"]
-    dedicated_used_capacity = (
-        2042 + commercial_config.BACKUP_DISTRIBUTION["reserved_backup_port_capacity"]
+    reserved_backup_capacity = commercial_config.BACKUP_DISTRIBUTION[
+        "reserved_backup_port_capacity"
+    ]
+    corporate_port_total = (
+        sum(
+            1
+            for device in devices.values()
+            if device.device_type == NetworkDeviceType.ACCESS_NODE
+            and device.access_role == NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION
+        )
+        * 48
     )
-    dedicated_used_remaining = dedicated_used_capacity
+    corporate_port_index = 0
     for device in sorted(devices.values(), key=lambda item: item.code):
         if device.device_type == NetworkDeviceType.OLT:
             for index in range(1, 17):
@@ -728,8 +737,20 @@ def seed_ports(
                 )
         elif device.device_type == NetworkDeviceType.ACCESS_NODE:
             for index in range(1, 49):
-                planned = dedicated_used_remaining > 0
-                dedicated_used_remaining -= 1 if planned else 0
+                reserved_backup_capacity_port = False
+                active = True
+                if (
+                    device.access_role
+                    == NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION
+                ):
+                    corporate_port_index += 1
+                    reserved_backup_capacity_port = (
+                        corporate_port_index * reserved_backup_capacity
+                    ) // corporate_port_total > (
+                        (corporate_port_index - 1) * reserved_backup_capacity
+                    ) // corporate_port_total
+                    if reserved_backup_capacity_port:
+                        active = True
                 rows.append(
                     NetworkPort(
                         data_snapshot=snapshot,
@@ -737,12 +758,12 @@ def seed_ports(
                         port_code=f"ETH-{index:03d}",
                         port_type=NetworkPortType.CUSTOMER,
                         inventory_status=NetworkPortStatus.ACTIVE
-                        if planned
+                        if active
                         else NetworkPortStatus.RESERVED,
                         capacity_mbps=10000,
                         metadata={
                             "service_port_role": "dedicated_fiber",
-                            "reserved_backup_capacity": index > 40,
+                            "reserved_backup_capacity": reserved_backup_capacity_port,
                             "synthetic": True,
                         },
                     )
@@ -919,12 +940,22 @@ def seed_subscriptions_and_lines(
         "fiber_standard": deque(
             p
             for p in ports_by_role["dedicated_fiber"]
-            if p.device.access_role == NetworkDeviceAccessRole.STANDARD_ACCESS
+            if p.inventory_status == NetworkPortStatus.ACTIVE
+            and p.device.access_role == NetworkDeviceAccessRole.STANDARD_ACCESS
         ),
         "fiber_corporate": deque(
             p
             for p in ports_by_role["dedicated_fiber"]
-            if p.device.access_role == NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION
+            if p.inventory_status == NetworkPortStatus.ACTIVE
+            and p.device.access_role == NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION
+            and not p.metadata.get("reserved_backup_capacity", False)
+        ),
+        "fiber_corporate_backup": deque(
+            p
+            for p in ports_by_role["dedicated_fiber"]
+            if p.inventory_status == NetworkPortStatus.ACTIVE
+            and p.device.access_role == NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION
+            and p.metadata.get("reserved_backup_capacity", False)
         ),
     }
     used_dsl_port_ids: set[int] = set()
@@ -1213,7 +1244,9 @@ def pop_port_for_plan(plan, port_queues, used_dsl_port_ids, used_fiber_port_ids)
 
 def select_backup_plans(subscription_plans: list[dict]) -> list[dict]:
     targets = commercial_config.BACKUP_DISTRIBUTION["by_district"]
-    diversity_values = expand_counts(commercial_config.BACKUP_DISTRIBUTION["actual_path_diversity"])
+    diversity_values = interleave_count_values(
+        commercial_config.BACKUP_DISTRIBUTION["actual_path_diversity"]
+    )
     diversity_iter = iter(diversity_values)
     selected = []
     for district_name, count in targets.items():
@@ -1230,8 +1263,20 @@ def select_backup_plans(subscription_plans: list[dict]) -> list[dict]:
     return selected
 
 
+def interleave_count_values(counts: dict[str, int]) -> list[str]:
+    remaining = dict(counts)
+    values: list[str] = []
+    while any(value > 0 for value in remaining.values()):
+        for key in counts:
+            if remaining[key] <= 0:
+                continue
+            values.append(key)
+            remaining[key] -= 1
+    return values
+
+
 def pop_backup_port_for_plan(plan, port_queues, used_fiber_port_ids, backup_index) -> NetworkPort:
-    queue = port_queues["fiber_corporate"]
+    queue = port_queues["fiber_corporate_backup"]
     primary_device_id = plan["primary_port"].device_id
     primary_signature = collect_device_path_signature(plan["primary_port"].device)
 

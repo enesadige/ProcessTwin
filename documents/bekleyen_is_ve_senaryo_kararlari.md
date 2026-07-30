@@ -1881,11 +1881,19 @@ Durum: `KARAR VERİLDİ`
 
 ### 8.9 Validator ve RAG Karar Kapısı
 
-Durum: `KARAR BEKLİYOR`
+Durum: `KARAR VERİLDİ`
 
 - Genişletilmiş dataset için config-driven validator yaklaşımı.
 - Row count, dağılım, topoloji, alarm, outage, payment, campaign, rule ve ground truth
   kontrolleri.
+- 039.5 multi-city synthetic realism v1 final gate sonucu: `PASS`.
+- `multi-city-realism-v1` passive ve `validated/exact` snapshot olarak korunur.
+- Maltepe MVP snapshot aktif regression/demo dataset'i olarak kalır.
+- Coğrafya, topoloji, müşteri, paket, SLA, alarm, olay ve iş kuralı kararları
+  baseline olarak dondurulmuştur.
+- Sonraki görevler bu temeli tüketir.
+- Gerekçesiz veya sessiz domain değişikliği yapılamaz.
+- Gerekli değişiklikler ayrı change note ve regression testiyle yapılır.
 - RAG kararları:
   - hangi prosedür ve politika dokümanları kullanılacak
   - gerçek kurum dokümanı mı, sentetik doküman mı
