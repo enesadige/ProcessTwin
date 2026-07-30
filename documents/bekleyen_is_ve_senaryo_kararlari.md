@@ -1776,13 +1776,28 @@ Durum: `KARAR VERİLDİ`
 
 ### 8.6 Genişletilmiş Seed Generator
 
-Durum: `KARAR BEKLİYOR`
+Durum: `KARAR VERİLDİ`
 
-- Genişletilmiş dataset ayrı config/generator version olarak mı üretilecek?
-- Mevcut Maltepe MVP seed'i nasıl korunacak?
-- Reset, activate, reference datetime ve transaction atomic davranışları nasıl
-  sürdürülecek?
-- Deterministik business code formatları şehir/ilçe genişlemesinde nasıl olacak?
+- Büyük gerçekçi dataset, Maltepe MVP regression dataset'inden ayrı tutulur.
+- Dataset slug: `multi-city-realism-v1`
+- Snapshot: `Multi-city Realism Snapshot v1`
+- Reference datetime: `2026-08-01T00:00:00+03:00`
+- Seed varsayılan olarak yeni snapshot'ı aktif etmez; Maltepe MVP active kalır.
+- `--reset` yalnız `multi-city-realism-v1` dataset ağacını siler.
+- `--validate-only` mevcut snapshot'ı DB sorgularıyla doğrular.
+- Tekrar çalıştırma duplicate üretmez; mevcut dataset valid ise yeniden seed yapmadan çıkar.
+- Transaction rollback davranışı korunur.
+- Büyük seed şu hacimleri üretir:
+  - 4 şehir, 12 ilçe, 59 mahalle
+  - 235 cihaz, 245 NetworkLink
+  - 14.400 müşteri, 16.200 abonelik
+  - 16.027 primary ve 208 backup SubscriptionConnection
+  - 27 ServicePackage, 5 SLAProfile, 10 Campaign
+  - 59.600 PaymentRecord, 4.050 CampaignEnrollment, 1.100 CompensationHistory
+  - `SYN-COMP-2026` v1 RuleSet, 25 Rule, 25 RuleVersion
+  - 30 AlarmType, 2.100 Alarm, 210 Incident, 78 Outage
+  - 30 MaintenanceWindow, 900 OperationalEvent, 12.000 QualityMeasurement
+- 039.5.7 final ground truth kayıtları bu görevde üretilmez.
 
 ### 8.7 Genişletilmiş Ground Truth
 
