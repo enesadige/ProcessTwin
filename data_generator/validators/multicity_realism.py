@@ -275,12 +275,27 @@ def collect_active_snapshot_is_maltepe(snapshot: DataSnapshot) -> bool:
 
 
 def collect_path_diversity(snapshot: DataSnapshot) -> dict[str, int]:
-    counts = Counter(
+    service = PathDiversityService()
+    counts: Counter[str] = Counter()
+    for backup in (
         SubscriptionConnection.objects.filter(
             data_snapshot=snapshot,
             connection_role=SubscriptionConnectionRole.BACKUP,
-        ).values_list("metadata__target_diversity", flat=True)
-    )
+        )
+        .select_related("subscription", "line_connection")
+        .order_by("subscription__subscription_number")
+    ):
+        primary = SubscriptionConnection.objects.get(
+            data_snapshot=snapshot,
+            subscription=backup.subscription,
+            connection_role=SubscriptionConnectionRole.PRIMARY,
+        )
+        result = service.evaluate(
+            primary_line=primary.line_connection,
+            backup_line=backup.line_connection,
+            snapshot=snapshot,
+        )
+        counts[result.classification] += 1
     return {
         key: counts.get(key, 0)
         for key in commercial_config.BACKUP_DISTRIBUTION["actual_path_diversity"]

@@ -1811,22 +1811,48 @@ Durum: `KARAR VERİLDİ`
 
 ### 8.7 Genişletilmiş Ground Truth
 
-Durum: `KARAR BEKLİYOR`
+Durum: `KARAR VERİLDİ`
 
-- Pozitif telafi senaryoları.
-- Negatif telafi senaryoları.
-- Eşik altı, eşik ve eşik üstü senaryolar.
-- Partial outage.
-- Degradation.
-- Tekrar eden kesinti.
-- Alarm gürültüsü ve yanlış korelasyon adayları.
-- Cross-snapshot kayıtlar.
-- Eksik veri / manual review.
-- VIP, segment, kampanya ve ödeme farklılıkları.
-- Bir müşterinin birden fazla aboneliği.
-- Farklı RuleVersion seçimi.
-- Her senaryo için root cause, affected setler, rule version, eligibility, reason code,
-  telafi tutarı ve evidence beklentileri.
+- `multi-city-realism-v1` snapshot'ı için 30 deterministik ground-truth vaka
+  oluşturulur.
+- Vakalar şu kategorileri kapsar:
+  - network_operation
+  - rule_compensation
+  - path_diversity
+  - noise
+  - maintenance
+  - manual_review
+  - duplicate
+- Her vaka config içinde sabit beklentileri taşır:
+  - case code
+  - scenario referansı
+  - incident/outage/subscription girdileri
+  - beklenen root cause
+  - incident type
+  - impact class
+  - affected customer/subscription count
+  - outage oluşup oluşmaması
+  - selected rule
+  - decision
+  - exact amount
+  - modifier/cap
+  - manual review reason
+  - evidence alanları
+- Beklenen değerler production servis çıktılarından otomatik kopyalanmaz.
+- Ground truth seed'i mevcut `GroundTruthCase` modeliyle yapılır; gereksiz yeni
+  model veya migration eklenmez.
+- Doğrulama komutu:
+  - `validate_multicity_ground_truth`
+  - `--case-code`
+  - `--json`
+- Path-diversity dağılımı metadata label'ı yerine `PathDiversityService` sonucu
+  ile doğrulanır:
+  - fully_diverse: 112
+  - partially_diverse: 60
+  - shared_risk: 24
+  - unknown: 12
+- Noise alarm tek başına incident oluşturmaz.
+- Maltepe MVP ground truth ve REFUND-001 regression sonucu değişmez.
 
 ### 8.8 Deterministik Servis Uyarlamaları
 

@@ -1233,6 +1233,30 @@ def select_backup_plans(subscription_plans: list[dict]) -> list[dict]:
 def pop_backup_port_for_plan(plan, port_queues, used_fiber_port_ids, backup_index) -> NetworkPort:
     queue = port_queues["fiber_corporate"]
     primary_device_id = plan["primary_port"].device_id
+    primary_signature = collect_device_path_signature(plan["primary_port"].device)
+
+    def port_matches_target(port: NetworkPort) -> bool:
+        if port.id in used_fiber_port_ids:
+            return False
+        if port.device_id == primary_device_id:
+            return plan["backup_diversity"] == "partially_diverse"
+        signature = collect_device_path_signature(port.device)
+        shares_aggregation = bool(
+            primary_signature["aggregation_ids"] & signature["aggregation_ids"]
+        )
+        shares_bng = bool(primary_signature["bng_ids"] & signature["bng_ids"])
+        if plan["backup_diversity"] == "partially_diverse":
+            return shares_aggregation or shares_bng
+        return not shares_aggregation and not shares_bng
+
+    for port in list(queue):
+        if port_matches_target(port):
+            queue.remove(port)
+            used_fiber_port_ids.add(port.id)
+            return port
+
+    # Keep generation deterministic if a district exhausts the ideal backup pool.
+    # The validator catches any resulting path-diversity drift.
     if plan["backup_diversity"] == "partially_diverse":
         for port in list(queue):
             if port.id not in used_fiber_port_ids and port.device_id == primary_device_id:
@@ -1251,6 +1275,41 @@ def pop_backup_port_for_plan(plan, port_queues, used_fiber_port_ids, backup_inde
         used_fiber_port_ids.add(port.id)
         return port
     raise ValueError("No backup fiber port left")
+
+
+def collect_device_path_signature(device) -> dict[str, set[int]]:
+    links_by_id: dict[int, NetworkLink] = {}
+    visited_device_ids: set[int] = set()
+    visiting_device_ids: set[int] = set()
+
+    def walk(current) -> None:
+        if current.id in visiting_device_ids or current.id in visited_device_ids:
+            return
+        visiting_device_ids.add(current.id)
+        incoming_links = NetworkLink.objects.filter(
+            data_snapshot=device.data_snapshot,
+            target_device=current,
+        ).select_related("source_device")
+        for link in incoming_links:
+            links_by_id[link.id] = link
+            walk(link.source_device)
+        visiting_device_ids.remove(current.id)
+        visited_device_ids.add(current.id)
+
+    walk(device)
+    upstream_devices = {link.source_device for link in links_by_id.values()}
+    return {
+        "aggregation_ids": {
+            upstream.id
+            for upstream in upstream_devices
+            if upstream.device_type == NetworkDeviceType.METRO_AGGREGATION
+        },
+        "bng_ids": {
+            upstream.id
+            for upstream in upstream_devices
+            if upstream.device_type == NetworkDeviceType.BNG
+        },
+    }
 
 
 def seed_line_failure_domains(
@@ -1376,7 +1435,12 @@ def seed_timeline(
     )
     failure_domain_pool = list(failure_domains.values())
     sub_conn_pool = primary_connections[:600] + backup_connections
-    scenario_cycle = cycle(alarm_config.SCENARIO_TEMPLATES)
+    incident_scenarios = [
+        scenario
+        for scenario in alarm_config.SCENARIO_TEMPLATES
+        if scenario.get("creates_incident", True)
+    ]
+    scenario_cycle = cycle(incident_scenarios)
 
     incident_rows = []
     impact_plan = (
