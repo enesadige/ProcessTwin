@@ -6,7 +6,7 @@ from django.utils import timezone
 
 from apps.datasets.management.commands.seed_maltepe_mvp import get_target_dataset_slug
 from apps.datasets.models import DatasetVersion, DataSnapshot
-from apps.network.models import NetworkDevice
+from apps.network.models import NetworkDevice, NetworkLink
 from apps.operations.models import (
     Alarm,
     AlarmCategory,
@@ -157,6 +157,60 @@ def test_root_cause_service_can_rank_same_bng_branch_candidate_as_probable():
     ]
     assert results[0].evidence_score == 55
     assert results[0].classification == "probable"
+
+
+@pytest.mark.django_db
+def test_root_cause_service_handles_candidate_with_multiple_bng_branches():
+    snapshot = seed_snapshot()
+    NetworkLink.objects.create(
+        data_snapshot=snapshot,
+        link_code="LINK-RCA-MULTI-BNG2-OLT",
+        source_device=NetworkDevice.objects.get(data_snapshot=snapshot, code="BNG-MAL-002"),
+        target_device=NetworkDevice.objects.get(data_snapshot=snapshot, code="OLT-MAL-ALT-001"),
+        capacity_mbps=10000,
+    )
+    source_device = NetworkDevice.objects.get(data_snapshot=snapshot, code="DSLAM-MAL-ZUM-001")
+    started_at = timezone.datetime(
+        2026,
+        7,
+        20,
+        15,
+        30,
+        tzinfo=timezone.get_current_timezone(),
+    )
+    outage = Outage.objects.create(
+        data_snapshot=snapshot,
+        outage_code="OUT-RCA-MULTI-BRANCH",
+        source_device=source_device,
+        outage_type=OutageType.DEVICE,
+        status=OutageStatus.OPEN,
+        detected_at=started_at,
+        started_at=started_at,
+        ended_at=started_at + timedelta(minutes=45),
+    )
+    create_alarm(
+        snapshot=snapshot,
+        alarm_id="ALM-RCA-MULTI-BRANCH-ACCESS",
+        alarm_type_code="ACCESS_DEVICE_UNREACHABLE",
+        device_code="OLT-MAL-ALT-001",
+        detected_at=started_at + timedelta(minutes=2),
+    )
+    create_alarm(
+        snapshot=snapshot,
+        alarm_id="ALM-RCA-MULTI-BRANCH-LINK",
+        alarm_type_code="LINK_DOWN",
+        device_code="OLT-MAL-ALT-001",
+        detected_at=started_at + timedelta(minutes=2),
+    )
+
+    results = RootCauseService().analyze(outage=outage, snapshot=snapshot)
+    candidate = next(
+        result for result in results if result.candidate_device_code == "OLT-MAL-ALT-001"
+    )
+
+    assert candidate.evidence_score == 50
+    assert candidate.classification == "probable"
+    assert candidate.evidence[3]["relation"] == "same_bng_branch"
 
 
 @pytest.mark.django_db

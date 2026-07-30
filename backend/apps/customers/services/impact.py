@@ -308,15 +308,17 @@ class CustomerImpactService:
                     "device_code": primary_device.code,
                 }
             )
-        primary_upstream = self._get_single_upstream_link_code(primary_device)
-        backup_upstream = self._get_single_upstream_link_code(backup_device)
-        if primary_upstream and primary_upstream == backup_upstream:
+        shared_upstream_links = (
+            self._get_upstream_link_codes(primary_device)
+            & self._get_upstream_link_codes(backup_device)
+        )
+        if shared_upstream_links:
             warnings.append(
                 {
                     "code": "shared_upstream_link",
                     "subscription_code": primary.subscription.subscription_number,
                     "message": "Primary and backup paths share the same upstream link.",
-                    "link_code": primary_upstream,
+                    "link_code": ",".join(sorted(shared_upstream_links)),
                 }
             )
         diversity = self.path_diversity_service.evaluate(
@@ -338,15 +340,13 @@ class CustomerImpactService:
             )
         return warnings
 
-    def _get_single_upstream_link_code(self, device) -> str:
-        incoming_links = list(
-            device.incoming_links.filter(data_snapshot=device.data_snapshot).order_by(
-                "link_code"
+    def _get_upstream_link_codes(self, device) -> set[str]:
+        return set(
+            device.incoming_links.filter(data_snapshot=device.data_snapshot).values_list(
+                "link_code",
+                flat=True,
             )
         )
-        if len(incoming_links) != 1:
-            return ""
-        return incoming_links[0].link_code
 
 
 def normalize_counter(counter: Counter) -> dict[str, int]:

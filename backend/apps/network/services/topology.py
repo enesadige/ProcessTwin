@@ -52,12 +52,10 @@ class NetworkTopologyService:
         evaluation_time=None,
     ) -> list[NetworkDevice]:
         self._validate_inputs(device=device, snapshot=snapshot, evaluation_time=evaluation_time)
-        ancestors: list[NetworkDevice] = []
-        visited_device_ids = {device.id}
-        current = device
+        ancestors_by_id: dict[int, tuple[NetworkDevice, int]] = {}
 
-        while True:
-            parent_links = list(
+        def walk(current: NetworkDevice, path_device_ids: set[int], depth: int) -> None:
+            parent_links = (
                 NetworkLink.objects.filter(
                     data_snapshot=snapshot,
                     target_device=current,
@@ -65,21 +63,25 @@ class NetworkTopologyService:
                 .select_related("source_device")
                 .order_by("source_device__code", "link_code")
             )
-            if not parent_links:
-                return ancestors
-            if len(parent_links) > 1:
-                raise NetworkTopologyInputError(
-                    f"Device {current.code} has multiple parent links in snapshot "
-                    f"{snapshot.snapshot_key}."
-                )
-            parent = parent_links[0].source_device
-            if parent.id in visited_device_ids:
-                raise NetworkTopologyCycleError(
-                    f"Topology cycle detected while resolving ancestors for {device.code}."
-                )
-            ancestors.append(parent)
-            visited_device_ids.add(parent.id)
-            current = parent
+            for link in parent_links:
+                parent = link.source_device
+                if parent.id in path_device_ids:
+                    raise NetworkTopologyCycleError(
+                        f"Topology cycle detected while resolving ancestors for {device.code}."
+                    )
+                existing = ancestors_by_id.get(parent.id)
+                if existing is None or depth < existing[1]:
+                    ancestors_by_id[parent.id] = (parent, depth)
+                walk(parent, {*path_device_ids, parent.id}, depth + 1)
+
+        walk(device, {device.id}, 1)
+        return [
+            item[0]
+            for item in sorted(
+                ancestors_by_id.values(),
+                key=lambda item: (item[1], item[0].code),
+            )
+        ]
 
     def get_subgraph(
         self,

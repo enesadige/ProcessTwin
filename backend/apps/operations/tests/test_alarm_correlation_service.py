@@ -58,11 +58,12 @@ def test_alarm_correlation_links_main_bng_unreachable_and_link_down_without_inci
 def test_alarm_correlation_does_not_correlate_other_bng_branch_seed_alarm():
     snapshot = seed_snapshot()
     anchor = get_alarm(snapshot, "ALM-OUT-MAL-BNG-001-PRIMARY")
+    candidate = get_alarm(snapshot, "ALM-OUT-MAL-OLT-001-PRIMARY")
 
-    result = get_candidate_result(
-        anchor,
-        "ALM-OUT-MAL-OLT-001-PRIMARY",
-        snapshot,
+    result = AlarmCorrelationService().score_pair(
+        anchor_alarm=anchor,
+        candidate_alarm=candidate,
+        snapshot=snapshot,
     )
 
     assert result.correlated is False
@@ -92,6 +93,13 @@ def test_alarm_correlation_time_window_outside_candidate_gets_low_score():
     assert result.evidence[0]["score"] == 0
     assert result.evidence_score == 30
     assert result.correlated is False
+    assert old_alarm.alarm_id not in [
+        item.candidate_alarm_code
+        for item in AlarmCorrelationService().find_correlations(
+            anchor_alarm=anchor,
+            snapshot=snapshot,
+        )
+    ]
 
 
 @pytest.mark.django_db
@@ -196,6 +204,43 @@ def test_alarm_correlation_scores_same_bng_branch_relation():
         alarm_id="ALM-CORR-BRANCH-CANDIDATE",
         alarm_type_code="LINK_DOWN",
         device_code="DSLAM-MAL-CEV-001",
+        detected_at=anchor.detected_at + timedelta(minutes=4),
+    )
+
+    result = AlarmCorrelationService().score_pair(
+        anchor_alarm=anchor,
+        candidate_alarm=candidate,
+        snapshot=snapshot,
+    )
+
+    assert result.topology_relation == "same_bng_branch"
+    assert result.type_compatibility == "known_compatible_pair"
+    assert result.evidence_score == 80
+    assert result.correlated is True
+
+
+@pytest.mark.django_db
+def test_alarm_correlation_handles_device_with_multiple_bng_branches():
+    snapshot = seed_snapshot()
+    NetworkLink.objects.create(
+        data_snapshot=snapshot,
+        link_code="LINK-CORR-MULTI-BNG2-OLT",
+        source_device=NetworkDevice.objects.get(data_snapshot=snapshot, code="BNG-MAL-002"),
+        target_device=NetworkDevice.objects.get(data_snapshot=snapshot, code="OLT-MAL-ALT-001"),
+        capacity_mbps=10000,
+    )
+    anchor = create_alarm(
+        snapshot=snapshot,
+        alarm_id="ALM-CORR-MULTI-BRANCH-ANCHOR",
+        alarm_type_code="ACCESS_DEVICE_UNREACHABLE",
+        device_code="OLT-MAL-ALT-001",
+        detected_at=get_alarm(snapshot, "ALM-OUT-MAL-BNG-001-PRIMARY").detected_at,
+    )
+    candidate = create_alarm(
+        snapshot=snapshot,
+        alarm_id="ALM-CORR-MULTI-BRANCH-CANDIDATE",
+        alarm_type_code="LINK_DOWN",
+        device_code="DSLAM-MAL-ZUM-001",
         detected_at=anchor.detected_at + timedelta(minutes=4),
     )
 

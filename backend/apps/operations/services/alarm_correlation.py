@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from apps.datasets.models import DataSnapshot
@@ -48,8 +49,14 @@ class AlarmCorrelationService:
         snapshot: DataSnapshot,
     ) -> list[AlarmCorrelationResult]:
         self._validate_inputs(anchor_alarm=anchor_alarm, snapshot=snapshot)
+        window_start = anchor_alarm.detected_at - timedelta(seconds=TIME_WINDOW_SECONDS)
+        window_end = anchor_alarm.detected_at + timedelta(seconds=TIME_WINDOW_SECONDS)
         candidates = (
-            Alarm.objects.filter(data_snapshot=snapshot)
+            Alarm.objects.filter(
+                data_snapshot=snapshot,
+                detected_at__gte=window_start,
+                detected_at__lte=window_end,
+            )
             .exclude(pk=anchor_alarm.pk)
             .select_related(
                 "alarm_type",
@@ -221,21 +228,21 @@ class AlarmCorrelationService:
         candidate_device = candidate_alarm.get_source_device()
         if anchor_device is None or candidate_device is None:
             return False
-        anchor_bng_code = get_bng_branch_code(
+        anchor_bng_codes = get_bng_branch_codes(
             anchor_device,
             self.topology_service.get_ancestors(
                 device=anchor_device,
                 snapshot=snapshot,
             ),
         )
-        candidate_bng_code = get_bng_branch_code(
+        candidate_bng_codes = get_bng_branch_codes(
             candidate_device,
             self.topology_service.get_ancestors(
                 device=candidate_device,
                 snapshot=snapshot,
             ),
         )
-        return bool(anchor_bng_code and anchor_bng_code == candidate_bng_code)
+        return bool(anchor_bng_codes and anchor_bng_codes & candidate_bng_codes)
 
     def _share_failure_domain(
         self,
@@ -249,14 +256,20 @@ class AlarmCorrelationService:
 
 
 def get_bng_branch_code(device: NetworkDevice | None, ancestors) -> str | None:
+    codes = get_bng_branch_codes(device, ancestors)
+    return sorted(codes)[0] if codes else None
+
+
+def get_bng_branch_codes(device: NetworkDevice | None, ancestors) -> set[str]:
     if device is None:
-        return None
+        return set()
+    codes: set[str] = set()
     if device.device_type == NetworkDeviceType.BNG:
-        return device.code
+        codes.add(device.code)
     for ancestor in ancestors:
         if ancestor.device_type == NetworkDeviceType.BNG:
-            return ancestor.code
-    return None
+            codes.add(ancestor.code)
+    return codes
 
 
 def score_time_proximity(time_difference_seconds: int) -> int:

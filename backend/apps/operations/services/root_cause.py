@@ -321,17 +321,22 @@ class RootCauseService:
         candidate_device: NetworkDevice,
         snapshot: DataSnapshot,
     ) -> bool:
-        source_bng_code = self._get_bng_branch_code(source_device, snapshot)
-        candidate_bng_code = self._get_bng_branch_code(candidate_device, snapshot)
-        return bool(source_bng_code and source_bng_code == candidate_bng_code)
+        source_bng_codes = self._get_bng_branch_codes(source_device, snapshot)
+        candidate_bng_codes = self._get_bng_branch_codes(candidate_device, snapshot)
+        return bool(source_bng_codes and source_bng_codes & candidate_bng_codes)
 
     def _get_bng_branch_code(self, device: NetworkDevice, snapshot: DataSnapshot) -> str | None:
+        codes = self._get_bng_branch_codes(device, snapshot)
+        return sorted(codes)[0] if codes else None
+
+    def _get_bng_branch_codes(self, device: NetworkDevice, snapshot: DataSnapshot) -> set[str]:
         if device.device_type == "bng":
-            return device.code
+            return {device.code}
+        codes: set[str] = set()
         for ancestor in self.topology_service.get_ancestors(device=device, snapshot=snapshot):
             if ancestor.device_type == "bng":
-                return ancestor.code
-        return None
+                codes.add(ancestor.code)
+        return codes
 
     def _score_topology_alignment(self, topology_relation: str) -> int:
         return {

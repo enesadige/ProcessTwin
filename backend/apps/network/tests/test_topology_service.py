@@ -77,6 +77,29 @@ def test_get_ancestors_returns_parent_bng_from_nearest_parent_to_root():
 
 
 @pytest.mark.django_db
+def test_get_ancestors_supports_multiple_upstream_branches_deterministically():
+    snapshot = seed_snapshot()
+    service = NetworkTopologyService()
+    olt = get_device(snapshot, "OLT-MAL-ALT-001")
+    second_bng = get_device(snapshot, "BNG-MAL-002")
+    NetworkLink.objects.create(
+        data_snapshot=snapshot,
+        link_code="LINK-MULTI-PARENT-BNG2-OLT",
+        source_device=second_bng,
+        target_device=olt,
+        capacity_mbps=10000,
+    )
+
+    ancestors = service.get_ancestors(
+        device=olt,
+        snapshot=snapshot,
+        evaluation_time=get_reference_datetime(snapshot),
+    )
+
+    assert [device.code for device in ancestors] == ["BNG-MAL-001", "BNG-MAL-002"]
+
+
+@pytest.mark.django_db
 def test_get_subgraph_returns_only_requested_bng_branch_without_duplicates():
     snapshot = seed_snapshot()
     service = NetworkTopologyService()

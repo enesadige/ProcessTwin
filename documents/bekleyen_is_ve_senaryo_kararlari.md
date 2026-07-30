@@ -1856,7 +1856,7 @@ Durum: `KARAR VERİLDİ`
 
 ### 8.8 Deterministik Servis Uyarlamaları
 
-Durum: `KARAR BEKLİYOR`
+Durum: `KARAR VERİLDİ`
 
 - Mevcut servisler korunacaktır:
   - NetworkTopologyService
@@ -1866,9 +1866,18 @@ Durum: `KARAR BEKLİYOR`
   - RootCauseService
   - RuleEvaluationService
   - CompensationService
-- Yeni veri ve iş kuralları belirlendikten sonra servislerde gereken genişletmeler
-  ayrı görevler halinde planlanacaktır.
-- Mevcut servisler tek Maltepe senaryosuna göre tamamlanmış kabul edilmeyecektir.
+- Multi-city topolojide çoklu upstream/BNG dalı desteklenir.
+- NetworkTopologyService ancestor traversal'ı çoklu parent dallarını deterministik
+  döndürür ve cycle korumasını korur.
+- AlarmCorrelationService ve RootCauseService BNG branch karşılaştırmasını branch
+  set kesişimiyle yapar.
+- CustomerImpactService failover warning'lerinde upstream link set kesişimini
+  raporlar.
+- AlarmCorrelationService `find_correlations()` adaylarını 30 dakikalık
+  deterministik correlation penceresiyle sınırlar; `score_pair()` pencere dışı
+  manuel adayları düşük skorla değerlendirebilir.
+- Evidence yetersiz olan root cause vakaları `unknown` kalabilir; tahmin üretilmez.
+- 30 ground-truth vaka ve Maltepe regression sonucu değişmeden doğrulanır.
 
 ### 8.9 Validator ve RAG Karar Kapısı
 
