@@ -538,12 +538,22 @@ Durum: `KARAR BEKLİYOR`
 
 ## 7. ProcessTwin
 
-Durum: `KARAR BEKLİYOR`
+Durum: `KARAR VERİLDİ`
 
-- Baseline değerleri: `KARAR BEKLİYOR`
-- Candidate değişiklikleri: `KARAR BEKLİYOR`
-- Karşılaştırılacak KPI'lar: `KARAR BEKLİYOR`
-- Beklenen sonuç farkları: `KARAR BEKLİYOR`
+- ProcessTwin gerçek üretim ağı değildir; canlıya benzer sentetik simülasyondur.
+- Aynı sentetik olay senaryosu baseline ve candidate rule set ile aynı başlangıç
+  koşullarında çalıştırılır.
+- Run sırasında virtual clock ilerler; desteklenecek hızlar en az 1x, 10x ve 60x
+  olur.
+- Alarm, operational event, incident, outage/degradation, müşteri etkisi ve telafi
+  değerlendirmeleri run içinde zamanla oluşur.
+- Harita, mantıksal topoloji ve event timeline çalışan run'a göre güncellenir.
+- Run izole, deterministik, tekrar oynatılabilir ve sıfırlanabilir olur.
+- Start, status, pause, resume, stop/cancel, replay ve result işlemleri bulunur.
+- RAG yalnız kural/prosedür kaynaklarını getirir.
+- LLM araçları orkestre eder ve deterministik sonuçları açıklar; hesaplama yapmaz.
+- Simulation MCP, Görev 075-081 runtime altyapısını dışarı açan ince adapter olarak
+  ele alınır.
 
 ## 8. Faz 039.5 - Gerçekçi Simülasyon Verisi ve İş Kuralları Genişletme
 

@@ -67,7 +67,7 @@ Zorunlu MCP sunuculari:
 
 MVP'de Analytics MCP zorunlu degildir. Ana sorgudaki "en uzun kesinti" islemi Network MCP veya operations tarafindaki deterministik servis uzerinden cozulur.
 
-ProcessTwin MVP icindedir; ilk asamada Django icindeki `SimulationService` ve domain servisleriyle calisir. Ayri Simulation MCP, MVP sonrasi gelistirilir.
+ProcessTwin MVP icindedir; ilk asamada Django icindeki `SimulationService` ve domain servisleriyle calisir. ProcessTwin, ayni sentetik olay senaryosunu baseline ve candidate rule set ile ayni baslangic kosullarinda calistiran, virtual clock ile ilerleyen, izole, deterministik, tekrar oynatilabilir ve sifirlanabilir sentetik simulasyon katmanidir. Alarm, operational event, incident, outage/degradation, musteri etkisi ve telafi degerlendirmeleri run icinde zamanla olusur; harita, topoloji ve event timeline calisan run'a gore guncellenir. RAG yalniz kural/prosedur kaynaklarini getirir; LLM araclari orkestre eder ve deterministik sonuclari aciklar, hesaplama yapmaz. Ayri Simulation MCP, 075-081 runtime altyapisini disa acan adapter olarak daha sonra gelistirilir.
 
 ## Ana Demo Sorgusu
 
