@@ -118,6 +118,16 @@ Temel servis portlari:
 - Analytics MCP: `8105`
 - Simulation MCP: `8106`
 
+Network MCP stdio runtime icin kisa not:
+
+```bash
+MCP_BACKEND_BASE_URL="http://127.0.0.1:8000" \
+MCP_BACKEND_SERVICE_TOKEN="<internal-service-token>" \
+python -m mcp_servers.network
+```
+
+Ayrinti: `documents/network_mcp.md`.
+
 PostgreSQL, Redis ve Ollama dis sistem servisi kabul edilir. Django, React, MCP sunuculari ve Celery worker uygulama process'i olarak baslatilir.
 
 `scripts/dev.py` su beklentilerle gelistirilecektir:

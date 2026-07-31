@@ -1,12 +1,12 @@
 [tool.pytest.ini_options]
 DJANGO_SETTINGS_MODULE = "config.settings.test"
-pythonpath = ["backend"]
-testpaths = ["backend"]
+pythonpath = ["backend", "."]
+testpaths = ["backend", "mcp_servers"]
 python_files = ["test_*.py", "*_test.py"]
 
 [tool.ruff]
 line-length = 100
-src = ["backend"]
+src = ["backend", "mcp_servers"]
 target-version = "py312"
 
 [tool.ruff.lint]

@@ -117,8 +117,8 @@ def test_client_rejects_invalid_request_id_before_sending():
     ("status_code", "expected_code"),
     [
         (400, MCPErrorCode.VALIDATION_ERROR),
-        (401, MCPErrorCode.UNSUPPORTED_OPERATION),
-        (403, MCPErrorCode.UNSUPPORTED_OPERATION),
+        (401, MCPErrorCode.AUTHENTICATION_ERROR),
+        (403, MCPErrorCode.AUTHORIZATION_ERROR),
         (404, MCPErrorCode.NOT_FOUND),
         (409, MCPErrorCode.CONFLICT),
         (500, MCPErrorCode.INTERNAL_ERROR),
@@ -148,7 +148,7 @@ def test_client_maps_timeout_to_retryable_internal_error():
     with pytest.raises(InternalAPIClientError) as exc:
         client.request_json("GET", "/api/internal/v1/health/", request_id="req-timeout")
 
-    assert exc.value.mcp_error.code == MCPErrorCode.INTERNAL_ERROR
+    assert exc.value.mcp_error.code == MCPErrorCode.TIMEOUT
     assert exc.value.mcp_error.retryable is True
     assert exc.value.mcp_error.details == {"reason": "timeout"}
 

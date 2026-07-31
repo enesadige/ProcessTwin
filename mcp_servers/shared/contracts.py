@@ -7,8 +7,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 class MCPErrorCode(StrEnum):
     VALIDATION_ERROR = "validation_error"
+    AUTHENTICATION_ERROR = "authentication_error"
+    AUTHORIZATION_ERROR = "authorization_error"
     NOT_FOUND = "not_found"
     CONFLICT = "conflict"
+    TIMEOUT = "timeout"
+    UPSTREAM_ERROR = "upstream_error"
     UNSUPPORTED_OPERATION = "unsupported_operation"
     INTERNAL_ERROR = "internal_error"
 
@@ -50,6 +54,7 @@ class MCPMetadata(BaseModel):
     snapshot_identifier: str | None = None
     reference_datetime: datetime | None = None
     evaluation_time: datetime | None = None
+    snapshot_details: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("reference_datetime", "evaluation_time")
     @classmethod

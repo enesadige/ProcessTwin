@@ -97,7 +97,7 @@ class InternalAPIClient:
         except httpx.TimeoutException as exc:
             raise InternalAPIClientError(
                 MCPError(
-                    code=MCPErrorCode.INTERNAL_ERROR,
+                    code=MCPErrorCode.TIMEOUT,
                     message="Internal API request timed out.",
                     details={"reason": "timeout"},
                     retryable=True,
@@ -106,7 +106,7 @@ class InternalAPIClient:
         except httpx.HTTPError as exc:
             raise InternalAPIClientError(
                 MCPError(
-                    code=MCPErrorCode.INTERNAL_ERROR,
+                    code=MCPErrorCode.UPSTREAM_ERROR,
                     message="Internal API request failed.",
                     details={"reason": exc.__class__.__name__},
                     retryable=False,
@@ -135,10 +135,17 @@ def map_http_error(status_code: int) -> MCPError:
             details={"status_code": status_code},
             retryable=False,
         )
-    if status_code in {401, 403}:
+    if status_code == 401:
         return MCPError(
-            code=MCPErrorCode.UNSUPPORTED_OPERATION,
-            message="Internal API authentication or authorization failed.",
+            code=MCPErrorCode.AUTHENTICATION_ERROR,
+            message="Internal API authentication failed.",
+            details={"status_code": status_code},
+            retryable=False,
+        )
+    if status_code == 403:
+        return MCPError(
+            code=MCPErrorCode.AUTHORIZATION_ERROR,
+            message="Internal API authorization failed.",
             details={"status_code": status_code},
             retryable=False,
         )

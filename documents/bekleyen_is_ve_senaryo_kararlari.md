@@ -1904,3 +1904,33 @@ Durum: `KARAR VERİLDİ`
   - hangi bilgiler deterministik servislerden, hangileri dokümandan gelecek
   - örnek kullanıcı sorguları
   - citation ve evidence davranışı
+
+## 9. Görev 040 - Network MCP Runtime Kararı
+
+Durum: `KARAR VERİLDİ`
+
+- Network MCP resmi `mcp==2.0.0` Python SDK ile stdio transport kullanır.
+- MCP process Django ORM'e veya veritabanına doğrudan bağlanmaz.
+- Veri akışı:
+  - MCP tool
+  - shared `InternalAPIClient`
+  - authenticated `/api/internal/v1/network/...`
+  - snapshot resolver
+  - deterministik backend servisleri veya kontrollü read adapter
+- Tool katalogu:
+  - `get_device_details`
+  - `get_device_topology`
+  - `search_alarms`
+  - `search_outages`
+  - `get_outage_details`
+  - `calculate_customer_impact`
+  - `correlate_alarms`
+  - `rank_root_cause_candidates`
+  - `get_longest_outage`
+- `snapshot_identifier` zorunludur; aktif snapshot'a sessiz fallback yapılmaz.
+- Snapshot identifier önce `DataSnapshot.snapshot_key`, sonra tekil
+  `DatasetVersion.slug` olarak çözülür.
+- Network MCP business logic, RCA, impact, duration veya compensation hesabını
+  yeniden yazmaz.
+- Customer MCP, Rule MCP ve Compensation MCP alanlarına ait kişisel/ticari detaylar
+  Network MCP response'larına eklenmez.
