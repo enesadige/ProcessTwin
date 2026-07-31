@@ -2023,3 +2023,25 @@ Durum: `KARAR VERİLDİ`
 - Campaign ve ranking tool'ları yeni uygunluk/ranking motoru icat etmeden mevcut
   kayıtları ve deterministic servis sırasını açıklar.
 - Compensation MCP `CompensationHistory` veya settlement kaydı oluşturmaz.
+
+## 13. Görev 044 - MCP Health ve Registry Runtime Kararı
+
+Durum: `KARAR VERİLDİ`
+
+- Network, Customer, Rule ve Compensation MCP için statik registry descriptor'ları
+  backend core katmanında tutulur.
+- Registry endpoint'i canlı process başlatmaz; yalnız `configured`, `enabled`,
+  module ve expected tool count metadata'sını döner.
+- Health endpoint'i her istekte kısa ömürlü stdio process başlatır ve resmi MCP SDK
+  ile yalnız `initialize` ve `list_tools` çağrılarını yapar.
+- `active`, initialize ve list_tools başarıyla tamamlandığında; `unavailable`,
+  process/probe hatasında; `disabled`, descriptor yapılandırma ile kapalı olduğunda
+  kullanılır.
+- Gerçek tool listesi `list_tools`, server name ve version `initialize` cevabından
+  alınır; registry içinde ikinci bir tool kataloğu tutulmaz.
+- Probe süresi process başlatma, initialize ve list_tools toplam wall-clock süresidir.
+- Health geçmişi veritabanına yazılmaz, background polling veya Celery görevi yoktur.
+- Endpointler service-token auth ve correlation ID kullanır; hata response'larında
+  traceback, token, environment veya özel dosya yolu bulunmaz.
+- MCP business tool'ları, RAG, LLM provider ve 039.5 domain baseline'ı bu kapsamın
+  dışındadır.
