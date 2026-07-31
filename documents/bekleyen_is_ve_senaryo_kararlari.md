@@ -1964,3 +1964,31 @@ Durum: `KARAR VERİLDİ`
   istek ve sentetik snapshot koşulu birlikte sağlanırsa döner.
 - Telefon, e-posta, kimlik, adres, raw metadata, SQL, traceback veya token response'a
   sızdırılmaz.
+
+## 11. Görev 042 - Rule MCP Runtime Kararı
+
+Durum: `KARAR VERİLDİ`
+
+- Rule MCP resmi `mcp==2.0.0` Python SDK ile stdio transport kullanır.
+- MCP process Django ORM'e veya veritabanına doğrudan bağlanmaz.
+- Veri akışı:
+  - MCP tool
+  - shared `InternalAPIClient`
+  - authenticated `/api/internal/v1/rules/...`
+  - snapshot resolver
+  - kontrollü read adapter veya izin verilen mevcut helper
+- Tool katalogu:
+  - `search_rules`
+  - `get_rule`
+  - `get_rules_effective_at`
+  - `get_rule_version_history`
+  - `find_related_rules`
+  - `detect_rule_conflicts`
+  - `get_rule_evidence`
+- `snapshot_identifier` zorunludur; aktif snapshot'a sessiz fallback yapılmaz.
+- Rule MCP kural seti, kural, kural versiyonu, event-time version seçimi,
+  conflict/priority açıklaması ve mevcut DecisionEvidence kayıtlarını read-only açar.
+- Ham `condition_tree` ve `action_config` yalnız explicit `include_raw_config=true`
+  istenirse döner.
+- Rule MCP yeni eligibility, yeni compensation amount, yeni CompensationEvaluation
+  veya yeni DecisionEvidence üretmez.
