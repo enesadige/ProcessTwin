@@ -1934,3 +1934,33 @@ Durum: `KARAR VERİLDİ`
   yeniden yazmaz.
 - Customer MCP, Rule MCP ve Compensation MCP alanlarına ait kişisel/ticari detaylar
   Network MCP response'larına eklenmez.
+
+## 10. Görev 041 - Customer MCP Runtime Kararı
+
+Durum: `KARAR VERİLDİ`
+
+- Customer MCP resmi `mcp==2.0.0` Python SDK ile stdio transport kullanır.
+- MCP process Django ORM'e veya veritabanına doğrudan bağlanmaz.
+- Veri akışı:
+  - MCP tool
+  - shared `InternalAPIClient`
+  - authenticated `/api/internal/v1/customer/...`
+  - snapshot resolver
+  - kontrollü read adapter veya mevcut deterministik servis
+- Tool katalogu:
+  - `get_customer_profile`
+  - `get_customer_subscription`
+  - `get_customer_payment_status`
+  - `get_customer_outage_history`
+  - `get_customer_compensation_history`
+  - `list_customers_by_device`
+  - `list_customers_by_location`
+- `snapshot_identifier` zorunludur; aktif snapshot'a sessiz fallback yapılmaz.
+- Customer MCP müşteri, abonelik, paket/SLA, campaign enrollment, ödeme durumu,
+  geçmiş outage görünümü ve geçmiş compensation kayıtlarını read-only açar.
+- Customer MCP yeni telafi hesabı, rule evaluation, root-cause veya topoloji hesabı
+  yapmaz.
+- Display name varsayılan olarak maskelenir. Açık display name yalnız explicit
+  istek ve sentetik snapshot koşulu birlikte sağlanırsa döner.
+- Telefon, e-posta, kimlik, adres, raw metadata, SQL, traceback veya token response'a
+  sızdırılmaz.

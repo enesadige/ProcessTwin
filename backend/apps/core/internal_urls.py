@@ -6,5 +6,6 @@ app_name = "internal"
 
 urlpatterns = [
     path("health/", internal_health, name="health"),
+    path("customer/", include("apps.customers.internal_urls")),
     path("network/", include("apps.network.internal_urls")),
 ]
