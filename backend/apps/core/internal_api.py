@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
 
 from apps.core.correlation import is_valid_correlation_id
 
@@ -40,7 +41,7 @@ def internal_service_required(view_func):
         response[CORRELATION_ID_RESPONSE_HEADER] = correlation_id
         return response
 
-    return wrapped
+    return csrf_exempt(wrapped)
 
 
 def resolve_correlation_id(request):

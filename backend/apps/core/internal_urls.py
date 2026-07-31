@@ -9,4 +9,5 @@ urlpatterns = [
     path("customer/", include("apps.customers.internal_urls")),
     path("network/", include("apps.network.internal_urls")),
     path("rules/", include("apps.rules.internal_urls")),
+    path("compensation/", include("apps.compensation.internal_urls")),
 ]

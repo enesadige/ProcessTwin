@@ -1992,3 +1992,34 @@ Durum: `KARAR VERİLDİ`
   istenirse döner.
 - Rule MCP yeni eligibility, yeni compensation amount, yeni CompensationEvaluation
   veya yeni DecisionEvidence üretmez.
+
+## 12. Görev 043 - Compensation MCP Runtime Kararı
+
+Durum: `KARAR VERİLDİ`
+
+- Compensation MCP resmi `mcp==2.0.0` Python SDK ile stdio transport kullanır.
+- MCP process Django ORM'e veya veritabanına doğrudan bağlanmaz.
+- Veri akışı:
+  - MCP tool
+  - shared `InternalAPIClient`
+  - authenticated `/api/internal/v1/compensation/...`
+  - snapshot resolver
+  - mevcut deterministik compensation/rule servisleri
+- Tool katalogu:
+  - `evaluate_refund_eligibility`
+  - `calculate_refund_amount`
+  - `evaluate_compensation_options`
+  - `check_campaign_eligibility`
+  - `rank_compensation_options`
+  - `get_compensation_evidence`
+- `snapshot_identifier` zorunludur; aktif snapshot'a sessiz fallback yapılmaz.
+- Rule selection için `rule_code` veya `rule_set_code` gerekir; gizli REFUND veya
+  SYN-COMP varsayılanı kullanılmaz.
+- `evaluate_refund_eligibility` tutar, `CompensationEvaluation` veya
+  `DecisionEvidence` üretmez.
+- `calculate_refund_amount` varsayılan dry-run'dır. Kalıcı kayıt yalnız
+  `persist=true` ile kapalı/finalizable outage için transaction içinde üretilir.
+- Ongoing outage için `evaluation_time` zorunludur ve persist reddedilir.
+- Campaign ve ranking tool'ları yeni uygunluk/ranking motoru icat etmeden mevcut
+  kayıtları ve deterministic servis sırasını açıklar.
+- Compensation MCP `CompensationHistory` veya settlement kaydı oluşturmaz.
