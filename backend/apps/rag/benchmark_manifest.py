@@ -28,6 +28,7 @@ class BenchmarkCase:
     expected_document_version: int
     expected_rule_version: int | None
     expected_heading_contains: str | None
+    require_heading_match: bool
     max_accepted_rank: int
     forbidden_document_codes: tuple[str, ...] = ()
     tags: tuple[str, ...] = ()
@@ -53,6 +54,7 @@ def _case(
     expected_document_version=1,
     expected_rule_version=None,
     expected_heading_contains=None,
+    require_heading_match,
     max_accepted_rank=1,
     forbidden_document_codes=(),
     tags=(),
@@ -76,6 +78,7 @@ def _case(
         expected_document_version=expected_document_version,
         expected_rule_version=expected_rule_version,
         expected_heading_contains=expected_heading_contains,
+        require_heading_match=require_heading_match,
         max_accepted_rank=max_accepted_rank,
         forbidden_document_codes=tuple(forbidden_document_codes),
         tags=tuple(tags),
@@ -92,6 +95,7 @@ BENCHMARK_CASES = (
         MULTICITY_SNAPSHOT_KEY,
         "SYN-COMP-2026-BROADBAND",
         expected_heading_contains="Broadband Telafi",
+        require_heading_match=False,
         tags=("document_code",),
     ),
     _case(
@@ -103,6 +107,7 @@ BENCHMARK_CASES = (
         MULTICITY_SNAPSHOT_KEY,
         "SYN-COMP-2026-BROADBAND",
         expected_heading_contains="Full Outage",
+        require_heading_match=True,
         tags=("rule_code",),
     ),
     _case(
@@ -114,6 +119,7 @@ BENCHMARK_CASES = (
         MULTICITY_SNAPSHOT_KEY,
         "SYN-ALARM-CATALOG-2026",
         expected_heading_contains="Katalog",
+        require_heading_match=True,
         tags=("alarm_code",),
     ),
     _case(
@@ -125,6 +131,7 @@ BENCHMARK_CASES = (
         MULTICITY_SNAPSHOT_KEY,
         "SYN-COMP-2026-REVIEW-CAPS",
         expected_heading_contains="Manual Review",
+        require_heading_match=True,
         tags=("rule_code", "manual_review"),
     ),
     _case(
@@ -138,6 +145,7 @@ BENCHMARK_CASES = (
         evaluation_time=datetime.fromisoformat("2026-07-10T12:00:00+03:00"),
         expected_rule_version=1,
         expected_heading_contains="v1 Sentetik Kaynak",
+        require_heading_match=False,
         forbidden_document_codes=("REFUND-001-V2-SOURCE",),
         tags=("historical", "refund"),
     ),
@@ -153,6 +161,7 @@ BENCHMARK_CASES = (
         expected_document_version=2,
         expected_rule_version=2,
         expected_heading_contains="v2 Sentetik Kaynak",
+        require_heading_match=False,
         forbidden_document_codes=("REFUND-001-V1-SOURCE",),
         tags=("historical", "refund"),
     ),
@@ -166,6 +175,7 @@ BENCHMARK_CASES = (
         "SYN-OPERATIONS-LIFECYCLE-2026",
         document_type="procedure",
         expected_heading_contains="Operasyon Olay Yaşam",
+        require_heading_match=False,
         forbidden_document_codes=("REFUND-001-V1-SOURCE", "REFUND-001-V2-SOURCE"),
         tags=("global", "snapshot_scope"),
     ),
@@ -179,6 +189,7 @@ BENCHMARK_CASES = (
         "SYN-FAILOVER-MAINTENANCE-2026",
         document_type="procedure",
         expected_heading_contains="Failover ve Planlı Bakım",
+        require_heading_match=False,
         forbidden_document_codes=("SYN-COMP-2026-METRO-SLA",),
         tags=("global", "snapshot_scope"),
     ),
@@ -192,6 +203,7 @@ BENCHMARK_CASES = (
         "SYN-COMP-2026-OVERVIEW",
         document_type="rule_policy",
         expected_heading_contains="Sentetik Telafi Politikası",
+        require_heading_match=False,
         forbidden_document_codes=("REFUND-001-V1-SOURCE", "REFUND-001-V2-SOURCE"),
         tags=("snapshot_isolation", "document_type"),
     ),
@@ -206,6 +218,7 @@ BENCHMARK_CASES = (
         document_type="rule_policy",
         rule_code="BB-DEGRADATION-QUALITY",
         expected_heading_contains="Degradation",
+        require_heading_match=True,
         forbidden_document_codes=("REFUND-001-V1-SOURCE", "REFUND-001-V2-SOURCE"),
         tags=("rule_filter", "document_type"),
     ),
@@ -219,9 +232,10 @@ BENCHMARK_CASES = (
         "SYN-FAILOVER-MAINTENANCE-2026",
         search_mode="semantic",
         expected_heading_contains="Failover",
+        require_heading_match=True,
         max_accepted_rank=3,
         forbidden_document_codes=("REFUND-001-V1-SOURCE", "REFUND-001-V2-SOURCE"),
-        tags=("paraphrase", "failover"),
+        tags=("paraphrase", "failover", "chunk_selection_quality_issue"),
     ),
     _case(
         "RAG-SEM-PACKET-LOSS-SLA",
@@ -236,8 +250,9 @@ BENCHMARK_CASES = (
         "SYN-COMP-2026-METRO-SLA",
         search_mode="hybrid",
         expected_heading_contains="SLA İhlalleri",
+        require_heading_match=True,
         max_accepted_rank=3,
-        tags=("paraphrase", "sla"),
+        tags=("paraphrase", "sla", "chunk_selection_quality_issue"),
     ),
     _case(
         "RAG-SEM-BROADBAND-FULL-OUTAGE",
@@ -249,6 +264,7 @@ BENCHMARK_CASES = (
         "SYN-COMP-2026-BROADBAND",
         search_mode="semantic",
         expected_heading_contains="Full Outage",
+        require_heading_match=True,
         max_accepted_rank=3,
         tags=("paraphrase", "broadband"),
     ),
@@ -262,8 +278,9 @@ BENCHMARK_CASES = (
         "SYN-COMP-2026-BROADBAND",
         search_mode="hybrid",
         expected_heading_contains="Degradation",
+        require_heading_match=True,
         max_accepted_rank=3,
-        tags=("paraphrase", "quality"),
+        tags=("paraphrase", "quality", "chunk_selection_quality_issue"),
     ),
     _case(
         "RAG-SEM-MAINTENANCE-OVERRUN",
@@ -275,6 +292,7 @@ BENCHMARK_CASES = (
         "SYN-FAILOVER-MAINTENANCE-2026",
         search_mode="semantic",
         expected_heading_contains="Planlı Bakım",
+        require_heading_match=True,
         max_accepted_rank=3,
         tags=("paraphrase", "maintenance"),
     ),
@@ -288,6 +306,7 @@ BENCHMARK_CASES = (
         "SYN-COMP-2026-REVIEW-CAPS",
         search_mode="hybrid",
         expected_heading_contains="Manual Review",
+        require_heading_match=True,
         max_accepted_rank=3,
         tags=("paraphrase", "manual_review"),
     ),

@@ -52,6 +52,29 @@ Kabul exact floating score değerlerine değil, sabit expected document/version
 ve 1-indexed rank değerlerine dayanır. Tam chunk metni ve raw embedding benchmark
 raporuna konmaz.
 
+## Semantic Kabul Politikası
+
+Semantic bir vaka şu koşullarla geçer:
+
+- beklenen `document_code`, vaka için tanımlı rank sınırındadır; semantic MVP
+  vakalarında bu sınır en fazla 3'tür,
+- forbidden doküman bulunmaz,
+- `effective_mode` istenen modla aynıdır ve fallback oluşmaz,
+- provider/model/version canonical Gemini embedding setiyle eşleşir,
+- heading eşleşmesi yalnız manifestte `require_heading_match=true` olan ve belirli
+  bir bölümü hedefleyen vakalarda zorunludur.
+
+Heading karşılaştırması Unicode NFC, trim, whitespace collapse, casefold ve
+Markdown heading marker temizliği uygular. Türkçe karakterler ASCII'ye çevrilmez;
+fuzzy eşleştirme yapılmaz. Exact-code ve tarihsel sürüm vakalarında ana kapı doğru
+doküman ve sürümdür; bölüm hedeflenmiyorsa heading kabul kapısı değildir.
+
+`RAG-SEM-FAILED-FAILOVER`, `RAG-SEM-PACKET-LOSS-SLA` ve
+`RAG-SEM-DEGRADATION` vakalarında doğru doküman ilk üçte bulunmasına rağmen hedef
+bölüm seçilememiştir. Bu vakalar `chunk_selection_quality_issue` olarak kayıtlıdır;
+beklenti gevşetilmez ve ayrı retrieval-quality düzeltmesi yapılana kadar başarısız
+kalır.
+
 ## Sınırlar
 
 Benchmark kaynak retrieval ölçer. Rule selection, eligibility, root cause,

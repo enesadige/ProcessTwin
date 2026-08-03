@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import re
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -24,6 +26,7 @@ from apps.rag.services.search import SearchRequest, search
 
 CANONICAL_CHUNK_COUNT = 74
 SEMANTIC_PROVIDER = "gemini"
+MARKDOWN_HEADING_PREFIX = re.compile(r"^\s{0,3}#{1,6}\s*")
 
 
 class BenchmarkPrerequisiteError(Exception):
@@ -66,6 +69,12 @@ def _safe_failure(exc: Exception) -> str:
     if isinstance(exc, (BenchmarkPrerequisiteError, LookupError, ValueError)):
         return str(exc)[:240]
     return "benchmark_case_failed"
+
+
+def normalize_heading(value: str | None) -> str:
+    normalized = unicodedata.normalize("NFC", value or "").strip()
+    normalized = MARKDOWN_HEADING_PREFIX.sub("", normalized)
+    return " ".join(normalized.split()).casefold()
 
 
 def validate_semantic_prerequisites() -> dict[str, Any]:
@@ -177,9 +186,11 @@ def evaluate_case(case: BenchmarkCase) -> BenchmarkCaseResult:
             and expected_result.get("rule_version") != case.expected_rule_version
         ):
             failures.append("rule_version_mismatch")
-        if case.expected_heading_contains and case.expected_heading_contains.casefold() not in (
-            expected_result.get("heading") or ""
-        ).casefold():
+        if (
+            case.require_heading_match
+            and normalize_heading(case.expected_heading_contains)
+            not in normalize_heading(expected_result.get("heading"))
+        ):
             failures.append("heading_mismatch")
         if case.category == "exact_code" and not expected_result.get("exact_code_match"):
             failures.append("exact_code_match_false")

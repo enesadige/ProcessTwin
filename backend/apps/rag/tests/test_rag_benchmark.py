@@ -19,6 +19,7 @@ from apps.rag.services import benchmark as benchmark_service
 from apps.rag.services.benchmark import (
     BenchmarkPrerequisiteError,
     evaluate_case,
+    normalize_heading,
     run_benchmark,
     validate_semantic_prerequisites,
 )
@@ -44,6 +45,7 @@ def _case(**overrides):
         "expected_document_version": 1,
         "expected_rule_version": None,
         "expected_heading_contains": "Koşullar",
+        "require_heading_match": True,
         "max_accepted_rank": 1,
         "forbidden_document_codes": (),
         "tags": (),
@@ -115,6 +117,7 @@ def test_manifest_contract_and_canonical_codes_are_valid():
         assert case.search_mode in {"semantic", "full_text", "hybrid"}
         if case.evaluation_time:
             assert case.evaluation_time.utcoffset() is not None
+        assert isinstance(case.require_heading_match, bool)
     assert all(
         case.search_mode == "full_text"
         for case in BENCHMARK_CASES
@@ -133,6 +136,79 @@ def test_evaluator_passes_expected_rank_and_exposes_no_chunk_text(monkeypatch):
     assert result.actual_rank == 1
     assert result.heading == "Koşullar ve İstisnalar"
     assert "text" not in result.to_dict()
+
+
+def test_optional_heading_policy_passes_correct_document_with_different_heading(monkeypatch):
+    monkeypatch.setattr(benchmark_service, "search", lambda request: _search_response())
+
+    result = evaluate_case(
+        _case(expected_heading_contains="Başka Bölüm", require_heading_match=False)
+    )
+
+    assert result.passed is True
+
+
+def test_required_heading_policy_rejects_different_heading(monkeypatch):
+    monkeypatch.setattr(benchmark_service, "search", lambda request: _search_response())
+
+    result = evaluate_case(
+        _case(expected_heading_contains="Başka Bölüm", require_heading_match=True)
+    )
+
+    assert result.passed is False
+    assert "heading_mismatch" in result.failure_reasons
+
+
+def test_required_heading_policy_uses_normalized_substring(monkeypatch):
+    response = _search_response()
+    response["results"][-1]["heading"] = "  ## KOŞULLAR   ve İstisnalar  "
+    monkeypatch.setattr(benchmark_service, "search", lambda request: response)
+
+    result = evaluate_case(
+        _case(expected_heading_contains="koşullar ve", require_heading_match=True)
+    )
+
+    assert result.passed is True
+
+
+def test_matching_heading_on_wrong_document_does_not_pass(monkeypatch):
+    response = _search_response()
+    response["results"] = [
+        {
+            **response["results"][-1],
+            "document_code": "OTHER-DOC",
+            "heading": "Koşullar",
+        }
+    ]
+    monkeypatch.setattr(benchmark_service, "search", lambda request: response)
+
+    result = evaluate_case(_case())
+
+    assert result.passed is False
+    assert "expected_document_not_found" in result.failure_reasons
+
+
+def test_heading_normalization_handles_unicode_whitespace_case_and_markdown():
+    decomposed = "Bas\u0327lık   İhlalleri"
+
+    assert normalize_heading("  ## Başlık İhlalleri  ") == normalize_heading(decomposed)
+    assert normalize_heading("## RULE   POLICY") == normalize_heading("rule policy")
+    assert normalize_heading("ÇĞİÖŞÜ") != "cgiOSu".casefold()
+
+
+def test_three_native_heading_mismatches_remain_quality_gate_cases():
+    cases = {
+        case.case_code: case
+        for case in BENCHMARK_CASES
+        if "chunk_selection_quality_issue" in case.tags
+    }
+
+    assert set(cases) == {
+        "RAG-SEM-FAILED-FAILOVER",
+        "RAG-SEM-PACKET-LOSS-SLA",
+        "RAG-SEM-DEGRADATION",
+    }
+    assert all(case.require_heading_match for case in cases.values())
 
 
 @pytest.mark.parametrize(
