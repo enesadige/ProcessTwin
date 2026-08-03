@@ -2071,3 +2071,12 @@ Durum: `KARAR VERİLDİ`
   traceback, token, environment veya özel dosya yolu bulunmaz.
 - MCP business tool'ları, RAG, LLM provider ve 039.5 domain baseline'ı bu kapsamın
   dışındadır.
+
+## 14. Görev 048 - RAG Ingestion ve Chunking Kararı
+
+Durum: `KARAR VERİLDİ`
+
+- `SourceDocument.content` tek canonical kaynaktır; chunking sırasında Markdown dosyaları yeniden okunmaz.
+- `heading-char-v1`, `max_chars=1800` ve `overlap_chars=200` kullanılır; `section_path` JSON liste olarak tutulur.
+- Her command invocation bir `IndexRun` oluşturur; `--validate-only` yazma yapmaz.
+- Token offsetleri, embedding üretimi ve arama 048 dışında bırakılır.
