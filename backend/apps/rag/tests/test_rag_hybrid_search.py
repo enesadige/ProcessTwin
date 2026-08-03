@@ -3,8 +3,7 @@ from django.test import override_settings
 
 from apps.datasets.models import DatasetVersion, DataSnapshot
 from apps.rag.corpus_utils import content_hash
-from apps.rag.models import DocumentChunk, SourceDocument
-from apps.rag.providers.base import PROMPT_VERSION
+from apps.rag.models import DocumentChunk, DocumentChunkEmbedding, SourceDocument
 from apps.rag.providers.mock import MockEmbeddingProvider
 from apps.rag.services.search import SearchRequest, search
 
@@ -38,13 +37,17 @@ def test_hybrid_search_exposes_section_scores_and_ranking_version():
         text="Paket kaybı SLA ihlali.",
         content_hash=content_hash("Paket kaybı SLA ihlali."),
     )
-    chunk.embedding = MockEmbeddingProvider().embed(chunk.text)
-    chunk.embedding_provider = "mock"
-    chunk.embedding_model = "mock-embedding-768"
-    chunk.embedding_version = "asymmetric-retrieval-v1"
-    chunk.embedding_dimensions = 768
-    chunk.metadata = {"prompt_version": PROMPT_VERSION}
-    chunk.save()
+    provider = MockEmbeddingProvider()
+    DocumentChunkEmbedding.objects.create(
+        document_chunk=chunk,
+        provider=provider.provider_name,
+        model=provider.model_name,
+        dimensions=provider.dimensions,
+        embedding_version=provider.embedding_version,
+        prompt_version=provider.document_prompt_version,
+        content_hash=chunk.content_hash,
+        embedding=provider.embed(chunk.text),
+    )
 
     result = search(
         SearchRequest(
@@ -55,7 +58,7 @@ def test_hybrid_search_exposes_section_scores_and_ranking_version():
     )
 
     assert result["effective_mode"] == "hybrid"
-    assert result["ranking_version"] == "hybrid-section-v2"
+    assert result["ranking_version"] == "hybrid-section-v3"
     assert result["results"][0]["hybrid_score"] is not None
     assert result["results"][0]["semantic_rank"] == 1
     assert result["results"][0]["full_text_rank"] == 1

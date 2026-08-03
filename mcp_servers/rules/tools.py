@@ -255,7 +255,10 @@ class RuleMCPTools:
         embedding = data.pop("embedding", None) or {}
         data["embedding_provider"] = embedding.get("provider")
         data["embedding_model"] = embedding.get("model")
+        data["embedding_dimensions"] = embedding.get("dimensions")
         data["embedding_version"] = embedding.get("embedding_version")
+        data["document_prompt_version"] = embedding.get("document_prompt_version")
+        data["query_prompt_version"] = embedding.get("query_prompt_version")
         data["correlation_id"] = payload.get("metadata", {}).get("correlation_id")
         data["results"] = [
             {

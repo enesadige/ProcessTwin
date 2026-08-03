@@ -192,7 +192,10 @@ def test_search_rule_documents_preserves_versions_sections_scores_and_removes_ve
             "embedding": {
                 "provider": "mock",
                 "model": "mock-embedding-768",
+                "dimensions": 768,
                 "embedding_version": "asymmetric-retrieval-v1",
+                "document_prompt_version": "rag-section-aware-document-v2",
+                "query_prompt_version": "gemini-search-query-v1",
             },
             "ranking_version": "hybrid-section-v2",
             "results": [
@@ -223,6 +226,9 @@ def test_search_rule_documents_preserves_versions_sections_scores_and_removes_ve
     assert result["section_path"] == ["Koşullar"]
     assert result["hybrid_score"] == 0.016
     assert response.data["embedding_provider"] == "mock"
+    assert response.data["embedding_dimensions"] == 768
+    assert response.data["document_prompt_version"] == "rag-section-aware-document-v2"
+    assert response.data["query_prompt_version"] == "gemini-search-query-v1"
     assert response.data["correlation_id"] == "req-from-backend"
     assert "embedding" not in result
 

@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from django.conf import settings
+from django.db.models import F
 
 from apps.rag.benchmark_manifest import (
     BENCHMARK_VERSION,
@@ -15,17 +16,11 @@ from apps.rag.benchmark_manifest import (
     BenchmarkCase,
 )
 from apps.rag.corpus_manifest import CORPUS_KEY
-from apps.rag.models import DocumentChunk
-from apps.rag.providers.base import (
-    DOCUMENT_MODEL,
-    EMBEDDING_DIMENSIONS,
-    EMBEDDING_VERSION,
-    PROMPT_VERSION,
-)
+from apps.rag.models import DocumentChunk, DocumentChunkEmbedding
+from apps.rag.providers import get_embedding_descriptor
 from apps.rag.services.search import SearchRequest, search
 
 CANONICAL_CHUNK_COUNT = 74
-SEMANTIC_PROVIDER = "gemini"
 MARKDOWN_HEADING_PREFIX = re.compile(r"^\s{0,3}#{1,6}\s*")
 
 
@@ -77,12 +72,11 @@ def normalize_heading(value: str | None) -> str:
     return " ".join(normalized.split()).casefold()
 
 
-def validate_semantic_prerequisites() -> dict[str, Any]:
-    if getattr(settings, "RAG_EMBEDDING_PROVIDER", "mock") != SEMANTIC_PROVIDER:
-        raise BenchmarkPrerequisiteError(
-            "Semantic profile requires RAG_EMBEDDING_PROVIDER=gemini and canonical Gemini "
-            "embeddings. Run generate_rag_embeddings --provider gemini --force first."
-        )
+def validate_semantic_prerequisites(provider_name: str | None = None) -> dict[str, Any]:
+    selected = provider_name or getattr(settings, "RAG_EMBEDDING_PROVIDER", "gemini")
+    descriptor = get_embedding_descriptor(selected)
+    if not descriptor.production_semantic_allowed:
+        raise BenchmarkPrerequisiteError("Semantic profile requires a production provider.")
     chunks = DocumentChunk.objects.filter(
         source_document__status="active",
         source_document__metadata__corpus_key=CORPUS_KEY,
@@ -91,33 +85,32 @@ def validate_semantic_prerequisites() -> dict[str, Any]:
         raise BenchmarkPrerequisiteError(
             f"Semantic profile requires exactly {CANONICAL_CHUNK_COUNT} canonical chunks."
         )
-    incompatible = chunks.exclude(
-        embedding__isnull=False,
-        embedding_provider=SEMANTIC_PROVIDER,
-        embedding_model=DOCUMENT_MODEL,
-        embedding_version=EMBEDDING_VERSION,
-        embedding_dimensions=EMBEDDING_DIMENSIONS,
-        metadata__prompt_version=PROMPT_VERSION,
-    ).exists()
-    if incompatible:
+    records = DocumentChunkEmbedding.objects.filter(
+        document_chunk__in=chunks,
+        provider=descriptor.provider,
+        model=descriptor.model,
+        dimensions=descriptor.dimensions,
+        embedding_version=descriptor.embedding_version,
+        prompt_version=descriptor.document_prompt_version,
+        content_hash=F("document_chunk__content_hash"),
+    )
+    if records.count() != CANONICAL_CHUNK_COUNT:
         raise BenchmarkPrerequisiteError(
-            "Canonical chunk embeddings do not match gemini-embedding-2/768/"
-            "asymmetric-retrieval-v1. Run generate_rag_embeddings --provider gemini --force."
+            "Canonical chunk embeddings do not match the selected provider descriptor. "
+            "Run generate_rag_embeddings "
+            f"--provider {descriptor.provider} "
+            f"--embedding-profile {descriptor.profile} --force."
         )
-    return {
-        "provider": SEMANTIC_PROVIDER,
-        "model": DOCUMENT_MODEL,
-        "dimensions": EMBEDDING_DIMENSIONS,
-        "embedding_version": EMBEDDING_VERSION,
-        "prompt_version": PROMPT_VERSION,
-        "chunk_count": CANONICAL_CHUNK_COUNT,
-    }
+    return {**descriptor.metadata(), "chunk_count": CANONICAL_CHUNK_COUNT}
 
 
-def evaluate_case(case: BenchmarkCase) -> BenchmarkCaseResult:
+def evaluate_case(
+    case: BenchmarkCase,
+    *,
+    embedding_provider: str | None = None,
+) -> BenchmarkCaseResult:
     try:
-        response = search(
-            SearchRequest(
+        request = SearchRequest(
                 query=case.query,
                 snapshot_identifier=case.snapshot_identifier,
                 search_mode=case.search_mode,
@@ -129,7 +122,11 @@ def evaluate_case(case: BenchmarkCase) -> BenchmarkCaseResult:
                 rule_code=case.rule_code,
                 rule_version=case.rule_version,
                 include_scores=True,
-            )
+        )
+        response = (
+            search(request, embedding_provider=embedding_provider)
+            if embedding_provider
+            else search(request)
         )
     except Exception as exc:
         return BenchmarkCaseResult(
@@ -266,7 +263,11 @@ def _metrics(results: Iterable[BenchmarkCaseResult], *, blocked_count=0):
     }
 
 
-def run_benchmark(cases: Iterable[BenchmarkCase]) -> dict[str, Any]:
+def run_benchmark(
+    cases: Iterable[BenchmarkCase],
+    *,
+    embedding_provider: str | None = None,
+) -> dict[str, Any]:
     selected = tuple(cases)
     semantic_cases = tuple(case for case in selected if case.profile == SEMANTIC_PROFILE)
     deterministic_cases = tuple(case for case in selected if case.profile != SEMANTIC_PROFILE)
@@ -276,7 +277,7 @@ def run_benchmark(cases: Iterable[BenchmarkCase]) -> dict[str, Any]:
     blocked = 0
     if semantic_cases:
         try:
-            semantic_metadata = validate_semantic_prerequisites()
+            semantic_metadata = validate_semantic_prerequisites(embedding_provider)
         except BenchmarkPrerequisiteError as exc:
             blocked = len(semantic_cases)
             profile_errors.append(
@@ -288,7 +289,10 @@ def run_benchmark(cases: Iterable[BenchmarkCase]) -> dict[str, Any]:
                 }
             )
         else:
-            results.extend(evaluate_case(case) for case in semantic_cases)
+            results.extend(
+                evaluate_case(case, embedding_provider=semantic_metadata["profile"])
+                for case in semantic_cases
+            )
     category_metrics = {}
     for category in sorted({case.category for case in selected}):
         category_results = [result for result in results if result.category == category]
@@ -308,6 +312,20 @@ def run_benchmark(cases: Iterable[BenchmarkCase]) -> dict[str, Any]:
         "selected_case_count": len(selected),
         "profiles": sorted({case.profile for case in selected}),
         "semantic_prerequisites": semantic_metadata,
+        "embedding_provider": semantic_metadata.get("provider") if semantic_metadata else None,
+        "embedding_model": semantic_metadata.get("model") if semantic_metadata else None,
+        "embedding_dimensions": (
+            semantic_metadata.get("dimensions") if semantic_metadata else None
+        ),
+        "embedding_version": (
+            semantic_metadata.get("embedding_version") if semantic_metadata else None
+        ),
+        "document_prompt_version": (
+            semantic_metadata.get("document_prompt_version") if semantic_metadata else None
+        ),
+        "query_prompt_version": (
+            semantic_metadata.get("query_prompt_version") if semantic_metadata else None
+        ),
         "metrics": metrics,
         "category_metrics": category_metrics,
         "profile_errors": profile_errors,

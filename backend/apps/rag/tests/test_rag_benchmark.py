@@ -336,28 +336,29 @@ def test_semantic_warning_and_fallback_fail_case(monkeypatch):
 
 def test_semantic_prerequisite_rejects_mock_provider(settings):
     settings.RAG_EMBEDDING_PROVIDER = "mock"
-    with pytest.raises(BenchmarkPrerequisiteError, match="provider gemini"):
+    with pytest.raises(BenchmarkPrerequisiteError, match="production provider"):
         validate_semantic_prerequisites()
 
 
 def test_semantic_prerequisite_accepts_canonical_gemini_metadata(settings, monkeypatch):
-    class FakeQuerySet:
+    class FakeChunks:
         def count(self):
             return 74
 
-        def exclude(self, **kwargs):
-            assert kwargs["embedding_provider"] == "gemini"
-            assert kwargs["embedding_model"] == "gemini-embedding-2"
-            return self
-
-        def exists(self):
-            return False
+    class FakeRecords:
+        def count(self):
+            return 74
 
     settings.RAG_EMBEDDING_PROVIDER = "gemini"
     monkeypatch.setattr(
         benchmark_service.DocumentChunk.objects,
         "filter",
-        lambda **kwargs: FakeQuerySet(),
+        lambda **kwargs: FakeChunks(),
+    )
+    monkeypatch.setattr(
+        benchmark_service.DocumentChunkEmbedding.objects,
+        "filter",
+        lambda **kwargs: FakeRecords(),
     )
 
     metadata = validate_semantic_prerequisites()
@@ -380,7 +381,9 @@ def test_semantic_prerequisite_is_reported_once_for_six_blocked_cases(monkeypatc
     monkeypatch.setattr(
         benchmark_service,
         "validate_semantic_prerequisites",
-        lambda: (_ for _ in ()).throw(BenchmarkPrerequisiteError("embedding prerequisite")),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            BenchmarkPrerequisiteError("embedding prerequisite")
+        ),
     )
     report = run_benchmark(cases)
 
@@ -452,6 +455,42 @@ def test_command_supports_case_and_category_filters(monkeypatch):
         stdout=StringIO(),
     )
     assert [item.case_code for item in captured["cases"]] == [case.case_code]
+
+
+def test_command_passes_controlled_embedding_provider(monkeypatch):
+    captured = {}
+
+    def fake_run(cases, *, embedding_provider=None):
+        captured["provider"] = embedding_provider
+        return _successful_command_report()
+
+    monkeypatch.setattr("apps.rag.management.commands.benchmark_rag.run_benchmark", fake_run)
+    call_command(
+        "benchmark_rag",
+        "--embedding-provider",
+        "ollama",
+        stdout=StringIO(),
+    )
+
+    assert captured["provider"] == "ollama"
+
+
+def test_command_passes_allowlisted_embedding_profile(monkeypatch):
+    captured = {}
+
+    def fake_run(cases, *, embedding_provider=None):
+        captured["provider"] = embedding_provider
+        return _successful_command_report()
+
+    monkeypatch.setattr("apps.rag.management.commands.benchmark_rag.run_benchmark", fake_run)
+    call_command(
+        "benchmark_rag",
+        "--embedding-profile",
+        "ollama-qwen3-0.6b",
+        stdout=StringIO(),
+    )
+
+    assert captured["provider"] == "ollama-qwen3-0.6b"
 
 
 @pytest.mark.parametrize(

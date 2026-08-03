@@ -6,6 +6,9 @@ Görev 046 yalnızca RAG kaynaklarının saklanacağı veri modelini sağlar.
 
 - `SourceDocument`: Doküman metni, kaynak türü, sürüm ve geçerlilik bilgisi.
 - `DocumentChunk`: Dokümanın sıralı parçaları, bölüm yolu, kural referansı ve ilerideki embedding alanı.
+- `DocumentChunkEmbedding`: Bir chunk için provider/model/sürüm/prompt kimliğiyle
+  ayrılmış embedding kaydı. Aynı chunk Gemini ve Ollama kayıtlarını birlikte
+  taşıyabilir.
 - `IndexRun`: Gelecekteki ingestion/embedding çalıştırmalarının metadata kaydı.
 
 `data_snapshot` boşsa doküman genel prosedür/kural kaynağıdır. Doluysa doküman belirli
@@ -14,7 +17,10 @@ kurulmaz; `DocumentChunk.rule_code` ve `rule_version` yalnız structured referan
 
 `section_path` JSON liste olarak tutulur. Örneğin `["Kapsam", "İstisnalar"]`.
 
-Embedding alanı nullable `vector(768)` alanıdır. 046’da embedding üretimi yapılmaz.
-Provider, ingestion, chunking ve arama sonraki görevlerin kapsamındadır.
+Legacy `DocumentChunk.embedding` alanı geçiş sürecinde read-only tutulur. Yeni
+generation ve search akışları `DocumentChunkEmbedding.embedding` üzerindeki
+`vector(768)` alanını kullanır. Tam kimlik `provider`, `model`, `dimensions`,
+`embedding_version`, `prompt_version` ve güncel chunk `content_hash` değerlerinden
+oluşur. Provider adı tek başına vektör uzayı kimliği değildir.
 
 Full-text alanları, GIN, HNSW ve IVFFlat indeksleri 049’a bırakılmıştır.

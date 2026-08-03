@@ -5,7 +5,11 @@ from django.views.decorators.http import require_POST
 from apps.core.internal_api import internal_service_required
 from apps.rag.internal_serializers import parse_json_body, parse_search_request
 from apps.rag.providers import EmbeddingProviderError
-from apps.rag.services.search import search
+from apps.rag.services.search import (
+    EmbeddingIntegrityError,
+    EmbeddingPrerequisiteError,
+    search,
+)
 
 
 def _error(code, message, status, details=None):
@@ -36,6 +40,18 @@ def search_documents(request):
         return _error("validation_error", str(exc), 400)
     except EmbeddingProviderError as exc:
         return _error("provider_unavailable", str(exc), 503)
+    except EmbeddingPrerequisiteError:
+        return _error(
+            "embedding_prerequisite_error",
+            "The selected embedding set is incomplete for this scope.",
+            409,
+        )
+    except EmbeddingIntegrityError:
+        return _error(
+            "embedding_integrity_error",
+            "The selected embedding set failed integrity validation.",
+            409,
+        )
     except LookupError as exc:
         return _error("not_found", str(exc), 404)
     except Exception:

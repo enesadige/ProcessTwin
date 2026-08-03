@@ -7,20 +7,24 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.rag.models import DocumentChunk, IndexRun, IndexRunStatus, SourceDocument
-from apps.rag.providers import GeminiEmbeddingProvider, MockEmbeddingProvider
-from apps.rag.providers.base import EMBEDDING_DIMENSIONS, PROMPT_VERSION, document_embedding_input
+from apps.rag.models import (
+    DocumentChunk,
+    DocumentChunkEmbedding,
+    IndexRun,
+    IndexRunStatus,
+    SourceDocument,
+)
+from apps.rag.providers import get_embedding_descriptor
 from apps.rag.providers.base import EmbeddingProviderError as ProviderError
 from apps.rag.services.indexing import resolve_snapshot_identifier
 
-ALLOWED_PROVIDERS = {"mock", "gemini"}
 
-
-def get_provider(name: str | None = None):
-    provider_name = name or getattr(settings, "RAG_EMBEDDING_PROVIDER", "mock")
-    if provider_name not in ALLOWED_PROVIDERS:
-        raise ValidationError("Unsupported embedding provider.")
-    return MockEmbeddingProvider() if provider_name == "mock" else GeminiEmbeddingProvider()
+def get_provider(name: str | None = None, *, embedding_profile: str | None = None):
+    provider_name = name or getattr(settings, "RAG_EMBEDDING_PROVIDER", "gemini")
+    return get_embedding_descriptor(
+        provider_name,
+        embedding_profile=embedding_profile,
+    ).create_provider()
 
 
 def embedding_metadata(chunk, provider) -> dict:
@@ -29,22 +33,22 @@ def embedding_metadata(chunk, provider) -> dict:
         "provider": provider.provider_name,
         "model": provider.model_name,
         "embedding_version": provider.embedding_version,
-        "prompt_version": provider.prompt_version,
-        "dimensions": EMBEDDING_DIMENSIONS,
+        "prompt_version": provider.document_prompt_version,
+        "dimensions": provider.dimensions,
     }
 
 
 def is_current_embedding(chunk, provider) -> bool:
-    metadata = chunk.metadata or {}
     expected = embedding_metadata(chunk, provider)
-    return (
-        chunk.embedding is not None
-        and chunk.embedding_provider == provider.provider_name
-        and chunk.embedding_model == provider.model_name
-        and chunk.embedding_version == provider.embedding_version
-        and chunk.embedding_dimensions == EMBEDDING_DIMENSIONS
-        and all(metadata.get(key) == value for key, value in expected.items())
-    )
+    return DocumentChunkEmbedding.objects.filter(
+        document_chunk=chunk,
+        provider=expected["provider"],
+        model=expected["model"],
+        dimensions=expected["dimensions"],
+        embedding_version=expected["embedding_version"],
+        prompt_version=expected["prompt_version"],
+        content_hash=expected["content_hash"],
+    ).exists()
 
 
 def selected_documents(*, document_codes=None, snapshot_identifier=None):
@@ -100,6 +104,7 @@ def generate_embeddings(
     )
     pending = [chunk for chunk in chunks if force or not is_current_embedding(chunk, provider)]
     if validate_only:
+        provider.validate_ready()
         return {"chunk_count": len(chunks), "pending_count": len(pending), "embedding_count": 0}
 
     run = IndexRun.objects.create(
@@ -107,13 +112,14 @@ def generate_embeddings(
         status=IndexRunStatus.PENDING,
         embedding_provider=provider.provider_name,
         embedding_model=provider.model_name,
-        embedding_dimensions=EMBEDDING_DIMENSIONS,
+        embedding_dimensions=provider.dimensions,
         source_digest=source_digest(documents, provider),
         metadata={
             "provider": provider.provider_name,
             "model": provider.model_name,
             "embedding_version": provider.embedding_version,
-            "prompt_version": PROMPT_VERSION,
+            "document_prompt_version": provider.document_prompt_version,
+            "query_prompt_version": provider.query_prompt_version,
             "selected_document_codes": [document.document_code for document in documents],
             "selected_chunk_count": len(chunks),
             "pending_chunk_count": len(pending),
@@ -125,45 +131,54 @@ def generate_embeddings(
     run.started_at = timezone.now()
     run.save(update_fields=["status", "started_at", "updated_at"])
     try:
-        results = []
-        for chunk in pending:
-            text = document_embedding_input(
+        provider.validate_ready()
+        inputs = [
+            provider.document_input(
                 chunk.source_document.title,
                 chunk.source_document.document_code,
                 chunk.section_path,
                 chunk.heading,
                 chunk.text,
             )
-            values = provider.embed(text)
-            if len(values) != EMBEDDING_DIMENSIONS:
+            for chunk in pending
+        ]
+        vectors = provider.embed_many(inputs) if inputs else []
+        if len(vectors) != len(pending):
+            raise ProviderError("embedding_batch_count_mismatch")
+        results = []
+        for chunk, values in zip(pending, vectors, strict=True):
+            if len(values) != provider.dimensions:
                 raise ProviderError("invalid_embedding_dimensions")
             results.append((chunk, values))
+        created_count = 0
+        replaced_count = 0
         with transaction.atomic():
             for chunk, values in results:
-                metadata = dict(chunk.metadata or {})
-                metadata.update(embedding_metadata(chunk, provider))
-                chunk.embedding = values
-                chunk.embedding_provider = provider.provider_name
-                chunk.embedding_model = provider.model_name
-                chunk.embedding_version = provider.embedding_version
-                chunk.embedding_dimensions = EMBEDDING_DIMENSIONS
-                chunk.metadata = metadata
-                chunk.save(
-                    update_fields=[
-                        "embedding",
-                        "embedding_provider",
-                        "embedding_model",
-                        "embedding_version",
-                        "embedding_dimensions",
-                        "metadata",
-                        "updated_at",
-                    ]
+                identity = embedding_metadata(chunk, provider)
+                _record, created = DocumentChunkEmbedding.objects.update_or_create(
+                    document_chunk=chunk,
+                    provider=identity["provider"],
+                    model=identity["model"],
+                    dimensions=identity["dimensions"],
+                    embedding_version=identity["embedding_version"],
+                    prompt_version=identity["prompt_version"],
+                    content_hash=identity["content_hash"],
+                    defaults={"embedding": values},
                 )
+                created_count += int(created)
+                replaced_count += int(not created)
             run.status = IndexRunStatus.SUCCEEDED
             run.completed_at = timezone.now()
             run.source_count = len(documents)
             run.chunk_count = len(chunks)
             run.embedding_count = len(results)
+            run.metadata.update(
+                {
+                    "created_count": created_count,
+                    "replaced_count": replaced_count,
+                    "unchanged_count": len(chunks) - len(pending),
+                }
+            )
             run.save(
                 update_fields=[
                     "status",

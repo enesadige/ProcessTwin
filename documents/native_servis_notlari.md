@@ -82,12 +82,26 @@ Bu makinede gorulen model:
 
 ```text
 gemma4:12b-it-qat
+qwen3-embedding:4b
 ```
 
 Kontrol:
 
 ```bash
 curl -s http://localhost:11434/api/tags
+```
+
+Lokal embedding modeli `qwen3-embedding:4b` olarak doğrulanmıştır. Uygulama
+runtime'da model indirmez; eksik kurulumda şu komut bir kez çalıştırılır:
+
+```bash
+ollama pull qwen3-embedding:4b
+```
+
+Gemma CLI smoke thinking kapalı yürütülür:
+
+```bash
+ollama run gemma4:12b-it-qat --think=false
 ```
 
 ## Celery

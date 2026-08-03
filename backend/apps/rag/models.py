@@ -42,6 +42,12 @@ class IndexRunStatus(models.TextChoices):
     CANCELLED = "cancelled", "Cancelled"
 
 
+class EmbeddingProviderName(models.TextChoices):
+    MOCK = "mock", "Mock"
+    GEMINI = "gemini", "Gemini"
+    OLLAMA = "ollama", "Ollama"
+
+
 def validate_sha256(value: str) -> None:
     if not SHA256_RE.fullmatch(value or ""):
         raise ValidationError("Value must be a 64-character SHA-256 hexadecimal digest.")
@@ -244,6 +250,91 @@ class DocumentChunk(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.source_document.document_code}#{self.sequence}"
+
+
+class DocumentChunkEmbedding(TimeStampedModel):
+    document_chunk = models.ForeignKey(
+        DocumentChunk,
+        on_delete=models.CASCADE,
+        related_name="embedding_records",
+    )
+    provider = models.CharField(max_length=80, choices=EmbeddingProviderName.choices)
+    model = models.CharField(max_length=160)
+    dimensions = models.PositiveIntegerField(default=EMBEDDING_DIMENSIONS)
+    embedding_version = models.CharField(max_length=80)
+    prompt_version = models.CharField(max_length=120)
+    content_hash = models.CharField(max_length=64, validators=[validate_sha256])
+    embedding = VectorField(dimensions=EMBEDDING_DIMENSIONS)
+
+    class Meta:
+        db_table = "rag_document_chunk_embedding"
+        ordering = ["document_chunk", "provider", "model", "embedding_version"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    "document_chunk",
+                    "provider",
+                    "model",
+                    "dimensions",
+                    "embedding_version",
+                    "prompt_version",
+                    "content_hash",
+                ],
+                name="rag_chunk_embedding_identity_uniq",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(dimensions=EMBEDDING_DIMENSIONS),
+                name="rag_chunk_embedding_dimensions_768",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["provider", "model", "embedding_version", "prompt_version"],
+                name="rag_emb_descriptor_idx",
+            ),
+            models.Index(
+                fields=["document_chunk", "provider", "model"],
+                name="rag_emb_chunk_provider_idx",
+            ),
+            models.Index(fields=["content_hash"], name="rag_emb_content_hash_idx"),
+        ]
+
+    def clean(self):
+        errors = {}
+        for field_name in ("model", "embedding_version", "prompt_version"):
+            if not (getattr(self, field_name, "") or "").strip():
+                errors[field_name] = f"{field_name} cannot be blank."
+        if self.dimensions != EMBEDDING_DIMENSIONS:
+            errors["dimensions"] = f"dimensions must be {EMBEDDING_DIMENSIONS}."
+        try:
+            embedding_length = len(self.embedding)
+        except TypeError:
+            errors["embedding"] = "embedding must be a sized vector."
+        else:
+            if embedding_length != EMBEDDING_DIMENSIONS:
+                errors["embedding"] = (
+                    f"embedding must contain {EMBEDDING_DIMENSIONS} dimensions."
+                )
+        if errors:
+            raise ValidationError(errors)
+
+    def full_clean(
+        self,
+        exclude=None,
+        validate_unique=True,
+        validate_constraints=False,
+    ):
+        return super().full_clean(
+            exclude=exclude,
+            validate_unique=validate_unique,
+            validate_constraints=validate_constraints,
+        )
+
+    def __str__(self) -> str:
+        return (
+            f"{self.document_chunk} {self.provider}/{self.model} "
+            f"({self.embedding_version})"
+        )
 
 
 class IndexRun(TimeStampedModel):

@@ -11,6 +11,10 @@ from apps.rag.providers.base import (
 class MockEmbeddingProvider(EmbeddingProvider):
     provider_name = "mock"
     model_name = "mock-embedding-768"
+    embedding_version = "mock-embedding-768-v1"
+    document_prompt_version = "mock-section-aware-document-v1"
+    query_prompt_version = "mock-search-query-v1"
+    production_semantic_allowed = False
 
     def embed(self, text: str, *, is_query: bool = False) -> list[float]:
         if not text.strip():

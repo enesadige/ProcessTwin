@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.rag.providers.registry import DESCRIPTORS, PROVIDER_DEFAULT_PROFILES
 from apps.rag.services.embeddings import (
     generate_embeddings,
     get_provider,
@@ -8,18 +9,22 @@ from apps.rag.services.embeddings import (
 
 
 class Command(BaseCommand):
-    help = "Generate deterministic or Gemini embeddings for active RAG chunks."
+    help = "Generate one selected provider embedding set for active RAG chunks."
 
     def add_arguments(self, parser):
         parser.add_argument("--document-code", action="append", dest="document_codes")
         parser.add_argument("--snapshot-identifier")
-        parser.add_argument("--provider", choices=["mock", "gemini"])
+        parser.add_argument("--provider", choices=sorted(PROVIDER_DEFAULT_PROFILES))
+        parser.add_argument("--embedding-profile", choices=sorted(DESCRIPTORS))
         parser.add_argument("--force", action="store_true")
         parser.add_argument("--validate-only", action="store_true")
 
     def handle(self, *args, **options):
         try:
-            provider = get_provider(options["provider"])
+            provider = get_provider(
+                options["provider"],
+                embedding_profile=options["embedding_profile"],
+            )
             documents, snapshot = selected_documents(
                 document_codes=options["document_codes"],
                 snapshot_identifier=options["snapshot_identifier"],

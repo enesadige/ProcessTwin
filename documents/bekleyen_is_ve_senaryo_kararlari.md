@@ -546,9 +546,10 @@ Gorev 049 uygulama kararlari:
   uygulanir; SearchVectorField ve GIN indeksleri bu asamada eklenmez.
 - Ilk hybrid ranking `hybrid-rrf-v1`, `rrf_k=60` ve esit semantic/full-text
   agirligi ile kurulmustur. Gorev 051.1 section-level kalite auditi sonrasinda
-  canonical davranis `semantic-section-v2` ve `hybrid-section-v2` olarak
-  guncellenmistir: raw semantic skor ana sinyal, full-text sinirli bonus ve
-  dusuk-bilgili H1/karakter fragment factor'u genel ikincil sinyaldir. Rule MCP
+  canonical davranis Gorev 051.5'te `semantic-section-v3` ve
+  `hybrid-section-v3` olarak guncellenmistir: raw semantic skor ana sinyal;
+  heading, section path, content ve dusuk-bilgili chunk factor'u genel ve
+  sinirli ikincil sinyallerdir. Rule MCP
   `search_rule_documents` entegrasyonu 050'ye aittir.
 - Bu teknik karar, hangi RAG dokümanlarının kullanılacağına ilişkin açık kaynak
   kararlarını değiştirmez; doküman türleri ve korpus seçimi hâlâ beklemededir.
@@ -2107,12 +2108,45 @@ Durum: `KARAR VERİLDİ`
   - karışık: LLM ve embedding provider birbirinden farklı olabilir
 - Mock provider yalnız unit test ve deterministik mekanik doğrulama içindir;
   gerçek semantic kalite kanıtı sayılmaz.
-- Embedding provider veya model değiştiğinde bütün aktif chunk embedding'leri
-  yeniden üretilir. Farklı provider/model embedding'leri aynı semantic sorguda
-  karıştırılmaz.
+- Seçilen provider/model descriptor'ı için güncel tam set yoksa bütün aktif chunk
+  embedding'leri o descriptor için üretilir. Güncel set varsa provider geçişi
+  yeniden üretim gerektirmez. Farklı provider/model embedding'leri aynı semantic
+  sorguda karıştırılmaz.
 - Search servisi yalnız aktif provider, model, embedding version ve prompt
   version ile eşleşen embedding kayıtlarını kullanır.
-- Ollama embedding modeli ve adapter implementasyonu ilgili sonraki provider
-  görevinde audit edilerek seçilir; model adı önceden varsayılmaz.
+- Ollama adapter aynı runtime altında allowlist edilmiş model profillerini
+  destekler. Aktif lokal model `qwen3-embedding:4b`, dimensions `768`, document
+  prompt `qwen3-section-document-v1` ve query prompt
+  `qwen3-telecom-query-v1` descriptor'ıdır. Nomic ve Qwen3 0.6B kalite kapısını
+  geçmediği için yalnız tarihsel benchmark kayıtlarıdır.
 - İleride kullanıcı ayarı eklendiğinde LLM ve embedding provider ayrı seçenekler
   olarak gösterilir. Mevcut aşamada seçim backend environment/settings ile yapılır.
+
+## 16. Çoklu Embedding Kimliği ve Lokal LLM Thinking Politikası
+
+Durum: `KARAR VERİLDİ`
+
+- Gemini ve lokal Ollama embedding setleri `DocumentChunkEmbedding` üzerinde
+  aynı anda saklanır. Provider adı tek başına kimlik değildir; model,
+  dimensions, embedding version, document prompt version ve content hash tam
+  eşleşmelidir.
+- `RAG_EMBEDDING_PROVIDER=ollama`, registry'deki doğrulanmış lokal default
+  descriptor'a çözülür. Internal API veya MCP serbest model adı gönderemez.
+- Aynı provider altındaki Nomic ve Qwen kayıtları birbirine karıştırılmaz.
+  Provider generation hatası diğer setleri değiştirmez; partial set semantic
+  aramaya alınmaz.
+- `LLM_PROVIDER` ve `RAG_EMBEDDING_PROVIDER` bağımsızdır. Online, lokal ve iki
+  karışık kombinasyon desteklenir; biri diğerini otomatik değiştirmez.
+- Gelecekteki lokal LLM provider `ollama` ve model `gemma4:12b-it-qat` kullanır.
+  Tüm `/api/chat` çağrıları, retry, streaming/non-streaming, structured output
+  ve tool-calling dahil, açık `think=false` taşır.
+- Thinking kullanıcı veya environment ayarıyla açılamaz. Reasoning/thinking
+  içeriği response'a eklenmez; log, DecisionEvidence veya veritabanında
+  saklanmaz.
+- `/api/embed` embedding endpoint'ine `think` parametresi gönderilmez.
+- M1 16 GB lokal çalışma profilinde Qwen query embedding ve retrieval sonrasında
+  `keep_alive=0` ile unload edilir; Gemma bundan sonra yüklenir. İki modelin
+  sürekli aynı anda bellekte tutulması varsayılan değildir. 74 document vector
+  her kullanıcı sorgusunda yeniden üretilmez.
+- Sunumda birleşik bellek baskısı görülürse Gemma LLM ile Gemini embedding hibrit
+  profili kullanılabilir.

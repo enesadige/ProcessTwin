@@ -6,14 +6,21 @@ from django.test import override_settings
 
 from apps.datasets.models import DatasetVersion, DataSnapshot
 from apps.rag.corpus_utils import content_hash
-from apps.rag.models import DocumentChunk, SourceDocument
-from apps.rag.providers.base import PROMPT_VERSION
+from apps.rag.models import DocumentChunk, DocumentChunkEmbedding, SourceDocument
 from apps.rag.providers.mock import MockEmbeddingProvider
+from apps.rag.services import search as search_service
 from apps.rag.services.search import (
     CHARACTER_FRAGMENT_FACTOR,
+    CONTENT_WEIGHT,
     H1_BOILERPLATE_FACTOR,
+    HEADING_WEIGHT,
+    MIN_CANDIDATE_LIMIT,
+    SECTION_PATH_WEIGHT,
+    SEMANTIC_WEIGHT,
     SearchRequest,
+    candidate_limit,
     hybrid_section_score,
+    lexical_relevance,
     rerank_semantic_results,
     search,
     section_information_factor,
@@ -52,22 +59,16 @@ def search_fixture():
             text=text,
             content_hash=content_hash(text),
         )
-        chunk.embedding = MockEmbeddingProvider().embed(text)
-        chunk.embedding_provider = "mock"
-        chunk.embedding_model = "mock-embedding-768"
-        chunk.embedding_version = "asymmetric-retrieval-v1"
-        chunk.embedding_dimensions = 768
-        chunk.metadata = {"prompt_version": PROMPT_VERSION}
-        chunk.save(
-            update_fields=[
-                "embedding",
-                "embedding_provider",
-                "embedding_model",
-                "embedding_version",
-                "embedding_dimensions",
-                "metadata",
-                "updated_at",
-            ]
+        provider = MockEmbeddingProvider()
+        DocumentChunkEmbedding.objects.create(
+            document_chunk=chunk,
+            provider=provider.provider_name,
+            model=provider.model_name,
+            dimensions=provider.dimensions,
+            embedding_version=provider.embedding_version,
+            prompt_version=provider.document_prompt_version,
+            content_hash=chunk.content_hash,
+            embedding=provider.embed(text),
         )
         docs.append(document)
     return snapshot, docs
@@ -104,6 +105,142 @@ def test_semantic_search_returns_scores_without_vectors_in_payload():
     assert result["results"]
     assert result["results"][0]["semantic_score"] is not None
     assert "embedding" not in result["results"][0]
+    assert result["embedding"]["provider"] == "mock"
+
+
+@pytest.mark.django_db
+@override_settings(RAG_EMBEDDING_PROVIDER="mock")
+def test_semantic_search_rejects_partial_selected_provider_set():
+    snapshot, _ = search_fixture()
+    DocumentChunkEmbedding.objects.filter(document_chunk__sequence=0).first().delete()
+
+    with pytest.raises(
+        search_service.EmbeddingPrerequisiteError,
+        match="embedding_prerequisite_error",
+    ):
+        search(
+            SearchRequest(
+                query="başarısız yedek hat geçişi",
+                snapshot_identifier=snapshot.snapshot_key,
+                search_mode="semantic",
+            )
+        )
+
+
+@pytest.mark.django_db
+@override_settings(RAG_EMBEDDING_PROVIDER="mock")
+def test_hybrid_does_not_fallback_for_partial_embedding_set():
+    snapshot, _ = search_fixture()
+    DocumentChunkEmbedding.objects.first().delete()
+
+    with pytest.raises(search_service.EmbeddingPrerequisiteError):
+        search(
+            SearchRequest(
+                query="başarısız yedek hat geçişi",
+                snapshot_identifier=snapshot.snapshot_key,
+                search_mode="hybrid",
+            )
+        )
+
+
+@pytest.mark.django_db
+def test_search_uses_only_the_exact_selected_provider_descriptor(monkeypatch):
+    snapshot, _ = search_fixture()
+    chunks = list(DocumentChunk.objects.order_by("pk"))
+
+    class Provider(MockEmbeddingProvider):
+        provider_name = "gemini"
+        model_name = "gemini-embedding-2"
+        embedding_version = "asymmetric-retrieval-v1"
+        document_prompt_version = "rag-section-aware-document-v2"
+        query_prompt_version = "gemini-search-query-v1"
+
+    provider = Provider()
+    for index, chunk in enumerate(chunks):
+        vector = [0.0] * 768
+        vector[index] = 1.0
+        DocumentChunkEmbedding.objects.create(
+            document_chunk=chunk,
+            provider=provider.provider_name,
+            model=provider.model_name,
+            dimensions=provider.dimensions,
+            embedding_version=provider.embedding_version,
+            prompt_version=provider.document_prompt_version,
+            content_hash=chunk.content_hash,
+            embedding=vector,
+        )
+    query_vector = [0.0] * 768
+    query_vector[1] = 1.0
+    monkeypatch.setattr(provider, "embed", lambda *args, **kwargs: query_vector)
+    monkeypatch.setattr(search_service, "get_provider", lambda _name=None: provider)
+
+    result = search(
+        SearchRequest(
+            query="yedek geçiş",
+            snapshot_identifier=snapshot.snapshot_key,
+            search_mode="semantic",
+        ),
+        embedding_provider="gemini",
+    )
+
+    assert result["results"][0]["document_code"] == "SYN-FAILOVER-MAINTENANCE-2026"
+    assert result["embedding"]["provider"] == "gemini"
+    assert result["embedding"]["document_prompt_version"] == (
+        "rag-section-aware-document-v2"
+    )
+
+
+@pytest.mark.django_db
+def test_search_does_not_mix_models_from_the_same_ollama_provider(monkeypatch):
+    snapshot, _ = search_fixture()
+    chunks = list(DocumentChunk.objects.order_by("pk"))
+
+    class QwenProvider(MockEmbeddingProvider):
+        provider_name = "ollama"
+        model_name = "qwen3-embedding:0.6b"
+        embedding_version = "qwen3-embedding-0.6b-768-v1"
+        document_prompt_version = "qwen3-section-document-v1"
+        query_prompt_version = "qwen3-telecom-query-v1"
+
+    provider = QwenProvider()
+    query_vector = [1.0] + [0.0] * 767
+    for index, chunk in enumerate(chunks):
+        qwen_vector = query_vector if index == 0 else [0.0, 1.0] + [0.0] * 766
+        nomic_vector = [0.0, 1.0] + [0.0] * 766 if index == 0 else query_vector
+        DocumentChunkEmbedding.objects.create(
+            document_chunk=chunk,
+            provider="ollama",
+            model="qwen3-embedding:0.6b",
+            dimensions=768,
+            embedding_version="qwen3-embedding-0.6b-768-v1",
+            prompt_version="qwen3-section-document-v1",
+            content_hash=chunk.content_hash,
+            embedding=qwen_vector,
+        )
+        DocumentChunkEmbedding.objects.create(
+            document_chunk=chunk,
+            provider="ollama",
+            model="nomic-embed-text-v2-moe",
+            dimensions=768,
+            embedding_version="nomic-embed-v2-moe-768-v1",
+            prompt_version="nomic-section-aware-document-v1",
+            content_hash=chunk.content_hash,
+            embedding=nomic_vector,
+        )
+    monkeypatch.setattr(provider, "embed", lambda *args, **kwargs: query_vector)
+    monkeypatch.setattr(search_service, "get_provider", lambda _name=None: provider)
+
+    result = search(
+        SearchRequest(
+            query="section query",
+            snapshot_identifier=snapshot.snapshot_key,
+            search_mode="semantic",
+        ),
+        embedding_provider="ollama-qwen3-0.6b",
+    )
+
+    assert result["results"][0]["chunk_id"] == chunks[0].pk
+    assert result["embedding"]["model"] == "qwen3-embedding:0.6b"
 
 
 @pytest.mark.django_db
@@ -172,11 +309,41 @@ def test_semantic_section_rerank_preserves_raw_score_and_uses_stable_tie_break()
     )
     section = _ranking_item(pk=1, sequence=1, text="Tam bölüm", score=0.636)
 
-    ranked = rerank_semantic_results([fragment, section])
+    ranked = rerank_semantic_results([fragment, section], "tam bölüm")
 
     assert [item["chunk"].pk for item in ranked] == [1, 2]
     assert ranked[0]["score"] == 0.636
     assert [item["rank"] for item in ranked] == [1, 2]
+
+
+def test_section_reranking_uses_general_normalized_components():
+    section = _ranking_item(pk=1, sequence=1, text="planlı bakım tamamlanır", score=0.60)
+    section["chunk"].heading = "Planlı Bakım"
+    section["chunk"].section_path = ["Operasyon", "Planlı Bakım"]
+    generic = _ranking_item(pk=2, sequence=2, text="genel açıklama", score=0.61)
+    generic["chunk"].heading = "Genel"
+    generic["chunk"].section_path = ["Operasyon", "Genel"]
+
+    ranked = rerank_semantic_results([generic, section], "planlı bakım tamamlanmadı")
+
+    assert ranked[0]["chunk"].pk == 1
+    assert ranked[0]["heading_score"] > 0
+    assert ranked[0]["section_path_score"] > 0
+    assert ranked[0]["content_score"] > 0
+    assert ranked[0]["score"] == 0.60
+    assert SEMANTIC_WEIGHT > HEADING_WEIGHT + SECTION_PATH_WEIGHT + CONTENT_WEIGHT
+
+
+def test_lexical_relevance_is_unicode_aware_and_not_synonym_specific():
+    assert lexical_relevance("Planlı çalışmalar tamamlanmadı", "Planlı çalışma tamamlandı") > 0
+    assert lexical_relevance("hizmet seviyesi", "SLA İhlalleri") == 0
+
+
+def test_candidate_pool_is_independent_from_small_final_limit(monkeypatch):
+    assert MIN_CANDIDATE_LIMIT == 20
+    assert candidate_limit(1) == 20
+    assert candidate_limit(5) == 20
+    assert candidate_limit(20) == 80
 
 
 def test_hybrid_section_score_keeps_semantic_primary_and_full_text_bounded():

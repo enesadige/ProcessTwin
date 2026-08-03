@@ -6,7 +6,9 @@ customer impact veya telafi tutari hesaplamaz.
 
 ## Embedding
 
-`EmbeddingProvider` arayuzu `mock` ve `gemini` provider'larini destekler.
+`EmbeddingProvider` arayuzu `mock`, `gemini` ve yerel `ollama` provider'larini
+destekler. Provider descriptor'lari merkezi allowlist registry'den çözülür;
+request serbest model adı kabul etmez.
 Gemini modeli `gemini-embedding-2`, boyut 768 ve embedding surumu
 `asymmetric-retrieval-v1` olarak sabittir. Dokuman girdisi
 `rag-section-aware-document-v2` ile document title, document code, normalized
@@ -16,6 +18,19 @@ ediliyorsa embedding input content bolumunde tekrarlanmaz; SourceDocument ve
 DocumentChunk icerigi degistirilmez. Sorgu girdisi
 `task: search result | query: ...` formatinda kalir. Mock provider, test ve offline
 gelistirme icin SHA-256 tabanli, deterministic ve L2-normalized vektor uretir.
+
+Gemini ve Ollama embedding kayıtları `DocumentChunkEmbedding` tablosunda aynı
+anda saklanır. Semantic sorgu yalnız aktif descriptor ile provider, model,
+dimensions, embedding version, document prompt version ve content hash birebir
+eşleşen tam seti kullanır. Farklı model uzayları, her ikisi de 768 boyutlu olsa
+bile karıştırılmaz.
+
+Aktif lokal descriptor `qwen3-embedding:4b`, 768 boyut,
+`qwen3-embedding-4b-768-v1`, `qwen3-section-document-v1` ve
+`qwen3-telecom-query-v1` tam kimliğidir. Interactive Ollama query isteği
+`keep_alive=0` ile tamamlandıktan sonra modeli bellekten çıkarır. Document
+generation tek batch boyunca modeli yüklü tutar ve yanıt sonrasında unload eder;
+74 document embedding normal kullanıcı sorgusunda yeniden üretilmez.
 
 `generate_rag_embeddings` yalniz aktif `SourceDocument` chunk'larini isler.
 Provider/model/surum veya chunk hash degismediyse kayit unchanged kabul edilir.
@@ -37,17 +52,21 @@ verilirse hem kaynak hem chunk gecerlilik araligi uygulanir.
 Desteklenen modlar:
 
 - `full_text`: PostgreSQL `simple` configuration ile expression-based arama.
-- `semantic`: pgvector `CosineDistance` ve gecerli 768 boyutlu embedding'lerle
-  raw cosine skoru korunurken `semantic-section-v2` ile section
-  butunlugu ikincil sinyal olarak kullanilir. Yalniz sentetiklik uyarisindan
+- `semantic`: pgvector `CosineDistance` ve seçili descriptor'ın eksiksiz 768
+  boyutlu embedding setiyle çalışır. Final limitten bağımsız en az 20 dense aday
+  alınır. Raw cosine skoru korunurken `semantic-section-v3` ile normalize dense
+  skor ana sinyal (`0.92`); heading (`0.03`), section path (`0.02`) ve chunk
+  content (`0.03`) lexical ilgisi sınırlı ikincil sinyaldir. Yalniz sentetiklik uyarisindan
   olusan H1 chunk'lari `0.95`, karakter sinirinda bolunmus/overlap chunk'lari
   `0.97` genel factor ile siralanir; exact code eslesmeleri penalize edilmez.
-- `hybrid`: `hybrid-section-v2` raw semantic section skorunu ana sinyal olarak
+- `hybrid`: `hybrid-section-v3` semantic section skorunu ana sinyal olarak
   kullanir. Full-text rank katkisi `0.02 / (1 + rank)` ile sinirlidir; exact code
   eslesmesi `1.0` bonus alir. Case, query terimi veya document code'a ozel kural
   yoktur.
 
-Hybrid provider kullanilamazsa response `effective_mode=full_text_fallback` ve
+Seçili descriptor seti eksik veya kısmiysa semantic ve hybrid arama açık
+`embedding_prerequisite_error` döndürür. Eksiksiz set varken runtime provider
+geçici olarak kullanılamazsa hybrid response `effective_mode=full_text_fallback` ve
 acik bir warning doner. Semantic modda sessiz fallback yapilmaz. Sonuclarda
 chunk metni, belge/bolum bilgisi, skorlar ve evidence metadata bulunur; ham
 embedding vektoru disari acilmaz.

@@ -7,6 +7,7 @@ from apps.rag.benchmark_manifest import (
     DETERMINISTIC_PROFILE,
     SEMANTIC_PROFILE,
 )
+from apps.rag.providers.registry import DESCRIPTORS
 from apps.rag.services.benchmark import run_benchmark
 
 PROFILES = {DETERMINISTIC_PROFILE, SEMANTIC_PROFILE, "all"}
@@ -20,10 +21,33 @@ class Command(BaseCommand):
         parser.add_argument("--format", dest="output_format", default="text")
         parser.add_argument("--case-code", action="append", dest="case_codes")
         parser.add_argument("--category", action="append", dest="categories")
+        parser.add_argument(
+            "--embedding-provider",
+            choices=("gemini", "ollama"),
+        )
+        parser.add_argument(
+            "--embedding-profile",
+            choices=sorted(
+                key
+                for key, descriptor in DESCRIPTORS.items()
+                if descriptor.production_semantic_allowed
+            ),
+        )
 
     def handle(self, *args, **options):
         selected = self._select_cases(options)
-        report = run_benchmark(selected)
+        provider = options["embedding_provider"]
+        embedding_profile = options["embedding_profile"]
+        if provider and embedding_profile:
+            from apps.rag.providers import get_embedding_descriptor
+
+            get_embedding_descriptor(provider, embedding_profile=embedding_profile)
+        selection = embedding_profile or provider
+        report = (
+            run_benchmark(selected, embedding_provider=selection)
+            if selection
+            else run_benchmark(selected)
+        )
         if options["output_format"] == "json":
             self.stdout.write(json.dumps(report, ensure_ascii=False, sort_keys=True))
         else:

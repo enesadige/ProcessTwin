@@ -2,12 +2,14 @@ from datetime import datetime, timedelta
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.datasets.models import DatasetVersion, DataSnapshot
 from apps.rag.models import (
     EMBEDDING_DIMENSIONS,
     DocumentChunk,
+    DocumentChunkEmbedding,
     DocumentStatus,
     DocumentType,
     IndexRun,
@@ -186,6 +188,87 @@ def test_document_chunk_accepts_768_dimensions_and_rejects_other_dimensions():
     )
     with pytest.raises(ValidationError):
         invalid.full_clean()
+
+
+def test_document_chunk_supports_multiple_embedding_provider_records():
+    document = make_document(code="DOC-MULTI-EMBEDDING")
+    chunk = DocumentChunk.objects.create(
+        source_document=document,
+        sequence=0,
+        text="Parça",
+        content_hash=digest(),
+    )
+    for provider, model, version, prompt in (
+        ("gemini", "gemini-embedding-2", "asymmetric-retrieval-v1", "gemini-v2"),
+        ("ollama", "nomic-embed-text-v2-moe", "nomic-v1", "nomic-v1"),
+    ):
+        record = DocumentChunkEmbedding(
+            document_chunk=chunk,
+            provider=provider,
+            model=model,
+            dimensions=EMBEDDING_DIMENSIONS,
+            embedding_version=version,
+            prompt_version=prompt,
+            content_hash=chunk.content_hash,
+            embedding=[0.0] * EMBEDDING_DIMENSIONS,
+        )
+        record.full_clean()
+        record.save()
+
+    assert chunk.embedding_records.count() == 2
+
+
+def test_document_chunk_embedding_rejects_duplicate_identity_and_invalid_values():
+    document = make_document(code="DOC-EMBEDDING-CONSTRAINT")
+    chunk = DocumentChunk.objects.create(
+        source_document=document,
+        sequence=0,
+        text="Parça",
+        content_hash=digest(),
+    )
+    values = {
+        "document_chunk": chunk,
+        "provider": "gemini",
+        "model": "gemini-embedding-2",
+        "dimensions": EMBEDDING_DIMENSIONS,
+        "embedding_version": "version-1",
+        "prompt_version": "prompt-1",
+        "content_hash": chunk.content_hash,
+        "embedding": [0.0] * EMBEDDING_DIMENSIONS,
+    }
+    DocumentChunkEmbedding.objects.create(**values)
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            DocumentChunkEmbedding.objects.create(**values)
+
+    invalid = DocumentChunkEmbedding(
+        **{**values, "dimensions": 3, "embedding": [0.0] * 3}
+    )
+    with pytest.raises(ValidationError):
+        invalid.full_clean()
+
+
+def test_document_chunk_embedding_cascades_with_chunk():
+    document = make_document(code="DOC-EMBEDDING-CASCADE")
+    chunk = DocumentChunk.objects.create(
+        source_document=document,
+        sequence=0,
+        text="Parça",
+        content_hash=digest(),
+    )
+    DocumentChunkEmbedding.objects.create(
+        document_chunk=chunk,
+        provider="gemini",
+        model="gemini-embedding-2",
+        dimensions=EMBEDDING_DIMENSIONS,
+        embedding_version="version-1",
+        prompt_version="prompt-1",
+        content_hash=chunk.content_hash,
+        embedding=[0.0] * EMBEDDING_DIMENSIONS,
+    )
+    chunk.delete()
+
+    assert DocumentChunkEmbedding.objects.count() == 0
 
 
 def test_index_run_status_and_time_invariants():

@@ -1,5 +1,6 @@
 import math
 import re
+import unicodedata
 from dataclasses import dataclass
 from functools import reduce
 from operator import or_
@@ -11,22 +12,35 @@ from django.db import connection
 from django.db.models import F, Q
 from pgvector.django import CosineDistance
 
-from apps.rag.models import DocumentChunk
+from apps.rag.models import DocumentChunk, DocumentChunkEmbedding
 from apps.rag.providers import EmbeddingProviderError
-from apps.rag.providers.base import query_embedding_input
 from apps.rag.services.embeddings import get_provider
 from apps.rag.services.indexing import resolve_snapshot_identifier
 
 SEARCH_MODES = {"semantic", "full_text", "hybrid"}
-SEMANTIC_RANKING_VERSION = "semantic-section-v2"
-HYBRID_RANKING_VERSION = "hybrid-section-v2"
+SEMANTIC_RANKING_VERSION = "semantic-section-v3"
+HYBRID_RANKING_VERSION = "hybrid-section-v3"
 H1_BOILERPLATE_FACTOR = 0.95
 CHARACTER_FRAGMENT_FACTOR = 0.97
+SEMANTIC_WEIGHT = 0.92
+HEADING_WEIGHT = 0.03
+SECTION_PATH_WEIGHT = 0.02
+CONTENT_WEIGHT = 0.03
 HYBRID_FULL_TEXT_BONUS = 0.02
 HYBRID_EXACT_CODE_BONUS = 1.0
 MAX_QUERY_LENGTH = 500
 MAX_TOP_K = 20
+MIN_CANDIDATE_LIMIT = 20
 CODE_RE = re.compile(r"[A-Z][A-Z0-9]*(?:[-_][A-Z0-9]+)+")
+TOKEN_RE = re.compile(r"[^\W_]+", flags=re.UNICODE)
+
+
+class EmbeddingPrerequisiteError(Exception):
+    """The selected embedding descriptor does not cover the requested scope."""
+
+
+class EmbeddingIntegrityError(Exception):
+    """The selected embedding set violates its one-record-per-chunk contract."""
 
 
 def expanded_search_terms(query: str) -> list[str]:
@@ -135,9 +149,52 @@ def section_information_factor(item: dict[str, Any]) -> float:
     return 1.0
 
 
-def rerank_semantic_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def normalized_tokens(value: str) -> tuple[str, ...]:
+    normalized = unicodedata.normalize("NFC", value or "").casefold()
+    return tuple(dict.fromkeys(TOKEN_RE.findall(normalized)))
+
+
+def lexical_relevance(query: str, value: str) -> float:
+    query_tokens = normalized_tokens(query)
+    value_tokens = normalized_tokens(value)
+    if not query_tokens or not value_tokens:
+        return 0.0
+
+    def matches(query_token: str) -> bool:
+        for value_token in value_tokens:
+            if query_token == value_token:
+                return True
+            if min(len(query_token), len(value_token)) >= 4 and (
+                query_token.startswith(value_token) or value_token.startswith(query_token)
+            ):
+                return True
+        return False
+
+    return sum(matches(token) for token in query_tokens) / len(query_tokens)
+
+
+def rerank_semantic_results(
+    results: list[dict[str, Any]],
+    query: str,
+) -> list[dict[str, Any]]:
     for item in results:
-        item["ranking_score"] = item["score"] * section_information_factor(item)
+        chunk = item["chunk"]
+        section_path = (
+            " > ".join(chunk.section_path)
+            if isinstance(chunk.section_path, list)
+            else str(chunk.section_path or "")
+        )
+        item["dense_normalized_score"] = min(max(item["score"], 0.0), 1.0)
+        item["heading_score"] = lexical_relevance(query, chunk.heading)
+        item["section_path_score"] = lexical_relevance(query, section_path)
+        item["content_score"] = lexical_relevance(query, chunk.text)
+        item["information_factor"] = section_information_factor(item)
+        item["ranking_score"] = (
+            SEMANTIC_WEIGHT * item["dense_normalized_score"]
+            + HEADING_WEIGHT * item["heading_score"]
+            + SECTION_PATH_WEIGHT * item["section_path_score"]
+            + CONTENT_WEIGHT * item["content_score"]
+        ) * item["information_factor"]
     results.sort(
         key=lambda item: (
             -item["ranking_score"],
@@ -160,6 +217,10 @@ def hybrid_section_score(semantic, full_text, *, exact: bool) -> float:
     if exact:
         score += HYBRID_EXACT_CODE_BONUS
     return score
+
+
+def candidate_limit(top_k: int) -> int:
+    return min(max(top_k * 4, MIN_CANDIDATE_LIMIT), 100)
 
 
 def full_text_results(queryset, request: SearchRequest, limit: int) -> list[dict[str, Any]]:
@@ -220,38 +281,51 @@ def full_text_results(queryset, request: SearchRequest, limit: int) -> list[dict
     return results
 
 
-def semantic_results(
-    queryset, request: SearchRequest, provider, limit: int
-) -> list[dict[str, Any]]:
-    vector = provider.embed(query_embedding_input(request.query), is_query=True)
-    eligible = queryset.filter(
-        embedding__isnull=False,
-        embedding_dimensions=provider.dimensions,
-        embedding_provider=provider.provider_name,
-        embedding_model=provider.model_name,
+def embedding_queryset(queryset, provider):
+    chunk_ids = list(queryset.values_list("pk", flat=True))
+    records = DocumentChunkEmbedding.objects.filter(
+        document_chunk_id__in=chunk_ids,
+        provider=provider.provider_name,
+        model=provider.model_name,
+        dimensions=provider.dimensions,
         embedding_version=provider.embedding_version,
-        metadata__prompt_version=provider.prompt_version,
+        prompt_version=provider.document_prompt_version,
+        content_hash=F("document_chunk__content_hash"),
     )
+    record_count = records.count()
+    if record_count < len(chunk_ids):
+        raise EmbeddingPrerequisiteError("embedding_prerequisite_error")
+    if record_count > len(chunk_ids):
+        raise EmbeddingIntegrityError("embedding_integrity_error")
+    return records.select_related("document_chunk__source_document")
+
+
+def semantic_results(queryset, request: SearchRequest, provider, limit: int):
+    eligible = embedding_queryset(queryset, provider)
+    vector = provider.embed(provider.query_input(request.query), is_query=True)
+    if len(vector) != provider.dimensions:
+        raise EmbeddingIntegrityError("query_embedding_dimension_mismatch")
     if connection.vendor == "postgresql":
         rows = eligible.annotate(distance=CosineDistance("embedding", vector)).order_by(
             "distance",
-            "source_document__document_code",
-            "-source_document__version",
-            "sequence",
-            "pk",
+            "document_chunk__source_document__document_code",
+            "-document_chunk__source_document__version",
+            "document_chunk__sequence",
+            "document_chunk__pk",
         )[:limit]
         results = [
             {
-                "chunk": row,
+                "chunk": row.document_chunk,
                 "score": max(0.0, 1.0 - float(row.distance)),
-                "exact_code_match": exact_code_match(request.query, row),
+                "exact_code_match": exact_code_match(request.query, row.document_chunk),
             }
             for row in rows
         ]
     else:
         results = []
-        for chunk in eligible:
-            values = list(chunk.embedding) if chunk.embedding is not None else []
+        for record in eligible:
+            chunk = record.document_chunk
+            values = list(record.embedding)
             denominator = math.sqrt(sum(value * value for value in values))
             query_norm = math.sqrt(sum(value * value for value in vector))
             score = sum(left * right for left, right in zip(values, vector, strict=True)) / (
@@ -274,7 +348,7 @@ def semantic_results(
             )
         )
         results = results[:limit]
-    return rerank_semantic_results(results)
+    return rerank_semantic_results(results, request.query)
 
 
 def result_payload(
@@ -311,23 +385,23 @@ def result_payload(
     return payload
 
 
-def search(request: SearchRequest) -> dict[str, Any]:
+def search(request: SearchRequest, *, embedding_provider: str | None = None) -> dict[str, Any]:
     validate_request(request)
     queryset, snapshot = base_queryset(request)
     provider = None
     warnings = []
-    candidate_limit = min(max(request.top_k * 4, 20), 100)
+    expanded_limit = candidate_limit(request.top_k)
     full = (
-        full_text_results(queryset, request, candidate_limit)
+        full_text_results(queryset, request, expanded_limit)
         if request.search_mode in {"full_text", "hybrid"}
         else []
     )
     semantic = []
     effective_mode = request.search_mode
     if request.search_mode in {"semantic", "hybrid"}:
-        provider = get_provider()
+        provider = get_provider(embedding_provider)
         try:
-            semantic = semantic_results(queryset, request, provider, candidate_limit)
+            semantic = semantic_results(queryset, request, provider, expanded_limit)
         except EmbeddingProviderError:
             if request.search_mode == "semantic":
                 raise
