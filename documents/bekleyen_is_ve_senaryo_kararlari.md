@@ -540,6 +540,17 @@ Durum: `KARAR VERİLDİ`
 - Bu teknik karar, hangi RAG dokümanlarının kullanılacağına ilişkin açık kaynak
   kararlarını değiştirmez; doküman türleri ve korpus seçimi hâlâ beklemededir.
 
+### 5.2 İlk sentetik korpus
+
+Durum: `KARAR VERİLDİ`
+
+- İlk korpus 10 Türkçe ve tamamen sentetik `SourceDocument` kaydından oluşur.
+- Dağılım 2 global, 6 multi-city ve 2 Maltepe snapshot dokümanıdır.
+- `SYN-COMP-2026` kaynakları multi-city, `REFUND-001` v1/v2 kaynakları Maltepe
+  snapshot'ına bağlıdır.
+- Alarm ve ground-truth coverage manifest üzerinden doğrulanır.
+- Görev 047 yalnız SourceDocument üretir; chunk ve index çalışmaları 048'e bırakılır.
+
 ## 6. Decision Evidence
 
 Durum: `KARAR BEKLİYOR`
