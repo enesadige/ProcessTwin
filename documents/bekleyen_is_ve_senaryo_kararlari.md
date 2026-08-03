@@ -525,6 +525,21 @@ Durum: `KARAR BEKLİYOR`
 - Kampanya koşulları: `KARAR BEKLİYOR`
 - Incident kapanış raporları: `KARAR BEKLİYOR`
 
+### 5.1 RAG model altyapısı
+
+Durum: `KARAR VERİLDİ`
+
+- `SourceDocument`, `DocumentChunk` ve `IndexRun` modelleri `apps.rag` içinde
+  oluşturulur.
+- `data_snapshot=NULL` global kural/prosedür dokümanını; dolu değer snapshot'a
+  özel sentetik dokümanı gösterir.
+- RuleSet, Rule ve RuleVersion ile doğrudan foreign key kurulmaz; rule code ve
+  version chunk üzerinde structured referans olarak tutulur.
+- Embedding alanı nullable `vector(768)` olur.
+- Full-text, semantic search ve vector indeksleri 049 kapsamına bırakılır.
+- Bu teknik karar, hangi RAG dokümanlarının kullanılacağına ilişkin açık kaynak
+  kararlarını değiştirmez; doküman türleri ve korpus seçimi hâlâ beklemededir.
+
 ## 6. Decision Evidence
 
 Durum: `KARAR BEKLİYOR`

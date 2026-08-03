@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "apps.operations",
     "apps.rules",
     "apps.compensation",
+    "apps.rag",
 ]
 
 MIDDLEWARE = [
