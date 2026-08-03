@@ -1,0 +1,48 @@
+# RAG Embedding ve Arama
+
+Bu belge Gorev 049 kapsamindaki deterministic embedding ve arama davranisini
+aciklar. RAG yalniz sentetik kural ve prosedur kaynaklarini bulur; kural secimi,
+customer impact veya telafi tutari hesaplamaz.
+
+## Embedding
+
+`EmbeddingProvider` arayuzu `mock` ve `gemini` provider'larini destekler.
+Gemini modeli `gemini-embedding-2`, boyut 768 ve embedding surumu
+`asymmetric-retrieval-v1` olarak sabittir. Dokuman girdisi `title: ... | text: ...`,
+sorgu girdisi `task: search result | query: ...` formatinda ortak helper ile
+uretilir. Mock provider, test ve offline gelistirme icin SHA-256 tabanli,
+deterministic ve L2-normalized vektor uretir.
+
+`generate_rag_embeddings` yalniz aktif `SourceDocument` chunk'larini isler.
+Provider/model/surum veya chunk hash degismediyse kayit unchanged kabul edilir.
+Provider ciktilari tamamen dogrulanmadan database yazilmaz; hata durumunda
+onceki gecerli embedding korunur. Her gercek calisma bir `IndexRun` kaydi ile
+izlenir.
+
+## Arama
+
+Authenticated internal endpoint:
+
+`POST /api/internal/v1/rag/search/`
+
+`snapshot_identifier` zorunludur. Cozumleme once exact `snapshot_key`, sonra
+tekil dataset slug ile yapilir; aktif snapshot'a sessiz fallback yoktur. Secilen
+snapshot dokumanlari ile global dokumanlar birlikte aranir. `evaluation_time`
+verilirse hem kaynak hem chunk gecerlilik araligi uygulanir.
+
+Desteklenen modlar:
+
+- `full_text`: PostgreSQL `simple` configuration ile expression-based arama.
+- `semantic`: pgvector `CosineDistance` ve gecerli 768 boyutlu embedding'ler.
+- `hybrid`: semantic ve full-text adaylarinin `hybrid-rrf-v1`, `rrf_k=60`, esit
+  agirlikli Reciprocal Rank Fusion birlesimi.
+
+Hybrid provider kullanilamazsa response `effective_mode=full_text_fallback` ve
+acik bir warning doner. Semantic modda sessiz fallback yapilmaz. Sonuclarda
+chunk metni, belge/bolum bilgisi, skorlar ve evidence metadata bulunur; ham
+embedding vektoru disari acilmaz.
+
+## Kapsam sinirlari
+
+Bu gorevde model veya migration degisikligi, SearchVectorField/GIN, HNSW veya
+IVFFlat indeksleri, Rule MCP tool'u, LLM ve RAG orchestrator eklenmez.

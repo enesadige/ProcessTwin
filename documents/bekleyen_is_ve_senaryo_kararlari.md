@@ -537,6 +537,15 @@ Durum: `KARAR VERİLDİ`
   version chunk üzerinde structured referans olarak tutulur.
 - Embedding alanı nullable `vector(768)` olur.
 - Full-text, semantic search ve vector indeksleri 049 kapsamına bırakılır.
+
+Gorev 049 uygulama kararlari:
+- Embedding provider allowlist'i `mock` ve `gemini` ile sinirlidir; Gemini modeli
+  `gemini-embedding-2`, boyut 768 ve embedding version
+  `asymmetric-retrieval-v1` kullanir.
+- Full-text arama PostgreSQL `simple` configuration ile expression-based
+  uygulanir; SearchVectorField ve GIN indeksleri bu asamada eklenmez.
+- Hybrid ranking `hybrid-rrf-v1`, `rrf_k=60` ve esit semantic/full-text agirligi
+  kullanir. Rule MCP `search_rule_documents` entegrasyonu 050'ye aittir.
 - Bu teknik karar, hangi RAG dokümanlarının kullanılacağına ilişkin açık kaynak
   kararlarını değiştirmez; doküman türleri ve korpus seçimi hâlâ beklemededir.
 
