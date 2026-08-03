@@ -8,10 +8,14 @@ customer impact veya telafi tutari hesaplamaz.
 
 `EmbeddingProvider` arayuzu `mock` ve `gemini` provider'larini destekler.
 Gemini modeli `gemini-embedding-2`, boyut 768 ve embedding surumu
-`asymmetric-retrieval-v1` olarak sabittir. Dokuman girdisi `title: ... | text: ...`,
-sorgu girdisi `task: search result | query: ...` formatinda ortak helper ile
-uretilir. Mock provider, test ve offline gelistirme icin SHA-256 tabanli,
-deterministic ve L2-normalized vektor uretir.
+`asymmetric-retrieval-v1` olarak sabittir. Dokuman girdisi
+`rag-section-aware-document-v2` ile document title, document code, normalized
+section path, section heading ve chunk content alanlarini ayri satirlarda tasir.
+Chunk'in ilk Markdown heading satiri `section_heading` alaninda zaten temsil
+ediliyorsa embedding input content bolumunde tekrarlanmaz; SourceDocument ve
+DocumentChunk icerigi degistirilmez. Sorgu girdisi
+`task: search result | query: ...` formatinda kalir. Mock provider, test ve offline
+gelistirme icin SHA-256 tabanli, deterministic ve L2-normalized vektor uretir.
 
 `generate_rag_embeddings` yalniz aktif `SourceDocument` chunk'larini isler.
 Provider/model/surum veya chunk hash degismediyse kayit unchanged kabul edilir.
@@ -33,9 +37,15 @@ verilirse hem kaynak hem chunk gecerlilik araligi uygulanir.
 Desteklenen modlar:
 
 - `full_text`: PostgreSQL `simple` configuration ile expression-based arama.
-- `semantic`: pgvector `CosineDistance` ve gecerli 768 boyutlu embedding'ler.
-- `hybrid`: semantic ve full-text adaylarinin `hybrid-rrf-v1`, `rrf_k=60`, esit
-  agirlikli Reciprocal Rank Fusion birlesimi.
+- `semantic`: pgvector `CosineDistance` ve gecerli 768 boyutlu embedding'lerle
+  raw cosine skoru korunurken `semantic-section-v2` ile section
+  butunlugu ikincil sinyal olarak kullanilir. Yalniz sentetiklik uyarisindan
+  olusan H1 chunk'lari `0.95`, karakter sinirinda bolunmus/overlap chunk'lari
+  `0.97` genel factor ile siralanir; exact code eslesmeleri penalize edilmez.
+- `hybrid`: `hybrid-section-v2` raw semantic section skorunu ana sinyal olarak
+  kullanir. Full-text rank katkisi `0.02 / (1 + rank)` ile sinirlidir; exact code
+  eslesmesi `1.0` bonus alir. Case, query terimi veya document code'a ozel kural
+  yoktur.
 
 Hybrid provider kullanilamazsa response `effective_mode=full_text_fallback` ve
 acik bir warning doner. Semantic modda sessiz fallback yapilmaz. Sonuclarda

@@ -69,11 +69,16 @@ Markdown heading marker temizliği uygular. Türkçe karakterler ASCII'ye çevri
 fuzzy eşleştirme yapılmaz. Exact-code ve tarihsel sürüm vakalarında ana kapı doğru
 doküman ve sürümdür; bölüm hedeflenmiyorsa heading kabul kapısı değildir.
 
-`RAG-SEM-FAILED-FAILOVER`, `RAG-SEM-PACKET-LOSS-SLA` ve
-`RAG-SEM-DEGRADATION` vakalarında doğru doküman ilk üçte bulunmasına rağmen hedef
-bölüm seçilememiştir. Bu vakalar `chunk_selection_quality_issue` olarak kayıtlıdır;
-beklenti gevşetilmez ve ayrı retrieval-quality düzeltmesi yapılana kadar başarısız
-kalır.
+Heading zorunlu bir vakada aynı dokümanın birden fazla chunk'i sonuçlarda yer
+alabilir. Evaluator, beklenen heading ile eşleşen chunk'in gerçek 1-indexed rank
+değerini ölçer; dokümanın daha üstteki farklı bir bölümünü başarı saymaz.
+
+Görev 051.1 ile document embedding girdisi `rag-section-aware-document-v2`,
+semantic sıralama `semantic-section-v2` ve hybrid sıralama
+`hybrid-section-v2` olarak sürümlendi. Benchmark sorguları, expected değerleri ve
+rank sınırları değişmeden native Gemini sonucu deterministic `10/10`, semantic
+`6/6`, semantic Hit@3 `1.0`, forbidden ihlali `0` ve fallback `0` oldu. Ayrı
+Rule MCP retrieval smoke seti `4/4` geçti.
 
 ## Sınırlar
 

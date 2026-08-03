@@ -158,10 +158,20 @@ def evaluate_case(case: BenchmarkCase) -> BenchmarkCaseResult:
         )
 
     results = response.get("results", [])
-    expected_result = next(
-        (item for item in results if item.get("document_code") == case.expected_document_code),
-        None,
-    )
+    document_results = [
+        item for item in results if item.get("document_code") == case.expected_document_code
+    ]
+    expected_result = document_results[0] if document_results else None
+    if case.require_heading_match and document_results:
+        expected_heading = normalize_heading(case.expected_heading_contains)
+        expected_result = next(
+            (
+                item
+                for item in document_results
+                if expected_heading in normalize_heading(item.get("heading"))
+            ),
+            expected_result,
+        )
     actual_rank = results.index(expected_result) + 1 if expected_result else None
     failures = []
     if expected_result is None:

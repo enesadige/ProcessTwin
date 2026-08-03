@@ -165,7 +165,7 @@ def test_search_rule_documents_defaults_to_hybrid_and_preserves_empty_results():
             "result_count": 0,
             "snapshot": {"snapshot_key": "snapshot-1"},
             "embedding": None,
-            "ranking_version": "hybrid-rrf-v1",
+            "ranking_version": "hybrid-section-v2",
             "results": [],
         }
     )
@@ -194,7 +194,7 @@ def test_search_rule_documents_preserves_versions_sections_scores_and_removes_ve
                 "model": "mock-embedding-768",
                 "embedding_version": "asymmetric-retrieval-v1",
             },
-            "ranking_version": "hybrid-rrf-v1",
+            "ranking_version": "hybrid-section-v2",
             "results": [
                 {
                     "document_code": "REFUND-001-V2-SOURCE",

@@ -18,10 +18,12 @@ from apps.rag.services.embeddings import get_provider
 from apps.rag.services.indexing import resolve_snapshot_identifier
 
 SEARCH_MODES = {"semantic", "full_text", "hybrid"}
-RANKING_VERSION = "hybrid-rrf-v1"
-RRF_K = 60
-SEMANTIC_WEIGHT = 0.5
-FULL_TEXT_WEIGHT = 0.5
+SEMANTIC_RANKING_VERSION = "semantic-section-v2"
+HYBRID_RANKING_VERSION = "hybrid-section-v2"
+H1_BOILERPLATE_FACTOR = 0.95
+CHARACTER_FRAGMENT_FACTOR = 0.97
+HYBRID_FULL_TEXT_BONUS = 0.02
+HYBRID_EXACT_CODE_BONUS = 1.0
 MAX_QUERY_LENGTH = 500
 MAX_TOP_K = 20
 CODE_RE = re.compile(r"[A-Z][A-Z0-9]*(?:[-_][A-Z0-9]+)+")
@@ -118,6 +120,46 @@ def exact_code_match(query: str, chunk: DocumentChunk) -> bool:
         or query_upper in code.upper()
         for code in codes
     )
+
+
+def section_information_factor(item: dict[str, Any]) -> float:
+    if item["exact_code_match"]:
+        return 1.0
+    chunk = item["chunk"]
+    lines = [line.strip() for line in chunk.text.splitlines() if line.strip()]
+    if chunk.sequence == 0 and lines and all(line.startswith(("#", ">")) for line in lines):
+        return H1_BOILERPLATE_FACTOR
+    metadata = chunk.metadata or {}
+    if metadata.get("split_reason") == "character_limit" or metadata.get("overlap_applied"):
+        return CHARACTER_FRAGMENT_FACTOR
+    return 1.0
+
+
+def rerank_semantic_results(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    for item in results:
+        item["ranking_score"] = item["score"] * section_information_factor(item)
+    results.sort(
+        key=lambda item: (
+            -item["ranking_score"],
+            -item["score"],
+            item["chunk"].source_document.document_code,
+            -item["chunk"].source_document.version,
+            item["chunk"].sequence,
+            item["chunk"].pk,
+        )
+    )
+    for rank, item in enumerate(results, start=1):
+        item["rank"] = rank
+    return results
+
+
+def hybrid_section_score(semantic, full_text, *, exact: bool) -> float:
+    score = semantic["ranking_score"] if semantic else 0.0
+    if full_text:
+        score += HYBRID_FULL_TEXT_BONUS / (1 + full_text["rank"])
+    if exact:
+        score += HYBRID_EXACT_CODE_BONUS
+    return score
 
 
 def full_text_results(queryset, request: SearchRequest, limit: int) -> list[dict[str, Any]]:
@@ -232,9 +274,7 @@ def semantic_results(
             )
         )
         results = results[:limit]
-    for rank, item in enumerate(results, start=1):
-        item["rank"] = rank
-    return results
+    return rerank_semantic_results(results)
 
 
 def result_payload(
@@ -341,9 +381,7 @@ def search(request: SearchRequest) -> dict[str, Any]:
             sem = semantic_by_id.get(chunk_id)
             fts = full_by_id.get(chunk_id)
             exact = (sem or fts)["exact_code_match"]
-            score = ((SEMANTIC_WEIGHT / (RRF_K + sem["rank"])) if sem else 0.0) + (
-                (FULL_TEXT_WEIGHT / (RRF_K + fts["rank"])) if fts else 0.0
-            )
+            score = hybrid_section_score(sem, fts, exact=exact)
             ranked.append((score, exact, sem, fts))
         ranked.sort(
             key=lambda row: (
@@ -384,9 +422,13 @@ def search(request: SearchRequest) -> dict[str, Any]:
             "is_active": snapshot.is_active,
         },
         "embedding": provider.metadata() if provider else None,
-        "ranking_version": RANKING_VERSION
-        if request.search_mode == "hybrid" and effective_mode == "hybrid"
-        else None,
+        "ranking_version": (
+            HYBRID_RANKING_VERSION
+            if request.search_mode == "hybrid" and effective_mode == "hybrid"
+            else SEMANTIC_RANKING_VERSION
+            if request.search_mode == "semantic"
+            else None
+        ),
         "warnings": warnings,
         "results": results,
     }

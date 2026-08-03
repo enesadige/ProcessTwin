@@ -4,7 +4,11 @@ import pytest
 
 from apps.rag.corpus_utils import content_hash
 from apps.rag.models import DocumentChunk, IndexRun, SourceDocument
-from apps.rag.providers.base import EMBEDDING_DIMENSIONS
+from apps.rag.providers.base import (
+    EMBEDDING_DIMENSIONS,
+    PROMPT_VERSION,
+    document_embedding_input,
+)
 from apps.rag.providers.mock import MockEmbeddingProvider
 from apps.rag.services.embeddings import generate_embeddings
 
@@ -36,6 +40,26 @@ def test_mock_embedding_is_deterministic_and_normalized():
     assert math.isclose(math.sqrt(sum(value * value for value in first)), 1.0, rel_tol=1e-6)
 
 
+def test_document_embedding_input_is_section_aware_and_structured():
+    value = document_embedding_input(
+        "Failover Prosedürü",
+        "SYN-FAILOVER-2026",
+        ["Ağ Operasyonları", "Failover Adımları"],
+        "Failover Adımları",
+        "## Failover Adımları\n\nPrimary yol kesildiğinde yedek yol doğrulanır.",
+    )
+
+    assert value.splitlines() == [
+        "document_title: Failover Prosedürü",
+        "document_code: SYN-FAILOVER-2026",
+        "section_path: Ağ Operasyonları > Failover Adımları",
+        "section_heading: Failover Adımları",
+        "content:",
+        "Primary yol kesildiğinde yedek yol doğrulanır.",
+    ]
+    assert PROMPT_VERSION == "rag-section-aware-document-v2"
+
+
 @pytest.mark.django_db
 def test_generation_is_idempotent_and_validate_only_does_not_write():
     document = make_document()
@@ -58,6 +82,32 @@ def test_generation_is_idempotent_and_validate_only_does_not_write():
     assert validation["pending_count"] == 0
     assert IndexRun.objects.count() == runs_before_validate
     assert DocumentChunk.objects.get().embedding_dimensions == EMBEDDING_DIMENSIONS
+
+
+@pytest.mark.django_db
+def test_previous_prompt_version_is_not_current():
+    document = make_document()
+    chunk = DocumentChunk.objects.create(
+        source_document=document,
+        sequence=0,
+        heading="Baslik",
+        section_path=["Baslik"],
+        text="Sentetik arama metni.",
+        content_hash=content_hash("Sentetik arama metni."),
+        embedding=[0.0] * EMBEDDING_DIMENSIONS,
+        embedding_provider="mock",
+        embedding_model="mock-embedding-768",
+        embedding_version="asymmetric-retrieval-v1",
+        embedding_dimensions=EMBEDDING_DIMENSIONS,
+        metadata={"prompt_version": "rag-embedding-prompt-v1"},
+    )
+    provider = MockEmbeddingProvider()
+
+    result = generate_embeddings([document], provider=provider, validate_only=True)
+
+    assert result["pending_count"] == 1
+    chunk.refresh_from_db()
+    assert chunk.metadata["prompt_version"] == "rag-embedding-prompt-v1"
 
 
 @pytest.mark.django_db

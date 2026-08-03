@@ -7,8 +7,17 @@ from django.test import override_settings
 from apps.datasets.models import DatasetVersion, DataSnapshot
 from apps.rag.corpus_utils import content_hash
 from apps.rag.models import DocumentChunk, SourceDocument
+from apps.rag.providers.base import PROMPT_VERSION
 from apps.rag.providers.mock import MockEmbeddingProvider
-from apps.rag.services.search import SearchRequest, search
+from apps.rag.services.search import (
+    CHARACTER_FRAGMENT_FACTOR,
+    H1_BOILERPLATE_FACTOR,
+    SearchRequest,
+    hybrid_section_score,
+    rerank_semantic_results,
+    search,
+    section_information_factor,
+)
 
 
 def search_fixture():
@@ -48,7 +57,7 @@ def search_fixture():
         chunk.embedding_model = "mock-embedding-768"
         chunk.embedding_version = "asymmetric-retrieval-v1"
         chunk.embedding_dimensions = 768
-        chunk.metadata = {"prompt_version": "rag-embedding-prompt-v1"}
+        chunk.metadata = {"prompt_version": PROMPT_VERSION}
         chunk.save(
             update_fields=[
                 "embedding",
@@ -122,3 +131,58 @@ def test_search_request_rejects_short_or_naive_queries():
                 evaluation_time=datetime(2026, 1, 1),
             )
         )
+
+
+def _ranking_item(*, pk, sequence, text, score, metadata=None, exact=False):
+    document = SourceDocument(document_code="DOC", version=1)
+    chunk = DocumentChunk(
+        pk=pk,
+        source_document=document,
+        sequence=sequence,
+        heading="Section",
+        text=text,
+        metadata=metadata or {},
+    )
+    return {"chunk": chunk, "score": score, "exact_code_match": exact}
+
+
+def test_low_information_factors_are_general_and_exact_codes_are_exempt():
+    h1 = _ranking_item(pk=1, sequence=0, text="# Başlık\n\n> Sentetik uyarı", score=0.7)
+    fragment = _ranking_item(
+        pk=2,
+        sequence=3,
+        text="Bölünmüş içerik",
+        score=0.7,
+        metadata={"split_reason": "character_limit", "overlap_applied": True},
+    )
+    exact = {**h1, "exact_code_match": True}
+
+    assert section_information_factor(h1) == H1_BOILERPLATE_FACTOR
+    assert section_information_factor(fragment) == CHARACTER_FRAGMENT_FACTOR
+    assert section_information_factor(exact) == 1.0
+
+
+def test_semantic_section_rerank_preserves_raw_score_and_uses_stable_tie_break():
+    fragment = _ranking_item(
+        pk=2,
+        sequence=2,
+        text="Fragment",
+        score=0.651,
+        metadata={"split_reason": "character_limit"},
+    )
+    section = _ranking_item(pk=1, sequence=1, text="Tam bölüm", score=0.636)
+
+    ranked = rerank_semantic_results([fragment, section])
+
+    assert [item["chunk"].pk for item in ranked] == [1, 2]
+    assert ranked[0]["score"] == 0.636
+    assert [item["rank"] for item in ranked] == [1, 2]
+
+
+def test_hybrid_section_score_keeps_semantic_primary_and_full_text_bounded():
+    semantic = {"ranking_score": 0.61, "rank": 1}
+    full_text = {"rank": 1}
+
+    assert hybrid_section_score(semantic, None, exact=False) == 0.61
+    assert hybrid_section_score(semantic, full_text, exact=False) == pytest.approx(0.62)
+    assert hybrid_section_score(semantic, full_text, exact=True) == pytest.approx(1.62)

@@ -544,8 +544,12 @@ Gorev 049 uygulama kararlari:
   `asymmetric-retrieval-v1` kullanir.
 - Full-text arama PostgreSQL `simple` configuration ile expression-based
   uygulanir; SearchVectorField ve GIN indeksleri bu asamada eklenmez.
-- Hybrid ranking `hybrid-rrf-v1`, `rrf_k=60` ve esit semantic/full-text agirligi
-  kullanir. Rule MCP `search_rule_documents` entegrasyonu 050'ye aittir.
+- Ilk hybrid ranking `hybrid-rrf-v1`, `rrf_k=60` ve esit semantic/full-text
+  agirligi ile kurulmustur. Gorev 051.1 section-level kalite auditi sonrasinda
+  canonical davranis `semantic-section-v2` ve `hybrid-section-v2` olarak
+  guncellenmistir: raw semantic skor ana sinyal, full-text sinirli bonus ve
+  dusuk-bilgili H1/karakter fragment factor'u genel ikincil sinyaldir. Rule MCP
+  `search_rule_documents` entegrasyonu 050'ye aittir.
 - Bu teknik karar, hangi RAG dokümanlarının kullanılacağına ilişkin açık kaynak
   kararlarını değiştirmez; doküman türleri ve korpus seçimi hâlâ beklemededir.
 

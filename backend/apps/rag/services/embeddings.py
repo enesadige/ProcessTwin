@@ -129,6 +129,8 @@ def generate_embeddings(
         for chunk in pending:
             text = document_embedding_input(
                 chunk.source_document.title,
+                chunk.source_document.document_code,
+                chunk.section_path,
                 chunk.heading,
                 chunk.text,
             )

@@ -171,6 +171,46 @@ def test_required_heading_policy_uses_normalized_substring(monkeypatch):
     assert result.passed is True
 
 
+def test_required_heading_policy_selects_matching_section_rank(monkeypatch):
+    response = _search_response()
+    matching_section = {
+        **response["results"][-1],
+        "heading": "Koşullar",
+        "chunk_id": 11,
+        "semantic_score": 0.7,
+    }
+    response["results"][-1]["heading"] = "Genel Bakış"
+    response["results"].append(matching_section)
+    monkeypatch.setattr(benchmark_service, "search", lambda request: response)
+
+    result = evaluate_case(_case(max_accepted_rank=2))
+
+    assert result.passed is True
+    assert result.actual_rank == 2
+    assert result.heading == "Koşullar"
+    assert result.chunk_id == 11
+
+
+def test_required_heading_policy_enforces_matching_section_rank_limit(monkeypatch):
+    response = _search_response()
+    response["results"][-1]["heading"] = "Genel Bakış"
+    response["results"].append(
+        {
+            **response["results"][-1],
+            "heading": "Koşullar",
+            "chunk_id": 11,
+        }
+    )
+    monkeypatch.setattr(benchmark_service, "search", lambda request: response)
+
+    result = evaluate_case(_case(max_accepted_rank=1))
+
+    assert result.passed is False
+    assert result.actual_rank == 2
+    assert result.heading == "Koşullar"
+    assert "expected_document_rank_exceeded" in result.failure_reasons
+
+
 def test_matching_heading_on_wrong_document_does_not_pass(monkeypatch):
     response = _search_response()
     response["results"] = [

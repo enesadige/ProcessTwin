@@ -4,13 +4,14 @@ from django.test import override_settings
 from apps.datasets.models import DatasetVersion, DataSnapshot
 from apps.rag.corpus_utils import content_hash
 from apps.rag.models import DocumentChunk, SourceDocument
+from apps.rag.providers.base import PROMPT_VERSION
 from apps.rag.providers.mock import MockEmbeddingProvider
 from apps.rag.services.search import SearchRequest, search
 
 
 @pytest.mark.django_db
 @override_settings(RAG_EMBEDDING_PROVIDER="mock")
-def test_hybrid_search_exposes_rrf_scores_and_ranking_version():
+def test_hybrid_search_exposes_section_scores_and_ranking_version():
     dataset = DatasetVersion.objects.create(
         name="Hybrid dataset", generator_version="test", seed="hybrid"
     )
@@ -42,7 +43,7 @@ def test_hybrid_search_exposes_rrf_scores_and_ranking_version():
     chunk.embedding_model = "mock-embedding-768"
     chunk.embedding_version = "asymmetric-retrieval-v1"
     chunk.embedding_dimensions = 768
-    chunk.metadata = {"prompt_version": "rag-embedding-prompt-v1"}
+    chunk.metadata = {"prompt_version": PROMPT_VERSION}
     chunk.save()
 
     result = search(
@@ -54,7 +55,7 @@ def test_hybrid_search_exposes_rrf_scores_and_ranking_version():
     )
 
     assert result["effective_mode"] == "hybrid"
-    assert result["ranking_version"] == "hybrid-rrf-v1"
+    assert result["ranking_version"] == "hybrid-section-v2"
     assert result["results"][0]["hybrid_score"] is not None
     assert result["results"][0]["semantic_rank"] == 1
     assert result["results"][0]["full_text_rank"] == 1
