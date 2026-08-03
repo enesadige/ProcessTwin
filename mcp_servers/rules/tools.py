@@ -14,6 +14,7 @@ from mcp_servers.rules.models import (
     GetRulesEffectiveAtInput,
     RuleEvidenceInput,
     RuleVersionHistoryInput,
+    SearchRuleDocumentsInput,
     SearchRulesInput,
 )
 from mcp_servers.shared.backend_client import InternalAPIClient, InternalAPIClientError
@@ -37,6 +38,7 @@ class RuleToolDefinition:
         method: str,
         path_builder: Callable[[BaseModel], str],
         params_builder: Callable[[BaseModel], dict[str, Any]],
+        body_builder: Callable[[BaseModel], dict[str, Any]] | None = None,
     ) -> None:
         self.name = name
         self.description = description
@@ -44,6 +46,7 @@ class RuleToolDefinition:
         self.method = method
         self.path_builder = path_builder
         self.params_builder = params_builder
+        self.body_builder = body_builder
 
 
 def _path(template: str, field_name: str | None = None):
@@ -142,6 +145,18 @@ RULE_TOOL_DEFINITIONS: dict[str, RuleToolDefinition] = {
         path_builder=_path("/api/internal/v1/rules/evidence/"),
         params_builder=_params,
     ),
+    "search_rule_documents": RuleToolDefinition(
+        name="search_rule_documents",
+        description=(
+            "Search rule and procedure source text with explicit snapshot and date "
+            "filters; this tool does not make rule or compensation decisions."
+        ),
+        input_model=SearchRuleDocumentsInput,
+        method="POST",
+        path_builder=_path("/api/internal/v1/rag/search/"),
+        params_builder=lambda _model: {},
+        body_builder=_params,
+    ),
 }
 
 
@@ -186,6 +201,7 @@ class RuleMCPTools:
                 definition.method,
                 definition.path_builder(model),
                 request_id=model.request_id,
+                json=definition.body_builder(model) if definition.body_builder else None,
                 params=definition.params_builder(model),
             )
         except InternalAPIClientError as exc:
@@ -206,7 +222,8 @@ class RuleMCPTools:
         payload: dict[str, Any],
     ) -> MCPToolResponse[dict[str, Any]]:
         backend_metadata = payload.get("metadata", {})
-        snapshot_details = backend_metadata.get("snapshot", {})
+        data = self._response_data(tool_name, payload)
+        snapshot_details = backend_metadata.get("snapshot", {}) or data.get("snapshot", {})
         metadata = MCPMetadata(
             tool_name=f"rules.{tool_name}",
             tool_version=RULE_MCP_VERSION,
@@ -219,17 +236,36 @@ class RuleMCPTools:
         )
         return MCPToolResponse[dict[str, Any]](
             success=True,
-            data=payload.get("data", {}),
+            data=data,
             metadata=metadata,
             warnings=[
-                MCPWarning.model_validate(warning)
-                for warning in payload.get("warnings", [])
+                MCPWarning.model_validate(warning) for warning in payload.get("warnings", [])
             ],
             evidence=[
-                MCPEvidence.model_validate(evidence)
-                for evidence in payload.get("evidence", [])
+                MCPEvidence.model_validate(evidence) for evidence in payload.get("evidence", [])
             ],
         )
+
+    @staticmethod
+    def _response_data(tool_name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        data = dict(payload.get("data", {}))
+        if tool_name != "search_rule_documents":
+            return data
+
+        embedding = data.pop("embedding", None) or {}
+        data["embedding_provider"] = embedding.get("provider")
+        data["embedding_model"] = embedding.get("model")
+        data["embedding_version"] = embedding.get("embedding_version")
+        data["correlation_id"] = payload.get("metadata", {}).get("correlation_id")
+        data["results"] = [
+            {
+                key: value
+                for key, value in result.items()
+                if key not in {"embedding", "vector", "raw_embedding"}
+            }
+            for result in data.get("results", [])
+        ]
+        return data
 
     def _failure(
         self,

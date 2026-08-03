@@ -89,3 +89,30 @@ def test_timeout_maps_to_common_timeout_error():
     assert error.code == MCPErrorCode.TIMEOUT
     assert error.details == {"reason": "timeout"}
     assert "secret" not in str(error).lower()
+
+
+@pytest.mark.parametrize(
+    ("upstream_code", "expected_code"),
+    [
+        ("provider_unavailable", MCPErrorCode.PROVIDER_UNAVAILABLE),
+        ("provider_error", MCPErrorCode.PROVIDER_ERROR),
+    ],
+)
+def test_embedding_provider_errors_are_safely_preserved(upstream_code, expected_code):
+    def handler(_request):
+        return httpx.Response(
+            503,
+            json={
+                "error": {
+                    "code": upstream_code,
+                    "message": "secret provider detail",
+                }
+            },
+        )
+
+    with pytest.raises(InternalAPIClientError) as exc_info:
+        make_client(handler).request_json("POST", "/api/internal/v1/rag/search/")
+
+    error = exc_info.value.mcp_error
+    assert error.code == expected_code
+    assert "secret provider detail" not in str(error)

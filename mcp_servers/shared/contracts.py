@@ -13,6 +13,8 @@ class MCPErrorCode(StrEnum):
     CONFLICT = "conflict"
     TIMEOUT = "timeout"
     UPSTREAM_ERROR = "upstream_error"
+    PROVIDER_UNAVAILABLE = "provider_unavailable"
+    PROVIDER_ERROR = "provider_error"
     UNSUPPORTED_OPERATION = "unsupported_operation"
     INTERNAL_ERROR = "internal_error"
 

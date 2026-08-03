@@ -23,13 +23,12 @@ def test_registry_lists_four_static_descriptors_without_probing(client, monkeypa
     assert response.headers["X-Correlation-ID"] == "req-registry-1"
     services = response.json()["services"]
     actual = [
-        (service["key"], service["module"], service["expected_tool_count"])
-        for service in services
+        (service["key"], service["module"], service["expected_tool_count"]) for service in services
     ]
     assert actual == [
         ("network", "mcp_servers.network", 9),
         ("customer", "mcp_servers.customer", 7),
-        ("rules", "mcp_servers.rules", 7),
+        ("rules", "mcp_servers.rules", 8),
         ("compensation", "mcp_servers.compensation", 6),
     ]
     assert all(service["status"] == "not_checked" for service in services)

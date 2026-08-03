@@ -16,7 +16,7 @@ class MCPDescriptor:
 _DESCRIPTORS = (
     MCPDescriptor("network", "Network MCP", "mcp_servers.network", 9),
     MCPDescriptor("customer", "Customer MCP", "mcp_servers.customer", 7),
-    MCPDescriptor("rules", "Rule MCP", "mcp_servers.rules", 7),
+    MCPDescriptor("rules", "Rule MCP", "mcp_servers.rules", 8),
     MCPDescriptor("compensation", "Compensation MCP", "mcp_servers.compensation", 6),
 )
 

@@ -86,7 +86,7 @@ COMMON_MCP_MATRIX = [
         RULE_TOOL_DEFINITIONS,
         RuleMCPTools,
         RULE_MCP_VERSION,
-        7,
+        8,
         {
             "search_rules": {},
             "get_rule": {"rule_code": "REFUND-001"},
@@ -97,6 +97,7 @@ COMMON_MCP_MATRIX = [
             "find_related_rules": {"family": "broadband"},
             "detect_rule_conflicts": {"conflict_group": "broadband_base"},
             "get_rule_evidence": {"rule_code": "REFUND-001"},
+            "search_rule_documents": {"query": "REFUND-001 v2"},
         },
         id="rules",
     ),

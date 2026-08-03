@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -144,6 +145,48 @@ class RuleEvidenceInput(SnapshotRequiredInput):
         ):
             raise ValueError("At least one evidence identifier is required")
         return self
+
+
+class SearchRuleDocumentsInput(TemporalSnapshotInput):
+    snapshot_identifier: str = Field(min_length=1)
+    query: str = Field(min_length=2, max_length=500)
+    search_mode: Literal["semantic", "full_text", "hybrid"] = "hybrid"
+    top_k: int = Field(default=5, ge=1, le=20)
+    document_type: (
+        Literal[
+            "rule_policy",
+            "procedure",
+            "sla",
+            "campaign",
+            "technical_guide",
+            "operational_runbook",
+            "other",
+        ]
+        | None
+    ) = None
+    language: str | None = Field(default=None, min_length=1)
+    source_kind: Literal["synthetic", "internal", "imported", "manual"] | None = None
+    rule_code: str | None = None
+    rule_version: int | None = Field(default=None, ge=1)
+    include_scores: bool = True
+
+    @field_validator("query")
+    @classmethod
+    def query_must_not_be_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if len(stripped) < 2:
+            raise ValueError("query must contain at least 2 non-whitespace characters")
+        return stripped
+
+    @field_validator("language")
+    @classmethod
+    def language_must_not_be_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("language must not be blank")
+        return stripped
 
 
 def validate_optional_aware_datetime(value: datetime | None, field_name: str) -> datetime | None:

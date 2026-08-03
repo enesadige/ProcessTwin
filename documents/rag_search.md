@@ -46,3 +46,10 @@ embedding vektoru disari acilmaz.
 
 Bu gorevde model veya migration degisikligi, SearchVectorField/GIN, HNSW veya
 IVFFlat indeksleri, Rule MCP tool'u, LLM ve RAG orchestrator eklenmez.
+
+## Rule MCP adapter'i
+
+Gorev 050 ile `search_rule_documents`, bu internal endpoint'i shared
+BackendClient uzerinden read-only olarak acar. Tool RAG skorlarini yeniden
+hesaplamaz veya siralamaz; backend sonucu, snapshot metadata ve warning'leri
+ortak MCP response sozlesmesine aktarir.

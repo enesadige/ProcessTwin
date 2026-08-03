@@ -35,10 +35,23 @@ Token repo içine yazılmaz.
 - `find_related_rules`
 - `detect_rule_conflicts`
 - `get_rule_evidence`
+- `search_rule_documents`
 
 Bütün tool input'larında `snapshot_identifier` zorunludur. Identifier önce
 `DataSnapshot.snapshot_key`, sonra tekil `DatasetVersion.slug` olarak çözülür.
 Aktif snapshot'a sessiz fallback yapılmaz.
+
+`search_rule_documents`, authenticated `POST /api/internal/v1/rag/search/`
+endpoint'ini adapter olarak çağırır. `semantic`, `full_text` ve varsayılan
+`hybrid` modlarını; timezone-aware `evaluation_time`, rule/document ve dil
+filtrelerini destekler. Sonuçlarda kaynak doküman kodu ve sürümü, heading,
+section path, chunk metni ve backend skorları bulunur. `document_version`
+SourceDocument sürümüdür; `rule_version` RuleVersion referansıdır.
+
+Hybrid semantic provider kullanılamadığında backend'in
+`effective_mode=full_text_fallback` sonucu ve warning'i değiştirilmeden aktarılır.
+Boş arama sonucu başarılı ve sıfır kayıtlı response olarak döner. Ham embedding
+vektörü MCP response'una eklenmez.
 
 ## Çıktı Politikası
 
@@ -54,5 +67,7 @@ final decision veya parasal sonuç üretmez.
 
 Rule MCP RuleSet/Rule/RuleVersion arama, event-time version seçimi,
 conflict/priority açıklaması ve mevcut DecisionEvidence okuma işlerini yapar.
+RAG kaynak aramasını backend'e devreder; MCP içinde embedding, search veya
+ranking hesabı yapmaz.
 Yeni telafi uygunluğu, yeni tutar hesabı, CompensationEvaluation ve yeni
 DecisionEvidence üretimi Compensation MCP kapsamındadır.

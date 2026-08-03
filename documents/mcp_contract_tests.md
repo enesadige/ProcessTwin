@@ -5,7 +5,7 @@ sözleşmelerini parameterized test matrisiyle doğrular.
 
 Kapsanan başlıklar:
 
-- tool katalogları ve beklenen tool sayıları (`9/7/7/6`)
+- tool katalogları ve beklenen tool sayıları (`9/7/8/6`)
 - Pydantic input validation ve zorunlu `snapshot_identifier`
 - ortak `MCPToolResponse` envelope, metadata ve correlation ID
 - internal API service-token auth ve HTTP hata eşleme

@@ -77,3 +77,20 @@ def test_all_mcp_internal_entrypoints_require_auth(client, path):
 
     assert unauthenticated.status_code == 401
     assert authenticated.status_code != 401
+
+
+@override_settings(INTERNAL_API_SERVICE_TOKEN="contract-token")
+def test_rule_document_search_internal_endpoint_requires_auth(client):
+    path = "/api/internal/v1/rag/search/"
+    payload = {"query": "REFUND-001", "snapshot_identifier": "missing-snapshot"}
+
+    unauthenticated = client.post(path, data=payload, content_type="application/json")
+    authenticated = client.post(
+        path,
+        data=payload,
+        content_type="application/json",
+        HTTP_AUTHORIZATION="Bearer contract-token",
+    )
+
+    assert unauthenticated.status_code == 401
+    assert authenticated.status_code != 401

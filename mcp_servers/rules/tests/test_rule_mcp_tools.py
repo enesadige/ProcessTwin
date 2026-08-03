@@ -10,7 +10,7 @@ from mcp_servers.shared.backend_client import InternalAPIClientError
 from mcp_servers.shared.contracts import MCPError, MCPErrorCode
 
 
-def test_all_seven_rule_tools_are_registered():
+def test_all_eight_rule_tools_are_registered():
     assert sorted(RULE_TOOL_DEFINITIONS) == [
         "detect_rule_conflicts",
         "find_related_rules",
@@ -18,6 +18,7 @@ def test_all_seven_rule_tools_are_registered():
         "get_rule_evidence",
         "get_rule_version_history",
         "get_rules_effective_at",
+        "search_rule_documents",
         "search_rules",
     ]
 
@@ -63,6 +64,11 @@ def test_all_seven_rule_tools_are_registered():
             {"snapshot_identifier": "snapshot-1", "rule_code": "BB-FULL-OUTAGE-TIERED"},
             "/api/internal/v1/rules/evidence/",
         ),
+        (
+            "search_rule_documents",
+            {"snapshot_identifier": "snapshot-1", "query": "REFUND-001 v2"},
+            "/api/internal/v1/rag/search/",
+        ),
     ],
 )
 def test_rule_tool_calls_internal_api_path_and_wraps_response(
@@ -75,9 +81,176 @@ def test_rule_tool_calls_internal_api_path_and_wraps_response(
 
     assert response.success is True
     assert client.calls[0]["path"] == expected_path
-    assert client.calls[0]["params"]["snapshot_identifier"] == "snapshot-1"
+    request_data = client.calls[0]["json"] or client.calls[0]["params"]
+    assert request_data["snapshot_identifier"] == "snapshot-1"
     assert response.metadata.snapshot_details["snapshot_key"] == "snapshot-1"
     assert response.metadata.request_id == "req-from-backend"
+
+
+def test_search_rule_documents_posts_all_explicit_filters_as_json():
+    client = FakeBackendClient()
+    response = RuleMCPTools(client).run(
+        "search_rule_documents",
+        {
+            "request_id": "req-rule-rag-1",
+            "snapshot_identifier": "snapshot-1",
+            "query": "  REFUND-001 v2  ",
+            "search_mode": "semantic",
+            "top_k": 7,
+            "evaluation_time": "2026-07-15T12:00:00+03:00",
+            "document_type": "rule_policy",
+            "language": "tr",
+            "source_kind": "synthetic",
+            "rule_code": "REFUND-001",
+            "rule_version": 2,
+            "include_scores": False,
+        },
+    )
+
+    call = client.calls[0]
+    assert response.success is True
+    assert call["method"] == "POST"
+    assert call["path"] == "/api/internal/v1/rag/search/"
+    assert call["params"] == {}
+    assert call["request_id"] == "req-rule-rag-1"
+    assert call["json"] == {
+        "snapshot_identifier": "snapshot-1",
+        "query": "REFUND-001 v2",
+        "search_mode": "semantic",
+        "top_k": 7,
+        "evaluation_time": "2026-07-15T12:00:00+03:00",
+        "document_type": "rule_policy",
+        "language": "tr",
+        "source_kind": "synthetic",
+        "rule_code": "REFUND-001",
+        "rule_version": 2,
+        "include_scores": False,
+    }
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"snapshot_identifier": "snapshot-1"},
+        {"snapshot_identifier": "snapshot-1", "query": " "},
+        {"snapshot_identifier": "snapshot-1", "query": "x"},
+        {"snapshot_identifier": "snapshot-1", "query": "x" * 501},
+        {"snapshot_identifier": "snapshot-1", "query": "valid", "top_k": 0},
+        {"snapshot_identifier": "snapshot-1", "query": "valid", "top_k": 21},
+        {"snapshot_identifier": "snapshot-1", "query": "valid", "search_mode": "other"},
+        {"snapshot_identifier": "snapshot-1", "query": "valid", "language": " "},
+        {
+            "snapshot_identifier": "snapshot-1",
+            "query": "valid",
+            "evaluation_time": "2026-07-15T12:00:00",
+        },
+    ],
+)
+def test_search_rule_documents_rejects_invalid_input(arguments):
+    client = FakeBackendClient()
+    response = RuleMCPTools(client).run("search_rule_documents", arguments)
+
+    assert response.success is False
+    assert response.error.code == MCPErrorCode.VALIDATION_ERROR
+    assert client.calls == []
+
+
+def test_search_rule_documents_defaults_to_hybrid_and_preserves_empty_results():
+    client = FakeBackendClient(
+        data={
+            "query": "bulunamayan kaynak",
+            "requested_mode": "hybrid",
+            "effective_mode": "hybrid",
+            "top_k": 5,
+            "result_count": 0,
+            "snapshot": {"snapshot_key": "snapshot-1"},
+            "embedding": None,
+            "ranking_version": "hybrid-rrf-v1",
+            "results": [],
+        }
+    )
+    response = RuleMCPTools(client).run(
+        "search_rule_documents",
+        {"snapshot_identifier": "snapshot-1", "query": "bulunamayan kaynak"},
+    )
+
+    assert response.success is True
+    assert response.data["requested_mode"] == "hybrid"
+    assert response.data["result_count"] == 0
+    assert response.data["results"] == []
+
+
+def test_search_rule_documents_preserves_versions_sections_scores_and_removes_vectors():
+    client = FakeBackendClient(
+        data={
+            "query": "REFUND-001 v2",
+            "requested_mode": "hybrid",
+            "effective_mode": "hybrid",
+            "top_k": 5,
+            "result_count": 1,
+            "snapshot": {"snapshot_key": "snapshot-1"},
+            "embedding": {
+                "provider": "mock",
+                "model": "mock-embedding-768",
+                "embedding_version": "asymmetric-retrieval-v1",
+            },
+            "ranking_version": "hybrid-rrf-v1",
+            "results": [
+                {
+                    "document_code": "REFUND-001-V2-SOURCE",
+                    "document_version": 3,
+                    "rule_version": 2,
+                    "heading": "Koşullar",
+                    "section_path": ["Koşullar"],
+                    "text": "Minimum etki süresi 120 dakikadır.",
+                    "semantic_score": 0.8,
+                    "full_text_score": 0.7,
+                    "hybrid_score": 0.016,
+                    "embedding": [0.1, 0.2],
+                }
+            ],
+        }
+    )
+    response = RuleMCPTools(client).run(
+        "search_rule_documents",
+        {"snapshot_identifier": "snapshot-1", "query": "REFUND-001 v2"},
+    )
+
+    result = response.data["results"][0]
+    assert result["document_version"] == 3
+    assert result["rule_version"] == 2
+    assert result["heading"] == "Koşullar"
+    assert result["section_path"] == ["Koşullar"]
+    assert result["hybrid_score"] == 0.016
+    assert response.data["embedding_provider"] == "mock"
+    assert response.data["correlation_id"] == "req-from-backend"
+    assert "embedding" not in result
+
+
+def test_search_rule_documents_preserves_full_text_fallback_warning():
+    warning = {
+        "code": "provider_unavailable",
+        "message": "Semantic provider unavailable; full-text results returned.",
+    }
+    client = FakeBackendClient(
+        data={
+            "query": "failover",
+            "requested_mode": "hybrid",
+            "effective_mode": "full_text_fallback",
+            "result_count": 0,
+            "snapshot": {"snapshot_key": "snapshot-1"},
+            "results": [],
+        },
+        warnings=[warning],
+    )
+    response = RuleMCPTools(client).run(
+        "search_rule_documents",
+        {"snapshot_identifier": "snapshot-1", "query": "failover"},
+    )
+
+    assert response.success is True
+    assert response.data["effective_mode"] == "full_text_fallback"
+    assert response.warnings[0].code == "provider_unavailable"
 
 
 def test_path_rule_code_is_not_sent_as_query_param_but_filter_rule_code_is_preserved():
@@ -223,12 +396,23 @@ def test_rule_mcp_modules_do_not_import_django_or_backend_apps():
 
     assert "django" not in source
     assert "apps." not in source
+    assert "CosineDistance" not in source
+    assert "SearchRank" not in source
+    assert "RuleEvaluationService" not in source
+    assert "CompensationService" not in source
 
 
 class FakeBackendClient:
-    def __init__(self, *, data: dict | None = None, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        data: dict | None = None,
+        error: Exception | None = None,
+        warnings: list[dict] | None = None,
+    ) -> None:
         self.data = data or {"ok": True}
         self.error = error
+        self.warnings = warnings or []
         self.calls: list[dict] = []
 
     def request_json(self, method, path, *, request_id=None, json=None, params=None):
@@ -245,7 +429,7 @@ class FakeBackendClient:
             raise self.error
         return {
             "data": self.data,
-            "warnings": [],
+            "warnings": self.warnings,
             "evidence": [],
             "metadata": {
                 "correlation_id": "req-from-backend",

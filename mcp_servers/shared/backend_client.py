@@ -114,7 +114,14 @@ class InternalAPIClient:
             ) from exc
 
         if response.status_code >= 400:
-            raise InternalAPIClientError(map_http_error(response.status_code))
+            upstream_code = None
+            try:
+                payload = response.json()
+                if isinstance(payload, dict) and isinstance(payload.get("error"), dict):
+                    upstream_code = payload["error"].get("code")
+            except ValueError:
+                pass
+            raise InternalAPIClientError(map_http_error(response.status_code, upstream_code))
         return response.json()
 
 
@@ -127,7 +134,21 @@ def parse_timeout_seconds(value: str | None, *, default: float) -> float:
     return parsed
 
 
-def map_http_error(status_code: int) -> MCPError:
+def map_http_error(status_code: int, upstream_code: str | None = None) -> MCPError:
+    if upstream_code == MCPErrorCode.PROVIDER_UNAVAILABLE:
+        return MCPError(
+            code=MCPErrorCode.PROVIDER_UNAVAILABLE,
+            message="Embedding provider is unavailable.",
+            details={"status_code": status_code},
+            retryable=True,
+        )
+    if upstream_code == MCPErrorCode.PROVIDER_ERROR:
+        return MCPError(
+            code=MCPErrorCode.PROVIDER_ERROR,
+            message="Embedding provider returned an invalid response.",
+            details={"status_code": status_code},
+            retryable=False,
+        )
     if status_code == 400:
         return MCPError(
             code=MCPErrorCode.VALIDATION_ERROR,
