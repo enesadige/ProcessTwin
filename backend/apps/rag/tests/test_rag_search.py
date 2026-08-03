@@ -2,6 +2,7 @@ from datetime import datetime
 
 import pytest
 from django.core.exceptions import ValidationError
+from django.test import override_settings
 
 from apps.datasets.models import DatasetVersion, DataSnapshot
 from apps.rag.corpus_utils import content_hash
@@ -80,6 +81,7 @@ def test_full_text_includes_snapshot_and_global_documents():
 
 
 @pytest.mark.django_db
+@override_settings(RAG_EMBEDDING_PROVIDER="mock")
 def test_semantic_search_returns_scores_without_vectors_in_payload():
     snapshot, _ = search_fixture()
     result = search(

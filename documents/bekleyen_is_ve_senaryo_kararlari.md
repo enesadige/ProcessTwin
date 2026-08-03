@@ -2089,3 +2089,26 @@ Durum: `KARAR VERİLDİ`
 - `heading-char-v1`, `max_chars=1800` ve `overlap_chars=200` kullanılır; `section_path` JSON liste olarak tutulur.
 - Her command invocation bir `IndexRun` oluşturur; `--validate-only` yazma yapmaz.
 - Token offsetleri, embedding üretimi ve arama 048 dışında bırakılır.
+
+## 15. LLM ve Embedding Provider Ayrımı
+
+Durum: `KARAR VERİLDİ`
+
+- Text generation ve embedding provider birbirinden bağımsız seçilir:
+  - `LLM_PROVIDER`: `mock`, `gemini`, `ollama`
+  - `RAG_EMBEDDING_PROVIDER`: `mock`, `gemini`, `ollama`
+- Desteklenen çalışma profilleri:
+  - online: Gemini LLM ve Gemini embedding
+  - tam lokal: Ollama LLM ve Ollama embedding
+  - karışık: LLM ve embedding provider birbirinden farklı olabilir
+- Mock provider yalnız unit test ve deterministik mekanik doğrulama içindir;
+  gerçek semantic kalite kanıtı sayılmaz.
+- Embedding provider veya model değiştiğinde bütün aktif chunk embedding'leri
+  yeniden üretilir. Farklı provider/model embedding'leri aynı semantic sorguda
+  karıştırılmaz.
+- Search servisi yalnız aktif provider, model, embedding version ve prompt
+  version ile eşleşen embedding kayıtlarını kullanır.
+- Ollama embedding modeli ve adapter implementasyonu ilgili sonraki provider
+  görevinde audit edilerek seçilir; model adı önceden varsayılmaz.
+- İleride kullanıcı ayarı eklendiğinde LLM ve embedding provider ayrı seçenekler
+  olarak gösterilir. Mevcut aşamada seçim backend environment/settings ile yapılır.
