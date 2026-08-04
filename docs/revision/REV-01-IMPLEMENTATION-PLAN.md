@@ -2,9 +2,16 @@
 
 Bu plan hedef tasarımdır; REV-01 kapsamında implementation yapılmaz. Sıra, schema ve nedensel generator olmadan service/API/MCP davranışının değiştirilmemesi için düzenlenmiştir.
 
+## İlerleme
+
+- `REV-02` tamamlandı: `apps.operations.contracts` içindeki modelden bağımsız
+  enum, dataclass, validation ve privacy serialization sözleşmeleri
+  `REV-02-DOMAIN-CONTRACTS.md` ile tanımlandı. Django modeli, migration, API ve
+  MCP yüzeyi değiştirilmedi.
+
 | Sıra / görev adı | Amaç | Ana değişiklikler | Ana katmanlar | Testler | Kabul kriteri | Commit mesajı |
 |---|---|---|---|---|---|---|
-| REV-02 — Operasyon sözleşmeleri ve enumlar | Causal event, impact verification ve session kanıtının kesin backend sözleşmesini tanımlamak | Enum/field isimleri, status transitions, privacy/redaction ve API additive-field contract tasarımı | `operations`, `customers`, `core` doküman/test fixture'ları | schema/contract tasarım testleri | Açık enum, state machine ve legacy mapping kabul edilmiş | `docs: define causal operations contracts` |
+| REV-02 — Operasyon sözleşmeleri ve enumlar | **Tamamlandı.** Causal event, impact verification ve session kanıtının kesin backend sözleşmesini tanımlamak | Enum/field isimleri, status transitions, privacy/redaction ve API additive-field contract tasarımı | `operations`, `customers`, `core` doküman/test fixture'ları | schema/contract tasarım testleri | Açık enum, state machine ve legacy mapping kabul edildi | `feat: define causal operations contracts` |
 | REV-03 — Nedensel operasyon modelleri | Sorgulanabilir ortak olay kökünü ve impact/session kayıtlarını eklemek | `CausalEvent`, `CustomerImpactAssessment`, `SessionEvent`; mevcut operasyon modellerine nullable causal FK; row-count düzeltme yolu | Django models, migrations, admin | model constraints, migration/backfill, PII-safe validation | Legacy kayıtlar korunur; snapshot isolation ve unique constraints çalışır | `feat: add causal operations models` |
 | REV-04 — GPON topology ve alarm katalog tutarlılığı | OLT/PON/segment/failure-domain kaynak doğruluğunu kurmak | PON port/device/source validators; alarm catalog matrix kararlarını versioned config'e geçirmek; failure-domain memberships | `network`, `operations`, data configs | topology, source compatibility, PON/DSL/Metro validators | PON alarmı yalnız OLT/PON portunda; DSL/Metro uyumluluğu doğrulanır | `feat: validate access alarm topology` |
 | REV-05 — Nedensel GPON generator | Ayrı döngüler yerine aynı scenario zincirinden operasyon verisi üretmek | 7 GPON scenario, relative timeline, causal IDs, alarm roles, clear/recovery, no-impact/hitless cases | `data_generator`, datasets commands | deterministic seed, causal-chain, no-outage/no-impact, row-count tests | Alarm/incident/outage/event aynı scenario zincirine bağlı; sabit 70 loop kaldırılmış | `feat: generate causal GPON operations data` |

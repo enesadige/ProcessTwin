@@ -6,9 +6,9 @@
 - Doğrulanmış HEAD: `6f296cd51da979fb972e01407d25adcafb24a7e5` (`docs: define target operations revision design`).
 - Bu checkpoint'te working tree temizdir.
 - Son doğrulanmış tam test baseline'i repository root'tan `.venv/bin/pytest -q` ile **612 passed** sonucudur. Bu sonuç REV-00 baseline dokümanında kayıtlıdır; bu handoff hazırlanırken testler yeniden çalıştırılmamalıdır.
-- REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla mevcut HEAD'de tamamlandı.
+- REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini tamamladı.
 - Görev 52 henüz başlamadı. Eski görev planındaki kesin tanımı: **QueryRun modelini oluştur**; `original_query`, `structured_query`, `planned_tools`, `executed_tools`, `status`, `final_result`, model ve prompt version alanlarıyla her AI sorgusunun kaydedilebilmesini hedefler.
-- Ancak sıradaki iş Görev 52 değildir: önce REV-02 ile başlayan zorunlu operasyon revizyon zinciri uygulanmalıdır. Bu zincir bittiğinde Görev 52'ye dönülecektir.
+- Ancak sıradaki iş Görev 52 değildir: sıradaki revizyon görevi REV-03'tür. Zorunlu operasyon revizyon zinciri tamamlanınca Görev 52'ye dönülecektir.
 
 Belge çelişkilerinde öncelik sırası: güncel git/kod durumu, REV-01, REV-00, güncel ilerleme günlüğü, sonra eski plan ve karar belgeleri. Örneğin README eski ürün vizyonunda simülasyondan söz eder; güncel REV-01 kararı canlı simülasyon, Simulation MCP ve Analytics MCP'nin mevcut zorunlu revizyonun parçası olmadığıdır. Bu, simülasyonu silme kararı değil; revizyon tamamlanmadan başlatmama kararıdır.
 
@@ -76,7 +76,7 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
 
 ## 11. Sıradaki Görev Sırası
 
-- **REV-02 — Operations contracts and enums:** Causal event, session evidence ve impact verification sözleşmelerini; enum, state transition, redaction ve additive API kurallarını kod yazmadan/veya sözleşme odaklı netleştirir.
+- **REV-02 — Operations contracts and enums:** Tamamlandı; modelden bağımsız enum, immutable dataclass, validation ve privacy serialization sözleşmeleri `apps.operations.contracts` içinde tanımlandı.
 - **REV-03 — Causal operations models:** CausalEvent, SessionEvent, CustomerImpactAssessment modelleri, nullable ilişkiler ve snapshot row-count düzeltmesi.
 - **REV-04 — GPON topology and alarm catalog:** OLT/PON port, alarm source/technology ve failure-domain uyum validator'ları, katalog matrisi.
 - **REV-05 — Causal GPON generator:** Yedi GPON senaryosundan zaman çizelgeli alarm, incident, outage, session ve recovery üretir; ayrı alarm döngüsü/sabit-70 dağılımını kaldırır.
