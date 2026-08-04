@@ -1,0 +1,38 @@
+# REV-01 Uygulama Planı
+
+Bu plan hedef tasarımdır; REV-01 kapsamında implementation yapılmaz. Sıra, schema ve nedensel generator olmadan service/API/MCP davranışının değiştirilmemesi için düzenlenmiştir.
+
+| Sıra / görev adı | Amaç | Ana değişiklikler | Ana katmanlar | Testler | Kabul kriteri | Commit mesajı |
+|---|---|---|---|---|---|---|
+| REV-02 — Operasyon sözleşmeleri ve enumlar | Causal event, impact verification ve session kanıtının kesin backend sözleşmesini tanımlamak | Enum/field isimleri, status transitions, privacy/redaction ve API additive-field contract tasarımı | `operations`, `customers`, `core` doküman/test fixture'ları | schema/contract tasarım testleri | Açık enum, state machine ve legacy mapping kabul edilmiş | `docs: define causal operations contracts` |
+| REV-03 — Nedensel operasyon modelleri | Sorgulanabilir ortak olay kökünü ve impact/session kayıtlarını eklemek | `CausalEvent`, `CustomerImpactAssessment`, `SessionEvent`; mevcut operasyon modellerine nullable causal FK; row-count düzeltme yolu | Django models, migrations, admin | model constraints, migration/backfill, PII-safe validation | Legacy kayıtlar korunur; snapshot isolation ve unique constraints çalışır | `feat: add causal operations models` |
+| REV-04 — GPON topology ve alarm katalog tutarlılığı | OLT/PON/segment/failure-domain kaynak doğruluğunu kurmak | PON port/device/source validators; alarm catalog matrix kararlarını versioned config'e geçirmek; failure-domain memberships | `network`, `operations`, data configs | topology, source compatibility, PON/DSL/Metro validators | PON alarmı yalnız OLT/PON portunda; DSL/Metro uyumluluğu doğrulanır | `feat: validate access alarm topology` |
+| REV-05 — Nedensel GPON generator | Ayrı döngüler yerine aynı scenario zincirinden operasyon verisi üretmek | 7 GPON scenario, relative timeline, causal IDs, alarm roles, clear/recovery, no-impact/hitless cases | `data_generator`, datasets commands | deterministic seed, causal-chain, no-outage/no-impact, row-count tests | Alarm/incident/outage/event aynı scenario zincirine bağlı; sabit 70 loop kaldırılmış | `feat: generate causal GPON operations data` |
+| REV-06 — Correlation ve root-cause revizyonu | Zaman, topoloji, upstream, failure domain ve alarm rolüyle root candidate sıralamak | candidate selection, root/child/support/noise role, evidence gaps, delayed propagation | `operations/services`, `network/services` | correlation/root-cause rank, time order, unrelated-noise tests | 08.00 upstream kök ile 09.00 downstream etki açıklanabilir | `feat: correlate causal network events` |
+| REV-07 — Session doğrulama ve impact assessment | Potential impact'i verified/no-impact/insufficient evidence ile ayırmak | Session resolver, connection-level assessment, backup/failover davranışı, aggregate customer impact | `customers/services`, `operations/services` | stop/restart, pre-existing offline, late data, hitless failover, subset invariant | Verified impact potential setin alt kümesidir; session yoksa verified denmez | `feat: verify customer impact from sessions` |
+| REV-08 — Outage, rule, compensation ve evidence | Operasyonel interruption ile müşteri verification'ı doğru bağlamak | Outage verification state, compensation precondition, DecisionEvidence schema version/causal summary | `operations`, `rules`, `compensation` | Maltepe legacy, GPON verified-impact, evidence hash, policy regressions | Mevcut REFUND regression korunur; no-impact/hitless compensation üretmez | `feat: link compensation evidence to verified impact` |
+| REV-09 — Backend internal API uyarlaması | Yeni kanıtları additive internal response alanlarıyla açmak | serializers/views, snapshot/evaluation filters, error mapping | `backend/apps/*/internal_*` | API auth, correlation ID, response compatibility | Eski consumer alanları korunur; yeni causal/impact breakdown güvenlidir | `feat: expose causal impact evidence internally` |
+| REV-10 — Dört MCP uyarlaması | Backend kanıtlarını MCP contract'i bozmadan yansıtmak | Network/Customer/Rule/Compensation response mapping; gerekirse kontrollü yeni read tool değerlendirmesi | `mcp_servers`, core registry | tool unit, shared contract/security, live health | Tool sayıları/isimleri açık karar olmadan değişmez; raw/PII sızmaz | `feat: surface verified operations evidence in MCP` |
+| REV-11 — RAG corpus ve benchmark yenilemesi | Yeni operasyon semantiğini versioned kaynaklarla aratılabilir yapmak | source docs, chunks, iki aktif embedding seti, benchmark/Ground Truth evidence açıklamaları | `rag`, `documents` | corpus/hash/chunk/embed/search benchmark | Eski source version korunur; yeni corpus semantic/deterministic kapıları geçer | `docs: refresh RAG operations evidence corpus` |
+| REV-12 — Final consistency ve regresyon | Yeni veri zincirini uçtan uca kapatmak | multi-city snapshot row counts, validators, export/audit, baseline comparison | tüm backend/MCP/datasets | full suite, 30/30 GT, Maltepe, native PostgreSQL, MCP health | Nedensel zincir, verified impact ve legacy regression birlikte geçer | `test: validate causal operations revision` |
+
+## Zorunlu domain consistency validator'ları
+
+- Alarm type kaynak teknoloji ve source level ile uyumludur.
+- PON alarmı OLT/PON portunda; DSL alarmı DSLAM/xDSL port/line'ında oluşur.
+- Incident zamanı bağlı alarm zinciriyle tutarlıdır; root alarm child alarmdan sonra başlayamaz.
+- Primary device, bağlı root/source alarmıyla topolojik olarak ilişkilidir.
+- `creates_outage=false` scenario Outage oluşturmaz.
+- Hitless failover Outage ve verified impact oluşturmaz.
+- Verified impact, potential impact kümesinin dışına çıkmaz.
+- Clear/recovery sırası causality ve session recovery ile tutarlıdır.
+- Session kanıtı olmayan sonuç verified diye işaretlenmez.
+- Snapshot `row_counts`, gerçek model sayılarıyla eşleşir.
+
+## Uygulama öncesi açık karar kapıları
+
+1. Session kaynak alan eşlemesi, pseudonymization ve retention politikası.
+2. CausalEvent state/role enumlarının REV-02’de kesinleştirilmesi.
+3. Outage verification state'in additive alan mı, ayrı assessment mi olacağı; hedef öneri additive verification alanı + assessment'tır.
+4. GPON scenario weight'leri ve kaynak eşiklerinin örnek CSV/log geldikten sonra kalibrasyonu.
+5. Ticari policy, özellikle 24 saat ifadesi, bağımsız rule governance ile teyit edilmeden değişmeyecektir.
