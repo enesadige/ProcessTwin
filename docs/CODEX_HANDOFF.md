@@ -3,12 +3,12 @@
 ## 1. Mevcut Checkpoint
 
 - Aktif branch: `main`.
-- Doğrulanmış HEAD: `6f296cd51da979fb972e01407d25adcafb24a7e5` (`docs: define target operations revision design`).
+- Doğrulanmış HEAD: `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` (`feat: define causal operations contracts`).
 - Bu checkpoint'te working tree temizdir.
 - Son doğrulanmış tam test baseline'i repository root'tan `.venv/bin/pytest -q` ile **612 passed** sonucudur. Bu sonuç REV-00 baseline dokümanında kayıtlıdır; bu handoff hazırlanırken testler yeniden çalıştırılmamalıdır.
-- REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini tamamladı.
+- REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` commit'iyle tamamladı. REV-02 hedefli testleri 13 passed sonucunu verdi.
 - Görev 52 henüz başlamadı. Eski görev planındaki kesin tanımı: **QueryRun modelini oluştur**; `original_query`, `structured_query`, `planned_tools`, `executed_tools`, `status`, `final_result`, model ve prompt version alanlarıyla her AI sorgusunun kaydedilebilmesini hedefler.
-- Ancak sıradaki iş Görev 52 değildir: sıradaki revizyon görevi REV-03'tür. Zorunlu operasyon revizyon zinciri tamamlanınca Görev 52'ye dönülecektir.
+- Ancak sıradaki iş Görev 52 değildir: sıradaki revizyon görevi REV-03 model/migration çalışmasıdır ve henüz başlamamıştır. Zorunlu operasyon revizyon zinciri tamamlanınca Görev 52'ye dönülecektir.
 
 Belge çelişkilerinde öncelik sırası: güncel git/kod durumu, REV-01, REV-00, güncel ilerleme günlüğü, sonra eski plan ve karar belgeleri. Örneğin README eski ürün vizyonunda simülasyondan söz eder; güncel REV-01 kararı canlı simülasyon, Simulation MCP ve Analytics MCP'nin mevcut zorunlu revizyonun parçası olmadığıdır. Bu, simülasyonu silme kararı değil; revizyon tamamlanmadan başlatmama kararıdır.
 
