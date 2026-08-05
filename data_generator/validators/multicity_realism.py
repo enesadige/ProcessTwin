@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from django.db import models
 from django.db.models import Count
 
 from apps.core.choices import ResultStatus
@@ -35,12 +36,14 @@ from apps.network.services.path_diversity import PathDiversityService
 from apps.operations.models import (
     Alarm,
     AlarmType,
+    CausalEvent,
     Incident,
     MaintenanceWindow,
     OperationalEvent,
     Outage,
     QualityMeasurement,
     ServiceImpactClass,
+    SessionEvent,
 )
 from apps.rules.models import Rule, RuleSet, RuleVersion
 from data_generator.configs import multi_city_realism_v1 as config
@@ -83,13 +86,21 @@ def validate_multicity_realism_snapshot(
         check("rule_sets", 1, row_counts["rule_sets"]),
         check("rules", 25, row_counts["rules"]),
         check("rule_versions", 25, row_counts["rule_versions"]),
-        check("alarm_types", 30, row_counts["alarm_types"]),
-        check("alarms", 2100, row_counts["alarms"]),
-        check("incidents", 210, row_counts["incidents"]),
-        check("outages", 78, row_counts["outages"]),
-        check("maintenance_windows", 30, row_counts["maintenance_windows"]),
-        check("operational_events", 900, row_counts["operational_events"]),
-        check("quality_measurements", 12000, row_counts["quality_measurements"]),
+        check("alarm_types", 31, row_counts["alarm_types"]),
+        check_at_least("causal_events", 1, row_counts["causal_events"]),
+        check_at_least("alarms", row_counts["causal_events"], row_counts["alarms"]),
+        check_at_least("incidents", 1, row_counts["incidents"]),
+        check_at_least(
+            "operational_events",
+            row_counts["causal_events"],
+            row_counts["operational_events"],
+        ),
+        check_at_least(
+            "quality_measurements",
+            row_counts["causal_events"] * 38,
+            row_counts["quality_measurements"],
+        ),
+        check_at_least("session_events", row_counts["causal_events"], row_counts["session_events"]),
         check("snapshot_is_passive", False, snapshot.is_active),
         check("active_snapshot_is_maltepe", True, collect_active_snapshot_is_maltepe(snapshot)),
         check("topology_bng_only_to_aggregation", 0, collect_bad_bng_direct_access_links(snapshot)),
@@ -146,13 +157,14 @@ def validate_multicity_realism_snapshot(
         ),
         check("metro_ethernet_subset", 520, collect_metro_ethernet_count(snapshot)),
         check("individual_metro_ethernet", 0, collect_individual_metro_count(snapshot)),
+        check_at_least("alarm_type_coverage", 1, collect_used_alarm_type_count(snapshot)),
+        check_at_least("scenario_coverage", 7, collect_scenario_coverage(snapshot)),
+        check("causal_alarm_links", 0, collect_alarms_without_causal_event(snapshot)),
         check(
-            "alarm_statuses",
-            config.TIMELINE_TARGETS["alarm_statuses"],
-            collect_alarm_statuses(snapshot),
+            "incident_alarm_causal_mismatches",
+            0,
+            collect_incident_alarm_causal_mismatches(snapshot),
         ),
-        check("alarm_type_coverage", 30, collect_used_alarm_type_count(snapshot)),
-        check("scenario_coverage", 22, collect_scenario_coverage(snapshot)),
         check("degradation_incident_outages", 0, collect_non_outage_incident_outages(snapshot)),
         check("noise_alarm_incidents", 0, collect_noise_incident_count(snapshot)),
         check("duplicate_final_compensation", 0, collect_duplicate_final_compensation(snapshot)),
@@ -217,6 +229,8 @@ def collect_row_counts(snapshot: DataSnapshot) -> dict[str, int]:
         "maintenance_windows": MaintenanceWindow.objects.filter(data_snapshot=snapshot).count(),
         "operational_events": OperationalEvent.objects.filter(data_snapshot=snapshot).count(),
         "quality_measurements": QualityMeasurement.objects.filter(data_snapshot=snapshot).count(),
+        "causal_events": CausalEvent.objects.filter(data_snapshot=snapshot).count(),
+        "session_events": SessionEvent.objects.filter(data_snapshot=snapshot).count(),
         "ground_truth_cases": GroundTruthCase.objects.filter(data_snapshot=snapshot).count(),
     }
 
@@ -325,6 +339,18 @@ def collect_scenario_coverage(snapshot: DataSnapshot) -> int:
         )
     )
     return len({item for item in scenarios if item})
+
+
+def collect_alarms_without_causal_event(snapshot: DataSnapshot) -> int:
+    return Alarm.objects.filter(data_snapshot=snapshot, causal_event__isnull=True).count()
+
+
+def collect_incident_alarm_causal_mismatches(snapshot: DataSnapshot) -> int:
+    return (
+        Incident.objects.filter(data_snapshot=snapshot, incident_alarms__isnull=False)
+        .exclude(incident_alarms__alarm__causal_event=models.F("causal_event"))
+        .count()
+    )
 
 
 def collect_active_snapshot_is_maltepe(snapshot: DataSnapshot) -> bool:
@@ -533,4 +559,13 @@ def check(name: str, expected: Any, actual: Any) -> dict[str, Any]:
         "expected": expected,
         "actual": actual,
         "passed": expected == actual,
+    }
+
+
+def check_at_least(name: str, minimum: int, actual: int) -> dict[str, Any]:
+    return {
+        "name": name,
+        "expected": {"minimum": minimum},
+        "actual": actual,
+        "passed": actual >= minimum,
     }

@@ -72,6 +72,7 @@ from apps.operations.models import (
     AlarmType,
     AlarmTypeAllowedSourceKind,
     AlarmTypeSupportedDeviceType,
+    CausalEvent,
     FailoverResult,
     Incident,
     IncidentAlarm,
@@ -91,6 +92,7 @@ from apps.operations.models import (
     QualityMetricType,
     RootCauseCategory,
     ServiceImpactClass,
+    SessionEvent,
     Severity,
 )
 from apps.rules.models import Rule, RuleSet, RuleStatus, RuleType, RuleVersion, RuleVersionStatus
@@ -98,6 +100,7 @@ from data_generator.configs import multi_city_realism_v1 as config
 from data_generator.configs import realistic_alarm_catalog_v1 as alarm_config
 from data_generator.configs import realistic_commercial_profile_v1 as commercial_config
 from data_generator.configs import synthetic_compensation_policy_v1 as policy_config
+from data_generator.seeders.causal_timeline import CausalTimelineContext, seed_causal_timeline
 
 ISTANBUL_TZ = ZoneInfo("Europe/Istanbul")
 REFERENCE_DATETIME = parse_datetime(config.DEFAULT_REFERENCE_DATETIME)
@@ -740,10 +743,7 @@ def seed_ports(
             for index in range(1, 49):
                 reserved_backup_capacity_port = False
                 active = True
-                if (
-                    device.access_role
-                    == NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION
-                ):
+                if device.access_role == NetworkDeviceAccessRole.CORPORATE_FIBER_AGGREGATION:
                     corporate_port_index += 1
                     reserved_backup_capacity_port = (
                         corporate_port_index * reserved_backup_capacity
@@ -1474,6 +1474,37 @@ def seed_timeline(
     alarm_types,
     batch_size,
 ) -> tuple[list[Incident], list[Outage]]:
+    reference_datetime = parse_reference_datetime(
+        snapshot.dataset_version.config["reference_datetime"]
+    )
+    return seed_causal_timeline(
+        CausalTimelineContext(
+            snapshot=snapshot,
+            devices=devices,
+            links=links,
+            ports_by_role=ports_by_role,
+            failure_domains=failure_domains,
+            primary_connections=primary_connections,
+            backup_connections=backup_connections,
+            alarm_types=alarm_types,
+            reference_datetime=reference_datetime,
+            batch_size=batch_size,
+        )
+    )
+
+
+def _seed_legacy_positional_timeline(
+    *,
+    snapshot,
+    devices,
+    links,
+    ports_by_role,
+    failure_domains,
+    primary_connections,
+    backup_connections,
+    alarm_types,
+    batch_size,
+) -> tuple[list[Incident], list[Outage]]:
     start = REFERENCE_DATETIME - timedelta(days=60)
     device_pool = list(devices.values())
     link_pool = list(links.values())
@@ -2123,6 +2154,8 @@ def collect_seed_counts(snapshot: DataSnapshot) -> dict[str, int]:
         "maintenance_windows": MaintenanceWindow.objects.filter(data_snapshot=snapshot).count(),
         "operational_events": OperationalEvent.objects.filter(data_snapshot=snapshot).count(),
         "quality_measurements": QualityMeasurement.objects.filter(data_snapshot=snapshot).count(),
+        "causal_events": CausalEvent.objects.filter(data_snapshot=snapshot).count(),
+        "session_events": SessionEvent.objects.filter(data_snapshot=snapshot).count(),
     }
 
 
@@ -2141,6 +2174,8 @@ def delete_multicity_realism_dataset_tree(dataset: DatasetVersion) -> None:
         IncidentAlarm.objects.filter(data_snapshot=snapshot).delete()
         Alarm.objects.filter(data_snapshot=snapshot).delete()
         Incident.objects.filter(data_snapshot=snapshot).delete()
+        SessionEvent.objects.filter(data_snapshot=snapshot).delete()
+        CausalEvent.objects.filter(data_snapshot=snapshot).delete()
         AlarmTypeSupportedDeviceType.objects.filter(data_snapshot=snapshot).delete()
         AlarmTypeAllowedSourceKind.objects.filter(data_snapshot=snapshot).delete()
         AlarmType.objects.filter(data_snapshot=snapshot).delete()

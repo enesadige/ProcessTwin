@@ -96,21 +96,11 @@ NETWORK_TARGETS = {
 }
 
 TIMELINE_TARGETS = {
-    "alarm_types": 30,
-    "alarms": 2100,
-    "alarm_statuses": {"cleared": 1680, "open": 210, "suppressed": 210},
-    "acknowledged_open_alarms": 105,
-    "incidents": 210,
-    "outages": 78,
-    "degradation_incidents": 60,
-    "protection_loss_incidents": 22,
     "maintenance_windows": 30,
-    "operational_events": 900,
-    "quality_measurements": 12000,
     "timeline_days": 60,
-    "dense_event_days": 9,
-    "planned_maintenance_dense_days": 3,
-    "recurring_flapping_days": 4,
+    "causal_event_budget": 210,
+    "causal_event_variance": 12,
+    "quality_samples_per_event": {"min": 38, "max": 62},
 }
 
 EXPECTED_TOTALS = {
@@ -129,7 +119,6 @@ EXPECTED_TOTALS = {
     "rule_sets": 1,
     "rules": 25,
     "rule_versions": 25,
-    **TIMELINE_TARGETS,
 }
 
 
