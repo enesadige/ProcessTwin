@@ -37,12 +37,18 @@ SENSITIVE_KEY_PARTS = frozenset(
 )
 SAFE_TOOL_FIELDS = frozenset(
     {
+        "call_id",
+        "server",
         "tool_name",
         "argument_summary",
         "status",
         "result_summary",
+        "safe_result_summary",
+        "result_fingerprint",
         "error_code",
+        "error_summary",
         "correlation_id",
+        "attempt_count",
         "duration_ms",
         "started_at",
         "completed_at",
@@ -285,6 +291,39 @@ class QueryRunService:
         query_run.full_clean()
         query_run.save()
         return query_run
+
+    def append_execution_record(
+        self,
+        query_run: QueryRun,
+        *,
+        record: Mapping[str, Any],
+    ) -> QueryRun:
+        """Append one safe call audit record without losing a concurrent update."""
+        sanitized_records = sanitize_tool_records([record])
+        sanitized_record = sanitized_records[0]
+        call_id = sanitized_record.get("call_id")
+        if not isinstance(call_id, str) or not call_id:
+            raise QueryRunError(
+                message="Tool execution record requires call_id.",
+                code="invalid_query_run_tool_record",
+            )
+        with transaction.atomic():
+            locked_run = QueryRun.objects.select_for_update().get(pk=query_run.pk)
+            if QueryRunStatus(locked_run.status) != QueryRunStatus.EXECUTING:
+                raise QueryRunTransitionError(
+                    current=locked_run.status, target=QueryRunStatus.EXECUTING
+                )
+            existing_call_ids = {
+                item.get("call_id")
+                for item in locked_run.executed_tools
+                if isinstance(item, Mapping)
+            }
+            if call_id in existing_call_ids:
+                return locked_run
+            locked_run.executed_tools = [*locked_run.executed_tools, sanitized_record]
+            locked_run.full_clean()
+            locked_run.save(update_fields=["executed_tools", "updated_at"])
+            return locked_run
 
     def complete(self, query_run: QueryRun, *, final_result: Mapping[str, Any]) -> QueryRun:
         if not isinstance(final_result, Mapping):

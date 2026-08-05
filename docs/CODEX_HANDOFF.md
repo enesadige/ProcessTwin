@@ -60,6 +60,13 @@
   doğrulandı. Hedefli regresyon seti 236 passed, full suite 807 passed;
   gerçek LLM, MCP, RAG veya model çağrısı yapılmadı. Sıradaki görev Görev 057
   MCP executor'dır.
+- Görev 057 tamamlandı: `ToolExecutor`, persisted ve validated `ToolPlan`
+  çağrılarını mevcut dört MCP tool sınıfına sıralı olarak yönlendirir. Plan
+  bağımlılıkları, bounded read-only retry ve partial failure korunur; her call
+  için yalnız privacy-safe audit özeti `QueryRun.executed_tools` alanına yazılır.
+  Run execution sonunda `executing` kalır; result merge ve terminal karar
+  uygulanmadı. Testlerde yalnız fake transport kullanıldı. Sıradaki görev
+  Görev 058 result merge/validation'dır.
 - REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
   snapshot'ını native kullanımda explicit almalıdır; model herhangi bir

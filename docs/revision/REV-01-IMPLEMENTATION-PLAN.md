@@ -112,6 +112,13 @@ ile idempotent olarak dogrulandi. Hedefli provider/schema/MCP contract seti 236
 passed, full suite 807 passed; gercek LLM, MCP, RAG veya model cagrisi yapilmadi.
 MCP tool sayilari 9/7/8/6 kaldi. Siradaki gorev: Gorev 057 - MCP executor.
 
+Gorev 057 — **Tamamlandi.** `ToolExecutor`, persisted ToolPlan'i mevcut MCP
+tool siniflarina sirali ve deterministic olarak yonlendirir. Dependency failure
+bagli call'i skip eder, bagimsiz call'lar devam eder; yalniz explicit read-only
+allowlist retry edilir. QueryRun `executing` kalir ve ham response yerine
+privacy-safe call audit ozetleri saklanir. Result merge, validation ve terminal
+karar Gorev 058'e birakildi.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.
