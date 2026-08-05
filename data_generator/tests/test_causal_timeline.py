@@ -4,6 +4,7 @@ import random
 
 from data_generator.seeders.causal_timeline import (
     GPON_SCENARIOS,
+    _calibrated_symptom_codes,
     _legacy_scenarios,
     _scenario_sequence,
 )
@@ -37,3 +38,24 @@ def test_no_impact_and_degradation_gpon_scenarios_do_not_create_outages():
     assert not scenarios["SCN-GPON-NO-IMPACT-001"].creates_outage
     assert not scenarios["SCN-GPON-TEMPERATURE-DEGRADATION-001"].creates_outage
     assert not scenarios["SCN-GPON-OPTICAL-INTERMITTENT-001"].creates_outage
+
+
+def test_optical_and_distribution_symptom_fanout_is_deterministic_and_bounded():
+    scenario = next(item for item in GPON_SCENARIOS if "DISTRIBUTION-CABLE" in item.code)
+
+    first = _calibrated_symptom_codes(scenario, random.Random("fanout-seed"), 4)
+    second = _calibrated_symptom_codes(scenario, random.Random("fanout-seed"), 4)
+
+    assert first == second
+    assert 1 <= len(first) <= 4
+    assert set(first) <= {"ONT_DISCONNECT_SURGE", "OLT_UNREACHABLE"}
+
+
+def test_fanout_does_not_change_temperature_no_impact_or_optical_intermitttent():
+    for code in {
+        "SCN-GPON-TEMPERATURE-DEGRADATION-001",
+        "SCN-GPON-NO-IMPACT-001",
+        "SCN-GPON-OPTICAL-INTERMITTENT-001",
+    }:
+        scenario = next(item for item in GPON_SCENARIOS if item.code == code)
+        assert _calibrated_symptom_codes(scenario, random.Random("fanout-seed"), 12) == []

@@ -14,6 +14,7 @@ from decimal import Decimal
 
 from apps.customers.models import SubscriptionConnection
 from apps.network.models import LineConnection, NetworkDeviceType
+from apps.operations.alarm_normalization import normalize_alarm_title, resolve_alarm_severity
 from apps.operations.alarm_topology import validate_alarm_topology
 from apps.operations.contracts import (
     CausalEventStatus,
@@ -569,6 +570,7 @@ def _create_alarms(
     codes = list(scenario.alarm_codes)
     if len(codes) > 1:
         codes.extend(rng.choices(codes[1:], k=rng.randrange(1, 5)))
+    codes.extend(_calibrated_symptom_codes(scenario, rng, len(context.gpon_lines)))
     alarms = []
     for alarm_index, code in enumerate(codes, start=1):
         source_kwargs = _source_kwargs_for_alarm(
@@ -579,12 +581,18 @@ def _create_alarms(
         )
         detected_at = started_at + timedelta(minutes=alarm_index * 4)
         cleared_at = None if ongoing else recovery_at + timedelta(minutes=alarm_index + 1)
+        raw_title = _synthetic_raw_title(scenario, code, alarm_index)
+        normalization = (
+            normalize_alarm_title(raw_title, resource_level=next(iter(source_kwargs)))
+            if raw_title
+            else None
+        )
         alarm = Alarm(
             data_snapshot=context.snapshot,
             causal_event=causal_event,
             alarm_id=f"ALM-MCR-{index:04d}-{alarm_index:02d}",
             alarm_type=context.alarm_types[code],
-            severity=context.alarm_types[code].severity,
+            severity=resolve_alarm_severity(None, context.alarm_types[code].severity),
             status=AlarmStatus.OPEN if ongoing else AlarmStatus.CLEARED,
             detected_at=detected_at,
             received_at=detected_at + timedelta(seconds=5),
@@ -592,11 +600,15 @@ def _create_alarms(
             last_seen_at=cleared_at or detected_at,
             occurrence_count=1 + (alarm_index % 3),
             deduplication_key=f"CE-{index:04d}-{code}-{alarm_index:02d}",
-            raw_payload={"synthetic": True},
+            raw_payload={
+                "synthetic": True,
+                **({"raw_alarm_title": raw_title} if raw_title else {}),
+            },
             metadata={
                 "synthetic": True,
                 "scenario_code": scenario.code,
                 "causal_role": "root" if alarm_index == 1 else "child",
+                **({"normalization": normalization.to_metadata()} if normalization else {}),
             },
             **source_kwargs,
         )
@@ -609,6 +621,35 @@ def _create_alarms(
         alarm.save()
         alarms.append(alarm)
     return alarms
+
+
+def _calibrated_symptom_codes(scenario, rng, topology_capacity):
+    """Add bounded, variable symptom fanout only to optical/cable chains."""
+    if scenario.code not in {
+        "SCN-GPON-DISTRIBUTION-CABLE-001",
+        "SCN-GPON-OLT-UNREACHABLE-001",
+    }:
+        return []
+    max_symptoms = min(3, max(0, topology_capacity - 1))
+    if max_symptoms == 0:
+        return []
+    # Dying Gasp is represented by the compatible ONT-disconnect alarm type;
+    # its raw-title metadata preserves the more precise sampled symptom.
+    symptoms = ["ONT_DISCONNECT_SURGE"] * (1 + rng.randrange(max_symptoms))
+    if len(symptoms) < max_symptoms and rng.randrange(3) == 0:
+        symptoms.append("OLT_UNREACHABLE")
+    return symptoms
+
+
+def _synthetic_raw_title(scenario, code, alarm_index):
+    if code == "ONT_DISCONNECT_SURGE" and scenario.code in {
+        "SCN-GPON-DISTRIBUTION-CABLE-001",
+        "SCN-GPON-OLT-UNREACHABLE-001",
+    }:
+        return "Dying Gasp" if alarm_index % 2 else "The dying-gasp of GPON ONTi (DGi) is generated"
+    if code == "OLT_UNREACHABLE" and scenario.code == "SCN-GPON-DISTRIBUTION-CABLE-001":
+        return "Device Not Active"
+    return None
 
 
 def _create_incident(

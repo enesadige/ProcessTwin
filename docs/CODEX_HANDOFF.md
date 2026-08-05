@@ -80,6 +80,7 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
 - **REV-03 — Causal operations models:** Tamamlandı; CausalEvent, SessionEvent, CustomerImpactAssessment modelleri, nullable ilişkiler ve snapshot row-count düzeltme migration'ı eklendi.
 - **REV-04 — GPON topology and alarm catalog:** Tamamlandı; merkezi source/device/technology compatibility validator, idempotent catalog seed ve `DISTRIBUTION_CABLE_DOWN` kararı eklendi. Mevcut operasyon kayıtları yeniden üretilmedi.
 - **REV-05 — Causal GPON generator:** Tamamlandı; yedi GPON senaryosundan zaman çizelgeli alarm, incident, outage, session ve recovery üretir; ayrı alarm döngüsü/sabit-70 dağılımını kaldırır.
+- **REV-05A — Alarm calibration:** Tamamlandı; anonim alan örneği repository/runtime bağımlılığı yapılmadan merkezi title normalization, raw-severity precedence ve sınırlı optical symptom fanout için kullanıldı. RAG reset `PROTECT` blocker'ı ayrı kaldı.
 - **REV-06 — Correlation and root cause:** Sıradaki görevdir; zaman/topoloji/failure-domain zincirlerini açıklanabilir root, symptom, supporting ve noise sonuçlarına dönüştürür.
 - **REV-07 — Session verification and impact:** Potential impact'i session kanıtıyla assessment'a dönüştürür.
 - **REV-08 — Compensation and evidence:** Outage/rule/compensation/evidence zincirini verified impact semantiğine bağlar.
