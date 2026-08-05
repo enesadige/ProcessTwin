@@ -10,9 +10,11 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 from apps.orchestration.providers.base import LLMProvider
+from apps.orchestration.providers.mock import MockLLMProvider
 
 OLLAMA_PROVIDER = "ollama"
 GEMINI_PROVIDER = "gemini"
+MOCK_PROVIDER = "mock"
 GEMMA4_MODEL = "gemma4:12b-it-qat"
 
 
@@ -28,6 +30,7 @@ class LLMProviderDescriptor:
     is_local: bool
     supports_thinking: bool
     thinking_enabled: bool
+    production_allowed: bool
     adapter_factory: Callable[[], LLMProvider] | None = None
 
     def create_provider(self) -> LLMProvider:
@@ -53,6 +56,7 @@ class LLMProviderDescriptor:
             "is_local": self.is_local,
             "supports_thinking": self.supports_thinking,
             "thinking_enabled": self.thinking_enabled,
+            "production_allowed": self.production_allowed,
         }
 
 
@@ -67,6 +71,7 @@ LLM_PROVIDER_REGISTRY = MappingProxyType(
             is_local=True,
             supports_thinking=True,
             thinking_enabled=False,
+            production_allowed=True,
         ),
         GEMINI_PROVIDER: LLMProviderDescriptor(
             registry_key=GEMINI_PROVIDER,
@@ -77,6 +82,19 @@ LLM_PROVIDER_REGISTRY = MappingProxyType(
             is_local=False,
             supports_thinking=False,
             thinking_enabled=False,
+            production_allowed=True,
+        ),
+        MOCK_PROVIDER: LLMProviderDescriptor(
+            registry_key=MOCK_PROVIDER,
+            provider=MOCK_PROVIDER,
+            model="mock-llm-v1",
+            model_version="mock-llm-deterministic-v1",
+            prompt_version="mock-llm-contract-v1",
+            is_local=True,
+            supports_thinking=False,
+            thinking_enabled=False,
+            production_allowed=False,
+            adapter_factory=MockLLMProvider,
         ),
     }
 )
@@ -85,6 +103,11 @@ LLM_PROVIDER_REGISTRY = MappingProxyType(
 def get_llm_descriptor(provider_name: str | None = None) -> LLMProviderDescriptor:
     selected = (provider_name if provider_name is not None else settings.LLM_PROVIDER).strip()
     try:
-        return LLM_PROVIDER_REGISTRY[selected]
+        descriptor = LLM_PROVIDER_REGISTRY[selected]
     except KeyError as exc:
         raise ImproperlyConfigured("Unsupported LLM provider configuration.") from exc
+    if not descriptor.production_allowed and not getattr(
+        settings, "LLM_ALLOW_MOCK_PROVIDER", False
+    ):
+        raise ImproperlyConfigured("Mock LLM provider is disabled outside tests.")
+    return descriptor

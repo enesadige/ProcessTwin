@@ -55,6 +55,14 @@ Gerçek provider adapter'ı veya network çağrısı yoktur. LLM provider seçim
 embedding registry'sinden bağımsız kalır. Sıradaki görev Görev 053A mock LLM
 provider'dır.
 
+Görev 053A — **Tamamlandı.** `MockLLMProvider` canonicalized privacy-safe
+mapping input ile deterministic success/empty response ve controlled failure
+senaryoları üretir; gerçek network/model çağrısı yapmaz. `mock` descriptor'ı
+yalnız `LLM_ALLOW_MOCK_PROVIDER=true` test/development izniyle factory üzerinden
+oluşturulur; production varsayılanı kapalıdır. QueryRun entegrasyonu, gerçek
+Gemini/Ollama adapter'ı ve orchestration bu görevde uygulanmadı. Sıradaki görev
+Görev 053B Gemini LLM adapter'ıdır.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.

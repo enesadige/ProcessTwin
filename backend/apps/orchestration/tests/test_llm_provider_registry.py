@@ -15,6 +15,7 @@ def test_known_ollama_descriptor_is_fixed_and_disables_thinking():
     assert descriptor.is_local is True
     assert descriptor.supports_thinking is True
     assert descriptor.thinking_enabled is False
+    assert descriptor.production_allowed is True
     assert descriptor.adapter_factory is None
 
 
@@ -24,6 +25,7 @@ def test_gemini_descriptor_is_provider_level_until_a_model_is_approved():
     assert descriptor.model is None
     assert descriptor.is_local is False
     assert descriptor.thinking_enabled is False
+    assert descriptor.production_allowed is True
     assert descriptor.model_version == "gemini-model-unconfigured-v1"
 
 

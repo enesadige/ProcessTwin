@@ -18,6 +18,11 @@
   olmadığından descriptor provider-level kalır. Gerçek adapter/network çağrısı
   yoktur; LLM ve embedding provider seçimleri bağımsızdır. Sıradaki görev
   Görev 053A mock LLM provider'dır.
+- Görev 053A tamamlandı: `MockLLMProvider` yalnız açık test/development izniyle
+  seçilir, ağ/model çağrısı yapmaz ve canonicalized güvenli input'tan
+  deterministic response veya kontrollü hata üretir. QueryRun entegrasyonu ve
+  gerçek Gemini/Ollama adapter'ları henüz yoktur. Sıradaki görev Görev 053B
+  Gemini LLM adapter'ıdır.
 - REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
   snapshot'ını native kullanımda explicit almalıdır; model herhangi bir
