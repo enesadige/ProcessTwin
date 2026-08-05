@@ -5,6 +5,8 @@ from apps.operations.models import (
     AlarmType,
     AlarmTypeAllowedSourceKind,
     AlarmTypeSupportedDeviceType,
+    CausalEvent,
+    CustomerImpactAssessment,
     Incident,
     IncidentAlarm,
     MaintenanceWindow,
@@ -13,6 +15,7 @@ from apps.operations.models import (
     OperationalEvent,
     Outage,
     QualityMeasurement,
+    SessionEvent,
 )
 
 
@@ -63,6 +66,35 @@ class AlarmTypeSupportedDeviceTypeAdmin(admin.ModelAdmin):
     list_select_related = ("data_snapshot", "alarm_type")
 
 
+@admin.register(CausalEvent)
+class CausalEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "event_code",
+        "event_type",
+        "status",
+        "source_system",
+        "origin",
+        "started_at",
+        "ended_at",
+        "data_snapshot",
+    )
+    list_filter = ("event_type", "status", "source_system", "origin")
+    search_fields = ("event_code", "source_system", "metadata")
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = (
+        "data_snapshot",
+        "root_device",
+        "root_network_link",
+        "root_network_port",
+        "root_line_connection",
+        "root_access_segment",
+        "root_failure_domain",
+        "root_subscription_connection",
+    )
+    list_select_related = ("data_snapshot",)
+    date_hierarchy = "started_at"
+
+
 @admin.register(Alarm)
 class AlarmAdmin(admin.ModelAdmin):
     list_display = (
@@ -93,6 +125,7 @@ class AlarmAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = (
         "data_snapshot",
+        "causal_event",
         "alarm_type",
         "device",
         "network_link",
@@ -103,6 +136,7 @@ class AlarmAdmin(admin.ModelAdmin):
     )
     list_select_related = (
         "data_snapshot",
+        "causal_event",
         "alarm_type",
         "device",
         "network_link",
@@ -143,8 +177,8 @@ class IncidentAdmin(admin.ModelAdmin):
     )
     search_fields = ("incident_number", "title", "primary_device__code", "root_cause_summary")
     readonly_fields = ("created_at", "updated_at")
-    autocomplete_fields = ("data_snapshot", "primary_device")
-    list_select_related = ("data_snapshot", "primary_device")
+    autocomplete_fields = ("data_snapshot", "causal_event", "primary_device")
+    list_select_related = ("data_snapshot", "causal_event", "primary_device")
     date_hierarchy = "started_at"
 
 
@@ -175,8 +209,8 @@ class OutageAdmin(admin.ModelAdmin):
     list_filter = ("outage_type", "impact_type", "status", "root_cause_category")
     search_fields = ("outage_code", "source_device__code", "root_cause_summary")
     readonly_fields = ("created_at", "updated_at")
-    autocomplete_fields = ("data_snapshot", "incident", "source_device")
-    list_select_related = ("data_snapshot", "incident", "source_device")
+    autocomplete_fields = ("data_snapshot", "causal_event", "incident", "source_device")
+    list_select_related = ("data_snapshot", "causal_event", "incident", "source_device")
     date_hierarchy = "started_at"
 
 
@@ -194,8 +228,8 @@ class OperationalEventAdmin(admin.ModelAdmin):
     list_filter = ("event_type", "source")
     search_fields = ("event_code", "summary", "device__code", "incident__incident_number")
     readonly_fields = ("created_at", "updated_at")
-    autocomplete_fields = ("data_snapshot", "device", "incident")
-    list_select_related = ("data_snapshot", "device", "incident")
+    autocomplete_fields = ("data_snapshot", "causal_event", "device", "incident")
+    list_select_related = ("data_snapshot", "causal_event", "device", "incident")
     date_hierarchy = "occurred_at"
 
 
@@ -221,6 +255,7 @@ class QualityMeasurementAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
     autocomplete_fields = (
         "data_snapshot",
+        "causal_event",
         "device",
         "network_link",
         "line_connection",
@@ -228,6 +263,7 @@ class QualityMeasurementAdmin(admin.ModelAdmin):
     )
     list_select_related = (
         "data_snapshot",
+        "causal_event",
         "device",
         "network_link",
         "line_connection",
@@ -238,6 +274,74 @@ class QualityMeasurementAdmin(admin.ModelAdmin):
     @admin.display(description="Kaynak türü")
     def source_kind(self, obj: QualityMeasurement):
         return obj.get_source_kind()
+
+
+@admin.register(SessionEvent)
+class SessionEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "external_event_id",
+        "event_type",
+        "source_system",
+        "occurred_at",
+        "received_at",
+        "subscription",
+        "subscription_connection",
+        "data_snapshot",
+    )
+    list_filter = ("event_type", "source_system")
+    search_fields = (
+        "external_event_id",
+        "source_system",
+        "external_service_reference_hash",
+        "nas_identifier",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = (
+        "data_snapshot",
+        "causal_event",
+        "subscription",
+        "subscription_connection",
+    )
+    list_select_related = (
+        "data_snapshot",
+        "causal_event",
+        "subscription",
+        "subscription_connection",
+    )
+    date_hierarchy = "occurred_at"
+
+
+@admin.register(CustomerImpactAssessment)
+class CustomerImpactAssessmentAdmin(admin.ModelAdmin):
+    list_display = (
+        "causal_event",
+        "status",
+        "potential_impact",
+        "subscription",
+        "subscription_connection",
+        "assessment_started_at",
+        "data_snapshot",
+    )
+    list_filter = ("status", "potential_impact", "connection_role")
+    search_fields = (
+        "causal_event__event_code",
+        "subscription__subscription_number",
+        "subscription_connection__subscription__subscription_number",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    autocomplete_fields = (
+        "data_snapshot",
+        "causal_event",
+        "subscription",
+        "subscription_connection",
+    )
+    list_select_related = (
+        "data_snapshot",
+        "causal_event",
+        "subscription",
+        "subscription_connection",
+    )
+    date_hierarchy = "assessment_started_at"
 
 
 @admin.register(MaintenanceWindow)

@@ -2,10 +2,12 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from apps.core.models import TimeStampedModel
 from apps.datasets.models import DataSnapshot
 from apps.network.models import (
+    AccessSegment,
     FailureDomain,
     LineConnection,
     NetworkDevice,
@@ -13,6 +15,19 @@ from apps.network.models import (
     NetworkLink,
     NetworkPort,
 )
+from apps.operations.contracts import (
+    CausalEventStatus,
+    CausalEventType,
+    CustomerImpactStatus,
+    EventOrigin,
+    ImpactReason,
+    ResourceType,
+    SessionEventType,
+)
+
+
+def contract_choices(enum_cls):
+    return [(member.value, member.value.replace("_", " ").title()) for member in enum_cls]
 
 
 class Severity(models.TextChoices):
@@ -162,6 +177,539 @@ def duration_seconds(started_at, ended_at) -> int | None:
     return int((ended_at - started_at).total_seconds())
 
 
+def validate_aware_datetimes(errors: dict[str, str], **values) -> None:
+    for field_name, value in values.items():
+        if value is not None and timezone.is_naive(value):
+            errors[field_name] = f"{field_name} must be timezone-aware."
+
+
+CAUSAL_ROOT_RESOURCE_FIELDS = {
+    "root_device": ResourceType.DEVICE.value,
+    "root_network_link": ResourceType.NETWORK_LINK.value,
+    "root_network_port": ResourceType.NETWORK_PORT.value,
+    "root_line_connection": ResourceType.LINE_CONNECTION.value,
+    "root_access_segment": ResourceType.ACCESS_SEGMENT.value,
+    "root_failure_domain": ResourceType.FAILURE_DOMAIN.value,
+    "root_subscription_connection": ResourceType.SUBSCRIPTION_CONNECTION.value,
+}
+
+
+def zero_or_one_root_resource_condition() -> models.Q:
+    conditions = [
+        models.Q(**{f"{field_name}__isnull": True for field_name in CAUSAL_ROOT_RESOURCE_FIELDS})
+    ]
+    for selected_field in CAUSAL_ROOT_RESOURCE_FIELDS:
+        condition = models.Q(**{f"{selected_field}__isnull": False})
+        for other_field in CAUSAL_ROOT_RESOURCE_FIELDS:
+            if other_field != selected_field:
+                condition &= models.Q(**{f"{other_field}__isnull": True})
+        conditions.append(condition)
+    combined = conditions[0]
+    for condition in conditions[1:]:
+        combined |= condition
+    return combined
+
+
+class CausalEvent(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="causal_events",
+    )
+    event_code = models.CharField(max_length=120)
+    event_type = models.CharField(max_length=40, choices=contract_choices(CausalEventType))
+    status = models.CharField(
+        max_length=24,
+        choices=contract_choices(CausalEventStatus),
+        default=CausalEventStatus.DETECTED.value,
+    )
+    started_at = models.DateTimeField()
+    ended_at = models.DateTimeField(null=True, blank=True)
+    source_system = models.CharField(max_length=80)
+    origin = models.CharField(
+        max_length=24,
+        choices=contract_choices(EventOrigin),
+        default=EventOrigin.SYNTHETIC.value,
+    )
+    root_device = models.ForeignKey(
+        NetworkDevice,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="root_causal_events",
+    )
+    root_network_link = models.ForeignKey(
+        NetworkLink,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="root_causal_events",
+    )
+    root_network_port = models.ForeignKey(
+        NetworkPort,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="root_causal_events",
+    )
+    root_line_connection = models.ForeignKey(
+        LineConnection,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="root_causal_events",
+    )
+    root_access_segment = models.ForeignKey(
+        AccessSegment,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="root_causal_events",
+    )
+    root_failure_domain = models.ForeignKey(
+        FailureDomain,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="root_causal_events",
+    )
+    root_subscription_connection = models.ForeignKey(
+        "customers.SubscriptionConnection",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="root_causal_events",
+    )
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "operations_causal_event"
+        ordering = ["data_snapshot", "-started_at", "event_code"]
+        verbose_name = "Nedensel operasyon olayı"
+        verbose_name_plural = "Nedensel operasyon olayları"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "event_code"],
+                name="unique_causal_event_code_per_snapshot",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(ended_at__isnull=True)
+                | models.Q(ended_at__gte=models.F("started_at")),
+                name="causal_event_end_at_or_after_start",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(
+                    status__in=[
+                        CausalEventStatus.RESOLVED.value,
+                        CausalEventStatus.CLOSED.value,
+                        CausalEventStatus.CANCELLED.value,
+                    ]
+                )
+                | models.Q(ended_at__isnull=False),
+                name="causal_event_terminal_status_requires_end",
+            ),
+            models.CheckConstraint(
+                condition=zero_or_one_root_resource_condition(),
+                name="causal_event_has_zero_or_one_root_resource",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["data_snapshot", "event_type", "status"],
+                name="causal_evt_type_status_idx",
+            ),
+            models.Index(
+                fields=["data_snapshot", "started_at"],
+                name="causal_evt_snapshot_start_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.event_code} - {self.event_type}"
+
+    def clean(self):
+        errors: dict[str, str] = {}
+        validate_aware_datetimes(errors, started_at=self.started_at, ended_at=self.ended_at)
+        if (
+            self.ended_at
+            and "started_at" not in errors
+            and "ended_at" not in errors
+            and self.ended_at < self.started_at
+        ):
+            errors["ended_at"] = "ended_at cannot be earlier than started_at."
+        if (
+            self.status
+            in {
+                CausalEventStatus.RESOLVED.value,
+                CausalEventStatus.CLOSED.value,
+                CausalEventStatus.CANCELLED.value,
+            }
+            and not self.ended_at
+        ):
+            errors["ended_at"] = "Terminal causal event statuses require ended_at."
+        if self.get_root_resource_kind() is False:
+            errors["root_device"] = "Causal event can have at most one root resource."
+        errors.update(self._validate_root_resource_snapshots())
+        if errors:
+            raise ValidationError(errors)
+
+    def get_root_resource(self):
+        for field_name in CAUSAL_ROOT_RESOURCE_FIELDS:
+            source = getattr(self, field_name)
+            if source is not None:
+                return source
+        return None
+
+    def get_root_resource_kind(self) -> str | None | bool:
+        filled = [
+            resource_type
+            for field_name, resource_type in CAUSAL_ROOT_RESOURCE_FIELDS.items()
+            if getattr(self, f"{field_name}_id")
+        ]
+        if len(filled) > 1:
+            return False
+        return filled[0] if filled else None
+
+    @property
+    def root_resource_code(self) -> str | None:
+        source = self.get_root_resource()
+        if source is None:
+            return None
+        return (
+            getattr(source, "code", None)
+            or getattr(source, "link_code", None)
+            or getattr(source, "port_code", None)
+            or getattr(source, "line_code", None)
+            or getattr(source, "segment_code", None)
+            or getattr(getattr(source, "subscription", None), "subscription_number", None)
+            or str(source)
+        )
+
+    def _validate_root_resource_snapshots(self) -> dict[str, str]:
+        errors: dict[str, str] = {}
+        for field_name in CAUSAL_ROOT_RESOURCE_FIELDS:
+            source = getattr(self, field_name)
+            if (
+                source is not None
+                and self.data_snapshot_id
+                and source.data_snapshot_id != self.data_snapshot_id
+            ):
+                errors[field_name] = f"{field_name} must belong to the same data snapshot."
+        return errors
+
+
+class SessionEvent(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="session_events",
+    )
+    causal_event = models.ForeignKey(
+        CausalEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="session_events",
+    )
+    external_event_id = models.CharField(max_length=160, blank=True)
+    event_type = models.CharField(max_length=16, choices=contract_choices(SessionEventType))
+    occurred_at = models.DateTimeField()
+    received_at = models.DateTimeField(null=True, blank=True)
+    source_system = models.CharField(max_length=80)
+    subscription = models.ForeignKey(
+        "customers.Subscription",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="session_events",
+    )
+    subscription_connection = models.ForeignKey(
+        "customers.SubscriptionConnection",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="session_events",
+    )
+    external_service_reference_hash = models.CharField(max_length=128, blank=True)
+    nas_identifier = models.CharField(max_length=120, blank=True)
+    service_identifier_hash = models.CharField(max_length=128, blank=True)
+    session_identifier_hash = models.CharField(max_length=128, blank=True)
+    subscriber_reference_hash = models.CharField(max_length=128, blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "operations_session_event"
+        ordering = ["data_snapshot", "occurred_at", "external_event_id"]
+        verbose_name = "Session kanıt olayı"
+        verbose_name_plural = "Session kanıt olayları"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "source_system", "external_event_id"],
+                condition=~models.Q(external_event_id=""),
+                name="unique_session_source_event_per_snapshot",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(received_at__isnull=True)
+                | models.Q(received_at__gte=models.F("occurred_at")),
+                name="session_event_received_at_or_after_occurred",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(subscription__isnull=False)
+                | models.Q(subscription_connection__isnull=False)
+                | ~models.Q(external_service_reference_hash=""),
+                name="session_event_has_identity_reference",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["data_snapshot", "event_type", "occurred_at"],
+                name="session_evt_type_time_idx",
+            ),
+            models.Index(
+                fields=["data_snapshot", "subscription_connection", "occurred_at"],
+                name="session_evt_conn_time_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.source_system}:{self.external_event_id or self.pk} - {self.event_type}"
+
+    def clean(self):
+        errors: dict[str, str] = {}
+        validate_aware_datetimes(
+            errors,
+            occurred_at=self.occurred_at,
+            received_at=self.received_at,
+        )
+        if (
+            self.received_at
+            and "occurred_at" not in errors
+            and "received_at" not in errors
+            and self.received_at < self.occurred_at
+        ):
+            errors["received_at"] = "received_at cannot be earlier than occurred_at."
+        if (
+            not self.subscription_id
+            and not self.subscription_connection_id
+            and not self.external_service_reference_hash
+        ):
+            errors["subscription"] = (
+                "Session event requires a subscription, connection, or hashed service reference."
+            )
+        for field_name in ("causal_event", "subscription", "subscription_connection"):
+            related = getattr(self, field_name)
+            if (
+                related is not None
+                and self.data_snapshot_id
+                and related.data_snapshot_id != self.data_snapshot_id
+            ):
+                errors[field_name] = f"{field_name} must belong to the same data snapshot."
+        if errors:
+            raise ValidationError(errors)
+
+    def to_public_dict(self) -> dict:
+        return {
+            "external_event_id": self.external_event_id or None,
+            "event_type": self.event_type,
+            "occurred_at": self.occurred_at.isoformat(),
+            "received_at": self.received_at.isoformat() if self.received_at else None,
+            "source_system": self.source_system,
+            "subscription_code": (
+                self.subscription.subscription_number if self.subscription_id else None
+            ),
+            "subscription_connection_code": (
+                self.subscription_connection.subscription.subscription_number
+                if self.subscription_connection_id
+                else None
+            ),
+            "nas_identifier": self.nas_identifier or None,
+        }
+
+
+class CustomerImpactAssessment(TimeStampedModel):
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.CASCADE,
+        related_name="customer_impact_assessments",
+    )
+    causal_event = models.ForeignKey(
+        CausalEvent,
+        on_delete=models.PROTECT,
+        related_name="customer_impact_assessments",
+    )
+    subscription = models.ForeignKey(
+        "customers.Subscription",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="impact_assessments",
+    )
+    subscription_connection = models.ForeignKey(
+        "customers.SubscriptionConnection",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="impact_assessments",
+    )
+    status = models.CharField(max_length=32, choices=contract_choices(CustomerImpactStatus))
+    potential_impact = models.BooleanField(default=True)
+    connection_role = models.CharField(max_length=32, blank=True)
+    assessment_started_at = models.DateTimeField()
+    assessment_ended_at = models.DateTimeField(null=True, blank=True)
+    reasons = models.JSONField(default=list, blank=True)
+    evidence_session_event_codes = models.JSONField(default=list, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "operations_customer_impact_assessment"
+        ordering = ["data_snapshot", "causal_event__event_code", "subscription_connection_id"]
+        verbose_name = "Müşteri etki değerlendirmesi"
+        verbose_name_plural = "Müşteri etki değerlendirmeleri"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["causal_event", "subscription_connection"],
+                condition=models.Q(subscription_connection__isnull=False),
+                name="unique_impact_assessment_per_event_connection",
+            ),
+            models.UniqueConstraint(
+                fields=["causal_event", "subscription"],
+                condition=models.Q(
+                    subscription__isnull=False,
+                    subscription_connection__isnull=True,
+                ),
+                name="unique_impact_assessment_per_event_subscription",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(assessment_ended_at__isnull=True)
+                | models.Q(assessment_ended_at__gte=models.F("assessment_started_at")),
+                name="impact_assessment_end_at_or_after_start",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(
+                    status__in=[
+                        CustomerImpactStatus.VERIFIED_IMPACT.value,
+                        CustomerImpactStatus.VERIFIED_NO_IMPACT.value,
+                        CustomerImpactStatus.INSUFFICIENT_EVIDENCE.value,
+                    ]
+                )
+                | models.Q(potential_impact=True),
+                name="impact_assessment_verified_requires_potential",
+            ),
+            models.CheckConstraint(
+                condition=~models.Q(status=CustomerImpactStatus.POTENTIAL_IMPACT.value)
+                | models.Q(potential_impact=True),
+                name="impact_assessment_potential_status_requires_flag",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(subscription__isnull=False)
+                | models.Q(subscription_connection__isnull=False),
+                name="impact_assessment_has_subscription_or_connection",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["data_snapshot", "status"],
+                name="impact_assessment_status_idx",
+            ),
+            models.Index(
+                fields=["data_snapshot", "assessment_started_at"],
+                name="impact_assessment_start_idx",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.causal_event.event_code} - {self.status}"
+
+    def clean(self):
+        errors: dict[str, str] = {}
+        validate_aware_datetimes(
+            errors,
+            assessment_started_at=self.assessment_started_at,
+            assessment_ended_at=self.assessment_ended_at,
+        )
+        if (
+            self.assessment_ended_at
+            and "assessment_started_at" not in errors
+            and "assessment_ended_at" not in errors
+            and self.assessment_ended_at < self.assessment_started_at
+        ):
+            errors["assessment_ended_at"] = (
+                "assessment_ended_at cannot be earlier than assessment_started_at."
+            )
+        if not self.subscription_id and not self.subscription_connection_id:
+            errors["subscription"] = "Assessment requires a subscription or connection."
+        if (
+            self.status
+            in {
+                CustomerImpactStatus.VERIFIED_IMPACT.value,
+                CustomerImpactStatus.VERIFIED_NO_IMPACT.value,
+                CustomerImpactStatus.INSUFFICIENT_EVIDENCE.value,
+            }
+            and not self.potential_impact
+        ):
+            errors["potential_impact"] = (
+                "Verified and insufficient assessments must originate from potential impact."
+            )
+        if (
+            self.status == CustomerImpactStatus.POTENTIAL_IMPACT.value
+            and not self.potential_impact
+        ):
+            errors["potential_impact"] = "potential_impact status requires potential_impact=true."
+        normalized_reasons = self._validated_reasons()
+        if (
+            self.status == CustomerImpactStatus.VERIFIED_NO_IMPACT.value
+            and not normalized_reasons
+        ):
+            errors["reasons"] = "Verified no-impact requires at least one reason."
+        for field_name in ("causal_event", "subscription", "subscription_connection"):
+            related = getattr(self, field_name)
+            if (
+                related is not None
+                and self.data_snapshot_id
+                and related.data_snapshot_id != self.data_snapshot_id
+            ):
+                errors[field_name] = f"{field_name} must belong to the same data snapshot."
+        if self.subscription_connection_id and self.subscription_id:
+            if self.subscription_connection.subscription_id != self.subscription_id:
+                errors["subscription_connection"] = (
+                    "Subscription connection must belong to the selected subscription."
+                )
+        if errors:
+            raise ValidationError(errors)
+
+    def _validated_reasons(self) -> list[str]:
+        if not isinstance(self.reasons, list):
+            raise ValidationError({"reasons": "reasons must be a list."})
+        valid_values = {reason.value for reason in ImpactReason}
+        invalid = [reason for reason in self.reasons if reason not in valid_values]
+        if invalid:
+            raise ValidationError({"reasons": f"Invalid impact reasons: {invalid}."})
+        return self.reasons
+
+    def to_public_dict(self) -> dict:
+        return {
+            "causal_event_code": self.causal_event.event_code,
+            "status": self.status,
+            "potential_impact": self.potential_impact,
+            "subscription_code": (
+                self.subscription.subscription_number if self.subscription_id else None
+            ),
+            "subscription_connection_code": (
+                self.subscription_connection.subscription.subscription_number
+                if self.subscription_connection_id
+                else None
+            ),
+            "connection_role": self.connection_role or None,
+            "assessment_started_at": self.assessment_started_at.isoformat(),
+            "assessment_ended_at": (
+                self.assessment_ended_at.isoformat() if self.assessment_ended_at else None
+            ),
+            "reasons": list(self.reasons),
+            "evidence_session_event_codes": sorted(set(self.evidence_session_event_codes)),
+        }
+
+
 class AlarmType(TimeStampedModel):
     data_snapshot = models.ForeignKey(
         DataSnapshot,
@@ -286,6 +834,13 @@ class Alarm(TimeStampedModel):
     data_snapshot = models.ForeignKey(
         DataSnapshot,
         on_delete=models.CASCADE,
+        related_name="alarms",
+    )
+    causal_event = models.ForeignKey(
+        CausalEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="alarms",
     )
     alarm_id = models.CharField(max_length=100)
@@ -450,6 +1005,12 @@ class Alarm(TimeStampedModel):
             and self.alarm_type.data_snapshot_id != self.data_snapshot_id
         ):
             errors["alarm_type"] = "Alarm type must belong to the same data snapshot."
+        if (
+            self.causal_event_id
+            and self.data_snapshot_id
+            and self.causal_event.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["causal_event"] = "Causal event must belong to the same data snapshot."
         source_errors = self._validate_source_snapshots()
         errors.update(source_errors)
         if self.alarm_type_id and source_kind:
@@ -581,6 +1142,13 @@ class Incident(TimeStampedModel):
         on_delete=models.CASCADE,
         related_name="incidents",
     )
+    causal_event = models.ForeignKey(
+        CausalEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="incidents",
+    )
     incident_number = models.CharField(max_length=100)
     title = models.CharField(max_length=200)
     status = models.CharField(
@@ -665,6 +1233,12 @@ class Incident(TimeStampedModel):
             and self.primary_device.data_snapshot_id != self.data_snapshot_id
         ):
             errors["primary_device"] = "Primary device must belong to the same data snapshot."
+        if (
+            self.causal_event_id
+            and self.data_snapshot_id
+            and self.causal_event.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["causal_event"] = "Causal event must belong to the same data snapshot."
         if errors:
             raise ValidationError(errors)
 
@@ -725,6 +1299,13 @@ class Outage(TimeStampedModel):
     data_snapshot = models.ForeignKey(
         DataSnapshot,
         on_delete=models.CASCADE,
+        related_name="outages",
+    )
+    causal_event = models.ForeignKey(
+        CausalEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="outages",
     )
     outage_code = models.CharField(max_length=100)
@@ -822,6 +1403,12 @@ class Outage(TimeStampedModel):
             and self.incident.data_snapshot_id != self.data_snapshot_id
         ):
             errors["incident"] = "Incident must belong to the same data snapshot."
+        if (
+            self.causal_event_id
+            and self.data_snapshot_id
+            and self.causal_event.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["causal_event"] = "Causal event must belong to the same data snapshot."
         if errors:
             raise ValidationError(errors)
 
@@ -834,6 +1421,13 @@ class OperationalEvent(TimeStampedModel):
     data_snapshot = models.ForeignKey(
         DataSnapshot,
         on_delete=models.CASCADE,
+        related_name="operational_events",
+    )
+    causal_event = models.ForeignKey(
+        CausalEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="operational_events",
     )
     event_code = models.CharField(max_length=100)
@@ -886,6 +1480,12 @@ class OperationalEvent(TimeStampedModel):
             and self.incident.data_snapshot_id != self.data_snapshot_id
         ):
             errors["incident"] = "Incident must belong to the same data snapshot."
+        if (
+            self.causal_event_id
+            and self.data_snapshot_id
+            and self.causal_event.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["causal_event"] = "Causal event must belong to the same data snapshot."
         if errors:
             raise ValidationError(errors)
 
@@ -894,6 +1494,13 @@ class QualityMeasurement(TimeStampedModel):
     data_snapshot = models.ForeignKey(
         DataSnapshot,
         on_delete=models.CASCADE,
+        related_name="quality_measurements",
+    )
+    causal_event = models.ForeignKey(
+        CausalEvent,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name="quality_measurements",
     )
     device = models.ForeignKey(
@@ -1005,6 +1612,12 @@ class QualityMeasurement(TimeStampedModel):
                 and source.data_snapshot_id != self.data_snapshot_id
             ):
                 errors[field_name] = f"{field_name} must belong to the same data snapshot."
+        if (
+            self.causal_event_id
+            and self.data_snapshot_id
+            and self.causal_event.data_snapshot_id != self.data_snapshot_id
+        ):
+            errors["causal_event"] = "Causal event must belong to the same data snapshot."
         if self.value < Decimal("0.0000"):
             errors["value"] = "Quality measurement value cannot be negative."
         if errors:
