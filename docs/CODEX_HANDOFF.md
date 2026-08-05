@@ -3,7 +3,8 @@
 ## 1. Mevcut Checkpoint
 
 - Aktif branch: `main`.
-- Doğrulanmış HEAD: REV-05 tamamlandıktan sonra alınan `feat: generate causal GPON operations data` commit'idir; kesin hash için güncel `git rev-parse HEAD` çıktısı kaynak alınmalıdır.
+- Doğrulanmış HEAD: 052-056 integration gate commit'i sonrasında güncel
+  `git rev-parse HEAD` çıktısı kaynak alınmalıdır.
 - Bu checkpoint'te working tree temiz bırakılmalıdır.
 - Son doğrulanmış tam test baseline'i repository root'tan `.venv/bin/pytest -q` ile **612 passed** sonucudur. Bu sonuç REV-00 baseline dokümanında kayıtlıdır; bu handoff hazırlanırken testler yeniden çalıştırılmamalıdır.
 - REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` commit'iyle tamamladı. REV-03, nedensel operasyon modelleri ve migration çalışmasıyla; REV-04 ise GPON alarm/topoloji compatibility validator ve katalog kararıyla tamamlandı.
@@ -54,6 +55,11 @@
   değiştirmez. Causal reference önceliklidir; compensation için PII üretmeden
   yalnız causal/outage evidence yolu kullanılabilir. Gerçek MCP execution, LLM,
   RAG ve final yanıt yoktur. Sıradaki görev Görev 057 MCP executor'dır.
+- 052-056 orchestration integration gate tamamlandı: explicit snapshot ile
+  QueryRun -> StructuredQuery -> ToolPlan zinciri offline ve idempotent olarak
+  doğrulandı. Hedefli regresyon seti 236 passed, full suite 807 passed;
+  gerçek LLM, MCP, RAG veya model çağrısı yapılmadı. Sıradaki görev Görev 057
+  MCP executor'dır.
 - REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
   snapshot'ını native kullanımda explicit almalıdır; model herhangi bir
