@@ -67,6 +67,17 @@ def _params(model: BaseModel, *, rename: dict[str, str] | None = None) -> dict[s
     return result
 
 
+def _causal_or_path(path: str, field_name: str):
+    def build(model: BaseModel) -> str:
+        code = getattr(model, "causal_event_code", None)
+        return (
+            f"/api/internal/v1/operations/causal-events/{code}/analysis/"
+            if code
+            else path.format(value=getattr(model, field_name))
+        )
+    return build
+
+
 NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
     "get_device_details": NetworkToolDefinition(
         name="get_device_details",
@@ -142,7 +153,7 @@ NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
         description="Return deterministic alarm-correlation candidates for one anchor alarm.",
         input_model=CorrelateAlarmsInput,
         method="GET",
-        path_builder=_path(
+        path_builder=_causal_or_path(
             "/api/internal/v1/network/alarms/{value}/correlations/",
             "anchor_alarm_id",
         ),
@@ -156,7 +167,7 @@ NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
         ),
         input_model=RankRootCauseCandidatesInput,
         method="GET",
-        path_builder=_path(
+        path_builder=_causal_or_path(
             "/api/internal/v1/network/outages/{value}/root-cause-candidates/",
             "outage_code",
         ),
@@ -249,9 +260,24 @@ class NetworkMCPTools:
             evaluation_time=getattr(model, "evaluation_time", None),
             snapshot_details=snapshot_details,
         )
+        data = payload.get("data", {})
+        if tool_name in {"correlate_alarms", "rank_root_cause_candidates"} and getattr(
+            model, "causal_event_code", None
+        ):
+            causal = data.get("causal_event", {})
+            correlation = data.get("correlation", {})
+            data = {
+                "causal_event_code": causal.get("code"),
+                "root_resource_type": causal.get("root_resource", {}).get("resource_type"),
+                "root_resource_reference": causal.get("root_resource", {}).get("reference"),
+                "root_cause_score": correlation.get("score"),
+                "reason_codes": correlation.get("reason_codes", []),
+                "role_counts": correlation.get("role_counts", {}),
+                "propagation_summary": correlation.get("description"),
+            }
         return MCPToolResponse[dict[str, Any]](
             success=True,
-            data=payload.get("data", {}),
+            data=data,
             metadata=metadata,
             warnings=[
                 MCPWarning.model_validate(warning)

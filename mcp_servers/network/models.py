@@ -96,11 +96,13 @@ class CalculateCustomerImpactInput(TemporalSnapshotInput):
 
 class CorrelateAlarmsInput(SnapshotRequiredInput):
     anchor_alarm_id: str = Field(min_length=1)
+    causal_event_code: str | None = Field(default=None, min_length=1)
     limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
 
 
 class RankRootCauseCandidatesInput(TemporalSnapshotInput):
     outage_code: str = Field(min_length=1)
+    causal_event_code: str | None = Field(default=None, min_length=1)
     limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
 
 
@@ -122,4 +124,3 @@ class GetLongestOutageInput(TemporalSnapshotInput):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("datetime filters must be timezone-aware")
         return value
-

@@ -68,6 +68,7 @@ class CustomerPaymentStatusInput(OneCustomerOrSubscriptionInput):
 class CustomerOutageHistoryInput(TemporalSnapshotInput):
     customer_number: str | None = None
     subscription_number: str | None = None
+    causal_event_code: str | None = Field(default=None, min_length=1)
     from_time: datetime | None = None
     to_time: datetime | None = None
     impact_class: str | None = None
@@ -76,6 +77,8 @@ class CustomerOutageHistoryInput(TemporalSnapshotInput):
 
     @model_validator(mode="after")
     def exactly_one_identifier_is_required(self):
+        if self.causal_event_code:
+            return self
         if bool(self.customer_number) == bool(self.subscription_number):
             raise ValueError("Exactly one of customer_number or subscription_number is required")
         return self

@@ -61,6 +61,12 @@ def _params(model: BaseModel) -> dict[str, Any]:
     return raw
 
 
+def _history_path(model: BaseModel) -> str:
+    if getattr(model, "causal_event_code", None):
+        return f"/api/internal/v1/operations/causal-events/{model.causal_event_code}/analysis/"
+    return "/api/internal/v1/customer/outages/history/"
+
+
 CUSTOMER_TOOL_DEFINITIONS: dict[str, CustomerToolDefinition] = {
     "get_customer_profile": CustomerToolDefinition(
         name="get_customer_profile",
@@ -106,7 +112,7 @@ CUSTOMER_TOOL_DEFINITIONS: dict[str, CustomerToolDefinition] = {
         ),
         input_model=CustomerOutageHistoryInput,
         method="GET",
-        path_builder=_path("/api/internal/v1/customer/outages/history/"),
+        path_builder=_history_path,
         params_builder=_params,
     ),
     "get_customer_compensation_history": CustomerToolDefinition(
@@ -224,9 +230,22 @@ class CustomerMCPTools:
             evaluation_time=getattr(model, "evaluation_time", None),
             snapshot_details=snapshot_details,
         )
+        data = payload.get("data", {})
+        if tool_name == "get_customer_outage_history" and getattr(model, "causal_event_code", None):
+            impact = data.get("impact", {})
+            data = {
+                "causal_event_code": data.get("causal_event", {}).get("code"),
+                "potential_connection_count": impact.get("potential", 0),
+                "verified_impacted_count": impact.get("verified_impacted", 0),
+                "verified_no_impact_count": impact.get("verified_no_impact", 0),
+                "insufficient_evidence_count": impact.get("insufficient_evidence", 0),
+                "pending_count": impact.get("pending", 0),
+                "failover_protected_count": 0,
+                "reason_code_distribution": impact.get("reason_codes", {}),
+            }
         return MCPToolResponse[dict[str, Any]](
             success=True,
-            data=payload.get("data", {}),
+            data=data,
             metadata=metadata,
             warnings=[
                 MCPWarning.model_validate(warning)
