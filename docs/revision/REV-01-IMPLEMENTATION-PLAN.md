@@ -81,6 +81,15 @@ entegrasyonu, planner, MCP/RAG execution ve final cevap uygulanmadı; Qwen
 embedding `keep_alive=0` politikası değişmedi. Sıradaki görev Görev 054
 StructuredQuery schema'dır.
 
+Görev 054 — **Tamamlandı.** `StructuredQuery` Pydantic sözleşmesi strict
+intent/requested-output/technology/clarification allowlist'leri, public event
+reference önceliği, nested location ve timezone-aware time-window validation'ı
+sağlar. Extra/raw/PK/tool alanları reddedilir. `QueryRunService`, yalnız geçerli
+normalize şemayı eşleşen snapshot'taki pending kayda idempotent biçimde yazıp
+planned durumuna geçirir;
+LLM ile doğal dilden üretim, tool planı, MCP/RAG execution ve final cevap bu
+görevde uygulanmadı. Sıradaki görev Görev 055 tool-plan schema'dır.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.

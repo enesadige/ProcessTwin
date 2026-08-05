@@ -35,6 +35,13 @@
   smoke, Qwen/Gemma residency orchestration ve QueryRun entegrasyonu yapılmadı.
   Qwen `/api/embed` `keep_alive=0` politikası değişmedi. Sıradaki görev Görev
   054 StructuredQuery schema'dır.
+- Görev 054 tamamlandı: `StructuredQuery`, nested location/time-window
+  modelleri ve strict allowlist ile Pydantic sözleşmesidir. LLM ile doğal dil
+  dönüşümü yapmaz; yalnız validasyon sonrası privacy-safe normalize JSON'u
+  bağlı snapshot identifier'ıyla eşleşen pending `QueryRun` kaydına idempotent
+  biçimde yazıp `planned` durumuna geçirir.
+  Tool planı, MCP/RAG execution ve final yanıt henüz yoktur. Sıradaki görev
+  Görev 055 tool-plan schema'dır.
 - REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
   snapshot'ını native kullanımda explicit almalıdır; model herhangi bir

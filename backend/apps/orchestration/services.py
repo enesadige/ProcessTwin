@@ -10,6 +10,7 @@ from django.utils import timezone
 from apps.core.exceptions import ProcessTwinError
 from apps.datasets.models import DataSnapshot
 from apps.orchestration.models import TERMINAL_QUERY_RUN_STATUSES, QueryRun, QueryRunStatus
+from apps.orchestration.structured_query import StructuredQuery
 
 SENSITIVE_KEY_PARTS = frozenset(
     {
@@ -197,6 +198,34 @@ class QueryRunService:
         query_run.planned_tools = sanitize_tool_records(planned_tools)
         query_run.model_version = (model_version or "").strip()
         query_run.prompt_version = (prompt_version or "").strip()
+        return self.transition(query_run, target_status=QueryRunStatus.PLANNED)
+
+    def save_structured_query(
+        self,
+        query_run: QueryRun,
+        *,
+        structured_query: StructuredQuery | Mapping[str, Any],
+    ) -> QueryRun:
+        """Persist an already validated structured query without creating a tool plan."""
+        query = (
+            structured_query
+            if isinstance(structured_query, StructuredQuery)
+            else StructuredQuery.model_validate(structured_query)
+        )
+        if query.snapshot_identifier != query_run.data_snapshot.snapshot_key:
+            raise QueryRunError(
+                message="Structured query snapshot does not match QueryRun.",
+                code="structured_query_snapshot_mismatch",
+            )
+        normalized = query.to_audit_dict()
+        current_status = QueryRunStatus(query_run.status)
+        if current_status == QueryRunStatus.PLANNED and query_run.structured_query == normalized:
+            return query_run
+        if current_status != QueryRunStatus.PENDING:
+            raise QueryRunTransitionError(
+                current=current_status.value, target=QueryRunStatus.PLANNED.value
+            )
+        query_run.structured_query = normalized
         return self.transition(query_run, target_status=QueryRunStatus.PLANNED)
 
     def save_execution_summary(
