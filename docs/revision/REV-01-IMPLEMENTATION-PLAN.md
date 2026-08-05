@@ -47,6 +47,14 @@ completed|failed` yaşam döngüsünü ekledi. Planner, MCP executor, RAG retrie
 çağrısı ve LLM final cevabı bu görevde uygulanmadı; sıradaki Görev 053
 provider interface/registry çalışmasına bırakıldı.
 
+Görev 053 — **Tamamlandı.** `apps.orchestration.providers` içinde immutable
+allowlist registry, LLM provider interface'i ve Gemini/Ollama descriptor'ları
+eklendi. Gemma `gemma4:12b-it-qat` için thinking policy zorunlu olarak kapalı;
+onaylı Gemini model adı olmadığı için Gemini descriptor'ı provider-level'dır.
+Gerçek provider adapter'ı veya network çağrısı yoktur. LLM provider seçimi RAG
+embedding registry'sinden bağımsız kalır. Sıradaki görev Görev 053A mock LLM
+provider'dır.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.
