@@ -23,8 +23,24 @@ def test_all_seven_customer_tools_are_registered():
 
 
 def test_causal_customer_history_maps_real_impact_aggregate():
-    client = FakeBackendClient(data={"causal_event": {"code": "CE-001"}, "impact": {"potential": 5, "verified_impacted": 1, "verified_no_impact": 2, "insufficient_evidence": 1, "pending": 1, "failover_protected_count": 2, "reason_codes": {"failover_protected": 2}}})
-    response = CustomerMCPTools(client).run("get_customer_outage_history", {"snapshot_identifier": "snapshot-1", "causal_event_code": "CE-001"})
+    client = FakeBackendClient(
+        data={
+            "causal_event": {"code": "CE-001"},
+            "impact": {
+                "potential": 5,
+                "verified_impacted": 1,
+                "verified_no_impact": 2,
+                "insufficient_evidence": 1,
+                "pending": 1,
+                "failover_protected_count": 2,
+                "reason_codes": {"failover_protected": 2},
+            },
+        }
+    )
+    response = CustomerMCPTools(client).run(
+        "get_customer_outage_history",
+        {"snapshot_identifier": "snapshot-1", "causal_event_code": "CE-001"},
+    )
     assert response.success is True
     assert client.calls[0]["path"].endswith("/CE-001/analysis/")
     assert response.data["failover_protected_count"] == 2

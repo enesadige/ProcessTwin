@@ -7,8 +7,8 @@
 - Bu checkpoint'te working tree temiz bırakılmalıdır.
 - Son doğrulanmış tam test baseline'i repository root'tan `.venv/bin/pytest -q` ile **612 passed** sonucudur. Bu sonuç REV-00 baseline dokümanında kayıtlıdır; bu handoff hazırlanırken testler yeniden çalıştırılmamalıdır.
 - REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` commit'iyle tamamladı. REV-03, nedensel operasyon modelleri ve migration çalışmasıyla; REV-04 ise GPON alarm/topoloji compatibility validator ve katalog kararıyla tamamlandı.
-- Görev 52 henüz başlamadı. Eski görev planındaki kesin tanımı: **QueryRun modelini oluştur**; `original_query`, `structured_query`, `planned_tools`, `executed_tools`, `status`, `final_result`, model ve prompt version alanlarıyla her AI sorgusunun kaydedilebilmesini hedefler.
-- Ancak sıradaki iş Görev 52 değildir: sıradaki revizyon görevi REV-06 correlation ve root-cause revizyonudur. Zorunlu operasyon revizyon zinciri tamamlanınca Görev 52'ye dönülecektir.
+- Görev 52 henüz başlamadı. Kesin tanımı: **QueryRun modelini oluştur**; `original_query`, `structured_query`, `planned_tools`, `executed_tools`, `status`, `final_result`, model ve prompt version alanlarıyla her AI sorgusunun kaydedilebilmesini hedefler.
+- REV-00–REV-12 tamamlandı; sıradaki görev Görev 52'dir. Native multi-city/RAG validation mevcut eski snapshotın REV-05 verisini taşımadığını gösterdi; `SourceDocument.data_snapshot=PROTECT` blocker'ı destructive çözüm olmadan açık teknik takip maddesidir.
 
 Belge çelişkilerinde öncelik sırası: güncel git/kod durumu, REV-01, REV-00, güncel ilerleme günlüğü, sonra eski plan ve karar belgeleri. Örneğin README eski ürün vizyonunda simülasyondan söz eder; güncel REV-01 kararı canlı simülasyon, Simulation MCP ve Analytics MCP'nin mevcut zorunlu revizyonun parçası olmadığıdır. Bu, simülasyonu silme kararı değil; revizyon tamamlanmadan başlatmama kararıdır.
 
@@ -84,14 +84,12 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
 - **REV-06 — Correlation and root cause:** Tamamlandı; CausalEvent-bound olaylar farklı event'lerle karışmadan temporal/topological/failure-domain kanıtıyla açıklanabilir root, child, symptom, supporting, unrelated ve noise sonuçlarına dönüştürülür. Legacy kayıtlar konservatif fallback'te kalır.
 - **REV-07 — Session verification and impact:** Tamamlandı; CausalEvent topology scope'u connection-level SessionEvent lifecycle, failover ve idempotent assessment ile potential/verified/no-impact/insufficient sonuçlarına ayrılır.
 - **REV-08 — Compensation and evidence:** Tamamlandı; yalnız verified connection impact mevcut deterministic rule/compensation zincirine aday olur ve privacy-safe immutable evidence aggregate'i taşır.
-- **REV-09 — Backend/API**, **REV-10 — dört MCP** ve **REV-11 — RAG
-  corpus/benchmark** tamamlandı. REV-11 üç immutable causal source sürümü ve
-  dokuz retrieval benchmark vakası ekledi; canlı PostgreSQL erişimi bu çalışma
-  ortamında engelli olduğundan yeni index sayıları iddia edilmedi. REV-10 causal
-  public-code validation, role/failover/compensation aggregate mapping ve
-  targeted MCP/API regressionlarıyla kapatıldı; tool sayıları 9/7/8/6 kaldı.
-  Sıradaki görev **REV-11 — RAG corpus/benchmark**, ardından **REV-12 — final
-  consistency/regression** ve Görev 52'dir.
+- **REV-09 — Backend/API**, **REV-10 — dört MCP**, **REV-11 — RAG
+  corpus/benchmark** ve **REV-12 — final integration gate** tamamlandı.
+  REV-12 full suite sonucu 667 passed; MCP tool sayıları 9/7/8/6, RAG manifest
+  13 ve benchmark 25'tir. Native multi-city/RAG gates eski snapshot data
+  precondition'larında güvenli biçimde durdu; yeni canlı sayı iddia edilmedi.
+  Sıradaki görev Görev 52'dir.
 
 ## 12. Açık Sorular
 
