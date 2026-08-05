@@ -5,9 +5,11 @@ from typing import Any
 from apps.datasets.models import DataSnapshot
 from apps.network.models import NetworkDevice, NetworkDeviceType
 from apps.network.services.topology import NetworkTopologyService
+from apps.operations.contracts import CorrelationReason, CorrelationRole
 from apps.operations.models import Alarm, AlarmSourceKind
 
 TIME_WINDOW_SECONDS = 30 * 60
+CAUSAL_PROPAGATION_WINDOW_SECONDS = 2 * 60 * 60
 CORRELATION_THRESHOLD = 60
 TYPE_COMPATIBILITY_PAIRS = frozenset(
     {
@@ -36,6 +38,9 @@ class AlarmCorrelationResult:
     type_compatibility: str
     evidence: list[dict[str, Any]]
     snapshot: dict[str, Any]
+    correlation_role: str = CorrelationRole.UNRELATED.value
+    reason_codes: list[str] | None = None
+    description: str = "No causal correlation was established."
 
 
 class AlarmCorrelationService:
@@ -49,8 +54,13 @@ class AlarmCorrelationService:
         snapshot: DataSnapshot,
     ) -> list[AlarmCorrelationResult]:
         self._validate_inputs(anchor_alarm=anchor_alarm, snapshot=snapshot)
-        window_start = anchor_alarm.detected_at - timedelta(seconds=TIME_WINDOW_SECONDS)
-        window_end = anchor_alarm.detected_at + timedelta(seconds=TIME_WINDOW_SECONDS)
+        window_seconds = (
+            CAUSAL_PROPAGATION_WINDOW_SECONDS
+            if anchor_alarm.causal_event_id
+            else TIME_WINDOW_SECONDS
+        )
+        window_start = anchor_alarm.detected_at - timedelta(seconds=window_seconds)
+        window_end = anchor_alarm.detected_at + timedelta(seconds=window_seconds)
         candidates = (
             Alarm.objects.filter(
                 data_snapshot=snapshot,
@@ -59,7 +69,7 @@ class AlarmCorrelationService:
             )
             .exclude(pk=anchor_alarm.pk)
             .select_related(
-                "alarm_type",
+                "alarm_type", "causal_event",
                 "device",
                 "device__district",
                 "network_link",
@@ -114,6 +124,14 @@ class AlarmCorrelationService:
         time_difference_seconds = abs(
             int((candidate_alarm.detected_at - anchor_alarm.detected_at).total_seconds())
         )
+        if anchor_alarm.causal_event_id and candidate_alarm.causal_event_id:
+            return self._score_causal_pair(
+                anchor_alarm=anchor_alarm,
+                candidate_alarm=candidate_alarm,
+                snapshot=snapshot,
+                time_difference_seconds=time_difference_seconds,
+            )
+
         time_score = score_time_proximity(time_difference_seconds)
         topology_relation = self._get_topology_relation(anchor_alarm, candidate_alarm, snapshot)
         topology_score = score_topology_relation(topology_relation)
@@ -169,6 +187,103 @@ class AlarmCorrelationService:
                 "snapshot_key": snapshot.snapshot_key,
                 "dataset_slug": snapshot.dataset_version.slug,
             },
+            correlation_role=(
+                CorrelationRole.CHILD.value
+                if evidence_score >= CORRELATION_THRESHOLD
+                else CorrelationRole.UNRELATED.value
+            ),
+            reason_codes=legacy_reason_codes(
+                topology_relation=topology_relation,
+                time_difference_seconds=time_difference_seconds,
+            ),
+            description=legacy_description(evidence_score >= CORRELATION_THRESHOLD),
+        )
+
+    def _score_causal_pair(
+        self,
+        *,
+        anchor_alarm: Alarm,
+        candidate_alarm: Alarm,
+        snapshot: DataSnapshot,
+        time_difference_seconds: int,
+    ) -> AlarmCorrelationResult:
+        """Score CausalEvent-bound alarms without merging separate event chains."""
+        topology_relation = self._get_topology_relation(anchor_alarm, candidate_alarm, snapshot)
+        type_compatibility = get_type_compatibility(
+            anchor_alarm, candidate_alarm, topology_relation
+        )
+        same_causal_event = anchor_alarm.causal_event_id == candidate_alarm.causal_event_id
+        if not same_causal_event:
+            return self._causal_result(
+                anchor_alarm, candidate_alarm, snapshot, time_difference_seconds,
+                topology_relation, type_compatibility, 0, CorrelationRole.UNRELATED,
+                [], "Alarms belong to different causal events.",
+                [{"criterion": "causal_event_boundary", "matched": False, "score": 0}],
+            )
+        if not technologies_compatible(anchor_alarm, candidate_alarm):
+            return self._causal_result(
+                anchor_alarm, candidate_alarm, snapshot, time_difference_seconds,
+                topology_relation, type_compatibility, 0, CorrelationRole.UNRELATED,
+                [], "Alarm technologies are incompatible for one causal chain.",
+                [{"criterion": "technology_compatibility", "matched": False, "score": 0}],
+            )
+
+        root_match = alarm_matches_causal_root(candidate_alarm) or alarm_matches_causal_root(
+            anchor_alarm
+        )
+        temporal_score = 25 if time_difference_seconds <= 30 * 60 else 15
+        topology_score = score_topology_relation(topology_relation)
+        type_score = score_type_compatibility(type_compatibility)
+        clear_score, clear_consistent = score_clear_recovery_sequence(anchor_alarm, candidate_alarm)
+        role = classify_causal_role(
+            anchor_alarm=anchor_alarm,
+            candidate_alarm=candidate_alarm,
+            topology_relation=topology_relation,
+            root_match=root_match,
+            time_difference_seconds=time_difference_seconds,
+        )
+        reasons = causal_reason_codes(
+            topology_relation=topology_relation,
+            time_difference_seconds=time_difference_seconds,
+            clear_consistent=clear_consistent,
+        )
+        evidence_score = min(100, 25 + temporal_score + topology_score + type_score + clear_score)
+        if role in {CorrelationRole.UNRELATED, CorrelationRole.NOISE}:
+            evidence_score = min(evidence_score, CORRELATION_THRESHOLD - 1)
+        return self._causal_result(
+            anchor_alarm, candidate_alarm, snapshot, time_difference_seconds,
+            topology_relation, type_compatibility, evidence_score, role, reasons,
+            causal_description(role),
+            [
+                {"criterion": "causal_event_boundary", "matched": True, "score": 25},
+                {"criterion": "temporal_propagation", "score": temporal_score,
+                 "time_difference_seconds": time_difference_seconds},
+                {"criterion": "topology_relation", "score": topology_score,
+                 "relation": topology_relation},
+                {"criterion": "alarm_type_compatibility", "score": type_score,
+                 "compatibility": type_compatibility},
+                {"criterion": "clear_recovery_sequence", "score": clear_score,
+                 "consistent": clear_consistent},
+            ],
+        )
+
+    def _causal_result(self, anchor, candidate, snapshot, seconds, topology_relation,
+                       type_compatibility, score, role, reasons, description, evidence):
+        return AlarmCorrelationResult(
+            anchor_alarm_code=anchor.alarm_id,
+            candidate_alarm_code=candidate.alarm_id,
+            evidence_score=score,
+            correlated=score >= CORRELATION_THRESHOLD and role not in {
+                CorrelationRole.UNRELATED, CorrelationRole.NOISE},
+            time_difference_seconds=seconds,
+            topology_relation=topology_relation,
+            type_compatibility=type_compatibility,
+            evidence=evidence,
+            snapshot={"id": snapshot.id, "snapshot_key": snapshot.snapshot_key,
+                      "dataset_slug": snapshot.dataset_version.slug},
+            correlation_role=role.value,
+            reason_codes=[reason.value for reason in reasons],
+            description=description,
         )
 
     def _validate_inputs(self, *, anchor_alarm: Alarm, snapshot: DataSnapshot) -> None:
@@ -321,6 +436,147 @@ def score_type_compatibility(type_compatibility: str) -> int:
         "same_correlation_family": 20,
         "none": 0,
     }[type_compatibility]
+
+
+def alarm_matches_causal_root(alarm: Alarm) -> bool:
+    """Return whether an alarm's structured source is its event's physical root."""
+    causal_event = alarm.causal_event
+    if causal_event is None:
+        return False
+    source = alarm.get_source()
+    root = causal_event.get_root_resource()
+    return (
+        source is not None
+        and root is not None
+        and source.pk == root.pk
+        and source.__class__ == root.__class__
+    )
+
+
+def alarm_role_hint(alarm: Alarm) -> str | None:
+    normalization = (alarm.metadata or {}).get("normalization", {})
+    if isinstance(normalization, dict):
+        hint = normalization.get("role_candidate")
+        if hint in {role.value for role in CorrelationRole}:
+            return hint
+    if alarm.alarm_type.code in {"ONT_DISCONNECT_SURGE", "OPTICAL_SIGNAL_LOSS"}:
+        return CorrelationRole.SYMPTOM.value
+    if alarm.alarm_type.code == "HIGH_TEMPERATURE":
+        return CorrelationRole.SUPPORTING.value
+    return None
+
+
+def classify_causal_role(
+    *,
+    anchor_alarm: Alarm,
+    candidate_alarm: Alarm,
+    topology_relation: str,
+    root_match: bool,
+    time_difference_seconds: int,
+) -> CorrelationRole:
+    """Classify the candidate relative to the anchor, using structured domain fields."""
+    candidate_hint = alarm_role_hint(candidate_alarm)
+    if candidate_hint == CorrelationRole.SYMPTOM.value:
+        return CorrelationRole.SYMPTOM
+    if candidate_hint == CorrelationRole.SUPPORTING.value:
+        return CorrelationRole.SUPPORTING
+    if root_match and alarm_matches_causal_root(candidate_alarm):
+        return CorrelationRole.ROOT
+    if topology_relation in {
+        "same_device",
+        "direct_parent_child",
+        "shared_failure_domain",
+        "same_bng_branch",
+    }:
+        return CorrelationRole.CHILD
+    if time_difference_seconds > TIME_WINDOW_SECONDS:
+        return CorrelationRole.NOISE
+    return CorrelationRole.UNRELATED
+
+
+def technologies_compatible(anchor_alarm: Alarm, candidate_alarm: Alarm) -> bool:
+    anchor_technology = alarm_technology(anchor_alarm)
+    candidate_technology = alarm_technology(candidate_alarm)
+    return (
+        not anchor_technology
+        or not candidate_technology
+        or anchor_technology == candidate_technology
+    )
+
+
+def alarm_technology(alarm: Alarm) -> str | None:
+    device = alarm.get_source_device()
+    if device is None:
+        return None
+    if device.device_type == NetworkDeviceType.OLT:
+        return "gpon"
+    if device.device_type == NetworkDeviceType.DSLAM:
+        return "xdsl"
+    return None
+
+
+def score_clear_recovery_sequence(
+    anchor_alarm: Alarm, candidate_alarm: Alarm
+) -> tuple[int, bool | None]:
+    if anchor_alarm.cleared_at is None or candidate_alarm.cleared_at is None:
+        return 0, None
+    # A downstream candidate clearing materially before its earlier alarm weakens the chain.
+    consistent = candidate_alarm.cleared_at >= anchor_alarm.cleared_at - timedelta(minutes=5)
+    return (10 if consistent else -20), consistent
+
+
+def causal_reason_codes(
+    *,
+    topology_relation: str,
+    time_difference_seconds: int,
+    clear_consistent: bool | None,
+) -> list[CorrelationReason]:
+    reasons: list[CorrelationReason] = []
+    relation_reason = {
+        "same_device": CorrelationReason.SAME_RESOURCE,
+        "direct_parent_child": CorrelationReason.TOPOLOGY_PARENT_CHILD,
+        "same_bng_branch": CorrelationReason.SHARED_UPSTREAM,
+        "shared_failure_domain": CorrelationReason.SHARED_FAILURE_DOMAIN,
+    }.get(topology_relation)
+    if relation_reason:
+        reasons.append(relation_reason)
+    if time_difference_seconds <= CAUSAL_PROPAGATION_WINDOW_SECONDS:
+        reasons.append(CorrelationReason.TEMPORAL_PROPAGATION)
+    if clear_consistent:
+        reasons.append(CorrelationReason.MATCHING_CLEAR_RECOVERY_SEQUENCE)
+    return reasons
+
+
+def legacy_reason_codes(*, topology_relation: str, time_difference_seconds: int) -> list[str]:
+    return [
+        reason.value
+        for reason in causal_reason_codes(
+            topology_relation=topology_relation,
+            time_difference_seconds=time_difference_seconds,
+            clear_consistent=None,
+        )
+    ]
+
+
+def causal_description(role: CorrelationRole) -> str:
+    return {
+        CorrelationRole.ROOT: "Candidate matches the causal event root resource.",
+        CorrelationRole.CHILD: "Candidate is topologically compatible with the causal chain.",
+        CorrelationRole.SYMPTOM: "Candidate is a downstream access symptom, not a root assertion.",
+        CorrelationRole.SUPPORTING: (
+            "Candidate supports the causal chain without proving an outage."
+        ),
+        CorrelationRole.NOISE: "Candidate is weak or delayed beyond the normal correlation window.",
+        CorrelationRole.UNRELATED: "Candidate lacks sufficient causal topology evidence.",
+    }[role]
+
+
+def legacy_description(correlated: bool) -> str:
+    return (
+        "Legacy alarms are conservatively correlated from time and topology evidence."
+        if correlated
+        else "Legacy alarms lack sufficient time and topology evidence."
+    )
 
 
 def get_alarm_failure_domain_ids(alarm: Alarm, snapshot: DataSnapshot) -> set[int]:

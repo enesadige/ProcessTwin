@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from django.utils import timezone
@@ -7,7 +7,14 @@ from django.utils import timezone
 from apps.datasets.models import DataSnapshot
 from apps.network.models import NetworkDevice
 from apps.network.services.topology import NetworkTopologyService
+from apps.operations.contracts import CorrelationRole
 from apps.operations.models import Alarm, Outage
+from apps.operations.services.alarm_correlation import (
+    alarm_matches_causal_root,
+    alarm_role_hint,
+    causal_reason_codes,
+    get_alarm_failure_domain_ids,
+)
 from apps.operations.services.outages import OutageService, OutageServiceInputError
 
 ROOT_CAUSE_ALARM_WINDOW = timedelta(minutes=30)
@@ -35,6 +42,11 @@ class RootCauseCandidate:
     missing_evidence: list[str]
     snapshot: dict[str, Any]
     evaluation_window: dict[str, str]
+    correlation_role: str = CorrelationRole.UNRELATED.value
+    reason_codes: list[str] | None = None
+    description: str = "No causal root was established."
+    candidate_resource_code: str | None = None
+    candidate_resource_kind: str | None = None
 
 
 class RootCauseService:
@@ -59,6 +71,13 @@ class RootCauseService:
             snapshot=snapshot,
             evaluation_time=evaluation_time,
         )
+        if outage.causal_event_id:
+            return self._analyze_causal_event(
+                outage=outage,
+                snapshot=snapshot,
+                window_start=window_start,
+                window_end=window_end,
+            )
         candidate_devices = self._get_candidate_devices(
             outage=outage,
             snapshot=snapshot,
@@ -78,6 +97,140 @@ class RootCauseService:
         return sorted(
             results,
             key=lambda result: (-result.evidence_score, result.candidate_device_code),
+        )
+
+    def _analyze_causal_event(
+        self, *, outage: Outage, snapshot: DataSnapshot, window_start, window_end
+    ):
+        """Rank only alarms in the Outage's causal boundary, never nearby events."""
+        causal_event = outage.causal_event
+        alarms = list(
+            self._get_window_alarms(
+                snapshot=snapshot, window_start=window_start, window_end=window_end
+            ).filter(causal_event=causal_event)
+        )
+        devices = {outage.source_device_id: outage.source_device}
+        root_device = root_resource_device(causal_event)
+        if root_device is not None:
+            devices[root_device.id] = root_device
+        for alarm in alarms:
+            if (device := alarm.get_source_device()) is not None:
+                devices[device.id] = device
+        results = [
+            self._score_causal_candidate(
+                outage=outage,
+                snapshot=snapshot,
+                candidate_device=device,
+                alarms=alarms,
+                causal_event=causal_event,
+                window_start=window_start,
+                window_end=window_end,
+            )
+            for device in devices.values()
+        ]
+        return sorted(
+            results,
+            key=lambda result: (
+                -result.evidence_score,
+                0 if result.candidate_resource_code == causal_event.root_resource_code else 1,
+                earliest_candidate_alarm_time(result.supporting_alarm_codes, alarms),
+                result.candidate_device_code,
+            ),
+        )
+
+    def _score_causal_candidate(
+        self, *, outage, snapshot, candidate_device, alarms, causal_event, window_start, window_end
+    ) -> RootCauseCandidate:
+        candidate_alarms = [
+            alarm for alarm in alarms if alarm.get_source_device() == candidate_device
+        ]
+        root_device = root_resource_device(causal_event)
+        root_match = root_device is not None and root_device.id == candidate_device.id
+        root_alarm_match = any(alarm_matches_causal_root(alarm) for alarm in candidate_alarms)
+        earliest = min((alarm.detected_at for alarm in candidate_alarms), default=None)
+        early = earliest is not None and earliest <= outage.started_at
+        topology_relation = self._get_topology_relation(
+            outage.source_device, candidate_device, snapshot
+        )
+        shared_failure_domain = bool(
+            set().union(
+                *(get_alarm_failure_domain_ids(alarm, snapshot) for alarm in candidate_alarms)
+            )
+            & set().union(*(get_alarm_failure_domain_ids(alarm, snapshot) for alarm in alarms))
+        ) if candidate_alarms else False
+        root_capable = any(is_strong_root_alarm(alarm) for alarm in candidate_alarms)
+        symptom_only = bool(candidate_alarms) and all(
+            alarm_role_hint(alarm) == CorrelationRole.SYMPTOM.value for alarm in candidate_alarms
+        )
+        # Fanout is bounded evidence: many access symptoms cannot outweigh a non-root candidate.
+        fanout_score = min(10, max(0, len(alarms) - len(candidate_alarms)) * 2) if root_match else 0
+        score = min(100, (45 if root_match else 0) + (25 if root_alarm_match else 0)
+                    + (15 if early else 0) + (10 if root_capable else 0)
+                    + (10 if topology_relation in {"same_device", "direct_parent_child"} else 0)
+                    + (10 if shared_failure_domain else 0) + fanout_score)
+        if symptom_only:
+            score = min(score, 45)
+        reasons = causal_reason_codes(
+            topology_relation=(
+                "shared_failure_domain" if shared_failure_domain else topology_relation
+            ),
+            time_difference_seconds=0 if early else ROOT_CAUSE_ALARM_WINDOW.seconds + 1,
+            clear_consistent=None,
+        )
+        role = CorrelationRole.ROOT if root_match and not symptom_only else (
+            CorrelationRole.SYMPTOM if symptom_only else CorrelationRole.CHILD
+        )
+        supporting_codes = sorted(alarm.alarm_id for alarm in candidate_alarms)
+        missing = []
+        if not root_match:
+            missing.append("no_causal_root_resource_match")
+        if not root_capable:
+            missing.append("no_root_capable_alarm")
+        if not early:
+            missing.append("no_early_alarm_evidence")
+        if symptom_only:
+            missing.append("symptom_alarm_cannot_establish_root")
+        return RootCauseCandidate(
+            outage_code=outage.outage_code,
+            candidate_device_code=candidate_device.code,
+            candidate_device_type=candidate_device.device_type,
+            evidence_score=score,
+            classification="confirmed" if score >= 70 and root_match and not missing else (
+                "probable" if score >= 50 and not symptom_only else "unknown"
+            ),
+            supporting_alarm_codes=supporting_codes,
+            evidence=[
+                {"criterion": "causal_root_resource_match", "score": 45 if root_match else 0,
+                 "matched": root_match},
+                {"criterion": "root_alarm_support", "score": 25 if root_alarm_match else 0,
+                 "matched": root_alarm_match},
+                {"criterion": "early_alarm_evidence", "score": 15 if early else 0,
+                 "matched": early},
+                {"criterion": "root_capable_alarm", "score": 10 if root_capable else 0,
+                 "matched": root_capable},
+                {"criterion": "symptom_fanout", "score": fanout_score,
+                 "bounded": True},
+            ],
+            missing_evidence=missing,
+            snapshot={"id": snapshot.id, "snapshot_key": snapshot.snapshot_key,
+                      "dataset_slug": snapshot.dataset_version.slug},
+            evaluation_window={
+                "started_at": window_start.isoformat(),
+                "ended_at": window_end.isoformat(),
+            },
+            correlation_role=role.value,
+            reason_codes=[reason.value for reason in reasons],
+            description=(
+                "Candidate matches the causal event physical root resource."
+                if role == CorrelationRole.ROOT
+                else "Candidate is retained as causal-chain evidence, not a confirmed root."
+            ),
+            candidate_resource_code=(
+                causal_event.root_resource_code if root_match else candidate_device.code
+            ),
+            candidate_resource_kind=(
+                causal_event.get_root_resource_kind() if root_match else "device"
+            ),
         )
 
     def _resolve_window(
@@ -390,4 +543,30 @@ def is_supporting_link_alarm(alarm: Alarm) -> bool:
     return alarm.alarm_type.code == SUPPORTING_LINK_ALARM_TYPE or (
         alarm.alarm_type.correlation_family in {"link_down", "fiber_route", "protection"}
         and alarm.alarm_type.code not in STRONG_ALARM_TYPES
+    )
+
+
+def root_resource_device(causal_event):
+    """Resolve a physical root to a device without inventing one for a producer."""
+    root = causal_event.get_root_resource()
+    if root is None:
+        return None
+    if isinstance(root, NetworkDevice):
+        return root
+    if hasattr(root, "source_device"):
+        return root.source_device
+    if hasattr(root, "device"):
+        return root.device
+    if hasattr(root, "port"):
+        return root.port.device
+    if hasattr(root, "line_connection"):
+        return root.line_connection.port.device
+    return None
+
+
+def earliest_candidate_alarm_time(alarm_codes: list[str], alarms: list[Alarm]):
+    by_code = {alarm.alarm_id: alarm.detected_at for alarm in alarms}
+    return min(
+        (by_code[code] for code in alarm_codes if code in by_code),
+        default=datetime.max.replace(tzinfo=timezone.get_current_timezone()),
     )
