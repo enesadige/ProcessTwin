@@ -63,6 +63,14 @@ oluşturulur; production varsayılanı kapalıdır. QueryRun entegrasyonu, gerç
 Gemini/Ollama adapter'ı ve orchestration bu görevde uygulanmadı. Sıradaki görev
 Görev 053B Gemini LLM adapter'ıdır.
 
+Görev 053B — **Tamamlandı.** `GeminiLLMProvider`, sabit
+`gemini-3.5-flash` descriptor/factory ile lazy `google-genai` client kullanır.
+Girdi yalnız normalized `contents` alanıdır; response ortak content/finish
+reason/provider/model/usage contract'ına dönüştürülür. Timeout, en fazla üç
+denemelik transient retry ve redakte stabil hata kodları vardır. Gerçek API
+çağrısı, QueryRun integration, planner, MCP/RAG execution ve final cevap bu
+görevde uygulanmadı. Sıradaki görev Görev 053C Ollama LLM adapter'ıdır.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.

@@ -4,6 +4,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from apps.orchestration.providers import get_llm_descriptor
+from apps.orchestration.providers.gemini import GeminiLLMProvider
 from apps.orchestration.providers.registry import GEMMA4_MODEL, LLM_PROVIDER_REGISTRY
 from apps.rag.providers.registry import get_embedding_descriptor
 
@@ -19,14 +20,15 @@ def test_known_ollama_descriptor_is_fixed_and_disables_thinking():
     assert descriptor.adapter_factory is None
 
 
-def test_gemini_descriptor_is_provider_level_until_a_model_is_approved():
+def test_gemini_descriptor_uses_the_fixed_allowlisted_model_and_factory():
     descriptor = get_llm_descriptor("gemini")
 
-    assert descriptor.model is None
+    assert descriptor.model == "gemini-3.5-flash"
     assert descriptor.is_local is False
     assert descriptor.thinking_enabled is False
     assert descriptor.production_allowed is True
-    assert descriptor.model_version == "gemini-model-unconfigured-v1"
+    assert descriptor.model_version == "gemini-3.5-flash-v1"
+    assert descriptor.adapter_factory is GeminiLLMProvider
 
 
 @pytest.mark.parametrize("provider_name", ["", "unknown", "ollama-custom-model"])

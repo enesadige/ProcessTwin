@@ -23,6 +23,12 @@
   deterministic response veya kontrollü hata üretir. QueryRun entegrasyonu ve
   gerçek Gemini/Ollama adapter'ları henüz yoktur. Sıradaki görev Görev 053B
   Gemini LLM adapter'ıdır.
+- Görev 053B tamamlandı: `GeminiLLMProvider`, allowlisted
+  `gemini-3.5-flash` modeliyle lazy `google-genai` client oluşturur; timeout,
+  sınırlı transient retry, normalize response ve redakte stabil hata kodları
+  taşır. Testlerde yalnız fake SDK/client kullanıldı; gerçek API çağrısı ve
+  QueryRun entegrasyonu yapılmadı. Sıradaki görev Görev 053C Ollama LLM
+  adapter'ıdır.
 - REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
   snapshot'ını native kullanımda explicit almalıdır; model herhangi bir
