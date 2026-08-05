@@ -84,7 +84,10 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
 - **REV-06 — Correlation and root cause:** Tamamlandı; CausalEvent-bound olaylar farklı event'lerle karışmadan temporal/topological/failure-domain kanıtıyla açıklanabilir root, child, symptom, supporting, unrelated ve noise sonuçlarına dönüştürülür. Legacy kayıtlar konservatif fallback'te kalır.
 - **REV-07 — Session verification and impact:** Tamamlandı; CausalEvent topology scope'u connection-level SessionEvent lifecycle, failover ve idempotent assessment ile potential/verified/no-impact/insufficient sonuçlarına ayrılır.
 - **REV-08 — Compensation and evidence:** Tamamlandı; yalnız verified connection impact mevcut deterministic rule/compensation zincirine aday olur ve privacy-safe immutable evidence aggregate'i taşır.
-- **REV-09 — Backend/API** ve **REV-10 — dört MCP** tamamlandı. REV-10 causal
+- **REV-09 — Backend/API**, **REV-10 — dört MCP** ve **REV-11 — RAG
+  corpus/benchmark** tamamlandı. REV-11 üç immutable causal source sürümü ve
+  dokuz retrieval benchmark vakası ekledi; canlı PostgreSQL erişimi bu çalışma
+  ortamında engelli olduğundan yeni index sayıları iddia edilmedi. REV-10 causal
   public-code validation, role/failover/compensation aggregate mapping ve
   targeted MCP/API regressionlarıyla kapatıldı; tool sayıları 9/7/8/6 kaldı.
   Sıradaki görev **REV-11 — RAG corpus/benchmark**, ardından **REV-12 — final

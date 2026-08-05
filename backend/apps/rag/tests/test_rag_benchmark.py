@@ -87,20 +87,21 @@ def _search_response(*, expected_rank=1, effective_mode="full_text", warnings=No
     return {"effective_mode": effective_mode, "warnings": warnings or [], "results": results}
 
 
-def test_manifest_has_versioned_immutable_sixteen_case_catalog():
+def test_manifest_has_versioned_immutable_causal_case_catalog():
     assert BENCHMARK_VERSION == "rag-benchmark-v1"
     assert isinstance(BENCHMARK_CASES, tuple)
-    assert len(BENCHMARK_CASES) == 16
-    assert len({case.case_code for case in BENCHMARK_CASES}) == 16
+    assert len(BENCHMARK_CASES) == 25
+    assert len({case.case_code for case in BENCHMARK_CASES}) == 25
     assert Counter(case.category for case in BENCHMARK_CASES) == {
         "exact_code": 4,
         "historical_version": 2,
         "scope_and_filter": 4,
         "turkish_semantic": 6,
+        "causal_analysis": 9,
     }
     assert Counter(case.profile for case in BENCHMARK_CASES) == {
-        DETERMINISTIC_PROFILE: 10,
-        SEMANTIC_PROFILE: 6,
+        DETERMINISTIC_PROFILE: 11,
+        SEMANTIC_PROFILE: 14,
     }
 
 
@@ -118,6 +119,9 @@ def test_manifest_contract_and_canonical_codes_are_valid():
         if case.evaluation_time:
             assert case.evaluation_time.utcoffset() is not None
         assert isinstance(case.require_heading_match, bool)
+        if case.category == "causal_analysis":
+            assert case.required_terms
+            assert case.forbidden_terms
     assert all(
         case.search_mode == "full_text"
         for case in BENCHMARK_CASES
@@ -125,7 +129,7 @@ def test_manifest_contract_and_canonical_codes_are_valid():
     )
     assert Counter(
         case.search_mode for case in BENCHMARK_CASES if case.profile == SEMANTIC_PROFILE
-    ) == {"semantic": 3, "hybrid": 3}
+    ) == {"semantic": 3, "hybrid": 11}
 
 
 def test_evaluator_passes_expected_rank_and_exposes_no_chunk_text(monkeypatch):
@@ -433,7 +437,7 @@ def test_command_defaults_to_deterministic_and_outputs_json(monkeypatch):
     payload = json.loads(stdout.getvalue())
 
     assert payload["success"] is True
-    assert len(captured["cases"]) == 10
+    assert len(captured["cases"]) == 11
     assert {case.profile for case in captured["cases"]} == {DETERMINISTIC_PROFILE}
 
 
@@ -546,6 +550,6 @@ def test_semantic_command_rejects_mock_provider_without_writes(settings):
 
     payload = json.loads(stdout.getvalue())
     assert payload["success"] is False
-    assert payload["metrics"]["blocked"] == 6
+    assert payload["metrics"]["blocked"] == 14
     assert len(payload["profile_errors"]) == 1
     assert IndexRun.objects.count() == before

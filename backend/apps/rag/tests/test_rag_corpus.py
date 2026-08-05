@@ -12,13 +12,24 @@ from apps.rag.corpus_manifest import (
 from apps.rag.corpus_utils import content_hash, normalize_markdown
 
 
-def test_manifest_has_exactly_ten_documents_and_unique_codes():
-    assert len(DOCUMENTS) == 10
-    codes = [item["document_code"] for item in DOCUMENTS]
-    assert len(codes) == len(set(codes))
-    assert sum(item["scope_type"] == "global" for item in DOCUMENTS) == 2
-    assert sum(item["scope_type"] == "multi_city" for item in DOCUMENTS) == 6
+def test_manifest_has_versioned_thirteen_document_causal_corpus():
+    assert len(DOCUMENTS) == 13
+    identities = {
+        (item["document_code"], item["version"], item["snapshot_identifier"])
+        for item in DOCUMENTS
+    }
+    assert len(identities) == 13
+    assert sum(item["scope_type"] == "global" for item in DOCUMENTS) == 3
+    assert sum(item["scope_type"] == "multi_city" for item in DOCUMENTS) == 8
     assert sum(item["scope_type"] == "maltepe" for item in DOCUMENTS) == 2
+    expected_versions = {
+        ("SYN-CAUSAL-ANALYSIS-2026", 1),
+        ("SYN-ALARM-CATALOG-2026", 2),
+        ("SYN-COMP-2026-ELIGIBILITY", 2),
+    }
+    assert expected_versions <= {
+        (item["document_code"], item["version"]) for item in DOCUMENTS
+    }
 
 
 def test_manifest_files_are_canonical_synthetic_turkish_sources():
@@ -34,7 +45,7 @@ def test_manifest_files_are_canonical_synthetic_turkish_sources():
 
 def test_manifest_coverage_catalogs_are_non_empty_and_unique():
     assert len(set(MULTICITY_RULES)) == 25
-    assert len(set(MULTICITY_ALARMS)) == 30
+    assert len(set(MULTICITY_ALARMS)) == 31
     assert len(set(GROUND_TRUTH_CASES)) == 30
     assert all(code for code in MULTICITY_RULES + MULTICITY_ALARMS + GROUND_TRUTH_CASES)
     assert CORPUS_KEY == "processtwin-rag-corpus-v1"
@@ -51,3 +62,13 @@ def test_markdown_normalization_is_lf_nfc_and_single_final_newline():
 def test_document_paths_are_relative_to_project():
     for descriptor in DOCUMENTS:
         assert not Path(descriptor["file_path"]).is_absolute()
+
+
+def test_causal_sources_are_public_safe_and_exclude_raw_sample_data():
+    causal_documents = [
+        item for item in DOCUMENTS if item["version"] == 2 or "CAUSAL" in item["document_code"]
+    ]
+    forbidden = ("outageAlarms_anonymized", "password=", "authorization:", "api_key=", "sk-")
+    for descriptor in causal_documents:
+        content = (PROJECT_ROOT / descriptor["file_path"]).read_text(encoding="utf-8")
+        assert all(value.casefold() not in content.casefold() for value in forbidden)

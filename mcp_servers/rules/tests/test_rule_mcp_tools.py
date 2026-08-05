@@ -24,8 +24,28 @@ def test_all_eight_rule_tools_are_registered():
 
 
 def test_causal_rule_evidence_maps_read_only_analysis_contract():
-    client = FakeBackendClient(data={"causal_event": {"code": "CE-001"}, "impact": {"verified_impacted": 1, "reason_codes": {"session_stop_and_recovery_match": 1}}, "compensation": {"eligible": 1, "ineligible_pending": 0, "selected_rule_version": "REFUND-001:v1", "baseline": None, "candidate": None, "difference_summary": None}, "evidence": None})
-    response = RuleMCPTools(client).run("get_rule_evidence", {"snapshot_identifier": "snapshot-1", "causal_event_code": "CE-001"})
+    client = FakeBackendClient(
+        data={
+            "causal_event": {"code": "CE-001"},
+            "impact": {
+                "verified_impacted": 1,
+                "reason_codes": {"session_stop_and_recovery_match": 1},
+            },
+            "compensation": {
+                "eligible": 1,
+                "ineligible_pending": 0,
+                "selected_rule_version": "REFUND-001:v1",
+                "baseline": None,
+                "candidate": None,
+                "difference_summary": None,
+            },
+            "evidence": None,
+        }
+    )
+    response = RuleMCPTools(client).run(
+        "get_rule_evidence",
+        {"snapshot_identifier": "snapshot-1", "causal_event_code": "CE-001"},
+    )
     assert response.success is True
     assert client.calls[0]["path"].endswith("/CE-001/analysis/")
     assert response.data["verified_impacted_count"] == 1
@@ -240,6 +260,38 @@ def test_search_rule_documents_preserves_versions_sections_scores_and_removes_ve
     assert response.data["query_prompt_version"] == "gemini-search-query-v1"
     assert response.data["correlation_id"] == "req-from-backend"
     assert "embedding" not in result
+
+
+def test_search_rule_documents_preserves_causal_source_section_without_raw_payload():
+    client = FakeBackendClient(
+        data={
+            "query": "Dying Gasp neden root değildir?",
+            "requested_mode": "hybrid",
+            "effective_mode": "hybrid",
+            "top_k": 5,
+            "result_count": 1,
+            "snapshot": {"snapshot_key": "snapshot-1"},
+            "embedding": {"provider": "mock", "model": "mock-embedding-768", "dimensions": 768},
+            "results": [{
+                "document_code": "SYN-ALARM-CATALOG-2026",
+                "document_version": 2,
+                "heading": "Dying Gasp ve Device Not Active",
+                "section_path": ["Dying Gasp ve Device Not Active"],
+                "text": "Dying Gasp symptom kanıtıdır.",
+                "raw_payload": {"serial": "hidden"},
+            }],
+        }
+    )
+    response = RuleMCPTools(client).run(
+        "search_rule_documents",
+        {"snapshot_identifier": "snapshot-1", "query": "Dying Gasp root değildir"},
+    )
+
+    result = response.data["results"][0]
+    assert result["document_code"] == "SYN-ALARM-CATALOG-2026"
+    assert result["document_version"] == 2
+    assert result["section_path"] == ["Dying Gasp ve Device Not Active"]
+    assert "raw_payload" not in result
 
 
 def test_search_rule_documents_preserves_full_text_fallback_warning():

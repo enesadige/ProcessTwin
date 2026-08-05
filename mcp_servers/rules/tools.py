@@ -286,7 +286,7 @@ class RuleMCPTools:
             {
                 key: value
                 for key, value in result.items()
-                if key not in {"embedding", "vector", "raw_embedding"}
+                if key not in {"embedding", "vector", "raw_embedding", "raw_payload"}
             }
             for result in data.get("results", [])
         ]

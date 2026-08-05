@@ -72,11 +72,14 @@ class Command(BaseCommand):
 
 
 def validate_corpus():
-    if len(DOCUMENTS) != 10:
-        raise CommandError(f"Expected exactly 10 corpus documents, found {len(DOCUMENTS)}.")
-    codes = [item["document_code"] for item in DOCUMENTS]
-    if len(codes) != len(set(codes)):
-        raise CommandError("Document codes must be unique.")
+    if len(DOCUMENTS) != 13:
+        raise CommandError(f"Expected exactly 13 corpus documents, found {len(DOCUMENTS)}.")
+    identities = [
+        (item["document_code"], item["version"], item["snapshot_identifier"])
+        for item in DOCUMENTS
+    ]
+    if len(identities) != len(set(identities)):
+        raise CommandError("Document code/version/scope identities must be unique.")
 
     resolved = []
     for descriptor in DOCUMENTS:
@@ -253,7 +256,9 @@ def validate_existing_documents(resolved):
     corpus_documents = SourceDocument.objects.filter(metadata__corpus_key=CORPUS_KEY)
     if corpus_documents.count() != len(DOCUMENTS):
         raise CommandError(
-            f"Expected 10 corpus SourceDocument records, found {corpus_documents.count()}."
+            "Expected "
+            f"{len(DOCUMENTS)} corpus SourceDocument records, found "
+            f"{corpus_documents.count()}."
         )
     if DocumentChunk.objects.filter(source_document__in=corpus_documents).exists():
         raise CommandError("Corpus must not contain DocumentChunk records in task 047.")
