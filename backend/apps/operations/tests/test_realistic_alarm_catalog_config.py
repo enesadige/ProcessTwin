@@ -5,12 +5,12 @@ from data_generator.configs.realistic_alarm_catalog_v1 import (
 )
 
 
-def test_realistic_alarm_catalog_has_exactly_thirty_synthetic_alarm_types():
+def test_realistic_alarm_catalog_has_exactly_thirty_one_synthetic_alarm_types():
     alarm_codes = [item["code"] for item in ALARM_CATALOG]
 
-    assert len(alarm_codes) == 30
-    assert len(set(alarm_codes)) == 30
-    assert DATASET_VOLUME_TARGETS["alarm_types"] == 30
+    assert len(alarm_codes) == 31
+    assert len(set(alarm_codes)) == 31
+    assert DATASET_VOLUME_TARGETS["alarm_types"] == 31
     assert "DEVICE_RESOURCE_HIGH" in alarm_codes
     assert "DSL_LINE_QUALITY_DEGRADED" in alarm_codes
     assert "BACKUP_POWER_DEGRADED" in alarm_codes

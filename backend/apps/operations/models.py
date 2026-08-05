@@ -15,6 +15,11 @@ from apps.network.models import (
     NetworkLink,
     NetworkPort,
 )
+from apps.operations.alarm_topology import (
+    UNSUPPORTED_DEVICE_TYPE,
+    UNSUPPORTED_SOURCE_KIND,
+    validate_alarm_topology,
+)
 from apps.operations.contracts import (
     CausalEventStatus,
     CausalEventType,
@@ -1034,6 +1039,13 @@ class Alarm(TimeStampedModel):
                     f"Alarm type {self.alarm_type.code} does not support device type "
                     f"{source_device.device_type}."
                 )
+            topology_result = validate_alarm_topology(self)
+            if (
+                not topology_result.valid
+                and topology_result.reason_code
+                not in {UNSUPPORTED_SOURCE_KIND, UNSUPPORTED_DEVICE_TYPE}
+            ):
+                errors["alarm_type"] = topology_result.description
         if errors:
             raise ValidationError(errors)
 

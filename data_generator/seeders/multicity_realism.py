@@ -65,6 +65,7 @@ from apps.network.models import (
     NetworkPortStatus,
     NetworkPortType,
 )
+from apps.operations.alarm_topology import topology_metadata_for
 from apps.operations.models import (
     Alarm,
     AlarmStatus,
@@ -1410,48 +1411,54 @@ def seed_line_failure_domains(
 
 
 def seed_alarm_types(snapshot: DataSnapshot) -> dict[str, AlarmType]:
-    rows = [
-        AlarmType(
+    alarm_types = {}
+    for item in alarm_config.ALARM_CATALOG:
+        alarm_type, _created = AlarmType.objects.update_or_create(
             data_snapshot=snapshot,
             code=item["code"],
-            name=item["name"],
-            severity=item["severity"],
-            category=item["category"],
-            probable_cause_family=item["probable_cause_family"],
-            service_impact_class=item["service_impact_class"],
-            auto_clear_policy=item["auto_clear_policy"],
-            deduplication_window_seconds=item["deduplication_window_seconds"],
-            correlation_family=item["correlation_family"],
-            default_incident_type=item["default_incident_type"],
-            is_root_candidate=item["is_root_candidate"],
-            metadata={"synthetic": True, "impact_class": item["impact_class"]},
+            defaults={
+                "name": item["name"],
+                "severity": item["severity"],
+                "category": item["category"],
+                "probable_cause_family": item["probable_cause_family"],
+                "service_impact_class": item["service_impact_class"],
+                "auto_clear_policy": item["auto_clear_policy"],
+                "deduplication_window_seconds": item["deduplication_window_seconds"],
+                "correlation_family": item["correlation_family"],
+                "default_incident_type": item["default_incident_type"],
+                "is_root_candidate": item["is_root_candidate"],
+                "metadata": {
+                    "synthetic": True,
+                    "impact_class": item["impact_class"],
+                    "topology_policy": topology_metadata_for(item["code"]),
+                },
+            },
         )
-        for item in alarm_config.ALARM_CATALOG
-    ]
-    AlarmType.objects.bulk_create(rows)
-    alarm_types = {item.code: item for item in AlarmType.objects.filter(data_snapshot=snapshot)}
-    source_rows = []
-    device_rows = []
-    for item in alarm_config.ALARM_CATALOG:
-        alarm_type = alarm_types[item["code"]]
-        source_rows.extend(
-            AlarmTypeAllowedSourceKind(
+        alarm_types[item["code"]] = alarm_type
+        allowed_source_kinds = item["allowed_source_kinds"]
+        allowed_source_queryset = alarm_type.allowed_source_kinds
+        if allowed_source_kinds:
+            allowed_source_queryset.exclude(source_kind__in=allowed_source_kinds).delete()
+        else:
+            allowed_source_queryset.all().delete()
+        for source_kind in allowed_source_kinds:
+            AlarmTypeAllowedSourceKind.objects.get_or_create(
                 data_snapshot=snapshot,
                 alarm_type=alarm_type,
                 source_kind=source_kind,
             )
-            for source_kind in item["allowed_source_kinds"]
-        )
-        device_rows.extend(
-            AlarmTypeSupportedDeviceType(
+        supported_device_types = item["supported_device_types"]
+        supported_device_queryset = alarm_type.supported_device_types
+        if supported_device_types:
+            supported_device_queryset.exclude(device_type__in=supported_device_types).delete()
+        else:
+            supported_device_queryset.all().delete()
+        for device_type in supported_device_types:
+            AlarmTypeSupportedDeviceType.objects.get_or_create(
                 data_snapshot=snapshot,
                 alarm_type=alarm_type,
                 device_type=device_type,
             )
-            for device_type in item["supported_device_types"]
-        )
-    AlarmTypeAllowedSourceKind.objects.bulk_create(source_rows)
-    AlarmTypeSupportedDeviceType.objects.bulk_create(device_rows)
     return alarm_types
 
 

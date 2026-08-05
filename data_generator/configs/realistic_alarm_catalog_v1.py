@@ -445,7 +445,7 @@ ALARM_CATALOG = [
         "name": "High temperature",
         "category": AlarmCategory.POWER,
         "severity": Severity.MAJOR,
-        "allowed_source_kinds": [AlarmSourceKind.DEVICE, AlarmSourceKind.FAILURE_DOMAIN],
+        "allowed_source_kinds": [AlarmSourceKind.DEVICE],
         "supported_device_types": [],
         "probable_cause_family": "environment_temperature",
         "service_impact_class": ServiceImpactClass.DEGRADATION,
@@ -503,6 +503,25 @@ ALARM_CATALOG = [
         "default_incident_type": IncidentType.SERVICE_DEGRADATION,
         "is_root_candidate": False,
         "impact_class": "degradation",
+    },
+    {
+        "code": "DISTRIBUTION_CABLE_DOWN",
+        "name": "Distribution cable down",
+        "category": AlarmCategory.ACCESS,
+        "severity": Severity.MAJOR,
+        "allowed_source_kinds": [
+            AlarmSourceKind.NETWORK_LINK,
+            AlarmSourceKind.FAILURE_DOMAIN,
+        ],
+        "supported_device_types": [],
+        "probable_cause_family": "distribution_fiber_failure",
+        "service_impact_class": ServiceImpactClass.PARTIAL_OUTAGE,
+        "auto_clear_policy": AutoClearPolicy.MANUAL,
+        "deduplication_window_seconds": 1800,
+        "correlation_family": "distribution_fiber",
+        "default_incident_type": IncidentType.NETWORK_OUTAGE,
+        "is_root_candidate": True,
+        "impact_class": "partial_outage",
     },
 ]
 
@@ -806,7 +825,7 @@ FAILOVER_TRANSITION_CLASSES = {
 }
 
 DATASET_VOLUME_TARGETS = {
-    "alarm_types": 30,
+    "alarm_types": 31,
     "alarms": 2100,
     "cleared_alarms": 1680,
     "open_alarms": 210,

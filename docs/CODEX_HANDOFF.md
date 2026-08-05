@@ -3,12 +3,12 @@
 ## 1. Mevcut Checkpoint
 
 - Aktif branch: `main`.
-- Doğrulanmış HEAD: REV-03 tamamlandıktan sonra alınan `feat: add causal operations models` commit'idir; kesin hash için güncel `git rev-parse HEAD` çıktısı kaynak alınmalıdır.
+- Doğrulanmış HEAD: REV-04 tamamlandıktan sonra alınan `feat: enforce GPON alarm topology catalog` commit'idir; kesin hash için güncel `git rev-parse HEAD` çıktısı kaynak alınmalıdır.
 - Bu checkpoint'te working tree temiz bırakılmalıdır.
 - Son doğrulanmış tam test baseline'i repository root'tan `.venv/bin/pytest -q` ile **612 passed** sonucudur. Bu sonuç REV-00 baseline dokümanında kayıtlıdır; bu handoff hazırlanırken testler yeniden çalıştırılmamalıdır.
-- REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` commit'iyle tamamladı. REV-03, nedensel operasyon modelleri ve migration çalışmasıyla tamamlandı.
+- REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` commit'iyle tamamladı. REV-03, nedensel operasyon modelleri ve migration çalışmasıyla; REV-04 ise GPON alarm/topoloji compatibility validator ve katalog kararıyla tamamlandı.
 - Görev 52 henüz başlamadı. Eski görev planındaki kesin tanımı: **QueryRun modelini oluştur**; `original_query`, `structured_query`, `planned_tools`, `executed_tools`, `status`, `final_result`, model ve prompt version alanlarıyla her AI sorgusunun kaydedilebilmesini hedefler.
-- Ancak sıradaki iş Görev 52 değildir: sıradaki revizyon görevi REV-04 GPON topology ve alarm katalog tutarlılığıdır. Zorunlu operasyon revizyon zinciri tamamlanınca Görev 52'ye dönülecektir.
+- Ancak sıradaki iş Görev 52 değildir: sıradaki revizyon görevi REV-05 nedensel GPON generator'dır. Zorunlu operasyon revizyon zinciri tamamlanınca Görev 52'ye dönülecektir.
 
 Belge çelişkilerinde öncelik sırası: güncel git/kod durumu, REV-01, REV-00, güncel ilerleme günlüğü, sonra eski plan ve karar belgeleri. Örneğin README eski ürün vizyonunda simülasyondan söz eder; güncel REV-01 kararı canlı simülasyon, Simulation MCP ve Analytics MCP'nin mevcut zorunlu revizyonun parçası olmadığıdır. Bu, simülasyonu silme kararı değil; revizyon tamamlanmadan başlatmama kararıdır.
 
@@ -78,7 +78,7 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
 
 - **REV-02 — Operations contracts and enums:** Tamamlandı; modelden bağımsız enum, immutable dataclass, validation ve privacy serialization sözleşmeleri `apps.operations.contracts` içinde tanımlandı.
 - **REV-03 — Causal operations models:** Tamamlandı; CausalEvent, SessionEvent, CustomerImpactAssessment modelleri, nullable ilişkiler ve snapshot row-count düzeltme migration'ı eklendi.
-- **REV-04 — GPON topology and alarm catalog:** Sıradaki görev; OLT/PON port, alarm source/technology ve failure-domain uyum validator'ları, katalog matrisi.
+- **REV-04 — GPON topology and alarm catalog:** Tamamlandı; merkezi source/device/technology compatibility validator, idempotent catalog seed ve `DISTRIBUTION_CABLE_DOWN` kararı eklendi. Mevcut operasyon kayıtları yeniden üretilmedi.
 - **REV-05 — Causal GPON generator:** Yedi GPON senaryosundan zaman çizelgeli alarm, incident, outage, session ve recovery üretir; ayrı alarm döngüsü/sabit-70 dağılımını kaldırır.
 - **REV-06 — Correlation and root cause:** Zaman/topoloji/failure-domain/rank algoritmalarını hedef sözleşmeye uyarlar.
 - **REV-07 — Session verification and impact:** Potential impact'i session kanıtıyla assessment'a dönüştürür.
