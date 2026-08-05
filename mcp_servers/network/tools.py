@@ -271,9 +271,10 @@ class NetworkMCPTools:
                 "root_resource_type": causal.get("root_resource", {}).get("resource_type"),
                 "root_resource_reference": causal.get("root_resource", {}).get("reference"),
                 "root_cause_score": correlation.get("score"),
+                "root_cause_confidence": correlation.get("confidence"),
                 "reason_codes": correlation.get("reason_codes", []),
                 "role_counts": correlation.get("role_counts", {}),
-                "propagation_summary": correlation.get("description"),
+                "propagation_summary": correlation.get("propagation_summary"),
             }
         return MCPToolResponse[dict[str, Any]](
             success=True,

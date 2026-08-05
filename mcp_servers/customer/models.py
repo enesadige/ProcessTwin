@@ -78,6 +78,11 @@ class CustomerOutageHistoryInput(TemporalSnapshotInput):
     @model_validator(mode="after")
     def exactly_one_identifier_is_required(self):
         if self.causal_event_code:
+            if self.customer_number or self.subscription_number:
+                raise ValueError(
+                    "causal_event_code cannot be combined with customer_number "
+                    "or subscription_number"
+                )
             return self
         if bool(self.customer_number) == bool(self.subscription_number):
             raise ValueError("Exactly one of customer_number or subscription_number is required")

@@ -240,7 +240,7 @@ class CustomerMCPTools:
                 "verified_no_impact_count": impact.get("verified_no_impact", 0),
                 "insufficient_evidence_count": impact.get("insufficient_evidence", 0),
                 "pending_count": impact.get("pending", 0),
-                "failover_protected_count": 0,
+                "failover_protected_count": impact.get("failover_protected_count", 0),
                 "reason_code_distribution": impact.get("reason_codes", {}),
             }
         return MCPToolResponse[dict[str, Any]](

@@ -24,6 +24,31 @@ def test_all_nine_network_tools_are_registered():
     ]
 
 
+def test_causal_network_call_requires_no_legacy_identifier_and_maps_analysis():
+    client = FakeBackendClient(
+        data={
+            "causal_event": {"code": "CE-001", "root_resource": {"resource_type": "network_link", "reference": "LINK-1"}},
+            "correlation": {"score": 88, "confidence": 88, "reason_codes": ["shared_failure_domain"], "role_counts": {"root": 1, "child": 2, "symptom": 3, "supporting": 0, "unrelated": 0, "noise": 0}, "propagation_summary": "Delayed downstream propagation."},
+        }
+    )
+    response = NetworkMCPTools(client).run(
+        "correlate_alarms", {"snapshot_identifier": "snapshot-1", "causal_event_code": "CE-001"}
+    )
+    assert response.success is True
+    assert client.calls[0]["path"].endswith("/CE-001/analysis/")
+    assert response.data["role_counts"]["symptom"] == 3
+    assert response.data["propagation_summary"] == "Delayed downstream propagation."
+
+
+def test_network_correlation_rejects_missing_or_ambiguous_scope():
+    client = FakeBackendClient()
+    for arguments in (
+        {"snapshot_identifier": "snapshot-1"},
+        {"snapshot_identifier": "snapshot-1", "anchor_alarm_id": "ALM-1", "causal_event_code": "CE-1"},
+    ):
+        assert NetworkMCPTools(client).run("correlate_alarms", arguments).success is False
+
+
 @pytest.mark.parametrize(
     ("tool_name", "arguments", "expected_path"),
     [
@@ -206,4 +231,3 @@ class FakeBackendClient:
                 },
             },
         }
-

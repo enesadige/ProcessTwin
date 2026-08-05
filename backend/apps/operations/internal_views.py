@@ -4,7 +4,8 @@ from django.views.decorators.http import require_GET
 from apps.compensation.models import DecisionEvidence
 from apps.compensation.services.verified_impact import VerifiedImpactCompensationService
 from apps.core.internal_api import internal_service_required
-from apps.operations.models import CausalEvent, Outage
+from apps.operations.models import Alarm, CausalEvent, Outage
+from apps.operations.services.alarm_correlation import summarize_causal_event_roles
 from apps.operations.services.customer_impact_assessment import CustomerImpactAssessmentService
 from apps.operations.services.root_cause import RootCauseService
 
@@ -31,6 +32,11 @@ def causal_analysis(request, event_code):
             status=404,
         )
     snapshot = event.data_snapshot
+    causal_alarms = list(
+        Alarm.objects.filter(data_snapshot=snapshot, causal_event=event)
+        .select_related("alarm_type", "causal_event")
+        .order_by("alarm_id")
+    )
     impact = CustomerImpactAssessmentService().summarize(causal_event=event, snapshot=snapshot)
     outage = (
         Outage.objects.filter(data_snapshot=snapshot, causal_event=event)
@@ -41,15 +47,23 @@ def causal_analysis(request, event_code):
         "resource_type": event.get_root_resource_kind(),
         "reference": event.root_resource_code,
     }
-    correlation = {"root_cause": None, "role_counts": {}, "reason_codes": [], "description": None}
+    correlation = {
+        "root_cause": None,
+        "score": None,
+        "confidence": None,
+        "role_counts": summarize_causal_event_roles(causal_alarms),
+        "reason_codes": [],
+        "propagation_summary": None,
+    }
     if outage is not None:
         candidates = RootCauseService().analyze(outage=outage, snapshot=snapshot)
         if candidates:
             candidate = candidates[0]
             correlation["root_cause"] = candidate.candidate_resource_code
             correlation["score"] = candidate.evidence_score
+            correlation["confidence"] = candidate.evidence_score
             correlation["reason_codes"] = candidate.reason_codes or []
-            correlation["description"] = candidate.description
+            correlation["propagation_summary"] = candidate.description
     evidence = (
         DecisionEvidence.objects.filter(
             data_snapshot=snapshot, context_snapshot__causal_event_code=event.event_code
@@ -75,6 +89,7 @@ def causal_analysis(request, event_code):
                     "verified_no_impact": impact.verified_no_impact_count,
                     "insufficient_evidence": impact.insufficient_evidence_count,
                     "pending": impact.pending_count,
+                    "failover_protected_count": impact.failover_protected_count,
                     "reason_codes": impact.reason_code_counts,
                 },
                 "compensation": compensation_payload(outage=outage, snapshot=snapshot),
@@ -102,7 +117,18 @@ def compensation_payload(*, outage, snapshot):
         outage=outage, snapshot=snapshot
     )
     if summary is None or summary.compensation_considered_count == 0:
-        return {"status": "pending", "consideration_count": 0}
+        return {
+            "status": "pending",
+            "consideration_count": 0,
+            "eligible": 0,
+            "ineligible_pending": 0,
+            "total_amount": None,
+            "rule_versions": {},
+            "selected_rule_version": None,
+            "baseline": None,
+            "candidate": None,
+            "difference_summary": None,
+        }
     return {
         "status": "available",
         "consideration_count": summary.compensation_considered_count,
@@ -110,4 +136,8 @@ def compensation_payload(*, outage, snapshot):
         "ineligible_pending": summary.ineligible_count + summary.pending_manual_review_count,
         "total_amount": str(summary.total_compensation_amount),
         "rule_versions": summary.rule_version_counts,
+        "selected_rule_version": next(iter(summary.rule_version_counts), None),
+        "baseline": None,
+        "candidate": None,
+        "difference_summary": None,
     }

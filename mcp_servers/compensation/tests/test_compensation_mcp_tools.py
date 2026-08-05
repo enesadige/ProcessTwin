@@ -24,6 +24,15 @@ def test_all_six_compensation_tools_are_registered():
     ]
 
 
+def test_causal_compensation_evidence_maps_read_only_aggregate():
+    client = FakeBackendClient(data={"causal_event": {"code": "CE-001"}, "compensation": {"status": "available", "consideration_count": 1, "eligible": 1, "ineligible_pending": 0, "total_amount": "12.50", "rule_versions": {"REFUND-001:v1": 1}}, "evidence": {"reference": "abcdef123456", "finalized": True}})
+    response = CompensationMCPTools(client).run("get_compensation_evidence", {"snapshot_identifier": "snapshot-1", "causal_event_code": "CE-001"})
+    assert response.success is True
+    assert client.calls[0]["path"].endswith("/CE-001/analysis/")
+    assert response.data["total_amount"] == "12.50"
+    assert response.data["evidence"]["finalized"] is True
+
+
 @pytest.mark.parametrize(
     ("tool_name", "arguments", "method", "expected_path"),
     [

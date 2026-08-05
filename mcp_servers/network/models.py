@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 
 from mcp_servers.shared.contracts import BaseMCPInput, TemporalMCPInput
 
@@ -95,15 +95,27 @@ class CalculateCustomerImpactInput(TemporalSnapshotInput):
 
 
 class CorrelateAlarmsInput(SnapshotRequiredInput):
-    anchor_alarm_id: str = Field(min_length=1)
+    anchor_alarm_id: str | None = Field(default=None, min_length=1)
     causal_event_code: str | None = Field(default=None, min_length=1)
     limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
+
+    @model_validator(mode="after")
+    def exactly_one_correlation_anchor_is_required(self):
+        if bool(self.anchor_alarm_id) == bool(self.causal_event_code):
+            raise ValueError("Exactly one of anchor_alarm_id or causal_event_code is required")
+        return self
 
 
 class RankRootCauseCandidatesInput(TemporalSnapshotInput):
-    outage_code: str = Field(min_length=1)
+    outage_code: str | None = Field(default=None, min_length=1)
     causal_event_code: str | None = Field(default=None, min_length=1)
     limit: int = Field(default=DEFAULT_LIMIT, ge=1, le=MAX_LIMIT)
+
+    @model_validator(mode="after")
+    def exactly_one_root_cause_scope_is_required(self):
+        if bool(self.outage_code) == bool(self.causal_event_code):
+            raise ValueError("Exactly one of outage_code or causal_event_code is required")
+        return self
 
 
 class GetLongestOutageInput(TemporalSnapshotInput):

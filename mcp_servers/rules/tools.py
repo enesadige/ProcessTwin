@@ -262,6 +262,10 @@ class RuleMCPTools:
             return {
                 "causal_event_code": data["causal_event"].get("code"),
                 "verified_impacted_count": impact.get("verified_impacted", 0),
+                "selected_rule_version": compensation.get("selected_rule_version"),
+                "baseline": compensation.get("baseline"),
+                "candidate": compensation.get("candidate"),
+                "difference_summary": compensation.get("difference_summary"),
                 "eligible_count": compensation.get("eligible", 0),
                 "ineligible_pending_count": compensation.get("ineligible_pending", 0),
                 "reason_codes": impact.get("reason_codes", {}),

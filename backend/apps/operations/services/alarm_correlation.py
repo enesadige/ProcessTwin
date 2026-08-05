@@ -571,6 +571,20 @@ def causal_description(role: CorrelationRole) -> str:
     }[role]
 
 
+def summarize_causal_event_roles(alarms: list[Alarm]) -> dict[str, int]:
+    """Return deterministic role counts for one already-bounded causal event."""
+    counts = {role.value: 0 for role in CorrelationRole}
+    for alarm in sorted(alarms, key=lambda item: item.alarm_id):
+        hint = alarm_role_hint(alarm)
+        if hint in counts:
+            counts[hint] += 1
+        elif alarm_matches_causal_root(alarm):
+            counts[CorrelationRole.ROOT.value] += 1
+        else:
+            counts[CorrelationRole.CHILD.value] += 1
+    return counts
+
+
 def legacy_description(correlated: bool) -> str:
     return (
         "Legacy alarms are conservatively correlated from time and topology evidence."

@@ -6,7 +6,11 @@ from collections import Counter
 from dataclasses import dataclass
 from decimal import Decimal
 
-from apps.compensation.models import DecisionEvidenceDecision
+from apps.compensation.models import (
+    CompensationEvaluation,
+    CompensationResultType,
+    DecisionEvidenceDecision,
+)
 from apps.compensation.services.calculation import (
     CompensationService,
     build_decision_evidence_hash,
@@ -108,7 +112,52 @@ class VerifiedImpactCompensationService:
                 subscription_connection__isnull=False,
             )
         )
-        return self._summarize(assessments=assessments, results=[])
+        verified_subscription_ids = {
+            assessment.subscription_id
+            for assessment in assessments
+            if assessment.status == CustomerImpactStatus.VERIFIED_IMPACT.value
+        }
+        evaluations = list(
+            CompensationEvaluation.objects.filter(
+                data_snapshot=snapshot,
+                outage=outage,
+                subscription_id__in=verified_subscription_ids,
+            ).select_related("rule_version__rule")
+        )
+        return self._summarize_existing_evaluations(
+            assessments=assessments, evaluations=evaluations
+        )
+
+    def _summarize_existing_evaluations(self, *, assessments, evaluations):
+        statuses = Counter(item.status for item in assessments)
+        rule_versions = Counter(
+            f"{item.rule_version.rule.code}:v{item.rule_version.version}" for item in evaluations
+        )
+        return VerifiedImpactCompensationSummary(
+            potential_count=statuses[CustomerImpactStatus.POTENTIAL_IMPACT.value],
+            verified_impacted_count=statuses[CustomerImpactStatus.VERIFIED_IMPACT.value],
+            verified_no_impact_count=statuses[CustomerImpactStatus.VERIFIED_NO_IMPACT.value],
+            insufficient_evidence_count=statuses[CustomerImpactStatus.INSUFFICIENT_EVIDENCE.value],
+            compensation_considered_count=len(evaluations),
+            eligible_count=sum(
+                item.result_type == CompensationResultType.ELIGIBLE for item in evaluations
+            ),
+            ineligible_count=sum(
+                item.result_type == CompensationResultType.NOT_ELIGIBLE for item in evaluations
+            ),
+            pending_manual_review_count=sum(
+                item.result_type
+                in {
+                    CompensationResultType.MANUAL_REVIEW,
+                    CompensationResultType.INSUFFICIENT_DATA,
+                }
+                for item in evaluations
+            ),
+            total_compensation_amount=sum(
+                (item.proposed_amount for item in evaluations), Decimal("0.00")
+            ),
+            rule_version_counts=dict(sorted(rule_versions.items())),
+        )
 
     def _get_or_create_evidence(
         self, *, compensation_service, outage, snapshot, assessments, results

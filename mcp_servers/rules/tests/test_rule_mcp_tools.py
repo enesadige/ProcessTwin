@@ -23,6 +23,15 @@ def test_all_eight_rule_tools_are_registered():
     ]
 
 
+def test_causal_rule_evidence_maps_read_only_analysis_contract():
+    client = FakeBackendClient(data={"causal_event": {"code": "CE-001"}, "impact": {"verified_impacted": 1, "reason_codes": {"session_stop_and_recovery_match": 1}}, "compensation": {"eligible": 1, "ineligible_pending": 0, "selected_rule_version": "REFUND-001:v1", "baseline": None, "candidate": None, "difference_summary": None}, "evidence": None})
+    response = RuleMCPTools(client).run("get_rule_evidence", {"snapshot_identifier": "snapshot-1", "causal_event_code": "CE-001"})
+    assert response.success is True
+    assert client.calls[0]["path"].endswith("/CE-001/analysis/")
+    assert response.data["verified_impacted_count"] == 1
+    assert response.data["selected_rule_version"] == "REFUND-001:v1"
+
+
 @pytest.mark.parametrize(
     ("tool_name", "arguments", "expected_path"),
     [

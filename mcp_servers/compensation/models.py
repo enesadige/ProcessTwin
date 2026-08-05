@@ -87,6 +87,18 @@ class CompensationEvidenceInput(SnapshotRequiredInput):
     @model_validator(mode="after")
     def at_least_one_identifier_is_required(self):
         if self.causal_event_code:
+            if any(
+                (
+                    self.evaluation_code,
+                    self.evidence_hash,
+                    self.outage_code,
+                    self.subscription_number,
+                    self.rule_code,
+                )
+            ):
+                raise ValueError(
+                    "causal_event_code cannot be combined with legacy evidence identifiers"
+                )
             return self
         if not any(
             (

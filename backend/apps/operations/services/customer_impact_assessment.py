@@ -33,6 +33,7 @@ class CustomerImpactAssessmentSummary:
     verified_no_impact_count: int
     insufficient_evidence_count: int
     pending_count: int
+    failover_protected_count: int
     reason_code_counts: dict[str, int]
 
 
@@ -95,6 +96,10 @@ class CustomerImpactAssessmentService:
             verified_no_impact_count=statuses[CustomerImpactStatus.VERIFIED_NO_IMPACT.value],
             insufficient_evidence_count=statuses[CustomerImpactStatus.INSUFFICIENT_EVIDENCE.value],
             pending_count=statuses[CustomerImpactStatus.POTENTIAL_IMPACT.value],
+            failover_protected_count=sum(
+                ImpactReason.FAILOVER_PROTECTED.value in assessment.reasons
+                for assessment in assessments
+            ),
             reason_code_counts=dict(sorted(reasons.items())),
         )
 

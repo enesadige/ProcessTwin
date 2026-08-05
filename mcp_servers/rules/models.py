@@ -135,6 +135,19 @@ class RuleEvidenceInput(SnapshotRequiredInput):
     @model_validator(mode="after")
     def at_least_one_identifier_is_required(self):
         if self.causal_event_code:
+            if any(
+                (
+                    self.evidence_hash,
+                    self.evaluation_code,
+                    self.rule_code,
+                    self.rule_set_code,
+                    self.outage_code,
+                    self.subscription_number,
+                )
+            ):
+                raise ValueError(
+                    "causal_event_code cannot be combined with legacy evidence identifiers"
+                )
             return self
         if not any(
             (
