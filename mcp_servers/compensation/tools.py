@@ -52,6 +52,13 @@ def _path(path: str):
     return build
 
 
+def _causal_evidence_path(model: BaseModel) -> str:
+    code = getattr(model, "causal_event_code", None)
+    if code:
+        return f"/api/internal/v1/operations/causal-events/{code}/analysis/"
+    return "/api/internal/v1/compensation/evidence/"
+
+
 def _payload(model: BaseModel) -> dict[str, Any]:
     raw = model.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
     raw.pop("request_id", None)
@@ -110,7 +117,7 @@ COMPENSATION_TOOL_DEFINITIONS: dict[str, CompensationToolDefinition] = {
         description="Read existing CompensationEvaluation and DecisionEvidence records.",
         input_model=CompensationEvidenceInput,
         method="GET",
-        path_builder=_path("/api/internal/v1/compensation/evidence/"),
+        path_builder=_causal_evidence_path,
         payload_builder=_payload,
     ),
 }
@@ -190,9 +197,20 @@ class CompensationMCPTools:
             evaluation_time=getattr(model, "evaluation_time", None),
             snapshot_details=snapshot_details,
         )
+        data = payload.get("data", {})
+        if tool_name == "get_compensation_evidence" and "causal_event" in data:
+            compensation = data.get("compensation")
+            if compensation is None:
+                data = {"status": "pending", "consideration_count": 0}
+            else:
+                data = {
+                    "causal_event_code": data["causal_event"].get("code"),
+                    **compensation,
+                    "evidence": data.get("evidence"),
+                }
         return MCPToolResponse[dict[str, Any]](
             success=True,
-            data=payload.get("data", {}),
+            data=data,
             metadata=metadata,
             warnings=[
                 MCPWarning.model_validate(warning)

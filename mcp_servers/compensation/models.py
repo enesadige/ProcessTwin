@@ -74,6 +74,7 @@ class RankCompensationOptionsInput(TemporalMCPInput):
 
 
 class CompensationEvidenceInput(SnapshotRequiredInput):
+    causal_event_code: str | None = Field(default=None, min_length=1)
     evaluation_code: str | None = None
     evidence_hash: str | None = None
     outage_code: str | None = None
@@ -85,6 +86,8 @@ class CompensationEvidenceInput(SnapshotRequiredInput):
 
     @model_validator(mode="after")
     def at_least_one_identifier_is_required(self):
+        if self.causal_event_code:
+            return self
         if not any(
             (
                 self.evaluation_code,

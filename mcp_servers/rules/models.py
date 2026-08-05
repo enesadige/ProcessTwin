@@ -121,6 +121,7 @@ class DetectRuleConflictsInput(TemporalSnapshotInput):
 
 
 class RuleEvidenceInput(SnapshotRequiredInput):
+    causal_event_code: str | None = Field(default=None, min_length=1)
     evidence_hash: str | None = None
     evaluation_code: str | None = None
     rule_code: str | None = None
@@ -133,6 +134,8 @@ class RuleEvidenceInput(SnapshotRequiredInput):
 
     @model_validator(mode="after")
     def at_least_one_identifier_is_required(self):
+        if self.causal_event_code:
+            return self
         if not any(
             (
                 self.evidence_hash,

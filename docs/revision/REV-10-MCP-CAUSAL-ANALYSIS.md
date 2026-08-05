@@ -5,4 +5,6 @@ REV-10A tamamlandı: Network MCP (9) `correlate_alarms` ve
 araçlarında additive `causal_event_code` ile read-only causal analysis özeti
 sunar. MCP handler'ları InternalAPIClient kullanır; backend business logic'i
 tekrar edilmez. Public aggregate ve reason code'lar döner; PII/raw payload/PK
-dönmez. Rule ve Compensation MCP REV-10B'de beklemektedir.
+dönmez. REV-10B de tamamlandı: Rule MCP (8) `get_rule_evidence` ve
+Compensation MCP (6) `get_compensation_evidence` causal event read-only
+özetini map eder. Rule RAG retrieval aracı değişmedi. Sıradaki REV-11'dir.

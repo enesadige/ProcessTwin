@@ -58,6 +58,13 @@ def _path(template: str, field_name: str | None = None):
     return build
 
 
+def _causal_evidence_path(model: BaseModel) -> str:
+    code = getattr(model, "causal_event_code", None)
+    if code:
+        return f"/api/internal/v1/operations/causal-events/{code}/analysis/"
+    return "/api/internal/v1/rules/evidence/"
+
+
 def _params(model: BaseModel) -> dict[str, Any]:
     raw = model.model_dump(mode="json", exclude_none=True, exclude_defaults=True)
     raw.pop("request_id", None)
@@ -142,7 +149,7 @@ RULE_TOOL_DEFINITIONS: dict[str, RuleToolDefinition] = {
         ),
         input_model=RuleEvidenceInput,
         method="GET",
-        path_builder=_path("/api/internal/v1/rules/evidence/"),
+        path_builder=_causal_evidence_path,
         params_builder=_params,
     ),
     "search_rule_documents": RuleToolDefinition(
@@ -249,6 +256,17 @@ class RuleMCPTools:
     @staticmethod
     def _response_data(tool_name: str, payload: dict[str, Any]) -> dict[str, Any]:
         data = dict(payload.get("data", {}))
+        if tool_name == "get_rule_evidence" and "causal_event" in data:
+            impact = data.get("impact", {})
+            compensation = data.get("compensation") or {}
+            return {
+                "causal_event_code": data["causal_event"].get("code"),
+                "verified_impacted_count": impact.get("verified_impacted", 0),
+                "eligible_count": compensation.get("eligible", 0),
+                "ineligible_pending_count": compensation.get("ineligible_pending", 0),
+                "reason_codes": impact.get("reason_codes", {}),
+                "evidence": data.get("evidence"),
+            }
         if tool_name != "search_rule_documents":
             return data
 
