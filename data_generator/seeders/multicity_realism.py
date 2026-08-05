@@ -101,6 +101,7 @@ from data_generator.configs import realistic_alarm_catalog_v1 as alarm_config
 from data_generator.configs import realistic_commercial_profile_v1 as commercial_config
 from data_generator.configs import synthetic_compensation_policy_v1 as policy_config
 from data_generator.seeders.causal_timeline import CausalTimelineContext, seed_causal_timeline
+from data_generator.seeders.multicity_ground_truth import seed_multicity_ground_truth
 
 ISTANBUL_TZ = ZoneInfo("Europe/Istanbul")
 REFERENCE_DATETIME = parse_datetime(config.DEFAULT_REFERENCE_DATETIME)
@@ -182,6 +183,7 @@ def seed_multicity_realism_dataset(*, snapshot: DataSnapshot, batch_size: int = 
         alarm_types=alarm_types,
         batch_size=batch_size,
     )
+    seed_multicity_ground_truth(snapshot)
     seed_payments(snapshot, subscriptions, batch_size)
     seed_campaign_enrollments(snapshot, subscriptions, campaigns, batch_size)
     seed_compensation_history_and_evidence(
@@ -1984,6 +1986,9 @@ def seed_compensation_history_and_evidence(
         for subscription in subscriptions
         if subscription.status in {SubscriptionStatus.ACTIVE, SubscriptionStatus.SUSPENDED}
     ]
+    resolved_incidents = [incident for incident in incidents if incident.resolved_at is not None]
+    if not resolved_incidents:
+        raise ValueError("Synthetic compensation history requires at least one resolved incident.")
     decision_values = expand_counts(
         commercial_config.COMPENSATION_HISTORY_TARGETS["decision_statuses"]
     )
@@ -1996,7 +2001,7 @@ def seed_compensation_history_and_evidence(
     outage_cycle = cycle(outages)
     for index, decision_status in enumerate(decision_values, start=1):
         subscription = eligible_subscriptions[index % len(eligible_subscriptions)]
-        incident = incidents[index % len(incidents)]
+        incident = resolved_incidents[index % len(resolved_incidents)]
         outage = (
             next(outage_cycle)
             if incident.service_impact_class != ServiceImpactClass.DEGRADATION

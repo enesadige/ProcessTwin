@@ -10,6 +10,7 @@ from apps.rag.corpus_manifest import (
     SYNTHETIC_NOTICE,
 )
 from apps.rag.corpus_utils import content_hash, normalize_markdown
+from apps.rag.management.commands.seed_rag_corpus import snapshot_for_descriptor
 
 
 def test_manifest_has_versioned_thirteen_document_causal_corpus():
@@ -72,3 +73,13 @@ def test_causal_sources_are_public_safe_and_exclude_raw_sample_data():
     for descriptor in causal_documents:
         content = (PROJECT_ROOT / descriptor["file_path"]).read_text(encoding="utf-8")
         assert all(value.casefold() not in content.casefold() for value in forbidden)
+
+
+def test_multicity_corpus_descriptors_use_the_explicit_versioned_snapshot():
+    descriptor = next(item for item in DOCUMENTS if item["scope_type"] == "multi_city")
+    selected_snapshot = object()
+
+    assert (
+        snapshot_for_descriptor(descriptor, {"multicity": selected_snapshot})
+        is selected_snapshot
+    )

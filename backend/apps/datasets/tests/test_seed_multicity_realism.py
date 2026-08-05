@@ -84,6 +84,40 @@ def test_seed_multicity_realism_second_run_validates_without_duplicates(monkeypa
 
 
 @pytest.mark.django_db
+def test_seed_multicity_realism_versioned_slug_preserves_legacy_snapshot(monkeypatch):
+    def fake_seed(*, snapshot, batch_size):
+        return {"customers": 1, "subscriptions": 1, "alarms": 1, "quality_measurements": 1}
+
+    def fake_validate(snapshot, **kwargs):
+        return {
+            "passed": True,
+            "row_counts": {"subscriptions": 1},
+            "checks": [{"name": "fake", "expected": 1, "actual": 1, "passed": True}],
+        }
+
+    monkeypatch.setattr(
+        "apps.datasets.management.commands.seed_multicity_realism.seed_multicity_realism_dataset",
+        fake_seed,
+    )
+    monkeypatch.setattr(
+        "apps.datasets.management.commands.seed_multicity_realism.validate_multicity_realism_snapshot",
+        fake_validate,
+    )
+
+    call_command("seed_multicity_realism")
+    call_command("seed_multicity_realism", dataset_slug="multi-city-realism-v2-causal")
+    call_command("seed_multicity_realism", dataset_slug="multi-city-realism-v2-causal")
+
+    assert DatasetVersion.objects.filter(slug=config.DATASET_SLUG).count() == 1
+    assert DatasetVersion.objects.filter(slug="multi-city-realism-v2-causal").count() == 1
+    assert DataSnapshot.objects.filter(dataset_version__slug=config.DATASET_SLUG).count() == 1
+    assert (
+        DataSnapshot.objects.filter(dataset_version__slug="multi-city-realism-v2-causal").count()
+        == 1
+    )
+
+
+@pytest.mark.django_db
 def test_seed_multicity_realism_rolls_back_on_validation_failure(monkeypatch):
     def fake_seed(*, snapshot, batch_size):
         return {"customers": 0, "subscriptions": 0, "alarms": 0, "quality_measurements": 0}

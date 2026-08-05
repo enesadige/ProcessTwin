@@ -32,6 +32,14 @@ Bu plan hedef tasarımdır; REV-01 kapsamında implementation yapılmaz. Sıra, 
 | REV-11 — RAG corpus ve benchmark yenilemesi | **Tamamlandı.** Causal analysis terminolojisini immutable source sürümleriyle aratılabilir yapmak | 3 causal source/version, 9 benchmark vakası, iki aktif embedding seti | `rag`, `documents` | corpus/hash/chunk/search/benchmark ve Rule MCP retrieval | Eski source version korunur; canlı index sayıları DB erişimi yokken iddia edilmez | `feat: refresh rag corpus for causal analysis` |
 | REV-12 — Final consistency ve regresyon | **Tamamlandı.** Yeni veri zincirini uçtan uca kapatmak | full suite, MCP/API/RAG contracts ve native non-destructive gates | tüm backend/MCP/datasets | 667 passed, Ruff, Django check | Native mevcut snapshot precondition mismatch'i açık blocker olarak kaldı | `chore: close causal revision integration gate` |
 
+PRE-052 — **Tamamlandı.** Eski snapshot ve PROTECT bağlı RAG kayıtları
+silinmeden, güncel causal generator'dan versioned native snapshot üretildi.
+Görev 052 snapshot identifier'ı
+`multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`;
+native realism gate PASS, katalog 31, CausalEvent 198, SessionEvent 496 ve
+GroundTruthCase 30'dur. Corpus idempotent seed edildi; yeni causal kaynakların
+chunk index'i doğrulandı. Commit: `feat: create versioned causal dataset snapshot`.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.

@@ -38,6 +38,10 @@ class Command(BaseCommand):
             default=seed_config.DEFAULT_REFERENCE_DATETIME,
             help="Timezone-aware reference datetime for deterministic generation.",
         )
+        parser.add_argument(
+            "--dataset-slug",
+            help="Create or validate this versioned dataset slug instead of the legacy default.",
+        )
 
     def handle(self, *args, **options):
         reference_datetime = parse_reference_datetime(options["reference_datetime"])
@@ -45,12 +49,15 @@ class Command(BaseCommand):
         if batch_size < 1:
             raise CommandError("--batch-size must be positive.")
 
+        dataset_slug = options["dataset_slug"] or seed_config.DATASET_SLUG
+        if options["reset"] and options["dataset_slug"]:
+            raise CommandError("--reset cannot be used with --dataset-slug.")
         with transaction.atomic():
-            dataset = DatasetVersion.objects.filter(slug=seed_config.DATASET_SLUG).first()
+            dataset = DatasetVersion.objects.filter(slug=dataset_slug).first()
             if options["validate_only"]:
                 if dataset is None:
                     raise CommandError("Multi-city realism dataset does not exist.")
-                snapshot = dataset.snapshots.get()
+                snapshot = dataset.snapshots.order_by("-created_at").first()
                 report = validate_multicity_realism_snapshot(snapshot)
                 if not report["passed"]:
                     raise CommandError(format_failed_checks(report))
@@ -66,7 +73,7 @@ class Command(BaseCommand):
                 delete_multicity_realism_dataset_tree(dataset)
                 dataset = None
             if dataset and not options["reset"]:
-                snapshot = dataset.snapshots.get()
+                snapshot = dataset.snapshots.order_by("-created_at").first()
                 report = validate_multicity_realism_snapshot(snapshot)
                 if not report["passed"]:
                     raise CommandError(format_failed_checks(report))
@@ -81,7 +88,7 @@ class Command(BaseCommand):
             source_started_at = timezone.now()
             dataset = DatasetVersion(
                 name=seed_config.DATASET_NAME,
-                slug=seed_config.DATASET_SLUG,
+                slug=dataset_slug,
                 kind=DatasetKind.SYNTHETIC,
                 generator_version=seed_config.GENERATOR_VERSION,
                 seed=seed_config.DATASET_SEED,
@@ -95,7 +102,11 @@ class Command(BaseCommand):
             dataset.save()
             snapshot = DataSnapshot(
                 dataset_version=dataset,
-                name=seed_config.SNAPSHOT_NAME,
+                name=(
+                    seed_config.SNAPSHOT_NAME
+                    if dataset_slug == seed_config.DATASET_SLUG
+                    else f"{seed_config.SNAPSHOT_NAME} ({dataset_slug})"
+                ),
                 status=DatasetSnapshotStatus.DRAFT,
                 is_active=False,
                 source_started_at=source_started_at,
@@ -124,7 +135,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Created {seed_config.DATASET_SLUG} as passive validated snapshot with "
+                f"Created {dataset_slug} as passive validated snapshot with "
                 f"{seed_counts['customers']} customers, {seed_counts['subscriptions']} "
                 f"subscriptions, {seed_counts['alarms']} alarms, and "
                 f"{seed_counts['quality_measurements']} quality measurements."

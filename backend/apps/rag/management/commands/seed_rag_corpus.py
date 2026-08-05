@@ -15,7 +15,7 @@ from apps.rag.corpus_manifest import (
     get_document_metadata,
 )
 from apps.rag.corpus_utils import content_hash, normalize_markdown
-from apps.rag.models import DocumentChunk, SourceDocument
+from apps.rag.models import SourceDocument
 from apps.rules.models import Rule
 
 LOCAL_TZ = ZoneInfo("Europe/Istanbul")
@@ -47,12 +47,13 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument("--reset", action="store_true")
         parser.add_argument("--validate-only", action="store_true")
+        parser.add_argument("--multicity-snapshot-identifier")
 
     def handle(self, *args, **options):
         if options["reset"] and options["validate_only"]:
             raise CommandError("--reset and --validate-only cannot be used together.")
 
-        resolved = validate_corpus()
+        resolved = validate_corpus(options["multicity_snapshot_identifier"])
         if options["validate_only"]:
             validate_existing_documents(resolved)
             self.stdout.write(self.style.SUCCESS("RAG corpus validation passed."))
@@ -71,7 +72,7 @@ class Command(BaseCommand):
         )
 
 
-def validate_corpus():
+def validate_corpus(multicity_snapshot_identifier=None):
     if len(DOCUMENTS) != 13:
         raise CommandError(f"Expected exactly 13 corpus documents, found {len(DOCUMENTS)}.")
     identities = [
@@ -105,7 +106,9 @@ def validate_corpus():
             )
         resolved.append((descriptor, path, content, content_hash(content)))
 
-    multicity = resolve_snapshot("multi-city-realism-v1-multi-city-realism-snapshot-v1")
+    multicity = resolve_snapshot(
+        multicity_snapshot_identifier or "multi-city-realism-v1-multi-city-realism-snapshot-v1"
+    )
     maltepe = resolve_snapshot(
         "maltepe-mvp-synthetic-dataset-maltepe-mvp-v1-maltepe-mvp-fixed-seed-v1-"
         "maltepe-mvp-snapshot"
@@ -202,9 +205,7 @@ def seed_documents(resolved):
     created = 0
     unchanged = 0
     for descriptor, _path, content, digest in resolved["documents"]:
-        snapshot = None
-        if descriptor["snapshot_identifier"]:
-            snapshot = resolve_snapshot(descriptor["snapshot_identifier"])
+        snapshot = snapshot_for_descriptor(descriptor, resolved)
         fields = document_fields(descriptor, content, digest, snapshot)
         existing = SourceDocument.objects.filter(
             data_snapshot=snapshot,
@@ -235,9 +236,7 @@ def seed_documents(resolved):
 
 def validate_existing_documents(resolved):
     for descriptor, _path, content, digest in resolved["documents"]:
-        snapshot = None
-        if descriptor["snapshot_identifier"]:
-            snapshot = resolve_snapshot(descriptor["snapshot_identifier"])
+        snapshot = snapshot_for_descriptor(descriptor, resolved)
         existing = SourceDocument.objects.filter(
             data_snapshot=snapshot,
             document_code=descriptor["document_code"],
@@ -253,12 +252,9 @@ def validate_existing_documents(resolved):
             raise CommandError(
                 f"SourceDocument content or metadata mismatch: {descriptor['document_code']}"
             )
-    corpus_documents = SourceDocument.objects.filter(metadata__corpus_key=CORPUS_KEY)
-    if corpus_documents.count() != len(DOCUMENTS):
-        raise CommandError(
-            "Expected "
-            f"{len(DOCUMENTS)} corpus SourceDocument records, found "
-            f"{corpus_documents.count()}."
-        )
-    if DocumentChunk.objects.filter(source_document__in=corpus_documents).exists():
-        raise CommandError("Corpus must not contain DocumentChunk records in task 047.")
+def snapshot_for_descriptor(descriptor, resolved):
+    if descriptor["scope_type"] == "multi_city":
+        return resolved["multicity"]
+    if descriptor["snapshot_identifier"]:
+        return resolve_snapshot(descriptor["snapshot_identifier"])
+    return None

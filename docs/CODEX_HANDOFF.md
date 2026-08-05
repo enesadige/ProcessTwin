@@ -8,7 +8,11 @@
 - Son doğrulanmış tam test baseline'i repository root'tan `.venv/bin/pytest -q` ile **612 passed** sonucudur. Bu sonuç REV-00 baseline dokümanında kayıtlıdır; bu handoff hazırlanırken testler yeniden çalıştırılmamalıdır.
 - REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` commit'iyle tamamladı. REV-03, nedensel operasyon modelleri ve migration çalışmasıyla; REV-04 ise GPON alarm/topoloji compatibility validator ve katalog kararıyla tamamlandı.
 - Görev 52 henüz başlamadı. Kesin tanımı: **QueryRun modelini oluştur**; `original_query`, `structured_query`, `planned_tools`, `executed_tools`, `status`, `final_result`, model ve prompt version alanlarıyla her AI sorgusunun kaydedilebilmesini hedefler.
-- REV-00–REV-12 tamamlandı; sıradaki görev Görev 52'dir. Native multi-city/RAG validation mevcut eski snapshotın REV-05 verisini taşımadığını gösterdi; `SourceDocument.data_snapshot=PROTECT` blocker'ı destructive çözüm olmadan açık teknik takip maddesidir.
+- REV-00–REV-12 ve PRE-052 tamamlandı; sıradaki görev Görev 52'dir. Görev 52
+  explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
+  snapshot'ını kullanmalıdır. Eski snapshot ve bağlı RAG kayıtları korunur;
+  `SourceDocument.data_snapshot=PROTECT` blocker'ı destructive çözüm olmadan
+  açık teknik takip maddesidir.
 
 Belge çelişkilerinde öncelik sırası: güncel git/kod durumu, REV-01, REV-00, güncel ilerleme günlüğü, sonra eski plan ve karar belgeleri. Örneğin README eski ürün vizyonunda simülasyondan söz eder; güncel REV-01 kararı canlı simülasyon, Simulation MCP ve Analytics MCP'nin mevcut zorunlu revizyonun parçası olmadığıdır. Bu, simülasyonu silme kararı değil; revizyon tamamlanmadan başlatmama kararıdır.
 

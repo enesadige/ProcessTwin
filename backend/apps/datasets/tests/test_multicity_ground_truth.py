@@ -4,6 +4,7 @@ from decimal import Decimal
 
 import pytest
 from data_generator.configs import multicity_ground_truth_v1 as config
+from data_generator.seeders.multicity_ground_truth import find_incident, find_outage
 from data_generator.validators.multicity_ground_truth import check, validate_case
 
 from apps.datasets.management.commands.validate_multicity_ground_truth import format_failed_checks
@@ -125,3 +126,24 @@ def test_multicity_ground_truth_failure_report_is_machine_readable():
     assert parsed["case_count"] == 1
     assert parsed["failed_count"] == 1
     assert parsed["failed"][0]["name"] == "forced_failure"
+
+
+@pytest.mark.django_db
+def test_ground_truth_lookup_tolerates_missing_legacy_reference_in_causal_snapshot():
+    dataset = DatasetVersion.objects.create(
+        name="Causal multi-city",
+        slug="causal-multi-city-ground-truth-test",
+        generator_version="test",
+        seed="test",
+    )
+    snapshot = DataSnapshot.objects.create(dataset_version=dataset, name="snapshot")
+
+    assert find_outage(snapshot=snapshot, case_config={"outage_code": "OUT-MCR-0021"}) is None
+    assert (
+        find_incident(
+            snapshot=snapshot,
+            case_config={"incident_number": "INC-MCR-0140"},
+            outage=None,
+        )
+        is None
+    )

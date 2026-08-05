@@ -112,10 +112,10 @@ def find_outage(*, snapshot: DataSnapshot, case_config: dict[str, Any]) -> Outag
     outage_code = case_config.get("outage_code")
     if not outage_code:
         return None
-    return Outage.objects.select_related("incident", "source_device").get(
+    return Outage.objects.select_related("incident", "source_device").filter(
         data_snapshot=snapshot,
         outage_code=outage_code,
-    )
+    ).first()
 
 
 def find_incident(
@@ -129,10 +129,10 @@ def find_incident(
     incident_number = case_config.get("incident_number")
     if not incident_number:
         return None
-    return Incident.objects.select_related("primary_device").get(
+    return Incident.objects.select_related("primary_device").filter(
         data_snapshot=snapshot,
         incident_number=incident_number,
-    )
+    ).first()
 
 
 def collect_oracle_affected_subscriptions(
