@@ -7,3 +7,6 @@ REV-06/REV-07 servislerini çağırır; yeni hesap yazmaz. Bilinmeyen kod 404,
 eksik analysis ise boş/null bölümler döndürür. Public response PK, PII, raw
 alarm/session payload veya credential içermez. Legacy incident/outage yüzeyleri
 değişmez; REV-10 MCP uyarlamasına bırakılmıştır.
+
+Compensation bölümü REV-08 adapter'ının read-only aggregate'ini kullanır.
+Henüz evaluation yoksa gerçek sıfır sonucu yerine `pending` döner.

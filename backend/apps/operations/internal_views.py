@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET
 
 from apps.compensation.models import DecisionEvidence
+from apps.compensation.services.verified_impact import VerifiedImpactCompensationService
 from apps.core.internal_api import internal_service_required
 from apps.operations.models import CausalEvent, Outage
 from apps.operations.services.customer_impact_assessment import CustomerImpactAssessmentService
@@ -76,13 +77,7 @@ def causal_analysis(request, event_code):
                     "pending": impact.pending_count,
                     "reason_codes": impact.reason_code_counts,
                 },
-                "compensation": {
-                    "consideration_count": 0,
-                    "eligible": 0,
-                    "ineligible_pending": 0,
-                    "total_amount": "0.00",
-                    "rule_versions": {},
-                },
+                "compensation": compensation_payload(outage=outage, snapshot=snapshot),
                 "evidence": (
                     {
                         "reference": evidence.evidence_hash[:12],
@@ -98,3 +93,21 @@ def causal_analysis(request, event_code):
             },
         }
     )
+
+
+def compensation_payload(*, outage, snapshot):
+    if outage is None:
+        return None
+    summary = VerifiedImpactCompensationService().summarize_existing(
+        outage=outage, snapshot=snapshot
+    )
+    if summary is None or summary.compensation_considered_count == 0:
+        return {"status": "pending", "consideration_count": 0}
+    return {
+        "status": "available",
+        "consideration_count": summary.compensation_considered_count,
+        "eligible": summary.eligible_count,
+        "ineligible_pending": summary.ineligible_count + summary.pending_manual_review_count,
+        "total_amount": str(summary.total_compensation_amount),
+        "rule_versions": summary.rule_version_counts,
+    }

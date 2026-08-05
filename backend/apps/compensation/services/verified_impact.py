@@ -97,6 +97,19 @@ class VerifiedImpactCompensationService:
         )
         return results, evidence, self._summarize(assessments=assessments, results=results)
 
+    def summarize_existing(self, *, outage: Outage, snapshot):
+        """Read-only aggregate for API consumers; it never evaluates or persists."""
+        if outage.causal_event_id is None:
+            return None
+        assessments = list(
+            CustomerImpactAssessment.objects.filter(
+                data_snapshot=snapshot,
+                causal_event=outage.causal_event,
+                subscription_connection__isnull=False,
+            )
+        )
+        return self._summarize(assessments=assessments, results=[])
+
     def _get_or_create_evidence(
         self, *, compensation_service, outage, snapshot, assessments, results
     ):
