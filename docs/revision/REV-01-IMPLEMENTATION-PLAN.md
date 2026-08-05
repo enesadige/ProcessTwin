@@ -71,6 +71,16 @@ denemelik transient retry ve redakte stabil hata kodları vardır. Gerçek API
 çağrısı, QueryRun integration, planner, MCP/RAG execution ve final cevap bu
 görevde uygulanmadı. Sıradaki görev Görev 053C Ollama LLM adapter'ıdır.
 
+Görev 053C — **Tamamlandı.** `OllamaLLMProvider`, sabit
+`gemma4:12b-it-qat` modelini lazy `httpx` istemcisiyle `/api/chat` üzerinden
+çağırır. Normalized girdi yalnız `contents` alanıdır; her request top-level
+`think: false` ve `stream: false` taşır. Timeout, en fazla üç transient retry,
+normalize usage/finish response'u ve redakte stabil hata sözleşmesi vardır.
+Gerçek Ollama smoke, Qwen/Gemma bellek sıralama orchestration'ı, QueryRun
+entegrasyonu, planner, MCP/RAG execution ve final cevap uygulanmadı; Qwen
+embedding `keep_alive=0` politikası değişmedi. Sıradaki görev Görev 054
+StructuredQuery schema'dır.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.

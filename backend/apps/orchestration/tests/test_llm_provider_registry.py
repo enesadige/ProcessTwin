@@ -5,6 +5,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from apps.orchestration.providers import get_llm_descriptor
 from apps.orchestration.providers.gemini import GeminiLLMProvider
+from apps.orchestration.providers.ollama import OllamaLLMProvider
 from apps.orchestration.providers.registry import GEMMA4_MODEL, LLM_PROVIDER_REGISTRY
 from apps.rag.providers.registry import get_embedding_descriptor
 
@@ -17,7 +18,7 @@ def test_known_ollama_descriptor_is_fixed_and_disables_thinking():
     assert descriptor.supports_thinking is True
     assert descriptor.thinking_enabled is False
     assert descriptor.production_allowed is True
-    assert descriptor.adapter_factory is None
+    assert descriptor.adapter_factory is OllamaLLMProvider
 
 
 def test_gemini_descriptor_uses_the_fixed_allowlisted_model_and_factory():
@@ -37,13 +38,12 @@ def test_unknown_or_empty_provider_is_rejected(provider_name):
         get_llm_descriptor(provider_name)
 
 
-def test_registry_and_descriptors_are_immutable_and_do_not_construct_adapters():
+def test_registry_and_descriptors_are_immutable_and_construct_allowlisted_adapters_only():
     with pytest.raises(TypeError):
         LLM_PROVIDER_REGISTRY["new"] = object()
     with pytest.raises(FrozenInstanceError):
         get_llm_descriptor("ollama").thinking_enabled = True
-    with pytest.raises(ImproperlyConfigured, match="not implemented"):
-        get_llm_descriptor("ollama").create_provider()
+    assert isinstance(get_llm_descriptor("ollama").create_provider(), OllamaLLMProvider)
 
 
 @pytest.mark.parametrize(

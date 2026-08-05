@@ -14,10 +14,8 @@
   başlamadı.
 - Görev 053 tamamlandı: `apps.orchestration.providers` sabit Gemini ve Ollama
   allowlist descriptor'larını taşır. Ollama modeli `gemma4:12b-it-qat` ve
-  `thinking_enabled=false` olarak sabittir; Gemini için onaylı model adı
-  olmadığından descriptor provider-level kalır. Gerçek adapter/network çağrısı
-  yoktur; LLM ve embedding provider seçimleri bağımsızdır. Sıradaki görev
-  Görev 053A mock LLM provider'dır.
+  `thinking_enabled=false` olarak sabittir; LLM ve embedding provider seçimleri
+  bağımsızdır.
 - Görev 053A tamamlandı: `MockLLMProvider` yalnız açık test/development izniyle
   seçilir, ağ/model çağrısı yapmaz ve canonicalized güvenli input'tan
   deterministic response veya kontrollü hata üretir. QueryRun entegrasyonu ve
@@ -29,6 +27,14 @@
   taşır. Testlerde yalnız fake SDK/client kullanıldı; gerçek API çağrısı ve
   QueryRun entegrasyonu yapılmadı. Sıradaki görev Görev 053C Ollama LLM
   adapter'ıdır.
+- Görev 053C tamamlandı: `OllamaLLMProvider`, allowlisted
+  `gemma4:12b-it-qat` modeline lazy `httpx` istemcisiyle `/api/chat` çağrısı
+  yapar. Her çağrıda `think: false` ve `stream: false` zorunludur; timeout,
+  en fazla üç denemelik transient retry, normalize response ve redakte stabil
+  hata kodları vardır. Testlerde fake HTTP client kullanıldı; gerçek Ollama
+  smoke, Qwen/Gemma residency orchestration ve QueryRun entegrasyonu yapılmadı.
+  Qwen `/api/embed` `keep_alive=0` politikası değişmedi. Sıradaki görev Görev
+  054 StructuredQuery schema'dır.
 - REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
   snapshot'ını native kullanımda explicit almalıdır; model herhangi bir

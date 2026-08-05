@@ -12,6 +12,7 @@ from django.core.exceptions import ImproperlyConfigured
 from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.gemini import GeminiLLMProvider
 from apps.orchestration.providers.mock import MockLLMProvider
+from apps.orchestration.providers.ollama import OllamaLLMProvider
 
 OLLAMA_PROVIDER = "ollama"
 GEMINI_PROVIDER = "gemini"
@@ -73,6 +74,7 @@ LLM_PROVIDER_REGISTRY = MappingProxyType(
             supports_thinking=True,
             thinking_enabled=False,
             production_allowed=True,
+            adapter_factory=OllamaLLMProvider,
         ),
         GEMINI_PROVIDER: LLMProviderDescriptor(
             registry_key=GEMINI_PROVIDER,
