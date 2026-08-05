@@ -98,6 +98,14 @@ invariant'ları korunur. Yalnız valid plan planned `QueryRun.planned_tools`
 alanına idempotent yazılır ve run planned kalır. LLM planner, MCP/RAG execution
 ve final cevap bu görevde uygulanmadı. Sıradaki görev Görev 056 planner'dır.
 
+Görev 056 — **Tamamlandı.** `DeterministicToolPlanner`, valid
+`StructuredQuery` için allowlisted MCP araçlarıyla kural tabanlı `ToolPlan`
+üretir ve yalnız successful planı `save_tool_plan` ile planned QueryRun'a yazar.
+Causal event code önceliklidir; clarification/unplannable sonuçları değişiklik
+yapmaz. Kişisel identity üretilmez; compensation yalnız causal/outage public
+evidence yolu varsa planlanır. LLM, MCP/RAG execution, result merge ve final
+cevap uygulanmadı. Sıradaki görev Görev 057 MCP executor'dır.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.
