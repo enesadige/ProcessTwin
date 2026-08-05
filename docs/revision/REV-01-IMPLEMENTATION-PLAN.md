@@ -90,6 +90,14 @@ planned durumuna geçirir;
 LLM ile doğal dilden üretim, tool planı, MCP/RAG execution ve final cevap bu
 görevde uygulanmadı. Sıradaki görev Görev 055 tool-plan schema'dır.
 
+Görev 055 — **Tamamlandı.** `ToolPlan`/`ToolCall` Pydantic sözleşmeleri dört
+mevcut MCP tool registry'sinden allowlist server/tool/input modelini çözer.
+Her çağrının arguments alanı ilgili MCP Pydantic input modeliyle doğrulanır;
+snapshot/context eşleşmesi, privacy, duplicate, dependency ve parallel-group
+invariant'ları korunur. Yalnız valid plan planned `QueryRun.planned_tools`
+alanına idempotent yazılır ve run planned kalır. LLM planner, MCP/RAG execution
+ve final cevap bu görevde uygulanmadı. Sıradaki görev Görev 056 planner'dır.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.

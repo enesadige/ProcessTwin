@@ -6,11 +6,13 @@ from typing import Any
 
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from pydantic import ValidationError
 
 from apps.core.exceptions import ProcessTwinError
 from apps.datasets.models import DataSnapshot
 from apps.orchestration.models import TERMINAL_QUERY_RUN_STATUSES, QueryRun, QueryRunStatus
 from apps.orchestration.structured_query import StructuredQuery
+from apps.orchestration.tool_plan import ToolPlan
 
 SENSITIVE_KEY_PARTS = frozenset(
     {
@@ -227,6 +229,49 @@ class QueryRunService:
             )
         query_run.structured_query = normalized
         return self.transition(query_run, target_status=QueryRunStatus.PLANNED)
+
+    def save_tool_plan(
+        self,
+        query_run: QueryRun,
+        *,
+        tool_plan: ToolPlan | Mapping[str, Any],
+    ) -> QueryRun:
+        """Persist a validated plan without moving the run into execution."""
+        plan = tool_plan if isinstance(tool_plan, ToolPlan) else ToolPlan.model_validate(tool_plan)
+        if plan.snapshot_identifier != query_run.data_snapshot.snapshot_key:
+            raise QueryRunError(
+                message="Tool plan snapshot does not match QueryRun.",
+                code="tool_plan_snapshot_mismatch",
+            )
+        current_status = QueryRunStatus(query_run.status)
+        if current_status != QueryRunStatus.PLANNED:
+            raise QueryRunTransitionError(
+                current=current_status.value, target=QueryRunStatus.PLANNED.value
+            )
+        try:
+            persisted_context = StructuredQuery.model_validate(query_run.structured_query)
+        except ValidationError as exc:
+            raise QueryRunError(
+                message="QueryRun structured query is invalid.",
+                code="query_run_structured_query_invalid",
+            ) from exc
+        if plan.structured_query_context.to_audit_dict() != persisted_context.to_audit_dict():
+            raise QueryRunError(
+                message="Tool plan context does not match QueryRun.",
+                code="tool_plan_structured_query_mismatch",
+            )
+        normalized = plan.to_planned_tools()
+        if query_run.planned_tools == normalized:
+            return query_run
+        if query_run.planned_tools:
+            raise QueryRunError(
+                message="QueryRun tool plan is already recorded.",
+                code="query_run_tool_plan_immutable",
+            )
+        query_run.planned_tools = normalized
+        query_run.full_clean()
+        query_run.save(update_fields=["planned_tools", "updated_at"])
+        return query_run
 
     def save_execution_summary(
         self,
