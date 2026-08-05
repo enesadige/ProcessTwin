@@ -119,6 +119,18 @@ allowlist retry edilir. QueryRun `executing` kalir ve ham response yerine
 privacy-safe call audit ozetleri saklanir. Result merge, validation ve terminal
 karar Gorev 058'e birakildi.
 
+Gorev 058 — **Tamamlandi.** `ResultMergerValidator`, fresh runtime MCP
+sonuclarini yalniz explicit server/tool response normalizer'lariyla typed,
+privacy-safe `ValidatedExecutionResult`a donusturur. Required evidence
+policy'si StructuredQuery intent/requested-output degerlerinden turetilir;
+optional retrieval/supporting failure partial warning olarak kalabilir, fakat
+required failure, snapshot/reference conflict veya impact/compensation
+invariant ihlali QueryRun'i `failed` yapar. Valid sonuc `executing ->
+completed` gecisiyle normalize `final_result`a yazilir. Persisted audit
+ozetlerinde raw runtime response olmadigindan audit-only resume
+`runtime_result_unavailable` ile guvenli bicimde durur. Dogal dil response
+builder siradaki Gorev 059'a birakildi.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.

@@ -1,0 +1,391 @@
+from __future__ import annotations
+
+import pytest
+
+from apps.operations.tests.test_operations_models import create_snapshot
+from apps.orchestration.executor import (
+    ExecutorResult,
+    ExecutorStatus,
+    ToolExecutionResult,
+    ToolExecutionStatus,
+)
+from apps.orchestration.models import QueryRunStatus
+from apps.orchestration.result_merge import ResultMergerValidator, ValidationStatus
+from apps.orchestration.services import QueryRunError, QueryRunService
+from apps.orchestration.tool_plan import ToolPlan
+
+
+def make_plan(snapshot_identifier: str, *, requested_outputs=None, calls=None) -> ToolPlan:
+    requested_outputs = requested_outputs or ["summary", "root_cause", "impact", "evidence"]
+    causal_args = {"snapshot_identifier": snapshot_identifier, "causal_event_code": "CE-GPON-001"}
+    calls = calls or [
+        {
+            "call_id": "correlate",
+            "server": "network",
+            "tool_name": "correlate_alarms",
+            "arguments": causal_args,
+            "execution_order": 1,
+            "parallel_group": "evidence",
+        },
+        {
+            "call_id": "impact",
+            "server": "customer",
+            "tool_name": "get_customer_outage_history",
+            "arguments": causal_args,
+            "execution_order": 1,
+            "parallel_group": "evidence",
+        },
+        {
+            "call_id": "rule",
+            "server": "rule",
+            "tool_name": "get_rule_evidence",
+            "arguments": causal_args,
+            "execution_order": 1,
+            "parallel_group": "evidence",
+        },
+        {
+            "call_id": "compensation",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence",
+            "arguments": causal_args,
+            "execution_order": 1,
+            "parallel_group": "evidence",
+        },
+    ]
+    return ToolPlan.model_validate(
+        {
+            "snapshot_identifier": snapshot_identifier,
+            "structured_query_context": {
+                "intent": "network_investigation",
+                "requested_outputs": requested_outputs,
+                "snapshot_identifier": snapshot_identifier,
+                "causal_event_code": "CE-GPON-001",
+            },
+            "calls": calls,
+        }
+    )
+
+
+def create_executing_run(snapshot, plan: ToolPlan):
+    service = QueryRunService()
+    run, _ = service.create_or_get(
+        data_snapshot=snapshot,
+        idempotency_key=f"merge-{snapshot.snapshot_key}-run",
+        original_query="Nedensel olay sonucu.",
+    )
+    service.save_structured_query(run, structured_query=plan.structured_query_context)
+    service.save_tool_plan(run, tool_plan=plan)
+    service.transition(run, target_status=QueryRunStatus.EXECUTING)
+    return run
+
+
+def success(call_id: str, server: str, tool_name: str, data: dict) -> ToolExecutionResult:
+    return ToolExecutionResult(
+        call_id=call_id,
+        server=server,
+        tool_name=tool_name,
+        status=ToolExecutionStatus.SUCCEEDED,
+        correlation_id=f"merge-request:{call_id}",
+        attempt_count=1,
+        duration_ms=1,
+        result_fingerprint=f"fingerprint-{call_id}",
+        normalized_response={"data": data, "raw_payload": {"token": "not-persisted"}},
+    )
+
+
+def failed(call_id: str, server: str, tool_name: str) -> ToolExecutionResult:
+    return ToolExecutionResult(
+        call_id=call_id,
+        server=server,
+        tool_name=tool_name,
+        status=ToolExecutionStatus.FAILED,
+        correlation_id=f"merge-request:{call_id}",
+        attempt_count=1,
+        duration_ms=1,
+        error_code="timeout",
+        error_summary="secret transport detail",
+    )
+
+
+def full_result(snapshot_identifier: str, *, impact=None, compensation=None) -> ExecutorResult:
+    impact = impact or {
+        "causal_event_code": "CE-GPON-001",
+        "potential_connection_count": 3,
+        "verified_impacted_count": 1,
+        "verified_no_impact_count": 1,
+        "insufficient_evidence_count": 1,
+        "failover_protected_count": 1,
+        "reason_code_distribution": {"session_stop_and_recovery_match": 1},
+    }
+    compensation = compensation or {
+        "causal_event_code": "CE-GPON-001",
+        "status": "available",
+        "consideration_count": 1,
+        "eligible": 1,
+        "ineligible_pending": 0,
+        "total_amount": "10.00",
+        "currency": "TRY",
+        "rule_versions": {"REFUND-001:v2": 1},
+        "evidence": {"reference": "evidence-public-01"},
+        "customer_number": "CUST-DO-NOT-PERSIST",
+    }
+    calls = [
+        success(
+            "correlate",
+            "network",
+            "correlate_alarms",
+            {
+                "causal_event_code": "CE-GPON-001",
+                "root_resource_type": "device",
+                "root_resource_reference": "OLT-001",
+                "reason_codes": ["shared_upstream"],
+                "role_counts": {"root": 1, "symptom": 2},
+                "propagation_summary": "Upstream propagation.",
+            },
+        ),
+        success("impact", "customer", "get_customer_outage_history", impact),
+        success(
+            "rule",
+            "rule",
+            "get_rule_evidence",
+            {
+                "causal_event_code": "CE-GPON-001",
+                "selected_rule_version": "REFUND-001:v2",
+                "evidence": {"reference": "evidence-public-01"},
+            },
+        ),
+        success("compensation", "compensation", "get_compensation_evidence", compensation),
+    ]
+    return ExecutorResult(
+        status=ExecutorStatus.SUCCEEDED,
+        snapshot_identifier=snapshot_identifier,
+        call_results=calls,
+        succeeded_count=4,
+        failed_count=0,
+        skipped_count=0,
+    )
+
+
+@pytest.mark.django_db
+def test_merge_validates_safe_result_and_completes_query_run():
+    snapshot = create_snapshot("merge-valid-001")
+    plan = make_plan(snapshot.snapshot_key)
+    run = create_executing_run(snapshot, plan)
+    merged = ResultMergerValidator().validate_and_merge(
+        run, plan, full_result(run.data_snapshot.snapshot_key)
+    )
+    completed = ResultMergerValidator().finalize_query_run(run, merged)
+
+    completed.refresh_from_db()
+    assert merged.validation_status == ValidationStatus.VALID
+    assert completed.status == QueryRunStatus.COMPLETED
+    assert completed.final_result["impact_summary"]["verified_impacted"] == 1
+    assert completed.final_result["compensation_summary"]["scope"] == "verified_impact"
+    serialized = str(completed.final_result)
+    assert "CUST-DO-NOT-PERSIST" not in serialized
+    assert "not-persisted" not in serialized
+
+
+@pytest.mark.django_db
+def test_required_failure_and_audit_only_runtime_result_fail_query_run():
+    snapshot = create_snapshot("merge-required-001")
+    plan = make_plan(snapshot.snapshot_key)
+    run = create_executing_run(snapshot, plan)
+    result = full_result(run.data_snapshot.snapshot_key)
+    result.call_results[1] = failed("impact", "customer", "get_customer_outage_history")
+    result.status = ExecutorStatus.PARTIAL
+    result.succeeded_count = 3
+    result.failed_count = 1
+
+    merged = ResultMergerValidator().validate_and_merge(run, plan, result)
+    failed_run = ResultMergerValidator().finalize_query_run(run, merged)
+
+    failed_run.refresh_from_db()
+    assert merged.validation_status == ValidationStatus.INVALID
+    assert any(item.code == "required_tool_failed" for item in merged.validation_errors)
+    assert failed_run.status == QueryRunStatus.FAILED
+    assert failed_run.error_code == "required_tool_failed"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    [
+        ("missing_runtime", "runtime_result_unavailable"),
+        ("malformed_response", "invalid_response_contract"),
+        ("snapshot_mismatch", "snapshot_mismatch"),
+    ],
+)
+def test_merge_rejects_audit_only_malformed_and_snapshot_mismatch(mutation, expected):
+    snapshot = create_snapshot(f"merge-runtime-{mutation.replace('_', '-')}")
+    plan = make_plan(snapshot.snapshot_key)
+    run = create_executing_run(snapshot, plan)
+    result = full_result(snapshot.snapshot_key)
+
+    if mutation == "missing_runtime":
+        result.call_results[0].normalized_response = None
+    elif mutation == "malformed_response":
+        result.call_results[0].normalized_response = {"data": {"unexpected": "value"}}
+    else:
+        result.snapshot_identifier = "other-snapshot-001"
+
+    merged = ResultMergerValidator().validate_and_merge(run, plan, result)
+
+    assert merged.validation_status == ValidationStatus.INVALID
+    assert any(item.code == expected for item in merged.validation_errors)
+
+
+@pytest.mark.django_db
+def test_optional_retrieval_failure_can_complete_partial_execution():
+    snapshot = create_snapshot("merge-partial-001")
+    args = {"snapshot_identifier": snapshot.snapshot_key, "causal_event_code": "CE-GPON-001"}
+    plan = make_plan(
+        snapshot.snapshot_key,
+        requested_outputs=["summary", "root_cause"],
+        calls=[
+            {
+                "call_id": "correlate",
+                "server": "network",
+                "tool_name": "correlate_alarms",
+                "arguments": args,
+                "execution_order": 1,
+                "parallel_group": "optional",
+            },
+            {
+                "call_id": "documents",
+                "server": "rule",
+                "tool_name": "search_rule_documents",
+                "arguments": {"snapshot_identifier": snapshot.snapshot_key, "query": "GPON"},
+                "execution_order": 1,
+                "parallel_group": "optional",
+            },
+        ],
+    )
+    run = create_executing_run(snapshot, plan)
+    result = ExecutorResult(
+        status=ExecutorStatus.PARTIAL,
+        snapshot_identifier=run.data_snapshot.snapshot_key,
+        call_results=[
+            full_result(run.data_snapshot.snapshot_key).call_results[0],
+            failed("documents", "rule", "search_rule_documents"),
+        ],
+        succeeded_count=1,
+        failed_count=1,
+        skipped_count=0,
+    )
+
+    merged = ResultMergerValidator().validate_and_merge(run, plan, result)
+
+    assert merged.validation_status == ValidationStatus.VALID
+    assert merged.execution_status == ExecutorStatus.PARTIAL
+    assert merged.warnings == ["optional_tool_failed:documents"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("impact", "compensation", "expected"),
+    [
+        (
+            {
+                "causal_event_code": "CE-GPON-001",
+                "potential_connection_count": 1,
+                "verified_impacted_count": 2,
+                "verified_no_impact_count": 0,
+                "insufficient_evidence_count": 0,
+                "failover_protected_count": 0,
+                "reason_code_distribution": {},
+            },
+            None,
+            "impact_invariant_failed",
+        ),
+        (None, {"status": "available", "consideration_count": 2}, "compensation_scope_mismatch"),
+    ],
+)
+def test_merge_rejects_cross_tool_invariant_failures(impact, compensation, expected):
+    snapshot = create_snapshot(
+        "merge-invariant-impact"
+        if expected == "impact_invariant_failed"
+        else "merge-invariant-scope"
+    )
+    plan = make_plan(snapshot.snapshot_key)
+    run = create_executing_run(snapshot, plan)
+    merged = ResultMergerValidator().validate_and_merge(
+        run,
+        plan,
+        full_result(run.data_snapshot.snapshot_key, impact=impact, compensation=compensation),
+    )
+
+    assert merged.validation_status == ValidationStatus.INVALID
+    assert any(item.code == expected for item in merged.validation_errors)
+
+
+@pytest.mark.django_db
+def test_merge_deduplicates_equal_facts_and_rejects_conflicting_public_references():
+    snapshot = create_snapshot("merge-conflict-001")
+    plan = make_plan(
+        snapshot.snapshot_key,
+        calls=[
+            {
+                "call_id": "correlate",
+                "server": "network",
+                "tool_name": "correlate_alarms",
+                "arguments": {
+                    "snapshot_identifier": snapshot.snapshot_key,
+                    "causal_event_code": "CE-GPON-001",
+                },
+                "execution_order": 1,
+                "parallel_group": "causal",
+            },
+            {
+                "call_id": "root",
+                "server": "network",
+                "tool_name": "rank_root_cause_candidates",
+                "arguments": {
+                    "snapshot_identifier": snapshot.snapshot_key,
+                    "causal_event_code": "CE-GPON-001",
+                },
+                "execution_order": 1,
+                "parallel_group": "causal",
+            },
+        ],
+        requested_outputs=["summary", "root_cause"],
+    )
+    run = create_executing_run(snapshot, plan)
+    first = full_result(run.data_snapshot.snapshot_key).call_results[0]
+    duplicate = first.model_copy(
+        update={"call_id": "root", "tool_name": "rank_root_cause_candidates"}
+    )
+    result = ExecutorResult(
+        status=ExecutorStatus.SUCCEEDED,
+        snapshot_identifier=run.data_snapshot.snapshot_key,
+        call_results=[first, duplicate],
+        succeeded_count=2,
+        failed_count=0,
+        skipped_count=0,
+    )
+
+    merged = ResultMergerValidator().validate_and_merge(run, plan, result)
+    assert merged.validation_status == ValidationStatus.VALID
+    assert merged.causal_summary.root_cause_reason_codes == ["shared_upstream"]
+
+    duplicate.normalized_response["data"]["causal_event_code"] = "CE-OTHER-001"
+    conflicting = ResultMergerValidator().validate_and_merge(run, plan, result)
+    assert any(
+        item.code in {"conflicting_fact", "public_reference_conflict"}
+        for item in conflicting.validation_errors
+    )
+
+
+@pytest.mark.django_db
+def test_terminal_query_run_cannot_be_finalized_twice():
+    snapshot = create_snapshot("merge-terminal-001")
+    plan = make_plan(snapshot.snapshot_key)
+    run = create_executing_run(snapshot, plan)
+    validator = ResultMergerValidator()
+    merged = validator.validate_and_merge(run, plan, full_result(snapshot.snapshot_key))
+    validator.finalize_query_run(run, merged)
+
+    with pytest.raises(QueryRunError) as exc_info:
+        validator.finalize_query_run(run, merged)
+
+    assert getattr(exc_info.value, "code", None) == "query_run_finalization_requires_execution"

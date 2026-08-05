@@ -67,6 +67,16 @@
   Run execution sonunda `executing` kalır; result merge ve terminal karar
   uygulanmadı. Testlerde yalnız fake transport kullanıldı. Sıradaki görev
   Görev 058 result merge/validation'dır.
+- Görev 058 tamamlandı: `ResultMergerValidator`, fresh runtime
+  `ExecutorResult` verisini yalnız allowlisted MCP response sözleşmelerinden
+  privacy-safe `ValidatedExecutionResult` biçimine normalleştirir. Required
+  evidence intent/requested-output'tan türetilir; optional tool failure
+  warning ile partial tamamlanabilir, required evidence/contract/invariant
+  hatası `QueryRun`ı `failed` yapar. Valid sonuç `executing -> completed`
+  geçişiyle yalnız normalize `final_result` kaydeder. Persisted audit özeti
+  ham runtime response taşımadığından audit-only resume güvenli biçimde
+  `runtime_result_unavailable` olur. Doğal dil response builder henüz yoktur;
+  sıradaki görev Görev 059'dur.
 - REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
   snapshot'ını native kullanımda explicit almalıdır; model herhangi bir
