@@ -7,10 +7,15 @@
 - Bu checkpoint'te working tree temiz bırakılmalıdır.
 - Son doğrulanmış tam test baseline'i repository root'tan `.venv/bin/pytest -q` ile **612 passed** sonucudur. Bu sonuç REV-00 baseline dokümanında kayıtlıdır; bu handoff hazırlanırken testler yeniden çalıştırılmamalıdır.
 - REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` commit'iyle tamamladı. REV-03, nedensel operasyon modelleri ve migration çalışmasıyla; REV-04 ise GPON alarm/topoloji compatibility validator ve katalog kararıyla tamamlandı.
-- Görev 52 henüz başlamadı. Kesin tanımı: **QueryRun modelini oluştur**; `original_query`, `structured_query`, `planned_tools`, `executed_tools`, `status`, `final_result`, model ve prompt version alanlarıyla her AI sorgusunun kaydedilebilmesini hedefler.
-- REV-00–REV-12 ve PRE-052 tamamlandı; sıradaki görev Görev 52'dir. Görev 52
+- Görev 052 tamamlandı: `apps.orchestration.QueryRun` explicit snapshot,
+  unique idempotency key, retry zinciri, privacy-safe JSON audit alanları ve
+  `pending -> planned -> executing -> completed|failed` yaşam döngüsünü
+  taşır. Planner, MCP executor, RAG çağrısı ve LLM yanıt üretimi henüz
+  başlamadı; sıradaki görev Görev 053 provider interface/registry'dir.
+- REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
-  snapshot'ını kullanmalıdır. Eski snapshot ve bağlı RAG kayıtları korunur;
+  snapshot'ını native kullanımda explicit almalıdır; model herhangi bir
+  snapshot'ı hard-code etmez. Eski snapshot ve bağlı RAG kayıtları korunur;
   `SourceDocument.data_snapshot=PROTECT` blocker'ı destructive çözüm olmadan
   açık teknik takip maddesidir.
 

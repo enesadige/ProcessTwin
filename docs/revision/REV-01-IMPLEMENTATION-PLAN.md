@@ -40,6 +40,13 @@ native realism gate PASS, katalog 31, CausalEvent 198, SessionEvent 496 ve
 GroundTruthCase 30'dur. Corpus idempotent seed edildi; yeni causal kaynakların
 chunk index'i doğrulandı. Commit: `feat: create versioned causal dataset snapshot`.
 
+Görev 052 — **Tamamlandı.** `apps.orchestration` içindeki `QueryRun`, explicit
+`DataSnapshot`/`PROTECT`, global unique idempotency key, terminal run'a bağlı
+retry, privacy-safe JSON audit alanları ve `pending -> planned -> executing ->
+completed|failed` yaşam döngüsünü ekledi. Planner, MCP executor, RAG retrieval
+çağrısı ve LLM final cevabı bu görevde uygulanmadı; sıradaki Görev 053
+provider interface/registry çalışmasına bırakıldı.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.
