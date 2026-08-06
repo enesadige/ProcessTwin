@@ -123,12 +123,19 @@ def test_rule_document_retrieval_plans_the_existing_rule_mcp_tool_with_safe_quer
     result = DeterministicToolPlanner().plan(query)
 
     assert result.status == PlannerResultStatus.PLANNED
-    assert [(call.server.value, call.tool_name) for call in result.tool_plan.calls] == [
+    assert {(call.server.value, call.tool_name) for call in result.tool_plan.calls} == {
         ("rule", "search_rule_documents"),
         ("rule", "get_rule_evidence"),
-    ]
-    assert result.tool_plan.calls[0].arguments["query"] == "failover protected bağlantı"
-    assert result.tool_plan.calls[1].arguments["causal_event_code"] == "CE-GPON-001"
+        ("compensation", "get_compensation_evidence"),
+    }
+    document_call = next(
+        call for call in result.tool_plan.calls if call.tool_name == "search_rule_documents"
+    )
+    evidence_call = next(
+        call for call in result.tool_plan.calls if call.tool_name == "get_rule_evidence"
+    )
+    assert document_call.arguments["query"] == "failover protected bağlantı"
+    assert evidence_call.arguments["causal_event_code"] == "CE-GPON-001"
 
 
 def test_compensation_prefers_safe_causal_evidence_path_without_personal_identifiers():
@@ -145,6 +152,20 @@ def test_compensation_prefers_safe_causal_evidence_path_without_personal_identif
     assert call.arguments["causal_event_code"] == "CE-GPON-001"
     assert "subscription_number" not in call.arguments
     assert "customer_number" not in call.arguments
+
+
+def test_compensation_uses_validated_public_subscription_reference_when_supplied():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            intent="compensation_evaluation",
+            requested_outputs=["eligibility", "evidence"],
+            subscription_reference="SUB-GPON-001",
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert result.tool_plan.calls[0].arguments["subscription_number"] == "SUB-GPON-001"
+    assert "causal_event_code" not in result.tool_plan.calls[0].arguments
 
 
 def test_compensation_without_safe_reference_returns_clarification():

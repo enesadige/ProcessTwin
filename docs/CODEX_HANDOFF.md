@@ -19,8 +19,10 @@
   calls; the Gemma+Qwen baseline passed 6/6 and the real provider matrix passed
   4/4 combinations (8/8 cases). Qwen and Gemini canonical corpora each cover
   54/54 chunks with zero contamination. Overall PRE-061 is **PASS**;
-  `MAIN-061` may start.
-  therefore **NOT COMPLETE** and `MAIN-061` must not start.
+  `MAIN-061` may start. A later semantic-completeness rerun also passed:
+  baseline 6/6 and provider matrix 8/8 each required user-visible canonical
+  fields, not merely HTTP completion. The final text is still assembled only
+  from backend statement IDs; no free model facts are rendered.
 
 - **PRE-061 final Gemini/LIVE-07 follow-up:** Aynı ephemeral key ile gerçek
   Gemini 3.6 interactions, 3.5 interactions ve 2.5 generate-content

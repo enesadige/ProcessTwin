@@ -3,30 +3,52 @@
     {
       "actual_machine_result": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0023",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "symptom",
+          "event_type": "device_failure",
           "propagation_summary": "Candidate matches the causal event physical root resource.",
           "role_counts": {
-            "child": 6,
+            "child": 0,
             "noise": 0,
-            "root": 0,
+            "root": 1,
             "supporting": 0,
-            "symptom": 0,
+            "symptom": 7,
             "unrelated": 0
           },
+          "root_alarm_types": [
+            "OLT_UNREACHABLE"
+          ],
           "root_cause_reason_codes": [
             "same_resource",
             "temporal_propagation"
           ],
-          "root_resource_reference": "AN-KON-001",
-          "root_resource_type": "device"
+          "root_cause_summary": "OLT-YEN-002",
+          "root_resource_reference": "OLT-YEN-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": [
+            "ONT_DISCONNECT_SURGE"
+          ]
         },
         "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
         "provenance": [
           {
             "call_id": "correlate",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:correlate",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "correlate_alarms"
           },
@@ -34,7 +56,7 @@
             "call_id": "root_cause",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:root_cause",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "rank_root_cause_candidates"
           },
@@ -42,12 +64,12 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "result_fingerprint": "bf1b08dc46e03939d8669d1043df597957aa62af57684d7728eb006a2010289d",
         "retrieval_sources": [],
         "schema_version": "validated-execution-result.v1",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
@@ -56,7 +78,7 @@
         "warnings": []
       },
       "actual_structured_query": {
-        "causal_event_code": "CE-MCR-0018",
+        "causal_event_code": "CE-MCR-0023",
         "clarification_reasons": [],
         "clarification_required": false,
         "embedding_provider": "ollama",
@@ -73,7 +95,7 @@
       "citation_support": true,
       "citations": [
         {
-          "reference_code": "CE-MCR-0018",
+          "reference_code": "CE-MCR-0023",
           "reference_kind": "causal_event"
         }
       ],
@@ -83,30 +105,52 @@
       "executed_tools": [],
       "expected_machine_facts": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0023",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "symptom",
+          "event_type": "device_failure",
           "propagation_summary": "Candidate matches the causal event physical root resource.",
           "role_counts": {
-            "child": 6,
+            "child": 0,
             "noise": 0,
-            "root": 0,
+            "root": 1,
             "supporting": 0,
-            "symptom": 0,
+            "symptom": 7,
             "unrelated": 0
           },
+          "root_alarm_types": [
+            "OLT_UNREACHABLE"
+          ],
           "root_cause_reason_codes": [
             "same_resource",
             "temporal_propagation"
           ],
-          "root_resource_reference": "AN-KON-001",
-          "root_resource_type": "device"
+          "root_cause_summary": "OLT-YEN-002",
+          "root_resource_reference": "OLT-YEN-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": [
+            "ONT_DISCONNECT_SURGE"
+          ]
         },
         "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
         "provenance": [
           {
             "call_id": "correlate",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:correlate",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "correlate_alarms"
           },
@@ -114,7 +158,7 @@
             "call_id": "root_cause",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:root_cause",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "rank_root_cause_candidates"
           },
@@ -122,12 +166,12 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "result_fingerprint": "bf1b08dc46e03939d8669d1043df597957aa62af57684d7728eb006a2010289d",
         "retrieval_sources": [],
         "schema_version": "validated-execution-result.v1",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
@@ -136,17 +180,36 @@
         "warnings": []
       },
       "failure_reason": null,
-      "final_user_text": "Kesinti de\u011ferlendirmesi\nK\u00f6k neden gerek\u00e7esi: same_resource, temporal_propagation.",
+      "final_user_text": "Kesinti değerlendirmesi\nKök neden alarmı: OLT_UNREACHABLE.\nKök neden gerekçesi: same_resource, temporal_propagation.\nDying Gasp alarmı kök neden değil, belirtidir.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\nDoğrulanmış kök kaynak: device OLT-YEN-002.\nPotansiyel kapsam: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nDoğrulanmış etkisizlik: 0 bağlantı.\nKanıt yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı; tam kesinti sayılmaz.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.\nDoğrulanmış ana kök neden: OLT-YEN-002.",
       "generation_mode": "llm_assisted",
       "http_status": 200,
-      "latency_ms": 31635.082,
+      "latency_ms": 24777.563,
       "lifecycle": "completed",
       "llm_provider": "ollama",
       "pass": true,
       "privacy_violation_count": 0,
-      "query_run_code": "QR-976291502BBA4F3D82E12309D0B7F3FB",
+      "query_run_code": "QR-08280673599445B4A80AE728C6E2A739",
       "requested_embedding_provider": "ollama",
       "requested_llm_provider": "ollama",
+      "required_final_field_checks": {
+        "Device Not Active için bu olayda doğrulanmış alarm kaydı yok.": true,
+        "Doğrulanmış ana kök neden: OLT-YEN-002": true,
+        "Dying Gasp alarmı kök neden değil, belirtidir.": true
+      },
+      "required_final_fields": [
+        "Doğrulanmış ana kök neden: OLT-YEN-002",
+        "Dying Gasp alarmı kök neden değil, belirtidir.",
+        "Device Not Active için bu olayda doğrulanmış alarm kaydı yok."
+      ],
+      "required_machine_fields": {
+        "root_alarm_types": [
+          "OLT_UNREACHABLE"
+        ],
+        "root_cause_summary": "OLT-YEN-002",
+        "symptom_alarm_types": [
+          "ONT_DISCONNECT_SURGE"
+        ]
+      },
       "resolved_embedding_model": "qwen3-embedding:4b",
       "resolved_embedding_provider": "ollama",
       "resolved_llm_model": "gemma4:12b-it-qat",
@@ -154,7 +217,7 @@
       "selected_tools": [
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -168,7 +231,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -182,7 +245,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -195,13 +258,14 @@
           "tool_name": "get_rule_evidence"
         }
       ],
+      "semantic_completeness_pass": true,
       "snapshot_leakage_count": 0,
       "structured_query_parser": "deterministic",
       "structured_query_parser_version": "deterministic-structured-query-tr-v1",
       "unsupported_decision_count": 0,
       "unsupported_fact_count": 0,
       "unsupported_reference_count": 0,
-      "user_prompt": "Public olay kodu CE-MCR-0018 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp belirti mi?",
+      "user_prompt": "Public olay kodu CE-MCR-0023 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp ve Device Not Active alarmlari kok neden mi, yoksa belirti mi?",
       "vector_corpus": {
         "model": "qwen3-embedding:4b",
         "prompt_version": "qwen3-telecom-query-v1",
@@ -211,12 +275,37 @@
     {
       "actual_machine_result": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0001",
           "role_counts": {},
-          "root_cause_reason_codes": []
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
         },
         "execution_status": "succeeded",
         "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-rag-001:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
           {
             "call_id": "rule_documents",
             "category": "document_retrieval",
@@ -229,15 +318,15 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "691ed34620afb85ca2861f3d6a648491ba591a831a2d93ceea2ae8a94b649d4e",
+        "result_fingerprint": "3eee020007dfae268c37f68ac30af61683bb7ddb97e0a8ce4949f955f7d43a0a",
         "retrieval_sources": [
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 1
           },
@@ -247,17 +336,17 @@
             "version": 2
           },
           {
-            "section": "De\u011ferlendirme S\u0131ras\u0131",
+            "section": "Değerlendirme Sırası",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           },
           {
-            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "section": "Kanıt ve Açıklanabilirlik",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           },
           {
-            "section": "Tan\u0131mlar",
+            "section": "Tanımlar",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           }
@@ -269,7 +358,7 @@
         "warnings": []
       },
       "actual_structured_query": {
-        "causal_event_code": "CE-MCR-0018",
+        "causal_event_code": "CE-MCR-0001",
         "clarification_reasons": [],
         "clarification_required": false,
         "decision_type": "eligibility",
@@ -280,21 +369,26 @@
           "evidence",
           "summary"
         ],
-        "retrieval_query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+        "retrieval_query": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
         "schema_version": "structured-query.v1",
-        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "subscription_reference": "SUB-MCR-00002"
       },
       "case_kind": "rag_citation",
       "citation_support": true,
       "citations": [
         {
-          "reference_code": "CE-MCR-0018",
+          "reference_code": "CE-MCR-0001",
           "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "0a388c1e82bf",
+          "reference_kind": "decision_evidence"
         },
         {
           "reference_code": "SYN-COMP-2026-ELIGIBILITY",
           "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve Referanslar",
+          "section": "Kanıt ve Referanslar",
           "version": 1
         },
         {
@@ -306,19 +400,19 @@
         {
           "reference_code": "SYN-COMP-2026-OVERVIEW",
           "reference_kind": "retrieval_source",
-          "section": "De\u011ferlendirme S\u0131ras\u0131",
+          "section": "Değerlendirme Sırası",
           "version": 1
         },
         {
           "reference_code": "SYN-COMP-2026-OVERVIEW",
           "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+          "section": "Kanıt ve Açıklanabilirlik",
           "version": 1
         },
         {
           "reference_code": "SYN-COMP-2026-OVERVIEW",
           "reference_kind": "retrieval_source",
-          "section": "Tan\u0131mlar",
+          "section": "Tanımlar",
           "version": 1
         }
       ],
@@ -328,12 +422,37 @@
       "executed_tools": [],
       "expected_machine_facts": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0001",
           "role_counts": {},
-          "root_cause_reason_codes": []
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
         },
         "execution_status": "succeeded",
         "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-rag-001:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
           {
             "call_id": "rule_documents",
             "category": "document_retrieval",
@@ -346,15 +465,15 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "691ed34620afb85ca2861f3d6a648491ba591a831a2d93ceea2ae8a94b649d4e",
+        "result_fingerprint": "3eee020007dfae268c37f68ac30af61683bb7ddb97e0a8ce4949f955f7d43a0a",
         "retrieval_sources": [
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 1
           },
@@ -364,17 +483,17 @@
             "version": 2
           },
           {
-            "section": "De\u011ferlendirme S\u0131ras\u0131",
+            "section": "Değerlendirme Sırası",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           },
           {
-            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "section": "Kanıt ve Açıklanabilirlik",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           },
           {
-            "section": "Tan\u0131mlar",
+            "section": "Tanımlar",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           }
@@ -386,27 +505,53 @@
         "warnings": []
       },
       "failure_reason": null,
-      "final_user_text": "Kesinti de\u011ferlendirmesi\nDo\u011frulanm\u0131\u015f kaynaklar: SYN-COMP-2026-ELIGIBILITY v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / De\u011ferlendirme S\u0131ras\u0131; SYN-COMP-2026-OVERVIEW v1 / Kan\u0131t ve A\u00e7\u0131klanabilirlik; SYN-COMP-2026-OVERVIEW v1 / Tan\u0131mlar.",
+      "final_user_text": "Kesinti değerlendirmesi\nDoğrulanmış RuleVersion: BB-DEGRADATION-QUALITY:v1.\nDoğrulanmış DecisionEvidence: 0a388c1e82bf.\nDoğrulanmış kaynaklar: SYN-COMP-2026-ELIGIBILITY v1 / Kanıt ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / Değerlendirme Sırası; SYN-COMP-2026-OVERVIEW v1 / Kanıt ve Açıklanabilirlik; SYN-COMP-2026-OVERVIEW v1 / Tanımlar.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 1 kayıt.\nUygun olmayan veya bekleyen: 0 kayıt.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nTelafi durumu: calculated.",
       "generation_mode": "llm_assisted",
       "http_status": 200,
-      "latency_ms": 38006.599,
+      "latency_ms": 38733.191,
       "lifecycle": "completed",
       "llm_provider": "ollama",
       "pass": true,
       "privacy_violation_count": 0,
-      "query_run_code": "QR-802CB71EF25243FC8B72BC5D5BE11003",
+      "query_run_code": "QR-4E0BDA8219824680862EFB095EDC629C",
       "requested_embedding_provider": "ollama",
       "requested_llm_provider": "ollama",
+      "required_final_field_checks": {
+        "Doğrulanmış DecisionEvidence:": true,
+        "Doğrulanmış RuleVersion:": true
+      },
+      "required_final_fields": [
+        "Doğrulanmış RuleVersion:",
+        "Doğrulanmış DecisionEvidence:"
+      ],
+      "required_machine_fields": {
+        "evidence_references": null,
+        "rule_versions": null
+      },
       "resolved_embedding_model": "qwen3-embedding:4b",
       "resolved_embedding_provider": "ollama",
       "resolved_llm_model": "gemma4:12b-it-qat",
       "resolved_llm_provider": "ollama",
       "selected_tools": [
+        {
+          "arguments": {
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "subscription_number": "SUB-MCR-00002"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        },
         {
           "arguments": {
             "embedding_provider": "ollama",
             "include_scores": true,
-            "query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+            "query": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
             "search_mode": "hybrid",
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
             "top_k": 5
@@ -421,7 +566,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0001",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -434,13 +579,14 @@
           "tool_name": "get_rule_evidence"
         }
       ],
+      "semantic_completeness_pass": true,
       "snapshot_leakage_count": 0,
       "structured_query_parser": "deterministic",
       "structured_query_parser_version": "deterministic-structured-query-tr-v1",
       "unsupported_decision_count": 0,
       "unsupported_fact_count": 0,
       "unsupported_reference_count": 0,
-      "user_prompt": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+      "user_prompt": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
       "vector_corpus": {
         "model": "qwen3-embedding:4b",
         "prompt_version": "qwen3-telecom-query-v1",
@@ -450,30 +596,52 @@
     {
       "actual_machine_result": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0023",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "symptom",
+          "event_type": "device_failure",
           "propagation_summary": "Candidate matches the causal event physical root resource.",
           "role_counts": {
-            "child": 6,
+            "child": 0,
             "noise": 0,
-            "root": 0,
+            "root": 1,
             "supporting": 0,
-            "symptom": 0,
+            "symptom": 7,
             "unrelated": 0
           },
+          "root_alarm_types": [
+            "OLT_UNREACHABLE"
+          ],
           "root_cause_reason_codes": [
             "same_resource",
             "temporal_propagation"
           ],
-          "root_resource_reference": "AN-KON-001",
-          "root_resource_type": "device"
+          "root_cause_summary": "OLT-YEN-002",
+          "root_resource_reference": "OLT-YEN-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": [
+            "ONT_DISCONNECT_SURGE"
+          ]
         },
         "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
         "provenance": [
           {
             "call_id": "correlate",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:correlate",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "correlate_alarms"
           },
@@ -481,7 +649,7 @@
             "call_id": "root_cause",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:root_cause",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "rank_root_cause_candidates"
           },
@@ -489,12 +657,12 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "result_fingerprint": "bf1b08dc46e03939d8669d1043df597957aa62af57684d7728eb006a2010289d",
         "retrieval_sources": [],
         "schema_version": "validated-execution-result.v1",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
@@ -503,7 +671,7 @@
         "warnings": []
       },
       "actual_structured_query": {
-        "causal_event_code": "CE-MCR-0018",
+        "causal_event_code": "CE-MCR-0023",
         "clarification_reasons": [],
         "clarification_required": false,
         "embedding_provider": "gemini",
@@ -520,7 +688,7 @@
       "citation_support": true,
       "citations": [
         {
-          "reference_code": "CE-MCR-0018",
+          "reference_code": "CE-MCR-0023",
           "reference_kind": "causal_event"
         }
       ],
@@ -530,30 +698,52 @@
       "executed_tools": [],
       "expected_machine_facts": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0023",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "symptom",
+          "event_type": "device_failure",
           "propagation_summary": "Candidate matches the causal event physical root resource.",
           "role_counts": {
-            "child": 6,
+            "child": 0,
             "noise": 0,
-            "root": 0,
+            "root": 1,
             "supporting": 0,
-            "symptom": 0,
+            "symptom": 7,
             "unrelated": 0
           },
+          "root_alarm_types": [
+            "OLT_UNREACHABLE"
+          ],
           "root_cause_reason_codes": [
             "same_resource",
             "temporal_propagation"
           ],
-          "root_resource_reference": "AN-KON-001",
-          "root_resource_type": "device"
+          "root_cause_summary": "OLT-YEN-002",
+          "root_resource_reference": "OLT-YEN-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": [
+            "ONT_DISCONNECT_SURGE"
+          ]
         },
         "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
         "provenance": [
           {
             "call_id": "correlate",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:correlate",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "correlate_alarms"
           },
@@ -561,7 +751,7 @@
             "call_id": "root_cause",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:root_cause",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "rank_root_cause_candidates"
           },
@@ -569,12 +759,12 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "result_fingerprint": "bf1b08dc46e03939d8669d1043df597957aa62af57684d7728eb006a2010289d",
         "retrieval_sources": [],
         "schema_version": "validated-execution-result.v1",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
@@ -583,17 +773,36 @@
         "warnings": []
       },
       "failure_reason": null,
-      "final_user_text": "Kesinti de\u011ferlendirmesi\nK\u00f6k neden gerek\u00e7esi: same_resource, temporal_propagation.",
+      "final_user_text": "Kesinti değerlendirmesi\nKök neden alarmı: OLT_UNREACHABLE.\nKök neden gerekçesi: same_resource, temporal_propagation.\nDying Gasp alarmı kök neden değil, belirtidir.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\nDoğrulanmış kök kaynak: device OLT-YEN-002.\nPotansiyel kapsam: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nDoğrulanmış etkisizlik: 0 bağlantı.\nKanıt yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı; tam kesinti sayılmaz.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.\nDoğrulanmış ana kök neden: OLT-YEN-002.",
       "generation_mode": "llm_assisted",
       "http_status": 200,
-      "latency_ms": 13520.608,
+      "latency_ms": 20429.058,
       "lifecycle": "completed",
       "llm_provider": "ollama",
       "pass": true,
       "privacy_violation_count": 0,
-      "query_run_code": "QR-314B240608AD40209D8E38CB321D2A26",
+      "query_run_code": "QR-27AD8A09F72C40D1AB5EC6F7C4E2DAA1",
       "requested_embedding_provider": "gemini",
       "requested_llm_provider": "ollama",
+      "required_final_field_checks": {
+        "Device Not Active için bu olayda doğrulanmış alarm kaydı yok.": true,
+        "Doğrulanmış ana kök neden: OLT-YEN-002": true,
+        "Dying Gasp alarmı kök neden değil, belirtidir.": true
+      },
+      "required_final_fields": [
+        "Doğrulanmış ana kök neden: OLT-YEN-002",
+        "Dying Gasp alarmı kök neden değil, belirtidir.",
+        "Device Not Active için bu olayda doğrulanmış alarm kaydı yok."
+      ],
+      "required_machine_fields": {
+        "root_alarm_types": [
+          "OLT_UNREACHABLE"
+        ],
+        "root_cause_summary": "OLT-YEN-002",
+        "symptom_alarm_types": [
+          "ONT_DISCONNECT_SURGE"
+        ]
+      },
       "resolved_embedding_model": "gemini-embedding-2",
       "resolved_embedding_provider": "gemini",
       "resolved_llm_model": "gemma4:12b-it-qat",
@@ -601,7 +810,7 @@
       "selected_tools": [
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -615,7 +824,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -629,7 +838,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -642,13 +851,14 @@
           "tool_name": "get_rule_evidence"
         }
       ],
+      "semantic_completeness_pass": true,
       "snapshot_leakage_count": 0,
       "structured_query_parser": "deterministic",
       "structured_query_parser_version": "deterministic-structured-query-tr-v1",
       "unsupported_decision_count": 0,
       "unsupported_fact_count": 0,
       "unsupported_reference_count": 0,
-      "user_prompt": "Public olay kodu CE-MCR-0018 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp belirti mi?",
+      "user_prompt": "Public olay kodu CE-MCR-0023 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp ve Device Not Active alarmlari kok neden mi, yoksa belirti mi?",
       "vector_corpus": {
         "model": "gemini-embedding-2",
         "prompt_version": "gemini-search-query-v1",
@@ -658,12 +868,37 @@
     {
       "actual_machine_result": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0001",
           "role_counts": {},
-          "root_cause_reason_codes": []
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
         },
         "execution_status": "succeeded",
         "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-rag-001:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
           {
             "call_id": "rule_documents",
             "category": "document_retrieval",
@@ -676,20 +911,30 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "df2e80bab6d9f74f934d0d971379f6f17ea6ed6a4315405626ce970cf37138ae",
+        "result_fingerprint": "a5535a15836667fd9c91bedd7ab49255a8c87ffa9842aa98fe3a7ee469188f74",
         "retrieval_sources": [
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
             "source_code": "SYN-COMP-2026-BROADBAND",
             "version": 1
           },
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Kurallar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Tanımlar",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 1
           },
@@ -697,16 +942,6 @@
             "section": "Immutable DecisionEvidence",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 2
-          },
-          {
-            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
-            "source_code": "SYN-COMP-2026-OVERVIEW",
-            "version": 1
-          },
-          {
-            "section": "Kan\u0131t ve Referanslar",
-            "source_code": "SYN-OPERATIONS-LIFECYCLE-2026",
-            "version": 1
           }
         ],
         "schema_version": "validated-execution-result.v1",
@@ -716,7 +951,7 @@
         "warnings": []
       },
       "actual_structured_query": {
-        "causal_event_code": "CE-MCR-0018",
+        "causal_event_code": "CE-MCR-0001",
         "clarification_reasons": [],
         "clarification_required": false,
         "decision_type": "eligibility",
@@ -727,27 +962,44 @@
           "evidence",
           "summary"
         ],
-        "retrieval_query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+        "retrieval_query": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
         "schema_version": "structured-query.v1",
-        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "subscription_reference": "SUB-MCR-00002"
       },
       "case_kind": "rag_citation",
       "citation_support": true,
       "citations": [
         {
-          "reference_code": "CE-MCR-0018",
+          "reference_code": "CE-MCR-0001",
           "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "0a388c1e82bf",
+          "reference_kind": "decision_evidence"
         },
         {
           "reference_code": "SYN-COMP-2026-BROADBAND",
           "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve Referanslar",
+          "section": "Kanıt ve Referanslar",
           "version": 1
         },
         {
           "reference_code": "SYN-COMP-2026-ELIGIBILITY",
           "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve Referanslar",
+          "section": "Kanıt ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Kurallar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Tanımlar",
           "version": 1
         },
         {
@@ -755,18 +1007,6 @@
           "reference_kind": "retrieval_source",
           "section": "Immutable DecisionEvidence",
           "version": 2
-        },
-        {
-          "reference_code": "SYN-COMP-2026-OVERVIEW",
-          "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
-          "version": 1
-        },
-        {
-          "reference_code": "SYN-OPERATIONS-LIFECYCLE-2026",
-          "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve Referanslar",
-          "version": 1
         }
       ],
       "embedding_prompt_version": "gemini-search-query-v1",
@@ -775,12 +1015,37 @@
       "executed_tools": [],
       "expected_machine_facts": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0001",
           "role_counts": {},
-          "root_cause_reason_codes": []
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
         },
         "execution_status": "succeeded",
         "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-rag-001:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
           {
             "call_id": "rule_documents",
             "category": "document_retrieval",
@@ -793,20 +1058,30 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "df2e80bab6d9f74f934d0d971379f6f17ea6ed6a4315405626ce970cf37138ae",
+        "result_fingerprint": "a5535a15836667fd9c91bedd7ab49255a8c87ffa9842aa98fe3a7ee469188f74",
         "retrieval_sources": [
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
             "source_code": "SYN-COMP-2026-BROADBAND",
             "version": 1
           },
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Kurallar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Tanımlar",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 1
           },
@@ -814,16 +1089,6 @@
             "section": "Immutable DecisionEvidence",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 2
-          },
-          {
-            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
-            "source_code": "SYN-COMP-2026-OVERVIEW",
-            "version": 1
-          },
-          {
-            "section": "Kan\u0131t ve Referanslar",
-            "source_code": "SYN-OPERATIONS-LIFECYCLE-2026",
-            "version": 1
           }
         ],
         "schema_version": "validated-execution-result.v1",
@@ -833,17 +1098,29 @@
         "warnings": []
       },
       "failure_reason": null,
-      "final_user_text": "Kesinti de\u011ferlendirmesi\nDo\u011frulanm\u0131\u015f kaynaklar: SYN-COMP-2026-BROADBAND v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / Kan\u0131t ve A\u00e7\u0131klanabilirlik; SYN-OPERATIONS-LIFECYCLE-2026 v1 / Kan\u0131t ve Referanslar.",
+      "final_user_text": "Kesinti değerlendirmesi\nDoğrulanmış RuleVersion: BB-DEGRADATION-QUALITY:v1.\nDoğrulanmış DecisionEvidence: 0a388c1e82bf.\nDoğrulanmış kaynaklar: SYN-COMP-2026-BROADBAND v1 / Kanıt ve Referanslar; SYN-COMP-2026-ELIGIBILITY v1 / Kanıt ve Referanslar; SYN-COMP-2026-ELIGIBILITY v1 / Kurallar; SYN-COMP-2026-ELIGIBILITY v1 / Tanımlar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 1 kayıt.\nUygun olmayan veya bekleyen: 0 kayıt.\nTelafi durumu: calculated.",
       "generation_mode": "llm_assisted",
       "http_status": 200,
-      "latency_ms": 17060.432,
+      "latency_ms": 16892.334,
       "lifecycle": "completed",
       "llm_provider": "ollama",
       "pass": true,
       "privacy_violation_count": 0,
-      "query_run_code": "QR-8EA13F8AC1C64FB2AD583C7BAD3CA9EE",
+      "query_run_code": "QR-883423BFA14C41AC9CD968D200E36F0B",
       "requested_embedding_provider": "gemini",
       "requested_llm_provider": "ollama",
+      "required_final_field_checks": {
+        "Doğrulanmış DecisionEvidence:": true,
+        "Doğrulanmış RuleVersion:": true
+      },
+      "required_final_fields": [
+        "Doğrulanmış RuleVersion:",
+        "Doğrulanmış DecisionEvidence:"
+      ],
+      "required_machine_fields": {
+        "evidence_references": null,
+        "rule_versions": null
+      },
       "resolved_embedding_model": "gemini-embedding-2",
       "resolved_embedding_provider": "gemini",
       "resolved_llm_model": "gemma4:12b-it-qat",
@@ -851,9 +1128,23 @@
       "selected_tools": [
         {
           "arguments": {
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "subscription_number": "SUB-MCR-00002"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        },
+        {
+          "arguments": {
             "embedding_provider": "gemini",
             "include_scores": true,
-            "query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+            "query": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
             "search_mode": "hybrid",
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
             "top_k": 5
@@ -868,7 +1159,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0001",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -881,13 +1172,14 @@
           "tool_name": "get_rule_evidence"
         }
       ],
+      "semantic_completeness_pass": true,
       "snapshot_leakage_count": 0,
       "structured_query_parser": "deterministic",
       "structured_query_parser_version": "deterministic-structured-query-tr-v1",
       "unsupported_decision_count": 0,
       "unsupported_fact_count": 0,
       "unsupported_reference_count": 0,
-      "user_prompt": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+      "user_prompt": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
       "vector_corpus": {
         "model": "gemini-embedding-2",
         "prompt_version": "gemini-search-query-v1",
@@ -897,30 +1189,52 @@
     {
       "actual_machine_result": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0023",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "symptom",
+          "event_type": "device_failure",
           "propagation_summary": "Candidate matches the causal event physical root resource.",
           "role_counts": {
-            "child": 6,
+            "child": 0,
             "noise": 0,
-            "root": 0,
+            "root": 1,
             "supporting": 0,
-            "symptom": 0,
+            "symptom": 7,
             "unrelated": 0
           },
+          "root_alarm_types": [
+            "OLT_UNREACHABLE"
+          ],
           "root_cause_reason_codes": [
             "same_resource",
             "temporal_propagation"
           ],
-          "root_resource_reference": "AN-KON-001",
-          "root_resource_type": "device"
+          "root_cause_summary": "OLT-YEN-002",
+          "root_resource_reference": "OLT-YEN-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": [
+            "ONT_DISCONNECT_SURGE"
+          ]
         },
         "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
         "provenance": [
           {
             "call_id": "correlate",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:correlate",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "correlate_alarms"
           },
@@ -928,7 +1242,7 @@
             "call_id": "root_cause",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:root_cause",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "rank_root_cause_candidates"
           },
@@ -936,12 +1250,12 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "result_fingerprint": "bf1b08dc46e03939d8669d1043df597957aa62af57684d7728eb006a2010289d",
         "retrieval_sources": [],
         "schema_version": "validated-execution-result.v1",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
@@ -950,7 +1264,7 @@
         "warnings": []
       },
       "actual_structured_query": {
-        "causal_event_code": "CE-MCR-0018",
+        "causal_event_code": "CE-MCR-0023",
         "clarification_reasons": [],
         "clarification_required": false,
         "embedding_provider": "ollama",
@@ -967,7 +1281,7 @@
       "citation_support": true,
       "citations": [
         {
-          "reference_code": "CE-MCR-0018",
+          "reference_code": "CE-MCR-0023",
           "reference_kind": "causal_event"
         }
       ],
@@ -977,30 +1291,52 @@
       "executed_tools": [],
       "expected_machine_facts": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0023",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "symptom",
+          "event_type": "device_failure",
           "propagation_summary": "Candidate matches the causal event physical root resource.",
           "role_counts": {
-            "child": 6,
+            "child": 0,
             "noise": 0,
-            "root": 0,
+            "root": 1,
             "supporting": 0,
-            "symptom": 0,
+            "symptom": 7,
             "unrelated": 0
           },
+          "root_alarm_types": [
+            "OLT_UNREACHABLE"
+          ],
           "root_cause_reason_codes": [
             "same_resource",
             "temporal_propagation"
           ],
-          "root_resource_reference": "AN-KON-001",
-          "root_resource_type": "device"
+          "root_cause_summary": "OLT-YEN-002",
+          "root_resource_reference": "OLT-YEN-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": [
+            "ONT_DISCONNECT_SURGE"
+          ]
         },
         "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
         "provenance": [
           {
             "call_id": "correlate",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:correlate",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "correlate_alarms"
           },
@@ -1008,7 +1344,7 @@
             "call_id": "root_cause",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:root_cause",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "rank_root_cause_candidates"
           },
@@ -1016,12 +1352,12 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "result_fingerprint": "bf1b08dc46e03939d8669d1043df597957aa62af57684d7728eb006a2010289d",
         "retrieval_sources": [],
         "schema_version": "validated-execution-result.v1",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
@@ -1030,17 +1366,36 @@
         "warnings": []
       },
       "failure_reason": null,
-      "final_user_text": "Kesinti de\u011ferlendirmesi\nK\u00f6k neden gerek\u00e7esi: same_resource, temporal_propagation.",
+      "final_user_text": "Kesinti değerlendirmesi\nDoğrulanmış ana kök neden: OLT-YEN-002.\nDoğrulanmış kök kaynak: device OLT-YEN-002.\nKök neden alarmı: OLT_UNREACHABLE.\nKök neden gerekçesi: same_resource, temporal_propagation.\nDying Gasp alarmı kök neden değil, belirtidir.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\nPotansiyel kapsam: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nDoğrulanmış etkisizlik: 0 bağlantı.\nKanıt yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı; tam kesinti sayılmaz.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.",
       "generation_mode": "llm_assisted",
       "http_status": 200,
-      "latency_ms": 7770.377,
+      "latency_ms": 7394.272,
       "lifecycle": "completed",
       "llm_provider": "gemini",
       "pass": true,
       "privacy_violation_count": 0,
-      "query_run_code": "QR-F3A9510E6A784CC78BDA6A0369573561",
+      "query_run_code": "QR-B3D003B2C16B455491B200AAF87D6641",
       "requested_embedding_provider": "ollama",
       "requested_llm_provider": "gemini",
+      "required_final_field_checks": {
+        "Device Not Active için bu olayda doğrulanmış alarm kaydı yok.": true,
+        "Doğrulanmış ana kök neden: OLT-YEN-002": true,
+        "Dying Gasp alarmı kök neden değil, belirtidir.": true
+      },
+      "required_final_fields": [
+        "Doğrulanmış ana kök neden: OLT-YEN-002",
+        "Dying Gasp alarmı kök neden değil, belirtidir.",
+        "Device Not Active için bu olayda doğrulanmış alarm kaydı yok."
+      ],
+      "required_machine_fields": {
+        "root_alarm_types": [
+          "OLT_UNREACHABLE"
+        ],
+        "root_cause_summary": "OLT-YEN-002",
+        "symptom_alarm_types": [
+          "ONT_DISCONNECT_SURGE"
+        ]
+      },
       "resolved_embedding_model": "qwen3-embedding:4b",
       "resolved_embedding_provider": "ollama",
       "resolved_llm_model": "gemini-3.6-flash",
@@ -1048,7 +1403,7 @@
       "selected_tools": [
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -1062,7 +1417,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -1076,7 +1431,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -1089,13 +1444,14 @@
           "tool_name": "get_rule_evidence"
         }
       ],
+      "semantic_completeness_pass": true,
       "snapshot_leakage_count": 0,
       "structured_query_parser": "deterministic",
       "structured_query_parser_version": "deterministic-structured-query-tr-v1",
       "unsupported_decision_count": 0,
       "unsupported_fact_count": 0,
       "unsupported_reference_count": 0,
-      "user_prompt": "Public olay kodu CE-MCR-0018 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp belirti mi?",
+      "user_prompt": "Public olay kodu CE-MCR-0023 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp ve Device Not Active alarmlari kok neden mi, yoksa belirti mi?",
       "vector_corpus": {
         "model": "qwen3-embedding:4b",
         "prompt_version": "qwen3-telecom-query-v1",
@@ -1105,12 +1461,37 @@
     {
       "actual_machine_result": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0001",
           "role_counts": {},
-          "root_cause_reason_codes": []
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
         },
         "execution_status": "succeeded",
         "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-rag-001:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
           {
             "call_id": "rule_documents",
             "category": "document_retrieval",
@@ -1123,15 +1504,15 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "691ed34620afb85ca2861f3d6a648491ba591a831a2d93ceea2ae8a94b649d4e",
+        "result_fingerprint": "3eee020007dfae268c37f68ac30af61683bb7ddb97e0a8ce4949f955f7d43a0a",
         "retrieval_sources": [
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 1
           },
@@ -1141,17 +1522,17 @@
             "version": 2
           },
           {
-            "section": "De\u011ferlendirme S\u0131ras\u0131",
+            "section": "Değerlendirme Sırası",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           },
           {
-            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "section": "Kanıt ve Açıklanabilirlik",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           },
           {
-            "section": "Tan\u0131mlar",
+            "section": "Tanımlar",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           }
@@ -1163,7 +1544,7 @@
         "warnings": []
       },
       "actual_structured_query": {
-        "causal_event_code": "CE-MCR-0018",
+        "causal_event_code": "CE-MCR-0001",
         "clarification_reasons": [],
         "clarification_required": false,
         "decision_type": "eligibility",
@@ -1174,21 +1555,26 @@
           "evidence",
           "summary"
         ],
-        "retrieval_query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+        "retrieval_query": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
         "schema_version": "structured-query.v1",
-        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "subscription_reference": "SUB-MCR-00002"
       },
       "case_kind": "rag_citation",
       "citation_support": true,
       "citations": [
         {
-          "reference_code": "CE-MCR-0018",
+          "reference_code": "CE-MCR-0001",
           "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "0a388c1e82bf",
+          "reference_kind": "decision_evidence"
         },
         {
           "reference_code": "SYN-COMP-2026-ELIGIBILITY",
           "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve Referanslar",
+          "section": "Kanıt ve Referanslar",
           "version": 1
         },
         {
@@ -1200,19 +1586,19 @@
         {
           "reference_code": "SYN-COMP-2026-OVERVIEW",
           "reference_kind": "retrieval_source",
-          "section": "De\u011ferlendirme S\u0131ras\u0131",
+          "section": "Değerlendirme Sırası",
           "version": 1
         },
         {
           "reference_code": "SYN-COMP-2026-OVERVIEW",
           "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+          "section": "Kanıt ve Açıklanabilirlik",
           "version": 1
         },
         {
           "reference_code": "SYN-COMP-2026-OVERVIEW",
           "reference_kind": "retrieval_source",
-          "section": "Tan\u0131mlar",
+          "section": "Tanımlar",
           "version": 1
         }
       ],
@@ -1222,12 +1608,37 @@
       "executed_tools": [],
       "expected_machine_facts": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0001",
           "role_counts": {},
-          "root_cause_reason_codes": []
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
         },
         "execution_status": "succeeded",
         "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-rag-001:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
           {
             "call_id": "rule_documents",
             "category": "document_retrieval",
@@ -1240,15 +1651,15 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "691ed34620afb85ca2861f3d6a648491ba591a831a2d93ceea2ae8a94b649d4e",
+        "result_fingerprint": "3eee020007dfae268c37f68ac30af61683bb7ddb97e0a8ce4949f955f7d43a0a",
         "retrieval_sources": [
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 1
           },
@@ -1258,17 +1669,17 @@
             "version": 2
           },
           {
-            "section": "De\u011ferlendirme S\u0131ras\u0131",
+            "section": "Değerlendirme Sırası",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           },
           {
-            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "section": "Kanıt ve Açıklanabilirlik",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           },
           {
-            "section": "Tan\u0131mlar",
+            "section": "Tanımlar",
             "source_code": "SYN-COMP-2026-OVERVIEW",
             "version": 1
           }
@@ -1280,27 +1691,53 @@
         "warnings": []
       },
       "failure_reason": null,
-      "final_user_text": "Kesinti de\u011ferlendirmesi\nDo\u011frulanm\u0131\u015f kaynaklar: SYN-COMP-2026-ELIGIBILITY v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / De\u011ferlendirme S\u0131ras\u0131; SYN-COMP-2026-OVERVIEW v1 / Kan\u0131t ve A\u00e7\u0131klanabilirlik; SYN-COMP-2026-OVERVIEW v1 / Tan\u0131mlar.",
+      "final_user_text": "Kesinti değerlendirmesi\nTelafi durumu: calculated.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 1 kayıt.\nUygun olmayan veya bekleyen: 0 kayıt.\nDoğrulanmış RuleVersion: BB-DEGRADATION-QUALITY:v1.\nDoğrulanmış DecisionEvidence: 0a388c1e82bf.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nDoğrulanmış kaynaklar: SYN-COMP-2026-ELIGIBILITY v1 / Kanıt ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / Değerlendirme Sırası; SYN-COMP-2026-OVERVIEW v1 / Kanıt ve Açıklanabilirlik; SYN-COMP-2026-OVERVIEW v1 / Tanımlar.",
       "generation_mode": "llm_assisted",
       "http_status": 200,
-      "latency_ms": 14081.405,
+      "latency_ms": 13391.993,
       "lifecycle": "completed",
       "llm_provider": "gemini",
       "pass": true,
       "privacy_violation_count": 0,
-      "query_run_code": "QR-A504D7A4CD1B416AA75D9F586DB31ED4",
+      "query_run_code": "QR-E4731183A072451091580D2D05329BAD",
       "requested_embedding_provider": "ollama",
       "requested_llm_provider": "gemini",
+      "required_final_field_checks": {
+        "Doğrulanmış DecisionEvidence:": true,
+        "Doğrulanmış RuleVersion:": true
+      },
+      "required_final_fields": [
+        "Doğrulanmış RuleVersion:",
+        "Doğrulanmış DecisionEvidence:"
+      ],
+      "required_machine_fields": {
+        "evidence_references": null,
+        "rule_versions": null
+      },
       "resolved_embedding_model": "qwen3-embedding:4b",
       "resolved_embedding_provider": "ollama",
       "resolved_llm_model": "gemini-3.6-flash",
       "resolved_llm_provider": "gemini",
       "selected_tools": [
+        {
+          "arguments": {
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "subscription_number": "SUB-MCR-00002"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        },
         {
           "arguments": {
             "embedding_provider": "ollama",
             "include_scores": true,
-            "query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+            "query": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
             "search_mode": "hybrid",
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
             "top_k": 5
@@ -1315,7 +1752,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0001",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -1328,13 +1765,14 @@
           "tool_name": "get_rule_evidence"
         }
       ],
+      "semantic_completeness_pass": true,
       "snapshot_leakage_count": 0,
       "structured_query_parser": "deterministic",
       "structured_query_parser_version": "deterministic-structured-query-tr-v1",
       "unsupported_decision_count": 0,
       "unsupported_fact_count": 0,
       "unsupported_reference_count": 0,
-      "user_prompt": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+      "user_prompt": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
       "vector_corpus": {
         "model": "qwen3-embedding:4b",
         "prompt_version": "qwen3-telecom-query-v1",
@@ -1344,30 +1782,52 @@
     {
       "actual_machine_result": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0023",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "symptom",
+          "event_type": "device_failure",
           "propagation_summary": "Candidate matches the causal event physical root resource.",
           "role_counts": {
-            "child": 6,
+            "child": 0,
             "noise": 0,
-            "root": 0,
+            "root": 1,
             "supporting": 0,
-            "symptom": 0,
+            "symptom": 7,
             "unrelated": 0
           },
+          "root_alarm_types": [
+            "OLT_UNREACHABLE"
+          ],
           "root_cause_reason_codes": [
             "same_resource",
             "temporal_propagation"
           ],
-          "root_resource_reference": "AN-KON-001",
-          "root_resource_type": "device"
+          "root_cause_summary": "OLT-YEN-002",
+          "root_resource_reference": "OLT-YEN-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": [
+            "ONT_DISCONNECT_SURGE"
+          ]
         },
         "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
         "provenance": [
           {
             "call_id": "correlate",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:correlate",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "correlate_alarms"
           },
@@ -1375,7 +1835,7 @@
             "call_id": "root_cause",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:root_cause",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "rank_root_cause_candidates"
           },
@@ -1383,12 +1843,12 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "result_fingerprint": "bf1b08dc46e03939d8669d1043df597957aa62af57684d7728eb006a2010289d",
         "retrieval_sources": [],
         "schema_version": "validated-execution-result.v1",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
@@ -1397,7 +1857,7 @@
         "warnings": []
       },
       "actual_structured_query": {
-        "causal_event_code": "CE-MCR-0018",
+        "causal_event_code": "CE-MCR-0023",
         "clarification_reasons": [],
         "clarification_required": false,
         "embedding_provider": "gemini",
@@ -1414,7 +1874,7 @@
       "citation_support": true,
       "citations": [
         {
-          "reference_code": "CE-MCR-0018",
+          "reference_code": "CE-MCR-0023",
           "reference_kind": "causal_event"
         }
       ],
@@ -1424,30 +1884,52 @@
       "executed_tools": [],
       "expected_machine_facts": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0023",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "symptom",
+          "event_type": "device_failure",
           "propagation_summary": "Candidate matches the causal event physical root resource.",
           "role_counts": {
-            "child": 6,
+            "child": 0,
             "noise": 0,
-            "root": 0,
+            "root": 1,
             "supporting": 0,
-            "symptom": 0,
+            "symptom": 7,
             "unrelated": 0
           },
+          "root_alarm_types": [
+            "OLT_UNREACHABLE"
+          ],
           "root_cause_reason_codes": [
             "same_resource",
             "temporal_propagation"
           ],
-          "root_resource_reference": "AN-KON-001",
-          "root_resource_type": "device"
+          "root_cause_summary": "OLT-YEN-002",
+          "root_resource_reference": "OLT-YEN-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": [
+            "ONT_DISCONNECT_SURGE"
+          ]
         },
         "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
         "provenance": [
           {
             "call_id": "correlate",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:correlate",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "correlate_alarms"
           },
@@ -1455,7 +1937,7 @@
             "call_id": "root_cause",
             "category": "network_causal",
             "correlation_id": "pre061-rag-001:root_cause",
-            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "server": "network",
             "tool_name": "rank_root_cause_candidates"
           },
@@ -1463,12 +1945,12 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "result_fingerprint": "bf1b08dc46e03939d8669d1043df597957aa62af57684d7728eb006a2010289d",
         "retrieval_sources": [],
         "schema_version": "validated-execution-result.v1",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
@@ -1477,17 +1959,36 @@
         "warnings": []
       },
       "failure_reason": null,
-      "final_user_text": "Kesinti de\u011ferlendirmesi\nK\u00f6k neden gerek\u00e7esi: same_resource, temporal_propagation.",
+      "final_user_text": "Kesinti değerlendirmesi\nDoğrulanmış ana kök neden: OLT-YEN-002.\nDoğrulanmış kök kaynak: device OLT-YEN-002.\nKök neden alarmı: OLT_UNREACHABLE.\nDying Gasp alarmı kök neden değil, belirtidir.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\nKök neden gerekçesi: same_resource, temporal_propagation.\nPotansiyel kapsam: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nDoğrulanmış etkisizlik: 0 bağlantı.\nKanıt yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı; tam kesinti sayılmaz.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.",
       "generation_mode": "llm_assisted",
       "http_status": 200,
-      "latency_ms": 7233.72,
+      "latency_ms": 7461.815,
       "lifecycle": "completed",
       "llm_provider": "gemini",
       "pass": true,
       "privacy_violation_count": 0,
-      "query_run_code": "QR-042B42C215E84D1AA4C493A15557ECE0",
+      "query_run_code": "QR-093A62AA995B4209960CE41039970B4D",
       "requested_embedding_provider": "gemini",
       "requested_llm_provider": "gemini",
+      "required_final_field_checks": {
+        "Device Not Active için bu olayda doğrulanmış alarm kaydı yok.": true,
+        "Doğrulanmış ana kök neden: OLT-YEN-002": true,
+        "Dying Gasp alarmı kök neden değil, belirtidir.": true
+      },
+      "required_final_fields": [
+        "Doğrulanmış ana kök neden: OLT-YEN-002",
+        "Dying Gasp alarmı kök neden değil, belirtidir.",
+        "Device Not Active için bu olayda doğrulanmış alarm kaydı yok."
+      ],
+      "required_machine_fields": {
+        "root_alarm_types": [
+          "OLT_UNREACHABLE"
+        ],
+        "root_cause_summary": "OLT-YEN-002",
+        "symptom_alarm_types": [
+          "ONT_DISCONNECT_SURGE"
+        ]
+      },
       "resolved_embedding_model": "gemini-embedding-2",
       "resolved_embedding_provider": "gemini",
       "resolved_llm_model": "gemini-3.6-flash",
@@ -1495,7 +1996,7 @@
       "selected_tools": [
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -1509,7 +2010,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -1523,7 +2024,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0023",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -1536,13 +2037,14 @@
           "tool_name": "get_rule_evidence"
         }
       ],
+      "semantic_completeness_pass": true,
       "snapshot_leakage_count": 0,
       "structured_query_parser": "deterministic",
       "structured_query_parser_version": "deterministic-structured-query-tr-v1",
       "unsupported_decision_count": 0,
       "unsupported_fact_count": 0,
       "unsupported_reference_count": 0,
-      "user_prompt": "Public olay kodu CE-MCR-0018 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp belirti mi?",
+      "user_prompt": "Public olay kodu CE-MCR-0023 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp ve Device Not Active alarmlari kok neden mi, yoksa belirti mi?",
       "vector_corpus": {
         "model": "gemini-embedding-2",
         "prompt_version": "gemini-search-query-v1",
@@ -1552,12 +2054,37 @@
     {
       "actual_machine_result": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0001",
           "role_counts": {},
-          "root_cause_reason_codes": []
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
         },
         "execution_status": "succeeded",
         "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-rag-001:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
           {
             "call_id": "rule_documents",
             "category": "document_retrieval",
@@ -1570,20 +2097,30 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "df2e80bab6d9f74f934d0d971379f6f17ea6ed6a4315405626ce970cf37138ae",
+        "result_fingerprint": "a5535a15836667fd9c91bedd7ab49255a8c87ffa9842aa98fe3a7ee469188f74",
         "retrieval_sources": [
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
             "source_code": "SYN-COMP-2026-BROADBAND",
             "version": 1
           },
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Kurallar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Tanımlar",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 1
           },
@@ -1591,16 +2128,6 @@
             "section": "Immutable DecisionEvidence",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 2
-          },
-          {
-            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
-            "source_code": "SYN-COMP-2026-OVERVIEW",
-            "version": 1
-          },
-          {
-            "section": "Kan\u0131t ve Referanslar",
-            "source_code": "SYN-OPERATIONS-LIFECYCLE-2026",
-            "version": 1
           }
         ],
         "schema_version": "validated-execution-result.v1",
@@ -1610,7 +2137,7 @@
         "warnings": []
       },
       "actual_structured_query": {
-        "causal_event_code": "CE-MCR-0018",
+        "causal_event_code": "CE-MCR-0001",
         "clarification_reasons": [],
         "clarification_required": false,
         "decision_type": "eligibility",
@@ -1621,27 +2148,44 @@
           "evidence",
           "summary"
         ],
-        "retrieval_query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+        "retrieval_query": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
         "schema_version": "structured-query.v1",
-        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "subscription_reference": "SUB-MCR-00002"
       },
       "case_kind": "rag_citation",
       "citation_support": true,
       "citations": [
         {
-          "reference_code": "CE-MCR-0018",
+          "reference_code": "CE-MCR-0001",
           "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "0a388c1e82bf",
+          "reference_kind": "decision_evidence"
         },
         {
           "reference_code": "SYN-COMP-2026-BROADBAND",
           "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve Referanslar",
+          "section": "Kanıt ve Referanslar",
           "version": 1
         },
         {
           "reference_code": "SYN-COMP-2026-ELIGIBILITY",
           "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve Referanslar",
+          "section": "Kanıt ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Kurallar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Tanımlar",
           "version": 1
         },
         {
@@ -1649,18 +2193,6 @@
           "reference_kind": "retrieval_source",
           "section": "Immutable DecisionEvidence",
           "version": 2
-        },
-        {
-          "reference_code": "SYN-COMP-2026-OVERVIEW",
-          "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
-          "version": 1
-        },
-        {
-          "reference_code": "SYN-OPERATIONS-LIFECYCLE-2026",
-          "reference_kind": "retrieval_source",
-          "section": "Kan\u0131t ve Referanslar",
-          "version": 1
         }
       ],
       "embedding_prompt_version": "gemini-search-query-v1",
@@ -1669,12 +2201,37 @@
       "executed_tools": [],
       "expected_machine_facts": {
         "causal_summary": {
-          "causal_event_code": "CE-MCR-0018",
+          "causal_event_code": "CE-MCR-0001",
           "role_counts": {},
-          "root_cause_reason_codes": []
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
         },
         "execution_status": "succeeded",
         "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-rag-001:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
           {
             "call_id": "rule_documents",
             "category": "document_retrieval",
@@ -1687,20 +2244,30 @@
             "call_id": "rule_evidence",
             "category": "rule_evidence",
             "correlation_id": "pre061-rag-001:rule_evidence",
-            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
             "server": "rule",
             "tool_name": "get_rule_evidence"
           }
         ],
-        "result_fingerprint": "df2e80bab6d9f74f934d0d971379f6f17ea6ed6a4315405626ce970cf37138ae",
+        "result_fingerprint": "a5535a15836667fd9c91bedd7ab49255a8c87ffa9842aa98fe3a7ee469188f74",
         "retrieval_sources": [
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
             "source_code": "SYN-COMP-2026-BROADBAND",
             "version": 1
           },
           {
-            "section": "Kan\u0131t ve Referanslar",
+            "section": "Kanıt ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Kurallar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Tanımlar",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 1
           },
@@ -1708,16 +2275,6 @@
             "section": "Immutable DecisionEvidence",
             "source_code": "SYN-COMP-2026-ELIGIBILITY",
             "version": 2
-          },
-          {
-            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
-            "source_code": "SYN-COMP-2026-OVERVIEW",
-            "version": 1
-          },
-          {
-            "section": "Kan\u0131t ve Referanslar",
-            "source_code": "SYN-OPERATIONS-LIFECYCLE-2026",
-            "version": 1
           }
         ],
         "schema_version": "validated-execution-result.v1",
@@ -1727,17 +2284,29 @@
         "warnings": []
       },
       "failure_reason": null,
-      "final_user_text": "Kesinti de\u011ferlendirmesi\nDo\u011frulanm\u0131\u015f kaynaklar: SYN-COMP-2026-BROADBAND v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / Kan\u0131t ve A\u00e7\u0131klanabilirlik; SYN-OPERATIONS-LIFECYCLE-2026 v1 / Kan\u0131t ve Referanslar.",
+      "final_user_text": "Kesinti değerlendirmesi\nTelafi durumu: calculated.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 1 kayıt.\nUygun olmayan veya bekleyen: 0 kayıt.\nDoğrulanmış RuleVersion: BB-DEGRADATION-QUALITY:v1.\nDoğrulanmış DecisionEvidence: 0a388c1e82bf.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nDoğrulanmış kaynaklar: SYN-COMP-2026-BROADBAND v1 / Kanıt ve Referanslar; SYN-COMP-2026-ELIGIBILITY v1 / Kanıt ve Referanslar; SYN-COMP-2026-ELIGIBILITY v1 / Kurallar; SYN-COMP-2026-ELIGIBILITY v1 / Tanımlar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence.",
       "generation_mode": "llm_assisted",
       "http_status": 200,
-      "latency_ms": 5920.992,
+      "latency_ms": 7879.587,
       "lifecycle": "completed",
       "llm_provider": "gemini",
       "pass": true,
       "privacy_violation_count": 0,
-      "query_run_code": "QR-1B20812F9D404EB7950FBAA34F1E403A",
+      "query_run_code": "QR-61E341F1DCF64492B2929274429FBE1D",
       "requested_embedding_provider": "gemini",
       "requested_llm_provider": "gemini",
+      "required_final_field_checks": {
+        "Doğrulanmış DecisionEvidence:": true,
+        "Doğrulanmış RuleVersion:": true
+      },
+      "required_final_fields": [
+        "Doğrulanmış RuleVersion:",
+        "Doğrulanmış DecisionEvidence:"
+      ],
+      "required_machine_fields": {
+        "evidence_references": null,
+        "rule_versions": null
+      },
       "resolved_embedding_model": "gemini-embedding-2",
       "resolved_embedding_provider": "gemini",
       "resolved_llm_model": "gemini-3.6-flash",
@@ -1745,9 +2314,23 @@
       "selected_tools": [
         {
           "arguments": {
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "subscription_number": "SUB-MCR-00002"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        },
+        {
+          "arguments": {
             "embedding_provider": "gemini",
             "include_scores": true,
-            "query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+            "query": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
             "search_mode": "hybrid",
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
             "top_k": 5
@@ -1762,7 +2345,7 @@
         },
         {
           "arguments": {
-            "causal_event_code": "CE-MCR-0018",
+            "causal_event_code": "CE-MCR-0001",
             "limit": 50,
             "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
           },
@@ -1775,13 +2358,14 @@
           "tool_name": "get_rule_evidence"
         }
       ],
+      "semantic_completeness_pass": true,
       "snapshot_leakage_count": 0,
       "structured_query_parser": "deterministic",
       "structured_query_parser_version": "deterministic-structured-query-tr-v1",
       "unsupported_decision_count": 0,
       "unsupported_fact_count": 0,
       "unsupported_reference_count": 0,
-      "user_prompt": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+      "user_prompt": "Public olay kodu CE-MCR-0001 ve abonelik referansi SUB-MCR-00002 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
       "vector_corpus": {
         "model": "gemini-embedding-2",
         "prompt_version": "gemini-search-query-v1",
@@ -1794,5 +2378,11 @@
   "gemma_unloaded": true,
   "passed_count": 8,
   "qwen_unloaded": true,
-  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+  "semantic_completeness": {
+    "decision": "PASS",
+    "combinations": "4/4",
+    "cases": "8/8",
+    "required_final_field_checks": "8/8"
+  }
 }

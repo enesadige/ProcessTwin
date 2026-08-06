@@ -35,7 +35,6 @@ _FORBIDDEN_ARGUMENT_PARTS = frozenset(
         "mac",
         "customer",
         "subscriber",
-        "subscription",
         "raw_",
         "payload",
         "metadata",
@@ -77,7 +76,9 @@ def _reject_forbidden_argument_keys(value: object) -> None:
     if isinstance(value, Mapping):
         for key, item in value.items():
             normalized_key = str(key).lower()
-            if any(part in normalized_key for part in _FORBIDDEN_ARGUMENT_PARTS):
+            if normalized_key != "subscription_number" and any(
+                part in normalized_key for part in _FORBIDDEN_ARGUMENT_PARTS
+            ):
                 raise ValueError("tool arguments contain a forbidden field")
             _reject_forbidden_argument_keys(item)
     elif isinstance(value, list):

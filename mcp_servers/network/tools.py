@@ -273,15 +273,34 @@ class NetworkMCPTools:
         ):
             causal = data.get("causal_event", {})
             correlation = data.get("correlation", {})
+            alarm_classification = data.get("alarm_classification", {})
+            impact = data.get("impact", {})
+            failover = data.get("failover") or {}
             data = {
                 "causal_event_code": causal.get("code"),
+                "event_type": causal.get("event_type"),
                 "root_resource_type": causal.get("root_resource", {}).get("resource_type"),
                 "root_resource_reference": causal.get("root_resource", {}).get("reference"),
+                "root_cause_summary": correlation.get("root_cause"),
                 "root_cause_score": correlation.get("score"),
                 "root_cause_confidence": correlation.get("confidence"),
                 "reason_codes": correlation.get("reason_codes", []),
                 "role_counts": correlation.get("role_counts", {}),
                 "propagation_summary": correlation.get("propagation_summary"),
+                "root_alarm_types": alarm_classification.get("root_alarm_types", []),
+                "symptom_alarm_types": alarm_classification.get("symptom_alarm_types", []),
+                "dying_gasp_classification": alarm_classification.get("dying_gasp"),
+                "device_not_active_classification": alarm_classification.get("device_not_active"),
+                "primary_status": failover.get("primary_status"),
+                "backup_status": failover.get("backup_status"),
+                "full_outage": failover.get("full_outage"),
+                "assessment_record_count": impact.get("assessment_record_count"),
+                "missing_evidence_categories": impact.get("missing_evidence_categories", []),
+                "potential_connection_count": impact.get("potential"),
+                "verified_impacted_count": impact.get("verified_impacted"),
+                "verified_no_impact_count": impact.get("verified_no_impact"),
+                "insufficient_evidence_count": impact.get("insufficient_evidence"),
+                "failover_protected_count": impact.get("failover_protected_count"),
             }
         elif tool_name == "rank_root_cause_candidates" and getattr(model, "outage_code", None):
             candidates = data.get("candidates", [])

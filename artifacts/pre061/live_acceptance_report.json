@@ -39,5 +39,14 @@
     "privacy_violation_count": 0,
     "snapshot_leakage_count": 0,
     "critical_citation_mismatch_count": 0
+  },
+  "semantic_completeness_revalidation": {
+    "decision": "PASS",
+    "baseline_semantic_completeness": "6/6",
+    "provider_matrix_semantic_completeness": "8/8",
+    "final_user_visible_unsupported_fact_count": 0,
+    "privacy_violation_count": 0,
+    "snapshot_leakage_count": 0,
+    "citation_mismatch_count": 0
   }
 }

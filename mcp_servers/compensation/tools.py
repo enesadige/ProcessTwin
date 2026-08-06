@@ -210,17 +210,36 @@ class CompensationMCPTools:
                     **compensation,
                     "evidence": data.get("evidence"),
                 }
+        elif tool_name == "get_compensation_evidence":
+            evaluations = data.get("evaluations", [])
+            evidence_rows = data.get("decision_evidence", [])
+            evaluation = evaluations[0] if isinstance(evaluations, list) and evaluations else {}
+            evidence = evidence_rows[0] if isinstance(evidence_rows, list) and evidence_rows else {}
+            data = {
+                "status": evaluation.get("status", "pending"),
+                "consideration_count": 1 if evaluation else 0,
+                "eligible": 1 if evaluation.get("result_type") == "eligible" else 0,
+                "ineligible_pending": 0 if evaluation.get("result_type") == "eligible" else 1,
+                "total_amount": evaluation.get("proposed_amount"),
+                "currency": evaluation.get("currency"),
+                "rule_versions": (
+                    {f"{evaluation.get('rule_code')}:v{evaluation.get('rule_version')}": 1}
+                    if evaluation.get("rule_code") and evaluation.get("rule_version") is not None
+                    else {}
+                ),
+                "evidence": {"reference": evidence.get("evidence_hash", "")[:12]}
+                if evidence.get("evidence_hash")
+                else None,
+            }
         return MCPToolResponse[dict[str, Any]](
             success=True,
             data=data,
             metadata=metadata,
             warnings=[
-                MCPWarning.model_validate(warning)
-                for warning in payload.get("warnings", [])
+                MCPWarning.model_validate(warning) for warning in payload.get("warnings", [])
             ],
             evidence=[
-                MCPEvidence.model_validate(evidence)
-                for evidence in payload.get("evidence", [])
+                MCPEvidence.model_validate(evidence) for evidence in payload.get("evidence", [])
             ],
         )
 

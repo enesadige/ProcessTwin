@@ -197,6 +197,24 @@ class DeterministicToolPlanner:
                         parallel_group="rule_document_context",
                     )
                 )
+                calls.append(
+                    self._call(
+                        "compensation_evidence",
+                        "compensation",
+                        "get_compensation_evidence",
+                        (
+                            self._snapshot_args(
+                                query, subscription_number=query.subscription_reference
+                            )
+                            if query.subscription_reference
+                            else self._snapshot_args(
+                                query, causal_event_code=query.causal_event_code
+                            )
+                        ),
+                        1,
+                        parallel_group="rule_document_context",
+                    )
+                )
             return calls
         return PlannerResult.unplannable(PlannerReasonCode.NO_SAFE_TOOL_MAPPING.value)
 
@@ -307,7 +325,14 @@ class DeterministicToolPlanner:
         missing_reason: PlannerReasonCode = PlannerReasonCode.MISSING_SAFE_OPERATIONAL_REFERENCE,
     ) -> list[dict[str, object]] | PlannerResult:
         if query.causal_event_code:
-            arguments = self._snapshot_args(query, causal_event_code=query.causal_event_code)
+            if tool_name == "get_compensation_evidence" and query.subscription_reference:
+                # The MCP contract deliberately accepts either a causal event or a
+                # public subscription reference. Prefer the latter when supplied.
+                arguments = self._snapshot_args(
+                    query, subscription_number=query.subscription_reference
+                )
+            else:
+                arguments = self._snapshot_args(query, causal_event_code=query.causal_event_code)
         elif query.outage_code:
             arguments = self._snapshot_args(query, outage_code=query.outage_code)
         else:

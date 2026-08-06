@@ -48,12 +48,20 @@ def test_causal_analysis_requires_auth_and_returns_pending_safe_public_shape(cli
     response = get(client, snapshot, event.event_code)
     assert response.status_code == 200
     data = response.json()["data"]
-    assert set(data) == {"causal_event", "correlation", "impact", "compensation", "evidence"}
+    assert set(data) == {
+        "causal_event",
+        "correlation",
+        "alarm_classification",
+        "failover",
+        "impact",
+        "compensation",
+        "evidence",
+    }
     assert data["compensation"]["status"] == "pending"
     assert data["compensation"]["consideration_count"] == 0
     assert data["impact"]["failover_protected_count"] == 0
     assert data["evidence"] is None
-    assert "customer" not in str(data).lower()
+    assert "cust-" not in str(data).lower()
     assert "raw_payload" not in str(data).lower()
 
 

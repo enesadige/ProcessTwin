@@ -29,13 +29,6 @@ from apps.orchestration.result_merge import (
 from apps.orchestration.services import QueryRunService
 from apps.orchestration.tool_plan import MCPServer
 
-SAFE_STRUCTURED_NARRATIVE = json.dumps(
-    {
-        "headline_id": "H1",
-        "selected_statement_ids": [f"S{index}" for index in range(1, 12)],
-    }
-)
-
 
 class RecordingProvider(LLMProvider):
     provider_name = "recording"
@@ -43,14 +36,20 @@ class RecordingProvider(LLMProvider):
     supports_thinking = False
     thinking_enabled = False
 
-    def __init__(self, content: str = SAFE_STRUCTURED_NARRATIVE) -> None:
+    def __init__(self, content: str | None = None) -> None:
         self.content = content
         self.requests: list[Mapping[str, Any]] = []
 
     def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
         self.requests.append(dict(request))
+        content = self.content
+        if content is None:
+            statement_ids = request["format_schema"]["properties"]["selected_statement_ids"][
+                "items"
+            ]["enum"]
+            content = json.dumps({"headline_id": "H1", "selected_statement_ids": statement_ids})
         return {
-            "content": self.content,
+            "content": content,
             "finish_reason": "stop",
             "provider": self.provider_name,
             "model": self.model_name,
@@ -69,6 +68,14 @@ def valid_result(snapshot_identifier: str, *, warnings: list[str] | None = None)
             root_resource_reference="OLT-001",
             root_cause_reason_codes=["shared_upstream"],
             propagation_summary="Üst katman etkisi doğrulandı.",
+            root_cause_summary="OLT_UNREACHABLE",
+            root_alarm_types=["OLT_UNREACHABLE"],
+            symptom_alarm_types=["ONT_DISCONNECT_SURGE"],
+            dying_gasp_classification="symptom",
+            device_not_active_classification="not_observed",
+            primary_status="down",
+            backup_status="active",
+            full_outage=False,
         ),
         impact_summary=ImpactSummary(
             outage_count=3,
@@ -77,6 +84,8 @@ def valid_result(snapshot_identifier: str, *, warnings: list[str] | None = None)
             verified_no_impact=1,
             insufficient_evidence=1,
             failover_protected=1,
+            assessment_record_count=0,
+            missing_evidence_categories=["customer_impact_assessment"],
         ),
         rule_summary=RuleSummary(
             rule_codes=["REFUND-001"],
@@ -142,6 +151,10 @@ def test_deterministic_response_renders_validated_sections_and_keeps_run_unchang
     assert "Etkilenmediği doğrulanan: 1 bağlantı." in response.response_text
     assert "Kanıtı yetersiz: 1 bağlantı." in response.response_text
     assert "Failover ile korunan: 1 bağlantı; tam kesinti sayılmaz." in response.response_text
+    assert "Doğrulanmış ana kök neden: OLT_UNREACHABLE." in response.response_text
+    assert "Dying Gasp alarmı kök neden değil, belirtidir." in response.response_text
+    assert "Tam hizmet kesintisi: Hayır." in response.response_text
+    assert "CustomerImpactAssessment kanıtı yok." in response.response_text
     assert "Toplam telafi tutarı: 10.00 TRY." in response.response_text
     assert "Doküman sonuçları karar değil" in response.response_text
     assert {citation.reference_kind for citation in response.citations} >= {
@@ -250,9 +263,9 @@ def test_provider_failure_and_nonstructured_mock_narrative_are_safe_and_determin
 
 
 @pytest.mark.django_db
-def test_statement_selection_rejects_missing_or_unknown_canonical_ids():
+def test_statement_selection_rejects_unknown_or_duplicate_canonical_ids():
     run = completed_run("response-semantic-guard")
-    transformed = json.dumps(
+    partial = json.dumps(
         {
             "headline_id": "H1",
             "selected_statement_ids": ["S1"],
@@ -275,7 +288,12 @@ def test_statement_selection_rejects_missing_or_unknown_canonical_ids():
             ],
         }
     )
-    for content in (transformed, full_outage):
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=RecordingProvider(partial)
+    )
+    assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
+    assert "Doğrulanmış etki: 2 bağlantı." in response.response_text
+    for content in (full_outage,):
         response = ValidatedResponseBuilder().build(
             run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=RecordingProvider(content)
         )

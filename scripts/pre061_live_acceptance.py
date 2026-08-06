@@ -316,8 +316,89 @@ def _enrich_http_acceptance_artifact(path: Path, env: dict[str, str]) -> dict[st
             "model": evidence.get("resolved_embedding_model"),
             "prompt_version": evidence.get("embedding_prompt_version"),
         }
+        _apply_semantic_completeness(case)
     _write_json_atomic(path, report)
     return report
+
+
+def _apply_semantic_completeness(case: dict[str, Any]) -> None:
+    """Require user-visible canonical statements, not merely a completed run."""
+    result = case.get("actual_machine_result") or {}
+    causal = result.get("causal_summary") or {}
+    impact = result.get("impact_summary") or {}
+    rule = result.get("rule_summary") or {}
+    compensation = result.get("compensation_summary") or {}
+    code = case.get("case_code") or case.get("case_kind")
+    required: list[str] = []
+    machine_fields: dict[str, Any] = {}
+    if code == "BLACKBOX-01":
+        for label, key in (
+            ("Kesinti sayısı", "outage_count"),
+            ("Potansiyel kapsam", "potential"),
+            ("Doğrulanmış etki", "verified_impacted"),
+            ("Doğrulanmış etkisizlik", "verified_no_impact"),
+            ("Kanıt yetersiz", "insufficient_evidence"),
+            ("Failover ile korunan", "failover_protected"),
+        ):
+            if key in impact:
+                required.append(f"{label}: {impact[key]}")
+                machine_fields[key] = impact[key]
+    elif code in {"BLACKBOX-02", "root_cause"}:
+        if causal.get("root_cause_summary"):
+            required.append(f"Doğrulanmış ana kök neden: {causal['root_cause_summary']}")
+        required.extend(
+            [
+                "Dying Gasp alarmı kök neden değil, belirtidir.",
+                "Device Not Active için bu olayda doğrulanmış alarm kaydı yok.",
+            ]
+        )
+        machine_fields = {
+            key: causal.get(key)
+            for key in ("root_cause_summary", "root_alarm_types", "symptom_alarm_types")
+        }
+    elif code == "BLACKBOX-03":
+        required.extend(
+            [
+                "Tam hizmet kesintisi: Hayır.",
+                "Bağlantı durumu: ana bağlantı down, yedek bağlantı active.",
+                "Failover ile korunan:",
+            ]
+        )
+        machine_fields = {
+            key: causal.get(key) for key in ("full_outage", "primary_status", "backup_status")
+        }
+        machine_fields["failover_protected"] = impact.get("failover_protected")
+    elif code == "BLACKBOX-04":
+        required.extend(
+            [
+                "Telafi durumu:",
+                "Tazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.",
+                "Doğrulanmış RuleVersion:",
+                "Doğrulanmış DecisionEvidence:",
+            ]
+        )
+        machine_fields = {
+            key: compensation.get(key)
+            for key in ("status", "rule_versions", "evidence_references", "scope")
+        }
+    elif code in {"BLACKBOX-05", "rag_citation"}:
+        required.extend(["Doğrulanmış RuleVersion:", "Doğrulanmış DecisionEvidence:"])
+        machine_fields = {key: rule.get(key) for key in ("rule_versions", "evidence_references")}
+    elif code == "BLACKBOX-06":
+        required.append(
+            "Gerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok."
+        )
+        machine_fields = {
+            key: impact.get(key)
+            for key in ("assessment_record_count", "missing_evidence_categories")
+        }
+    final_text = case.get("actual_final_user_text") or case.get("final_user_text") or ""
+    checks = {field: field in final_text for field in required}
+    case["required_machine_fields"] = machine_fields
+    case["required_final_fields"] = required
+    case["required_final_field_checks"] = checks
+    case["semantic_completeness_pass"] = bool(required) and all(checks.values())
+    case["pass"] = bool(case.get("pass")) and case["semantic_completeness_pass"]
 
 
 def _gemma_provenance_case(
@@ -725,23 +806,46 @@ def _natural_language_case_context(env: dict[str, str]) -> dict[str, str]:
 import json
 from apps.customers.models import Subscription
 from apps.datasets.models import DataSnapshot
-from apps.operations.models import CausalEvent
+from apps.operations.models import Alarm, CausalEvent
+from apps.compensation.models import CompensationEvaluation
 s = DataSnapshot.objects.get(snapshot_key={SNAPSHOT!r})
-event = (
+aggregate_event = (
     CausalEvent.objects.filter(data_snapshot=s, root_device__district__isnull=False)
     .select_related('root_device__city', 'root_device__district')
     .order_by('event_code')
     .first()
 )
-subscription = Subscription.objects.filter(data_snapshot=s).order_by('subscription_number').first()
-if event is None or subscription is None:
+root_event = next(
+    (
+        alarm.causal_event
+        for alarm in Alarm.objects.filter(data_snapshot=s, causal_event__isnull=False)
+        .select_related('causal_event')
+        .order_by('alarm_id')
+        if (alarm.metadata.get('normalization') or {{}}).get('canonical_subtype')
+        == 'ont_dying_gasp'
+    ),
+    None,
+)
+failover_event = CausalEvent.objects.filter(
+    data_snapshot=s, metadata__scenario_code='SCN-FAILOVER-HITLESS-001'
+).order_by('event_code').first()
+evaluation = (
+    CompensationEvaluation.objects.filter(data_snapshot=s, status='calculated')
+    .select_related('outage__causal_event', 'subscription')
+    .order_by('evaluation_code').first()
+)
+if any(value is None for value in (aggregate_event, root_event, failover_event, evaluation)):
     raise RuntimeError('natural_language_acceptance_context_missing')
 print(json.dumps({{
-    'causal_event_code': event.event_code,
-    'subscription_reference': subscription.subscription_number,
-    'city': event.root_device.city.name,
-    'district': event.root_device.district.name,
-    'date': event.started_at.date().isoformat(),
+    'causal_event_code': root_event.event_code,
+    'subscription_reference': evaluation.subscription.subscription_number,
+    'city': aggregate_event.root_device.city.name,
+    'district': aggregate_event.root_device.district.name,
+    'date': aggregate_event.started_at.date().isoformat(),
+    'root_event_code': root_event.event_code,
+    'failover_event_code': failover_event.event_code,
+    'compensation_event_code': evaluation.outage.causal_event.event_code,
+    'compensation_subscription_reference': evaluation.subscription.subscription_number,
 }}))
 """
     return json.loads(_run_shell(code, env))
@@ -1076,8 +1180,10 @@ def _run_original_query_baseline(
     """Run the six self-contained baseline requests through the public intake path."""
     context = _natural_language_case_context(env)
     date = context["date"]
-    event = context["causal_event_code"]
-    subscription = context["subscription_reference"]
+    root_event = context["root_event_code"]
+    failover_event = context["failover_event_code"]
+    compensation_event = context["compensation_event_code"]
+    subscription = context["compensation_subscription_reference"]
     district = context["district"]
     prompts = [
         (
@@ -1089,30 +1195,33 @@ def _run_original_query_baseline(
         ),
         (
             "BLACKBOX-02",
-            f"Public olay kodu {event} olan kesintinin dogrulanmis ana kok nedeni nedir? "
+            f"Public olay kodu {root_event} olan kesintinin dogrulanmis ana kok nedeni nedir? "
             "Dying Gasp ve Device Not Active alarmlari kok neden mi, yoksa belirti mi?",
         ),
         (
             "BLACKBOX-03",
-            f"Public olay kodu {event} icin ana baglantinin durdugu ve yedek baglantinin "
+            f"Public olay kodu {failover_event} icin ana baglantinin durdugu ve yedek baglantinin "
             "aktif kaldigi goruluyor. Bu olay tam hizmet kesintisi midir? Gercek musteri "
             "etkisini ve failover durumunu acikla.",
         ),
         (
             "BLACKBOX-04",
-            f"Public olay kodu {event} ve abonelik referansi {subscription} icin tazminat "
+            f"Public olay kodu {compensation_event} ve abonelik referansi {subscription} "
+            "icin tazminat "
             "uygunluk sonucu nedir? Dogrulanmis etkiyi, RuleVersion'i ve DecisionEvidence "
             "kaydini belirt.",
         ),
         (
             "BLACKBOX-05",
-            f"Public olay kodu {event} icin uretilen eligibility karari hangi RuleVersion'a, "
+            f"Public olay kodu {compensation_event} icin uretilen eligibility karari "
+            f"ve abonelik referansi {subscription} icin "
+            "hangi RuleVersion'a, "
             "DecisionEvidence kaydina ve RAG kaynaginin hangi source, version ve section "
             "bolumune dayanir?",
         ),
         (
             "BLACKBOX-06",
-            f"Public olay kodu {event} ve abonelik referansi {subscription} icin musterinin "
+            f"Public olay kodu {root_event} ve abonelik referansi {subscription} icin musterinin "
             "gercekten etkilendigi kesin olarak dogrulanmis mi? Kanit yetersizse neden kesin "
             "etki karari verilemedigini acikla.",
         ),
@@ -1122,9 +1231,16 @@ def _run_original_query_baseline(
         if only_cases and BLACK_BOX_ARTIFACT.exists()
         else {}
     )
-    preserved = [
-        case for case in existing.get("cases", []) if case.get("case_code") not in only_cases
-    ]
+    preserved = (
+        [case for case in existing.get("cases", []) if case.get("case_code") not in only_cases]
+        if only_cases
+        else []
+    )
+    prior_answers = {
+        case.get("case_code"): case.get("actual_final_user_text")
+        for case in existing.get("cases", [])
+        if isinstance(case.get("case_code"), str)
+    }
     report: dict[str, Any] = {
         "gate": "PRE-061-baseline-original-query",
         "snapshot_identifier": SNAPSHOT,
@@ -1164,6 +1280,8 @@ def _run_original_query_baseline(
             or (payload.get("clarification") or {}).get("code"),
             "latency_ms": round((time.monotonic() - started) * 1000, 3),
         }
+        if prior_answers.get(case_code):
+            record["old_final_user_text"] = prior_answers[case_code]
         record["pass"] = (
             response.status_code == 200
             and record["lifecycle"] == "completed"
@@ -1171,6 +1289,8 @@ def _run_original_query_baseline(
         )
         report["cases"].append(record)
         _write_json_atomic(BLACK_BOX_ARTIFACT, report)
+    _enrich_http_acceptance_artifact(BLACK_BOX_ARTIFACT, env)
+    report = json.loads(BLACK_BOX_ARTIFACT.read_text(encoding="utf-8"))
     report["passed_count"] = sum(item["pass"] for item in report["cases"])
     report["decision"] = "PASS" if report["passed_count"] == 6 else "FAIL"
     _write_json_atomic(BLACK_BOX_ARTIFACT, report)
@@ -1179,7 +1299,9 @@ def _run_original_query_baseline(
 
 def _run_provider_matrix(headers: dict[str, str], env: dict[str, str]) -> dict[str, Any]:
     context = _natural_language_case_context(env)
-    event = context["causal_event_code"]
+    root_event = context["root_event_code"]
+    compensation_event = context["compensation_event_code"]
+    subscription = context["compensation_subscription_reference"]
     matrix = [
         ("ollama", "ollama"),
         ("ollama", "gemini"),
@@ -1189,12 +1311,13 @@ def _run_provider_matrix(headers: dict[str, str], env: dict[str, str]) -> dict[s
     prompts = [
         (
             "root_cause",
-            f"Public olay kodu {event} olan kesintinin dogrulanmis ana kok nedeni nedir? "
-            "Dying Gasp belirti mi?",
+            f"Public olay kodu {root_event} olan kesintinin dogrulanmis ana kok nedeni nedir? "
+            "Dying Gasp ve Device Not Active alarmlari kok neden mi, yoksa belirti mi?",
         ),
         (
             "rag_citation",
-            f"Public olay kodu {event} icin eligibility karari hangi RuleVersion'a, "
+            f"Public olay kodu {compensation_event} ve abonelik referansi {subscription} "
+            "icin eligibility karari hangi RuleVersion'a, "
             "DecisionEvidence kaydina ve RAG kaynaginin source, version ve section "
             "bolumune dayanir?",
         ),
@@ -1236,6 +1359,7 @@ def _run_provider_matrix(headers: dict[str, str], env: dict[str, str]) -> dict[s
                 "case_kind": kind,
                 "user_prompt": prompt,
                 "http_status": http_status,
+                "query_run_code": payload.get("query_run_code"),
                 "lifecycle": payload.get("status"),
                 "final_user_text": (payload.get("response") or {}).get("response_text"),
                 "citations": (payload.get("response") or {}).get("citations", []),
@@ -1255,9 +1379,12 @@ def _run_provider_matrix(headers: dict[str, str], env: dict[str, str]) -> dict[s
             _write_json_atomic(
                 ROOT / "artifacts" / "pre061" / "provider_matrix_acceptance.json", report
             )
+    matrix_path = ROOT / "artifacts" / "pre061" / "provider_matrix_acceptance.json"
+    _enrich_http_acceptance_artifact(matrix_path, env)
+    report = json.loads(matrix_path.read_text(encoding="utf-8"))
     report["passed_count"] = sum(case["pass"] for case in report["cases"])
     report["decision"] = "PASS" if report["passed_count"] == len(report["cases"]) else "FAIL"
-    _write_json_atomic(ROOT / "artifacts" / "pre061" / "provider_matrix_acceptance.json", report)
+    _write_json_atomic(matrix_path, report)
     return report
 
 

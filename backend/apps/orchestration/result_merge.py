@@ -56,6 +56,15 @@ class CausalSummary(BaseModel):
     root_cause_reason_codes: list[str] = Field(default_factory=list)
     role_counts: dict[str, int] = Field(default_factory=dict)
     propagation_summary: str | None = None
+    event_type: str | None = None
+    root_cause_summary: str | None = None
+    root_alarm_types: list[str] = Field(default_factory=list)
+    symptom_alarm_types: list[str] = Field(default_factory=list)
+    dying_gasp_classification: str | None = None
+    device_not_active_classification: str | None = None
+    primary_status: str | None = None
+    backup_status: str | None = None
+    full_outage: bool | None = None
 
 
 class ImpactSummary(BaseModel):
@@ -68,6 +77,8 @@ class ImpactSummary(BaseModel):
     insufficient_evidence: int | None = None
     failover_protected: int | None = None
     reason_code_distribution: dict[str, int] = Field(default_factory=dict)
+    assessment_record_count: int | None = None
+    missing_evidence_categories: list[str] = Field(default_factory=list)
 
 
 class RuleSummary(BaseModel):
@@ -207,6 +218,40 @@ def _network_causal(data: Mapping[str, Any]) -> _ExtractedToolResult:
             "root_cause_reason_codes": _string_list(data.get("reason_codes"), "reason_codes"),
             "role_counts": _count_mapping(data.get("role_counts"), "role_counts"),
             "propagation_summary": _string(data.get("propagation_summary"), "propagation_summary"),
+            "event_type": _string(data.get("event_type"), "event_type"),
+            "root_cause_summary": _string(data.get("root_cause_summary"), "root_cause_summary"),
+            "root_alarm_types": _string_list(data.get("root_alarm_types"), "root_alarm_types"),
+            "symptom_alarm_types": _string_list(
+                data.get("symptom_alarm_types"), "symptom_alarm_types"
+            ),
+            "dying_gasp_classification": _string(
+                data.get("dying_gasp_classification"), "dying_gasp_classification"
+            ),
+            "device_not_active_classification": _string(
+                data.get("device_not_active_classification"), "device_not_active_classification"
+            ),
+            "primary_status": _string(data.get("primary_status"), "primary_status"),
+            "backup_status": _string(data.get("backup_status"), "backup_status"),
+            "full_outage": data.get("full_outage")
+            if isinstance(data.get("full_outage"), bool)
+            else None,
+        },
+        impact={
+            key: value
+            for key, value in {
+                "potential": _optional_non_negative(data, "potential_connection_count"),
+                "verified_impacted": _optional_non_negative(data, "verified_impacted_count"),
+                "verified_no_impact": _optional_non_negative(data, "verified_no_impact_count"),
+                "insufficient_evidence": _optional_non_negative(
+                    data, "insufficient_evidence_count"
+                ),
+                "failover_protected": _optional_non_negative(data, "failover_protected_count"),
+                "assessment_record_count": _optional_non_negative(data, "assessment_record_count"),
+                "missing_evidence_categories": _string_list(
+                    data.get("missing_evidence_categories"), "missing_evidence_categories"
+                ),
+            }.items()
+            if value is not None and value != []
         },
     )
 
@@ -255,6 +300,10 @@ def _customer_causal_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
             ),
             "reason_code_distribution": _count_mapping(
                 data.get("reason_code_distribution"), "reason_code_distribution"
+            ),
+            "assessment_record_count": _optional_non_negative(data, "assessment_record_count"),
+            "missing_evidence_categories": _string_list(
+                data.get("missing_evidence_categories"), "missing_evidence_categories"
             ),
         },
     )

@@ -172,6 +172,22 @@ class ValidatedResponseBuilder:
             if causal.root_resource_reference:
                 resource = causal.root_resource_type or "kaynak"
                 sections.append(f"Kök kaynak: {resource} {causal.root_resource_reference}.")
+            if causal.root_cause_summary:
+                sections.append(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
+            if causal.dying_gasp_classification == "symptom":
+                sections.append("Dying Gasp alarmı kök neden değil, belirtidir.")
+            if causal.device_not_active_classification == "not_observed":
+                sections.append("Device Not Active için bu olayda doğrulanmış alarm kaydı yok.")
+            if causal.full_outage is not None:
+                sections.append(
+                    f"Tam hizmet kesintisi: {'Evet' if causal.full_outage else 'Hayır'}."
+                )
+            if causal.primary_status or causal.backup_status:
+                sections.append(
+                    "Bağlantı durumu: ana bağlantı "
+                    f"{causal.primary_status or 'doğrulanmadı'}, yedek bağlantı "
+                    f"{causal.backup_status or 'doğrulanmadı'}."
+                )
             if causal.root_cause_reason_codes:
                 sections.append(
                     "Gerekçe kodları: " + ", ".join(causal.root_cause_reason_codes) + "."
@@ -196,6 +212,12 @@ class ValidatedResponseBuilder:
                 sections.append(
                     f"Failover ile korunan: {impact.failover_protected} bağlantı; "
                     "tam kesinti sayılmaz."
+                )
+            if impact.assessment_record_count == 0 and "customer_impact_assessment" in (
+                impact.missing_evidence_categories
+            ):
+                sections.append(
+                    "Gerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok."
                 )
 
         rule = result.rule_summary
@@ -226,6 +248,22 @@ class ValidatedResponseBuilder:
             if compensation.total_amount and compensation.currency:
                 sections.append(
                     f"Toplam telafi tutarı: {compensation.total_amount} {compensation.currency}."
+                )
+            if compensation.rule_versions:
+                sections.append(
+                    "Doğrulanmış RuleVersion: "
+                    + ", ".join(sorted(compensation.rule_versions))
+                    + "."
+                )
+            if compensation.evidence_references:
+                sections.append(
+                    "Doğrulanmış DecisionEvidence: "
+                    + ", ".join(compensation.evidence_references)
+                    + "."
+                )
+            if compensation.scope == "verified_impact":
+                sections.append(
+                    "Tazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir."
                 )
 
         if result.retrieval_sources:
@@ -290,8 +328,33 @@ class ValidatedResponseBuilder:
             statements[f"S{len(statements) + 1}"] = text
 
         causal = result.causal_summary
-        if causal and causal.root_cause_reason_codes:
-            add("Kök neden gerekçesi: " + ", ".join(causal.root_cause_reason_codes) + ".")
+        if causal:
+            if causal.root_cause_summary:
+                add(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
+            if causal.root_resource_reference:
+                resource_type = causal.root_resource_type or "kaynak"
+                add(f"Doğrulanmış kök kaynak: {resource_type} {causal.root_resource_reference}.")
+            if causal.root_alarm_types:
+                add("Kök neden alarmı: " + ", ".join(causal.root_alarm_types) + ".")
+            if causal.dying_gasp_classification == "symptom":
+                add("Dying Gasp alarmı kök neden değil, belirtidir.")
+            elif causal.dying_gasp_classification == "not_observed":
+                add("Dying Gasp için bu olayda doğrulanmış alarm kaydı yok.")
+            if causal.device_not_active_classification == "symptom":
+                add("Device Not Active alarmı kök neden değil, belirtidir.")
+            elif causal.device_not_active_classification == "not_observed":
+                add("Device Not Active için bu olayda doğrulanmış alarm kaydı yok.")
+            if causal.full_outage is not None:
+                full_outage = "Evet" if causal.full_outage else "Hayır"
+                add(f"Tam hizmet kesintisi: {full_outage}.")
+            if causal.primary_status or causal.backup_status:
+                add(
+                    "Bağlantı durumu: ana bağlantı "
+                    f"{causal.primary_status or 'doğrulanmadı'}, yedek bağlantı "
+                    f"{causal.backup_status or 'doğrulanmadı'}."
+                )
+            if causal.root_cause_reason_codes:
+                add("Kök neden gerekçesi: " + ", ".join(causal.root_cause_reason_codes) + ".")
         impact = result.impact_summary
         if impact:
             if impact.outage_count is not None:
@@ -304,10 +367,16 @@ class ValidatedResponseBuilder:
             ):
                 if value is not None:
                     add(f"{label}: {value} bağlantı.")
-            if impact.failover_protected is not None and impact.failover_protected > 0:
+            if impact.failover_protected is not None:
                 add(
                     f"Failover ile korunan: {impact.failover_protected} bağlantı; "
                     "tam kesinti sayılmaz."
+                )
+            if impact.assessment_record_count == 0 and "customer_impact_assessment" in (
+                impact.missing_evidence_categories
+            ):
+                add(
+                    "Gerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok."
                 )
         rule = result.rule_summary
         if rule and rule.rule_versions:
@@ -317,6 +386,20 @@ class ValidatedResponseBuilder:
         compensation = result.compensation_summary
         if compensation and compensation.status:
             add(f"Telafi durumu: {compensation.status}.")
+        if compensation and compensation.considered is not None:
+            add(f"Telafi değerlendirmesi yapılan: {compensation.considered} kayıt.")
+        if compensation and compensation.eligible is not None:
+            add(f"Tazminata uygun: {compensation.eligible} kayıt.")
+        if compensation and compensation.ineligible_pending is not None:
+            add(f"Uygun olmayan veya bekleyen: {compensation.ineligible_pending} kayıt.")
+        if compensation and compensation.rule_versions:
+            add("Doğrulanmış RuleVersion: " + ", ".join(sorted(compensation.rule_versions)) + ".")
+        if compensation and compensation.evidence_references:
+            add(
+                "Doğrulanmış DecisionEvidence: " + ", ".join(compensation.evidence_references) + "."
+            )
+        if compensation and compensation.scope == "verified_impact":
+            add("Tazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.")
         if result.retrieval_sources:
             source_labels = []
             for source in result.retrieval_sources:
@@ -370,9 +453,12 @@ class ValidatedResponseBuilder:
         cls._validate_statement_selection(selection, statements)
         headline = "Kesinti değerlendirmesi" if selection["headline_id"] == "H1" else None
         lines = [headline] if headline else []
-        lines.extend(
-            statements[statement_id] for statement_id in selection["selected_statement_ids"]
-        )
+        selected = selection["selected_statement_ids"]
+        # The model chooses a safe ordering only. Any omitted critical ID is
+        # deterministically appended so semantic completeness never depends on
+        # the model deciding to include every canonical statement.
+        ordered_ids = [*selected, *(item for item in statements if item not in selected)]
+        lines.extend(statements[statement_id] for statement_id in ordered_ids)
         return "\n".join(lines)
 
     @staticmethod
@@ -389,9 +475,6 @@ class ValidatedResponseBuilder:
             raise ValueError("statement selection IDs are invalid")
         if len(selected) != len(set(selected)) or any(item not in statements for item in selected):
             raise ValueError("unknown or duplicate statement ID")
-        # All candidates are canonical and critical; omission can hide an impact class.
-        if set(selected) != set(statements):
-            raise ValueError("critical statement missing")
 
     @staticmethod
     def _narrative_contract(result: ValidatedExecutionResult) -> str:

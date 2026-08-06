@@ -325,3 +325,24 @@ cross-provider vector contamination. Exact fact and citation checks passed;
 unsupported fact/reference/decision, privacy violations, snapshot leakage and
 critical citation mismatches were all zero. PRE-061 is therefore **PASS** and
 `MAIN-061` may start.
+
+## Semantic Completeness Revalidation
+
+**Decision: PASS.** The earlier HTTP/provider pass was narrowed: it proved
+execution and supported subsets, but did not require every user-requested
+canonical statement in the final Turkish response. The statement contract now
+adds backend-generated, immutable statements for the aggregate failover count,
+named root cause and alarm classification, full-outage/primary/backup status,
+verified-impact compensation basis, exact RuleVersion/DecisionEvidence, and
+missing CustomerImpactAssessment evidence. No model-authored factual text is
+rendered.
+
+The semantic baseline passed 6/6. Each response includes its required
+case-specific final fields and the corresponding merged machine fields. The
+provider matrix passed 8/8 semantic checks across all four LLM/embedding
+combinations. The model may order known statement IDs; omitted IDs are appended
+by the backend in canonical order, so completeness is deterministic while
+unknown or duplicate IDs remain rejected. `final_black_box_acceptance.json`
+retains the pre-fix response where available and the new response plus field
+checks for every case. No unsupported fact/reference/decision, privacy
+violation, snapshot leakage, or citation mismatch was observed.
