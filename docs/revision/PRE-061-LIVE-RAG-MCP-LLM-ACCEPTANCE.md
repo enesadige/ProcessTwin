@@ -169,3 +169,29 @@ start from this gate.
   a real endpoint RAG-citation case cannot yet satisfy the requested matrix.
 - Qwen was not resident at phase start. Gemma was gracefully unloaded after
   the diagnostic; no simultaneous Qwen/Gemma residency was observed.
+
+## Final Gap Completion
+
+**Overall PRE-061 decision remains FAIL.** The remaining LIVE-07 evidence is
+now accepted: the post-fix single-case harness wrote its result to
+`artifacts/pre061/live_live_07.json`, rather than the aggregate artifact. It
+completed with HTTP `200`, a completed QueryRun, the real Rule MCP
+`search_rule_documents` tool, five snapshot-scoped source/version/section
+citations, citation support, zero critical mismatch, zero leakage, and zero
+privacy violations. The prior "orphaned launcher" diagnosis was incorrect;
+the actual defect was missing aggregate-artifact reconciliation.
+
+The three missing real Gemma calls are now recorded as
+`GEMMA-10-RAG-CITATION`, `GEMMA-11-IMPACT`, and
+`GEMMA-12-COMPENSATION`. They used `gemma4:12b-it-qat` through the existing
+provider contract with `think:false` and `stream:false`: two deterministic
+fallbacks and one LLM-assisted response. All three user-visible outputs were
+safe. Gemma was then unloaded; Qwen was not resident.
+
+This closes the call-count gap at 12/12, but not the acceptance-metric proof:
+the first nine Gemma calls were persisted only as an aggregate count, without
+their case-level guard outcome or contradiction fields. Their aggregate
+narrative acceptance, contradiction, unsupported-number/reference/decision,
+and fallback rates therefore cannot be certified retrospectively. PRE-061
+cannot be marked PASS or CONDITIONAL PASS, and `MAIN-061` remains blocked
+until an evidence-grade replacement Gemma matrix is run and persisted.

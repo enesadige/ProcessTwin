@@ -36,6 +36,12 @@
       "simultaneous_residency_observed": false
     }
   },
+  "final_gap_completion": {
+    "decision": "FAIL",
+    "live_07": {"artifact": "artifacts/pre061/live_live_07.json", "citation_support": true, "critical_citation_mismatch_count": 0, "launcher_root_cause": "The single-case harness intentionally wrote a separate artifact; the aggregate artifact was not reconciled.", "privacy_violation_count": 0, "query_run_status": "completed", "selected_tool": "rule.search_rule_documents", "snapshot_leakage_count": 0, "status_code": 200, "status": "accepted"},
+    "gemma": {"completed_case_count": 12, "new_case_evidence_count": 3, "final_user_visible_unsupported_fact_count": 0, "status": "coverage_count_complete_metrics_not_certifiable"},
+    "blocker": "The missing live calls are complete, but per-case metrics for the nine historical Gemma calls were never persisted; PRE-061 narrative thresholds cannot be certified without a replacement evidence run."
+  },
   "qwen_unloaded_before_gemma": true,
   "rag": {
     "result_count": 5,

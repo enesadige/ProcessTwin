@@ -25,8 +25,18 @@
   diagnosticleri başarılı oldu. Canonical production seçimi
   `gemini-3.6-flash` + `interactions`; dört gerçek fact-sheet smoke guard
   fallback'iyle güvenli kaldı. LIVE-07 planner/required-evidence dar
-  düzeltmesi kod/test düzeyinde tamamlandı, fakat post-fix canlı artefact
-  oluşmadı. Gemma 9/12 olduğundan PRE-061 FAIL ve `MAIN-061` bloklu kalır.
+  düzeltmesi kod/test düzeyinde tamamlandı. Post-fix canlı sonuç ayrı
+  `live_live_07.json` artefact'ına yazılmış, fakat aggregate rapora
+  uzlaştırılmamıştı.
+
+- **PRE-061 final-gap completion:** LIVE-07 post-fix canlı kanıtı HTTP 200,
+  completed QueryRun, gerçek `rule.search_rule_documents`, citation support ve
+  sıfır critical mismatch/leakage/privacy ihlali ile kabul edildi. Üç eksik
+  gerçek Gemma çağrısı (`GEMMA-10-RAG-CITATION`, `GEMMA-11-IMPACT`,
+  `GEMMA-12-COMPENSATION`) tamamlandı ve model unload edildi. Buna rağmen ilk
+  dokuz çağrının vaka bazlı fact-guard/contradiction metrikleri persist
+  edilmediğinden 12-vaka narrative acceptance eşiği kanıtlanamıyor. PRE-061
+  **FAIL**, `MAIN-061` bloklu kalır.
 
 - **MAIN-xxx — Ana kümülatif görev planı:** Ek orchestration serisinden önce
   son tamamlanan ana plan maddesi `MAIN-051.5 — Çoklu embedding seti ve lokal

@@ -174,6 +174,40 @@
     "post_fix_live_result": "unavailable_orphaned_launcher_no_persisted_result",
     "status": "not_accepted"
   },
+  "final_gap_completion": {
+    "decision": "FAIL",
+    "gemma": {
+      "completed_case_count": 12,
+      "legacy_aggregate_case_count": 9,
+      "new_case_evidence": [
+        {"case_code": "GEMMA-10-RAG-CITATION", "fallback": true, "final_user_output_safe": true, "generation_mode": "deterministic_fallback", "latency_ms": 42154.237},
+        {"case_code": "GEMMA-11-IMPACT", "fallback": false, "final_user_output_safe": true, "generation_mode": "llm_assisted", "latency_ms": 9189.135},
+        {"case_code": "GEMMA-12-COMPENSATION", "fallback": true, "final_user_output_safe": true, "generation_mode": "deterministic_fallback", "latency_ms": 10748.169}
+      ],
+      "new_case_average_latency_ms": 20697.18,
+      "new_case_p95_latency_ms": 42154.237,
+      "new_case_fallback_success_rate": 1.0,
+      "final_user_visible_unsupported_fact_count": 0,
+      "metric_provenance": "The nine historical calls were persisted only as an aggregate count; case-level acceptance and contradiction metrics cannot be reconstructed without rerunning them.",
+      "status": "coverage_count_complete_metrics_not_certifiable"
+    },
+    "live_07": {
+      "artifact": "artifacts/pre061/live_live_07.json",
+      "citation_support": true,
+      "critical_citation_mismatch_count": 0,
+      "launcher_root_cause": "The single-case harness intentionally wrote a separate artifact; the aggregate artifact was not reconciled.",
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-E8F96103F20A4317BC4AD67F79895D65",
+      "query_run_status": "completed",
+      "selected_tool": "rule.search_rule_documents",
+      "snapshot_leakage_count": 0,
+      "source_sections": ["SYN-COMP-2026-METRO-SLA@1:Failover", "SYN-COMP-2026-METRO-SLA@1:İstisnalar", "SYN-FAILOVER-MAINTENANCE-2026@1:Amaç", "SYN-FAILOVER-MAINTENANCE-2026@1:Failover Adımları", "SYN-FAILOVER-MAINTENANCE-2026@1:İstisnalar ve Kanıt"],
+      "status_code": 200,
+      "status": "accepted"
+    },
+    "model_residency": {"gemma_unloaded_after_new_cases": true, "qwen_resident_during_gemma_cases": false, "simultaneous_residency_observed": false},
+    "blocker": "Twelve calls are now accounted for, but the nine historical Gemma calls lack the per-case fact-guard outcomes required to certify the narrative acceptance and contradiction thresholds."
+  },
   "gemma_unloaded_after_acceptance": true,
   "qwen_retrieval_reused": true,
   "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
