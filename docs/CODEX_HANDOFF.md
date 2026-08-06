@@ -8,6 +8,20 @@
 - Bu checkpoint'te working tree temiz bırakılmalıdır.
 - Son doğrulanmış tam test baseline'i repository root'tan `.venv/bin/pytest -q` ile **612 passed** sonucudur. Bu sonuç REV-00 baseline dokümanında kayıtlıdır; bu handoff hazırlanırken testler yeniden çalıştırılmamalıdır.
 - REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` commit'iyle tamamladı. REV-03, nedensel operasyon modelleri ve migration çalışmasıyla; REV-04 ise GPON alarm/topoloji compatibility validator ve katalog kararıyla tamamlandı.
+
+## Görev Takip Durumu
+
+- **MAIN-xxx — Ana kümülatif görev planı:** Ek orchestration serisinden önce
+  son tamamlanan ana plan maddesi `MAIN-051.5 — Çoklu embedding seti ve lokal
+  provider`dır. Dosyadaki ilk tamamlanmamış ana plan maddesi
+  `MAIN-061 — Frontend uygulama kabuğunu tasarla`dır.
+- **REV-00–REV-12 — Causal revizyon serisi:** Tamamlandı; PRE-052 native
+  snapshot refresh ve causal integration gate de tamamlandı.
+- **ORCH-052–ORCH-060 — Ek orchestration serisi:** Tamamlandı. QueryRun,
+  provider registry/adapters, StructuredQuery, ToolPlan, deterministic planner,
+  MCP executor, result validation, response builder ve authenticated endpoint
+  bu ayrı serinin parçalarıdır. Bu seri ana kümülatif plan numaralandırmasını
+  veya MAIN görev imlecini değiştirmez.
 - Görev 052 tamamlandı: `apps.orchestration.QueryRun` explicit snapshot,
   unique idempotency key, retry zinciri, privacy-safe JSON audit alanları ve
   `pending -> planned -> executing -> completed|failed` yaşam döngüsünü
@@ -180,7 +194,8 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
   REV-12 full suite sonucu 667 passed; MCP tool sayıları 9/7/8/6, RAG manifest
   13 ve benchmark 25'tir. Native multi-city/RAG gates eski snapshot data
   precondition'larında güvenli biçimde durdu; yeni canlı sayı iddia edilmedi.
-  Sıradaki görev Görev 52'dir.
+  Ana plan takibinde sıradaki görev `MAIN-061 — Frontend uygulama kabuğunu
+  tasarla`dır; `ORCH-052–ORCH-060` tamamlanmış ek seridir.
 
 ## 12. Açık Sorular
 
@@ -188,7 +203,7 @@ Session identity mapping, masking ve retention; stop/restart/continue semantiği
 
 ## 13. Yeni Codex Oturumu İçin Kurallar
 
-İşe `git status --short`, `git rev-parse HEAD` ve son commit ile başla. Tamamlanmış görevleri yeniden uygulama, kullanıcı değişikliklerini silme, görevin dışına refactor taşıma. Her görevde tüm repo kataloglanmaz; önce bu handoff ve ilgili REV-01/REV-00 dokümanları okunur. Uygulama görevinde yalnız ilgili testler, önemli entegrasyon kapısında veya finalde full suite çalıştırılır. Her tamamlanan görev ayrı commit alır. 24 saat kuralı doğrulanmadan kodlanmaz; canlı simülasyon veya yeni MCP kendiliğinden başlatılmaz. REV-12 tamamlanmadan Görev 52'ye geçilmez.
+İşe `git status --short`, `git rev-parse HEAD` ve son commit ile başla. Tamamlanmış görevleri yeniden uygulama, kullanıcı değişikliklerini silme, görevin dışına refactor taşıma. Her görevde tüm repo kataloglanmaz; önce bu handoff ve ilgili REV-01/REV-00 dokümanları okunur. Uygulama görevinde yalnız ilgili testler, önemli entegrasyon kapısında veya finalde full suite çalıştırılır. Her tamamlanan görev ayrı commit alır. 24 saat kuralı doğrulanmadan kodlanmaz; canlı simülasyon veya yeni MCP kendiliğinden başlatılmaz. Görev seçerken `Görev Takip Durumu` bölümündeki MAIN/REV/ORCH ayrımını kullan.
 
 ## 14. Yeni Oturuma Yapıştırılacak Başlangıç Promptu
 

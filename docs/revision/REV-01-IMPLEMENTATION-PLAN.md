@@ -148,6 +148,12 @@ run planned kalir, executing run 202, conflict 409 ve terminal failure yeni
 idempotency key gerektirir. Endpoint yalniz privacy-safe typed response veya
 stable hata doner; gercek network/model cagrilari testlerde kullanilmadi.
 
+**Görev takip notu:** Bu belgedeki 052–060 uygulamaları tamamlanmış
+`ORCH-052–ORCH-060` ek orchestration serisidir. Causal revizyon serisi
+`REV-00–REV-12` de tamamlanmıştır. Bu iki seri ana kümülatif planın görev
+imlecini yeniden numaralandırmaz; dosyadaki ilk tamamlanmamış ana plan maddesi
+`MAIN-061 — Frontend uygulama kabuğunu tasarla`dır.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.

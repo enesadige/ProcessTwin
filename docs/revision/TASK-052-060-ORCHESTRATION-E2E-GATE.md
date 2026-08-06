@@ -57,6 +57,8 @@ execution ran.
 
 ## Transition
 
-Task 060 closes the synchronous authenticated orchestration integration. The
-next integration work must be selected from the current project plan; it must
-not change the validated snapshot or add a new provider/tool override surface.
+`ORCH-060` closes the synchronous authenticated orchestration integration.
+`ORCH-052–ORCH-060` is an additional completed series and does not create a
+new main-plan number. The next uncompleted main-plan task is
+`MAIN-061 — Frontend uygulama kabuğunu tasarla`; it must not change the
+validated snapshot or add a new provider/tool override surface.
