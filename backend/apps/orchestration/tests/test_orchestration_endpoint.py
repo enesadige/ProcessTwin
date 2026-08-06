@@ -16,6 +16,7 @@ from apps.orchestration.executor import (
 )
 from apps.orchestration.facade import OrchestrationFacade
 from apps.orchestration.models import QueryRun, QueryRunStatus
+from apps.orchestration.natural_language_intake import ParsedStructuredQuery
 from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.mock import MockLLMProvider
 from apps.orchestration.services import QueryRunService
@@ -109,6 +110,18 @@ class FailingNarrativeProvider(LLMProvider):
         raise RuntimeError("provider must fall back")
 
 
+class StubIntakeParser:
+    def __init__(self, query):
+        self.query = query
+        self.calls = 0
+
+    def parse(self, *, original_query, snapshot):
+        self.calls += 1
+        assert original_query
+        assert snapshot.snapshot_key == self.query.snapshot_identifier
+        return ParsedStructuredQuery(structured_query=self.query, missing_fields=())
+
+
 def request_payload(snapshot_identifier: str, *, idempotency_key: str = "endpoint-key-001") -> dict:
     return {
         "snapshot_identifier": snapshot_identifier,
@@ -189,6 +202,68 @@ def test_endpoint_runs_complete_lifecycle_and_replays_without_new_tools(settings
     assert run.status == QueryRunStatus.COMPLETED
     assert run.request_id == "e2e-060"
     assert run.final_result["validation_status"] == "valid"
+
+
+@pytest.mark.django_db
+def test_original_query_only_uses_intake_once_and_preserves_structured_replay(
+    settings, monkeypatch
+):
+    snapshot = create_snapshot("endpoint-intake")
+    query = request_payload(snapshot.snapshot_key)["structured_query"]
+    from apps.orchestration.structured_query import StructuredQuery
+
+    intake = StubIntakeParser(StructuredQuery.model_validate(query))
+    executor = FakeExecutor()
+    patch_facade(monkeypatch, OrchestrationFacade(executor=executor, intake_parser=intake))
+    payload = request_payload(snapshot.snapshot_key, idempotency_key="endpoint-intake-001")
+    payload.pop("structured_query")
+    client = Client()
+
+    first = client.post(
+        ENDPOINT,
+        data=json.dumps(payload),
+        content_type="application/json",
+        **client_headers(settings),
+    )
+    replay_payload = {**payload, "structured_query": query}
+    second = client.post(
+        ENDPOINT,
+        data=json.dumps(replay_payload),
+        content_type="application/json",
+        **client_headers(settings),
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert second.json()["replayed"] is True
+    assert intake.calls == 1
+    assert executor.calls == 1
+
+
+@pytest.mark.django_db
+def test_intake_failure_never_reaches_executor(settings, monkeypatch):
+    snapshot = create_snapshot("endpoint-intake-failure")
+    executor = FakeExecutor()
+
+    class FailingIntake:
+        def parse(self, *, original_query, snapshot):
+            from apps.orchestration.natural_language_intake import NaturalLanguageQueryParseError
+
+            raise NaturalLanguageQueryParseError("query_parse_unavailable")
+
+    patch_facade(monkeypatch, OrchestrationFacade(executor=executor, intake_parser=FailingIntake()))
+    payload = request_payload(snapshot.snapshot_key, idempotency_key="endpoint-intake-failure-001")
+    payload.pop("structured_query")
+    response = Client().post(
+        ENDPOINT,
+        data=json.dumps(payload),
+        content_type="application/json",
+        **client_headers(settings),
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "query_parse_unavailable"
+    assert executor.calls == 0
 
 
 @pytest.mark.django_db

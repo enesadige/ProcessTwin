@@ -277,3 +277,24 @@ The next and only scoped task is: normal Turkish `original_query` -> safe
 `StructuredQuery` -> deterministic planner -> real MCP/Internal API/RAG ->
 Gemma statement selection -> final user response -> six self-contained
 black-box tests. No black-box result is claimed here.
+
+## Natural-Language Intake Capability
+
+**Decision: FAIL.** The internal endpoint now accepts either a supplied,
+validated `structured_query` replay payload or an `original_query`-only intake
+payload. The latter calls `structured-query-parser-tr-v1`, which sends the
+fixed local Gemma model through the existing `/api/chat` adapter with native
+JSON Schema, `think:false`, `stream:false`, `raw:false`, and temperature zero.
+The backend rejects invented public references, dates, locations, and
+subscription references before planning; it also checks supplied public event,
+outage, and subscription references against the selected snapshot.
+
+The one real six-case parser capability run did not meet its gate. One response
+was schema-valid but produced an incorrect scope and unexpected missing fields;
+five responses exhausted the adapter's two 60-second attempts and returned
+`query_parse_unavailable`. Therefore provider/schema/StructuredQuery success
+was 1/6 and scope-match was 0/6. The endpoint, MCP, RAG, and final six-case
+black-box chain were **not started**. Gemma was unloaded after the run.
+
+PRE-061 remains **FAIL / BLOCKED** and `MAIN-061` must not start. No second
+prompt-tuning or black-box run was opened in this task.

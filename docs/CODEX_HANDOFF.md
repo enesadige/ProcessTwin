@@ -58,6 +58,14 @@
   edildi. Sıradaki kabul işi altı gerçek kullanıcı promptunun black-box
   testidir; MAIN-061 hâlâ başlamaz.
 
+- **PRE-061 natural-language intake capability:** `original_query`-only yol,
+  sabit Gemma/native-schema parser ve invented-field/snapshot-reference guard
+  ile eklendi; hazır `structured_query` replay yolu korunur. Tek gerçek altı
+  vaka gate'i **FAIL** oldu: 1/6 provider/schema/StructuredQuery başarısı,
+  0/6 kapsam eşleşmesi; beş vaka iki 60 saniyelik denemeden sonra
+  `query_parse_unavailable` döndü. Endpoint/MCP/RAG black-box zinciri
+  başlatılmadı, Gemma unload edildi. PRE-061 ve `MAIN-061` bloklu kalır.
+
 - **MAIN-xxx — Ana kümülatif görev planı:** Ek orchestration serisinden önce
   son tamamlanan ana plan maddesi `MAIN-051.5 — Çoklu embedding seti ve lokal
   provider`dır. Dosyadaki ilk tamamlanmamış ana plan maddesi

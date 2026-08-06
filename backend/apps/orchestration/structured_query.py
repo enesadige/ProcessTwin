@@ -114,6 +114,8 @@ class StructuredQuery(BaseModel):
     causal_event_code: str | None = Field(default=None, max_length=80)
     incident_code: str | None = Field(default=None, max_length=80)
     outage_code: str | None = Field(default=None, max_length=80)
+    subscription_reference: str | None = Field(default=None, max_length=80)
+    decision_type: str | None = Field(default=None, max_length=40)
     retrieval_query: str | None = Field(default=None, max_length=500)
     location: StructuredQueryLocation | None = None
     technology: Technology | None = None
@@ -129,7 +131,7 @@ class StructuredQuery(BaseModel):
             raise ValueError("snapshot_identifier is invalid")
         return normalized
 
-    @field_validator("causal_event_code", "incident_code", "outage_code")
+    @field_validator("causal_event_code", "incident_code", "outage_code", "subscription_reference")
     @classmethod
     def validate_public_code(cls, value: str | None, info) -> str | None:
         if value is None:
@@ -137,6 +139,16 @@ class StructuredQuery(BaseModel):
         normalized = _normalized_text(value, field_name=info.field_name, max_length=80).upper()
         if not _PUBLIC_CODE_RE.fullmatch(normalized):
             raise ValueError(f"{info.field_name} is invalid")
+        return normalized
+
+    @field_validator("decision_type")
+    @classmethod
+    def validate_decision_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = _normalized_text(value, field_name="decision_type", max_length=40)
+        if normalized not in {"eligibility", "compensation"}:
+            raise ValueError("decision_type is invalid")
         return normalized
 
     @field_validator("retrieval_query")
@@ -169,12 +181,17 @@ class StructuredQuery(BaseModel):
             raise ValueError("requested_outputs cannot be empty without clarification")
         if self.intent == StructuredQueryIntent.COMPENSATION_EVALUATION and not anchors:
             raise ValueError("compensation evaluation requires an operational reference")
-        if self.intent in {
-            StructuredQueryIntent.NETWORK_INVESTIGATION,
-            StructuredQueryIntent.OUTAGE_IMPACT,
-            StructuredQueryIntent.CUSTOMER_HISTORY,
-            StructuredQueryIntent.RULE_EVIDENCE,
-        } and not anchors and not any((self.location, self.technology, self.time_window)):
+        if (
+            self.intent
+            in {
+                StructuredQueryIntent.NETWORK_INVESTIGATION,
+                StructuredQueryIntent.OUTAGE_IMPACT,
+                StructuredQueryIntent.CUSTOMER_HISTORY,
+                StructuredQueryIntent.RULE_EVIDENCE,
+            }
+            and not anchors
+            and not any((self.location, self.technology, self.time_window))
+        ):
             raise ValueError("The query requires an operational reference or scope filter")
         return self
 

@@ -11,6 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_valida
 from apps.datasets.models import DataSnapshot
 from apps.orchestration.executor import ExecutorResult, ToolExecutor
 from apps.orchestration.models import QueryRun, QueryRunStatus
+from apps.orchestration.natural_language_intake import (
+    NaturalLanguageQueryParseError,
+    NaturalLanguageStructuredQueryParser,
+)
 from apps.orchestration.planner import (
     DeterministicToolPlanner,
     PlannerResultStatus,
@@ -35,12 +39,15 @@ class OrchestrationRequest(BaseModel):
     snapshot_identifier: str = Field(min_length=3, max_length=160)
     idempotency_key: str = Field(min_length=1, max_length=160)
     original_query: str = Field(min_length=1, max_length=10000)
-    structured_query: StructuredQuery
+    structured_query: StructuredQuery | None = None
     response_mode: ResponseGenerationMode = ResponseGenerationMode.DETERMINISTIC
 
     @model_validator(mode="after")
     def validate_snapshot_context(self):
-        if self.snapshot_identifier != self.structured_query.snapshot_identifier:
+        if (
+            self.structured_query
+            and self.snapshot_identifier != self.structured_query.snapshot_identifier
+        ):
             raise ValueError("request snapshot does not match structured query")
         if not self.idempotency_key.strip() or not self.original_query.strip():
             raise ValueError("request fields are invalid")
@@ -95,12 +102,14 @@ class OrchestrationFacade:
         merger: ResultMergerValidator | None = None,
         response_builder: ValidatedResponseBuilder | None = None,
         response_provider=None,
+        intake_parser: NaturalLanguageStructuredQueryParser | None = None,
     ) -> None:
         self._planner = planner or DeterministicToolPlanner()
         self._executor = executor or ToolExecutor()
         self._merger = merger or ResultMergerValidator()
         self._response_builder = response_builder or ValidatedResponseBuilder()
         self._response_provider = response_provider
+        self._intake_parser = intake_parser or NaturalLanguageStructuredQueryParser()
         self._query_run_service = QueryRunService()
 
     def execute(
@@ -134,13 +143,30 @@ class OrchestrationFacade:
             )
 
         structured_query = normalized_request.structured_query
+        if structured_query is None:
+            try:
+                parsed = self._intake_parser.parse(
+                    original_query=normalized_request.original_query,
+                    snapshot=snapshot,
+                )
+            except NaturalLanguageQueryParseError as exc:
+                return self._error(
+                    422 if exc.code in {"invalid_structured_query", "reference_not_found"} else 503,
+                    exc.code,
+                    "Query intake could not produce a safe structured query.",
+                    query_run=query_run,
+                )
+            structured_query = parsed.structured_query
+            response_mode = ResponseGenerationMode.LLM_ASSISTED
+        else:
+            response_mode = normalized_request.response_mode
         if not created and query_run.structured_query != structured_query.to_audit_dict():
             return self._error(
                 409, "idempotency_conflict", "Idempotency key conflicts with another request."
             )
 
         if not created:
-            replay = self._replay(query_run, structured_query, normalized_request.response_mode)
+            replay = self._replay(query_run, structured_query, response_mode)
             if replay is not None:
                 return replay
 
@@ -164,7 +190,7 @@ class OrchestrationFacade:
                 return self._failed_run_outcome(finalized_run, execution_result)
             response = self._response_builder.build(
                 finalized_run,
-                mode=normalized_request.response_mode,
+                mode=response_mode,
                 provider=self._response_provider,
             )
             return OrchestrationOutcome(

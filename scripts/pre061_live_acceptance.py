@@ -24,6 +24,7 @@ SNAPSHOT = (
 )
 ARTIFACT = ROOT / "artifacts" / "pre061" / "live_acceptance_report.json"
 LLM_ARTIFACT = ROOT / "artifacts" / "pre061" / "llm_narrative_acceptance.json"
+BLACK_BOX_ARTIFACT = ROOT / "artifacts" / "pre061" / "final_black_box_acceptance.json"
 MCP_MODULES = {
     "network": "mcp_servers.network",
     "customer": "mcp_servers.customer",
@@ -640,6 +641,193 @@ def _run_native_schema_benchmark(env: dict[str, str]) -> dict[str, Any]:
     return report
 
 
+def _natural_language_case_context(env: dict[str, str]) -> dict[str, str]:
+    code = f"""
+import json
+from apps.customers.models import Subscription
+from apps.datasets.models import DataSnapshot
+from apps.operations.models import CausalEvent
+s = DataSnapshot.objects.get(snapshot_key={SNAPSHOT!r})
+event = (
+    CausalEvent.objects.filter(data_snapshot=s, root_device__district__isnull=False)
+    .select_related('root_device__city', 'root_device__district')
+    .order_by('event_code')
+    .first()
+)
+subscription = Subscription.objects.filter(data_snapshot=s).order_by('subscription_number').first()
+if event is None or subscription is None:
+    raise RuntimeError('natural_language_acceptance_context_missing')
+print(json.dumps({{
+    'causal_event_code': event.event_code,
+    'subscription_reference': subscription.subscription_number,
+    'city': event.root_device.city.name,
+    'district': event.root_device.district.name,
+    'date': event.started_at.date().isoformat(),
+}}))
+"""
+    return json.loads(_run_shell(code, env))
+
+
+def _run_natural_language_parser_case(
+    case_code: str,
+    prompt: str,
+    expected: dict[str, Any],
+    env: dict[str, str],
+) -> dict[str, Any]:
+    code = f"""
+import json
+import time
+from apps.datasets.models import DataSnapshot
+from apps.orchestration.natural_language_intake import (
+    NaturalLanguageQueryParseError,
+    NaturalLanguageStructuredQueryParser,
+    STRUCTURED_QUERY_PARSER_PROMPT_VERSION,
+)
+snapshot = DataSnapshot.objects.get(snapshot_key={SNAPSHOT!r})
+started = time.monotonic()
+out = {{
+    'case_code': {case_code!r},
+    'user_prompt': {prompt!r},
+    'parser_provider': 'ollama',
+    'parser_model': 'gemma4:12b-it-qat',
+    'prompt_version': STRUCTURED_QUERY_PARSER_PROMPT_VERSION,
+    'provider_success': False,
+    'timeout': False,
+    'native_schema_parse_success': False,
+    'structured_query_validation': False,
+    'actual_structured_query': None,
+    'invented_field_count': 0,
+    'missing_fields': [],
+    'failure_reason': None,
+}}
+try:
+    parsed = NaturalLanguageStructuredQueryParser().parse(
+        original_query={prompt!r}, snapshot=snapshot
+    )
+    out['provider_success'] = True
+    out['native_schema_parse_success'] = True
+    out['structured_query_validation'] = True
+    out['actual_structured_query'] = parsed.structured_query.to_audit_dict()
+    out['missing_fields'] = [item.value for item in parsed.missing_fields]
+except NaturalLanguageQueryParseError as exc:
+    out['failure_reason'] = exc.code
+    out['timeout'] = exc.code == 'query_parse_unavailable'
+out['latency_ms'] = round((time.monotonic() - started) * 1000, 3)
+expected = {expected!r}
+actual = out['actual_structured_query'] or {{}}
+out['pass'] = (
+    out['provider_success']
+    and out['native_schema_parse_success']
+    and out['structured_query_validation']
+    and out['missing_fields'] == []
+    and all(actual.get(key) == value for key, value in expected.items())
+)
+if not out['pass'] and out['failure_reason'] is None:
+    out['failure_reason'] = 'parsed_scope_does_not_match_expected'
+print(json.dumps(out, ensure_ascii=True, sort_keys=True))
+"""
+    return json.loads(_run_shell(code, env))
+
+
+def _run_natural_language_parser_capability(env: dict[str, str]) -> dict[str, Any]:
+    context = _natural_language_case_context(env)
+    date = context["date"]
+    causal_event_code = context["causal_event_code"]
+    subscription_reference = context["subscription_reference"]
+    district = context["district"]
+    city = context["city"]
+    cases = (
+        (
+            "BLACKBOX-01",
+            f"{date} ile {date} arasinda {district} ilcesinde kac kesinti yasandi? "
+            "Potansiyel kapsami, gercekten etkilendigi dogrulanan baglantilari, "
+            "etkilenmedigi dogrulananlari, kaniti yetersiz olanlari ve failover ile "
+            "korunanlari ayri ayri belirt.",
+            {
+                "intent": "outage_impact",
+                "location": {"city": city, "district": district},
+            },
+        ),
+        (
+            "BLACKBOX-02",
+            (
+                f"Public olay kodu {causal_event_code} olan kesintinin dogrulanmis ana kok "
+                "nedeni nedir? Bu olayla iliskili Dying Gasp ve Device Not Active alarmlari "
+                "kok neden mi, yoksa belirti mi?"
+            ),
+            {"intent": "network_investigation", "causal_event_code": causal_event_code},
+        ),
+        (
+            "BLACKBOX-03",
+            (
+                f"Public olay kodu {causal_event_code} icin ana baglantinin durdugu ve yedek "
+                "baglantinin aktif kaldigi goruluyor. Bu olay tam hizmet kesintisi olarak mi "
+                "siniflandirilmistir? Gercek musteri etkisini ve failover durumunu acikla."
+            ),
+            {"intent": "outage_impact", "causal_event_code": causal_event_code},
+        ),
+        (
+            "BLACKBOX-04",
+            (
+                f"Public olay kodu {causal_event_code} ve abonelik referansi "
+                f"{subscription_reference} icin tazminat uygunluk sonucu nedir? Kararin dayandigi "
+                "dogrulanmis etkiyi, RuleVersion'i ve DecisionEvidence kaydini belirt."
+            ),
+            {
+                "intent": "compensation_evaluation",
+                "causal_event_code": causal_event_code,
+                "subscription_reference": subscription_reference,
+            },
+        ),
+        (
+            "BLACKBOX-05",
+            (
+                f"Public olay kodu {causal_event_code} icin uretilen eligibility karari hangi "
+                "RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin hangi source, version "
+                "ve section bolumune dayanir?"
+            ),
+            {"intent": "rule_document_retrieval", "causal_event_code": causal_event_code},
+        ),
+        (
+            "BLACKBOX-06",
+            (
+                f"Public olay kodu {causal_event_code} ve abonelik referansi "
+                f"{subscription_reference} icin musterinin gercekten etkilendigi kesin olarak "
+                "dogrulanmis mi? Kanit yetersizse neden kesin etki karari verilemedigini acikla."
+            ),
+            {
+                "intent": "outage_impact",
+                "causal_event_code": causal_event_code,
+                "subscription_reference": subscription_reference,
+            },
+        ),
+    )
+    report: dict[str, Any] = {
+        "gate": "PRE-061-natural-language-parser-capability",
+        "snapshot_identifier": SNAPSHOT,
+        "context": context,
+        "cases": [],
+    }
+    for case_code, prompt, expected in cases:
+        report["cases"].append(_run_natural_language_parser_case(case_code, prompt, expected, env))
+        _write_json_atomic(BLACK_BOX_ARTIFACT, report)
+    report["metrics"] = {
+        "case_count": len(report["cases"]),
+        "provider_success_count": sum(case["provider_success"] for case in report["cases"]),
+        "native_schema_parse_success_count": sum(
+            case["native_schema_parse_success"] for case in report["cases"]
+        ),
+        "structured_query_validation_count": sum(
+            case["structured_query_validation"] for case in report["cases"]
+        ),
+        "invented_field_count": sum(case["invented_field_count"] for case in report["cases"]),
+        "passed_count": sum(case["pass"] for case in report["cases"]),
+    }
+    report["decision"] = "PASS" if report["metrics"]["passed_count"] == 6 else "FAIL"
+    _write_json_atomic(BLACK_BOX_ARTIFACT, report)
+    return report
+
+
 def _snapshot_context(env: dict[str, str]) -> dict[str, str]:
     code = (
         "import json; "
@@ -817,6 +1005,7 @@ def main() -> int:
     parser.add_argument("--closed-world-gemma", action="store_true")
     parser.add_argument("--native-schema-capability", action="store_true")
     parser.add_argument("--native-schema-benchmark", action="store_true")
+    parser.add_argument("--natural-language-parser-capability", action="store_true")
     options = parser.parse_args()
     token = secrets.token_urlsafe(32)
     env = {
@@ -867,6 +1056,12 @@ def main() -> int:
             json.dumps(report["native_schema_clean_benchmark"], ensure_ascii=True, sort_keys=True)
         )
         return 0 if report["native_schema_clean_benchmark"]["decision"] == "PASS" else 1
+    if options.natural_language_parser_capability:
+        report = _run_natural_language_parser_capability(env)
+        report["gemma_unloaded_after_parser_capability"] = _unload_model("gemma4:12b-it-qat")
+        _write_json_atomic(BLACK_BOX_ARTIFACT, report)
+        print(json.dumps(report, ensure_ascii=True, sort_keys=True))
+        return 0 if report["decision"] == "PASS" else 1
     server = subprocess.Popen(
         [sys.executable, "backend/manage.py", "runserver", "127.0.0.1:8000", "--noreload"],
         cwd=ROOT,

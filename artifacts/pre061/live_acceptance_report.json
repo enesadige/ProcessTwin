@@ -367,8 +367,21 @@
     "gemini_provider_smoke": "PASS",
     "gemma_native_schema_statement_selection": "PASS",
     "normal_turkish_original_query_black_box_e2e": "NOT_RUN_BLOCKED",
-    "black_box_blocker": "The authenticated internal endpoint requires a prebuilt structured_query; no original_query to StructuredQuery intake/parser exists.",
+    "black_box_blocker": "The real native-schema intake capability gate failed before endpoint execution: only 1/6 parser responses validated and 0/6 matched the requested scope; the remaining five timed out across two 60-second attempts.",
     "main_061": "BLOCKED",
     "next_scoped_task": "Normal Turkish original_query to safe StructuredQuery to deterministic planner to real MCP/Internal API/RAG to Gemma statement selection to final user response to six self-contained black-box tests."
+  },
+  "natural_language_intake_capability": {
+    "prompt_version": "structured-query-parser-tr-v1",
+    "provider": "ollama",
+    "model": "gemma4:12b-it-qat",
+    "case_count": 6,
+    "provider_success_count": 1,
+    "native_schema_parse_success_count": 1,
+    "structured_query_validation_count": 1,
+    "scope_match_count": 0,
+    "endpoint_black_box_started": false,
+    "gemma_unloaded_after_capability": true,
+    "decision": "FAIL"
   }
 }

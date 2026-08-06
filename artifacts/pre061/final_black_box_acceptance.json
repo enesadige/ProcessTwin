@@ -1,0 +1,148 @@
+{
+  "cases": [
+    {
+      "actual_structured_query": {
+        "clarification_reasons": [
+          "compensation_anchor_required",
+          "missing_requested_output"
+        ],
+        "clarification_required": true,
+        "intent": "outage_impact",
+        "location": {
+          "city": "Konak",
+          "district": "Konak"
+        },
+        "requested_outputs": [
+          "impact"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "time_window": {
+          "from_time": "2026-06-06T00:00:00Z",
+          "to_time": "2026-06-06T00:00:00Z"
+        }
+      },
+      "case_code": "BLACKBOX-01",
+      "failure_reason": "parsed_scope_does_not_match_expected",
+      "invented_field_count": 0,
+      "latency_ms": 54358.29,
+      "missing_fields": [
+        "compensation_anchor",
+        "requested_output"
+      ],
+      "native_schema_parse_success": true,
+      "parser_model": "gemma4:12b-it-qat",
+      "parser_provider": "ollama",
+      "pass": false,
+      "prompt_version": "structured-query-parser-tr-v1",
+      "provider_success": true,
+      "structured_query_validation": true,
+      "timeout": false,
+      "user_prompt": "2026-06-06 ile 2026-06-06 arasinda Konak ilcesinde kac kesinti yasandi? Potansiyel kapsami, gercekten etkilendigi dogrulanan baglantilari, etkilenmedigi dogrulananlari, kaniti yetersiz olanlari ve failover ile korunanlari ayri ayri belirt."
+    },
+    {
+      "actual_structured_query": null,
+      "case_code": "BLACKBOX-02",
+      "failure_reason": "query_parse_unavailable",
+      "invented_field_count": 0,
+      "latency_ms": 120055.064,
+      "missing_fields": [],
+      "native_schema_parse_success": false,
+      "parser_model": "gemma4:12b-it-qat",
+      "parser_provider": "ollama",
+      "pass": false,
+      "prompt_version": "structured-query-parser-tr-v1",
+      "provider_success": false,
+      "structured_query_validation": false,
+      "timeout": true,
+      "user_prompt": "Public olay kodu CE-MCR-0018 olan kesintinin dogrulanmis ana kok nedeni nedir? Bu olayla iliskili Dying Gasp ve Device Not Active alarmlari kok neden mi, yoksa belirti mi?"
+    },
+    {
+      "actual_structured_query": null,
+      "case_code": "BLACKBOX-03",
+      "failure_reason": "query_parse_unavailable",
+      "invented_field_count": 0,
+      "latency_ms": 120088.04,
+      "missing_fields": [],
+      "native_schema_parse_success": false,
+      "parser_model": "gemma4:12b-it-qat",
+      "parser_provider": "ollama",
+      "pass": false,
+      "prompt_version": "structured-query-parser-tr-v1",
+      "provider_success": false,
+      "structured_query_validation": false,
+      "timeout": true,
+      "user_prompt": "Public olay kodu CE-MCR-0018 icin ana baglantinin durdugu ve yedek baglantinin aktif kaldigi goruluyor. Bu olay tam hizmet kesintisi olarak mi siniflandirilmistir? Gercek musteri etkisini ve failover durumunu acikla."
+    },
+    {
+      "actual_structured_query": null,
+      "case_code": "BLACKBOX-04",
+      "failure_reason": "query_parse_unavailable",
+      "invented_field_count": 0,
+      "latency_ms": 120109.322,
+      "missing_fields": [],
+      "native_schema_parse_success": false,
+      "parser_model": "gemma4:12b-it-qat",
+      "parser_provider": "ollama",
+      "pass": false,
+      "prompt_version": "structured-query-parser-tr-v1",
+      "provider_success": false,
+      "structured_query_validation": false,
+      "timeout": true,
+      "user_prompt": "Public olay kodu CE-MCR-0018 ve abonelik referansi SUB-MCR-00001 icin tazminat uygunluk sonucu nedir? Kararin dayandigi dogrulanmis etkiyi, RuleVersion'i ve DecisionEvidence kaydini belirt."
+    },
+    {
+      "actual_structured_query": null,
+      "case_code": "BLACKBOX-05",
+      "failure_reason": "query_parse_unavailable",
+      "invented_field_count": 0,
+      "latency_ms": 120142.038,
+      "missing_fields": [],
+      "native_schema_parse_success": false,
+      "parser_model": "gemma4:12b-it-qat",
+      "parser_provider": "ollama",
+      "pass": false,
+      "prompt_version": "structured-query-parser-tr-v1",
+      "provider_success": false,
+      "structured_query_validation": false,
+      "timeout": true,
+      "user_prompt": "Public olay kodu CE-MCR-0018 icin uretilen eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin hangi source, version ve section bolumune dayanir?"
+    },
+    {
+      "actual_structured_query": null,
+      "case_code": "BLACKBOX-06",
+      "failure_reason": "query_parse_unavailable",
+      "invented_field_count": 0,
+      "latency_ms": 120093.057,
+      "missing_fields": [],
+      "native_schema_parse_success": false,
+      "parser_model": "gemma4:12b-it-qat",
+      "parser_provider": "ollama",
+      "pass": false,
+      "prompt_version": "structured-query-parser-tr-v1",
+      "provider_success": false,
+      "structured_query_validation": false,
+      "timeout": true,
+      "user_prompt": "Public olay kodu CE-MCR-0018 ve abonelik referansi SUB-MCR-00001 icin musterinin gercekten etkilendigi kesin olarak dogrulanmis mi? Kanit yetersizse neden kesin etki karari verilemedigini acikla."
+    }
+  ],
+  "context": {
+    "causal_event_code": "CE-MCR-0018",
+    "city": "\u0130zmir",
+    "date": "2026-06-06",
+    "district": "Konak",
+    "subscription_reference": "SUB-MCR-00001"
+  },
+  "decision": "FAIL",
+  "gate": "PRE-061-natural-language-parser-capability",
+  "gemma_unloaded_after_parser_capability": true,
+  "metrics": {
+    "case_count": 6,
+    "invented_field_count": 0,
+    "native_schema_parse_success_count": 1,
+    "passed_count": 0,
+    "provider_success_count": 1,
+    "structured_query_validation_count": 1
+  },
+  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+}
