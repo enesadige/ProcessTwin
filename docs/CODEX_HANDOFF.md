@@ -11,14 +11,14 @@
 
 ## Görev Takip Durumu
 
-- **PRE-061 — Live RAG + MCP + LLM Core Acceptance:** Retrieval aşaması PASS
-  (8 source, 54 chunk, 54 gerçek Qwen embedding; top-3 %93.33, top-5 %100,
-  citation mismatch/leakage 0). Genel gate **FAIL**: endpoint HTTP/lifecycle
-  matrisi LIVE-08 outage root-cause normalizasyonu sonrası 10/10'a ulaştı,
-  ancak LIVE-07 gerçek RAG citation üretmeden planner clarification döndü.
-  Dokuz gerçek Gemma narrative çağrısı 12-vaka eşiğinin altında kaldı. Gemini
-  canlı hata sınıfı gerçek SDK işaretine göre `invalid_api_key` olarak düzeltildi.
-  `MAIN-061` başlamaz.
+- **PRE-061 — Current reconciled status:** Retrieval acceptance **PASS**
+  (8 source, 54 chunk, 54 real Qwen embeddings; top-3 %93.33, top-5 %100,
+  citation mismatch/leakage 0). Real Gemini provider/smoke is **PASS**. Gemma
+  native-schema statement selection is **PASS** at `3c364e3` (capability 3/3;
+  clean 12/12). Normal Turkish `original_query` black-box E2E is **NOT RUN /
+  BLOCKED**: the internal endpoint requires a prebuilt `structured_query` and
+  has no `original_query -> StructuredQuery` intake/parser. Overall PRE-061 is
+  therefore **NOT COMPLETE** and `MAIN-061` must not start.
 
 - **PRE-061 final Gemini/LIVE-07 follow-up:** Aynı ephemeral key ile gerçek
   Gemini 3.6 interactions, 3.5 interactions ve 2.5 generate-content
@@ -247,7 +247,10 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
   hit oranı %100, top-3 oranı %93.33 ve kritik citation mismatch sayısı 0
   çıktığı için retrieval aşaması **PASS** durumundadır. PRE-061'in Gemma/Gemini
   acceptance aşaması sıradadır; frontend henüz başlatılmaz.
-  `MAIN-061 — Frontend uygulama kabuğunu tasarla` başlatılmamalıdır.
+  Native-schema Gemma acceptance is now PASS, but normal Turkish query black-box
+  E2E has not run because an `original_query -> StructuredQuery` intake/parser
+  does not exist. PRE-061 is **NOT COMPLETE** and `MAIN-061 — Frontend uygulama
+  kabuğunu tasarla` başlatılmamalıdır.
 
 ## 12. Açık Sorular
 

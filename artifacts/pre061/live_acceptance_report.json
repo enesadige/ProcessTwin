@@ -358,5 +358,17 @@
     "p95_latency_ms": 26180.598,
     "gemma_unloaded_after_acceptance": true,
     "decision": "PASS"
+  },
+  "current_reconciled_pre061_status": {
+    "overall_decision": "NOT_COMPLETE",
+    "authoritative_gemma_commit": "3c364e3",
+    "historical_gemma_records": ["ce36cdf", "a7f9ef3"],
+    "retrieval_acceptance": "PASS",
+    "gemini_provider_smoke": "PASS",
+    "gemma_native_schema_statement_selection": "PASS",
+    "normal_turkish_original_query_black_box_e2e": "NOT_RUN_BLOCKED",
+    "black_box_blocker": "The authenticated internal endpoint requires a prebuilt structured_query; no original_query to StructuredQuery intake/parser exists.",
+    "main_061": "BLOCKED",
+    "next_scoped_task": "Normal Turkish original_query to safe StructuredQuery to deterministic planner to real MCP/Internal API/RAG to Gemma statement selection to final user response to six self-contained black-box tests."
   }
 }

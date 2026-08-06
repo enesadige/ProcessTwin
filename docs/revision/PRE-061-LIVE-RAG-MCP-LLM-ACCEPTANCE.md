@@ -255,3 +255,25 @@ Average latency was 12,822.656 ms and p95 26,180.598 ms. Gemma was unloaded
 after the run. This supersedes the prior mixed-run narrative result; the six
 user-prompt black-box test remains the next acceptance work, not part of this
 task.
+
+## Current Reconciled Status
+
+The historical FAIL sections above are retained as evidence for the iterations
+that preceded the native-schema contract. They do not override the latest
+Gemma-specific result at commit `3c364e3`.
+
+| Acceptance area | Current status | Evidence / boundary |
+| --- | --- | --- |
+| Retrieval | **PASS** | 8 sources, 54 chunks and embeddings; top-3 93.33%, top-5 100%, critical citation mismatch 0, snapshot leakage 0. |
+| Gemini provider and smoke | **PASS** | Real provider diagnostic and four privacy-safe smoke cases were recorded before this reconciliation. |
+| Gemma native-schema statement selection | **PASS** | `closed-world-statement-selection-tr-v3`: capability 3/3 and one clean 12/12 real-provider run. |
+| Normal Turkish user-query black-box E2E | **NOT RUN / BLOCKED** | The authenticated internal endpoint requires `structured_query`; it has no intake/parser that converts `original_query` into `StructuredQuery`. |
+
+This is not a general PRE-061 PASS. Overall PRE-061 is **NOT COMPLETE** until
+the missing intake/parser is implemented and six self-contained normal Turkish
+user prompts have passed the real chain. `MAIN-061` remains blocked.
+
+The next and only scoped task is: normal Turkish `original_query` -> safe
+`StructuredQuery` -> deterministic planner -> real MCP/Internal API/RAG ->
+Gemma statement selection -> final user response -> six self-contained
+black-box tests. No black-box result is claimed here.
