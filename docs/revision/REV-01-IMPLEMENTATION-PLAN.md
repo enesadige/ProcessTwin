@@ -139,6 +139,15 @@ reference veya karar terimi tespitinde ya da provider hatasinda deterministic
 fallback kullanilir. Retrieval sonuclari citation olarak kalir; endpoint ve
 E2E orchestration Gorev 060'a birakildi.
 
+Gorev 060 — **Tamamlandi.** Internal service-token authentication kullanan
+senkron endpoint, explicit snapshot ile `QueryRun -> StructuredQuery ->
+deterministic planner -> ToolExecutor -> ResultMergerValidator ->
+ValidatedResponseBuilder` zincirini ince facade uzerinden baglar. Completed
+idempotency replayi MCP execution'i tekrar etmez; clarification/unplannable
+run planned kalir, executing run 202, conflict 409 ve terminal failure yeni
+idempotency key gerektirir. Endpoint yalniz privacy-safe typed response veya
+stable hata doner; gercek network/model cagrilari testlerde kullanilmadi.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.

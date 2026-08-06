@@ -13,5 +13,6 @@ urlpatterns = [
     path("rules/", include("apps.rules.internal_urls")),
     path("compensation/", include("apps.compensation.internal_urls")),
     path("operations/", include("apps.operations.internal_urls")),
+    path("orchestration/", include("apps.orchestration.internal_urls")),
     path("rag/", include("apps.rag.internal_urls")),
 ]

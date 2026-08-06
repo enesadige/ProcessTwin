@@ -84,6 +84,16 @@
   üretebilir; yeni sayı/reference/karar tespiti veya provider hatasında
   deterministik fallback kullanılır. Endpoint ve E2E entegrasyonu Görev 060'a
   bırakıldı.
+- Görev 060 tamamlandı: internal service-token ile korunan endpoint ve ince
+  orchestration facade, explicit snapshot-bound `QueryRun -> StructuredQuery
+  -> ToolPlan -> executor -> merge -> validated response` zincirini senkron
+  bağlar. İdempotent completed replay araçları yeniden çalıştırmaz; executing,
+  clarification, failed ve payload/snapshot conflict durumları stable ve
+  privacy-safe HTTP sonuçları verir. LLM-assisted provider hatası mevcut
+  deterministic fallback ile başarılı sunum olarak kalır. Ham query, MCP,
+  provider veya kişisel veri endpoint/audit sonucuna taşınmaz. Hedefli E2E seti
+  164 passed, full suite 836 passed in 396.28s; gerçek MCP/LLM/RAG network
+  çağrısı testlerde yapılmadı.
 - REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
   snapshot'ını native kullanımda explicit almalıdır; model herhangi bir

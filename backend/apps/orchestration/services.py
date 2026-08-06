@@ -71,7 +71,8 @@ _SECRET_ASSIGNMENT_RE = re.compile(
 )
 _IDENTIFIER_LABEL_RE = re.compile(
     r"\b(?:customer|müşteri|subscriber|abonelik|subscription)"
-    r"(?:\s*(?:id|no|number|numarası))?\s*[:=#-]?\s*[A-Za-z0-9._-]+",
+    r"(?:\s+(?:id|no|number|numarası)\s*[:=#-]?\s*[A-Za-z0-9._-]+"
+    r"|\s+[0-9][A-Za-z0-9._-]*|\s*[:=#-]\s*[A-Za-z0-9._-]+)",
     re.IGNORECASE,
 )
 _EMAIL_ADDRESS_RE = re.compile(r"\b[^\s@]+@[^\s@]+\.[^\s@]+\b")
@@ -117,9 +118,8 @@ def sanitize_json(value: Any) -> Any:
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
             normalized_key = str(key).lower()
-            if (
-                normalized_key.startswith("raw_")
-                or any(part in normalized_key for part in SENSITIVE_KEY_PARTS)
+            if normalized_key.startswith("raw_") or any(
+                part in normalized_key for part in SENSITIVE_KEY_PARTS
             ):
                 continue
             sanitized[str(key)] = sanitize_json(item)
