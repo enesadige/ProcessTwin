@@ -74,3 +74,12 @@ its in-memory metrics were not written to the artefact. The writer is fixed,
 but the 15-case benchmark was not launched a third time. The gate remains
 **FAIL** until a single persisted post-index benchmark supplies the required
 top-k and citation metrics.
+
+## Persisted Post-Index Benchmark
+
+The persisted 15-case run on the 54-chunk / 54-embedding scoped corpus yielded
+top-1 **66.67%**, top-3 **80%**, and top-5 **86.67%**. Critical citation
+mismatches fell from 9 to 2; snapshot leakage remained 0. Average latency was
+2206.707 ms and p95 was 2801.314 ms. The top-5 and zero-mismatch requirements
+are not met, so retrieval remains **FAIL**. The two remaining cases are in
+`artifacts/pre061/rag_retrieval_failure_analysis.json`.

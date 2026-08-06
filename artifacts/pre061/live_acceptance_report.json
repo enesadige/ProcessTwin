@@ -1,46 +1,22 @@
 {
   "causal_event_code": "CE-MCR-0001",
-  "decision": "PASS",
-  "duration_seconds": 96.034,
-  "endpoint": {
-    "generation_mode": "deterministic_fallback",
-    "has_response": true,
-    "status": "completed",
-    "status_code": 200
-  },
+  "decision": "FAIL",
+  "duration_seconds": 39.529,
   "gate": "PRE-061",
-  "mcp": {
-    "compensation": {
-      "success": true,
-      "tool_count": 6
-    },
-    "customer": {
-      "success": true,
-      "tool_count": 7
-    },
-    "network": {
-      "success": true,
-      "tool_count": 9
-    },
-    "rule": {
-      "success": true,
-      "tool_count": 8
-    }
-  },
   "qwen_unloaded_before_gemma": true,
   "rag": {
     "result_count": 5,
     "status_code": 200
   },
   "retrieval_benchmark": {
-    "average_latency_ms": 2209.851,
+    "average_latency_ms": 2206.707,
     "case_count": 15,
     "cases": [
       {
         "benchmark_case_code": "RAG-01",
         "citation_support": true,
         "expected_source": "SYN-ALARM-CATALOG-2026",
-        "latency_ms": 2396.896,
+        "latency_ms": 2923.847,
         "snapshot_leakage": false,
         "top_1_hit": true,
         "top_3_hit": true,
@@ -57,7 +33,7 @@
         "benchmark_case_code": "RAG-02",
         "citation_support": true,
         "expected_source": "SYN-ALARM-CATALOG-2026",
-        "latency_ms": 2252.895,
+        "latency_ms": 2801.314,
         "snapshot_leakage": false,
         "top_1_hit": true,
         "top_3_hit": true,
@@ -74,7 +50,7 @@
         "benchmark_case_code": "RAG-03",
         "citation_support": true,
         "expected_source": "SYN-ALARM-CATALOG-2026",
-        "latency_ms": 2305.664,
+        "latency_ms": 2215.902,
         "snapshot_leakage": false,
         "top_1_hit": true,
         "top_3_hit": true,
@@ -84,14 +60,14 @@
           "SYN-ALARM-CATALOG-2026",
           "SYN-CAUSAL-ANALYSIS-2026",
           "SYN-OPERATIONS-LIFECYCLE-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026"
+          "SYN-CAUSAL-ANALYSIS-2026"
         ]
       },
       {
         "benchmark_case_code": "RAG-04",
         "citation_support": true,
         "expected_source": "SYN-ALARM-CATALOG-2026",
-        "latency_ms": 1941.957,
+        "latency_ms": 2226.21,
         "snapshot_leakage": false,
         "top_1_hit": true,
         "top_3_hit": true,
@@ -99,16 +75,16 @@
         "top_sources": [
           "SYN-ALARM-CATALOG-2026",
           "SYN-ALARM-CATALOG-2026",
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-CAUSAL-ANALYSIS-2026",
-          "SYN-OPERATIONS-LIFECYCLE-2026"
+          "SYN-COMP-2026-BROADBAND",
+          "SYN-COMP-2026-BROADBAND",
+          "SYN-ALARM-CATALOG-2026"
         ]
       },
       {
         "benchmark_case_code": "RAG-05",
         "citation_support": true,
         "expected_source": "SYN-COMP-2026-ELIGIBILITY",
-        "latency_ms": 1921.608,
+        "latency_ms": 1851.343,
         "snapshot_leakage": false,
         "top_1_hit": true,
         "top_3_hit": true,
@@ -116,7 +92,7 @@
         "top_sources": [
           "SYN-COMP-2026-ELIGIBILITY",
           "SYN-CAUSAL-ANALYSIS-2026",
-          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-BROADBAND",
           "SYN-COMP-2026-ELIGIBILITY",
           "SYN-COMP-2026-ELIGIBILITY"
         ]
@@ -125,7 +101,7 @@
         "benchmark_case_code": "RAG-06",
         "citation_support": false,
         "expected_source": "SYN-COMP-2026-ELIGIBILITY",
-        "latency_ms": 2336.257,
+        "latency_ms": 2112.795,
         "snapshot_leakage": false,
         "top_1_hit": false,
         "top_3_hit": false,
@@ -133,8 +109,8 @@
         "top_sources": [
           "SYN-FAILOVER-MAINTENANCE-2026",
           "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-COMP-2026-METRO-SLA",
+          "SYN-COMP-2026-METRO-SLA",
           "SYN-FAILOVER-MAINTENANCE-2026"
         ]
       },
@@ -142,33 +118,33 @@
         "benchmark_case_code": "RAG-07",
         "citation_support": true,
         "expected_source": "SYN-COMP-2026-ELIGIBILITY",
-        "latency_ms": 2260.576,
+        "latency_ms": 2284.31,
         "snapshot_leakage": false,
-        "top_1_hit": true,
+        "top_1_hit": false,
         "top_3_hit": true,
         "top_5_hit": true,
         "top_sources": [
+          "SYN-COMP-2026-REVIEW-CAPS",
           "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-OVERVIEW",
           "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-CAUSAL-ANALYSIS-2026",
           "SYN-COMP-2026-ELIGIBILITY"
         ]
       },
       {
         "benchmark_case_code": "RAG-08",
-        "citation_support": false,
+        "citation_support": true,
         "expected_source": "SYN-COMP-2026-BROADBAND",
-        "latency_ms": 2435.219,
+        "latency_ms": 2424.992,
         "snapshot_leakage": false,
         "top_1_hit": false,
-        "top_3_hit": false,
-        "top_5_hit": false,
+        "top_3_hit": true,
+        "top_5_hit": true,
         "top_sources": [
           "SYN-COMP-2026-ELIGIBILITY",
           "SYN-CAUSAL-ANALYSIS-2026",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-BROADBAND",
+          "SYN-COMP-2026-BROADBAND",
           "SYN-COMP-2026-ELIGIBILITY"
         ]
       },
@@ -176,128 +152,128 @@
         "benchmark_case_code": "RAG-09",
         "citation_support": false,
         "expected_source": "SYN-COMP-2026-BROADBAND",
-        "latency_ms": 1898.25,
+        "latency_ms": 1907.455,
         "snapshot_leakage": false,
         "top_1_hit": false,
         "top_3_hit": false,
         "top_5_hit": false,
         "top_sources": [
           "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-OVERVIEW",
           "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-OPERATIONS-LIFECYCLE-2026"
+          "SYN-COMP-2026-OVERVIEW"
         ]
       },
       {
         "benchmark_case_code": "RAG-10",
-        "citation_support": false,
+        "citation_support": true,
         "expected_source": "SYN-COMP-2026-BROADBAND",
-        "latency_ms": 2156.165,
+        "latency_ms": 1893.697,
         "snapshot_leakage": false,
-        "top_1_hit": false,
-        "top_3_hit": false,
-        "top_5_hit": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
         "top_sources": [
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-COMP-2026-ELIGIBILITY"
+          "SYN-COMP-2026-BROADBAND",
+          "SYN-COMP-2026-BROADBAND",
+          "SYN-COMP-2026-BROADBAND",
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-BROADBAND"
         ]
       },
       {
         "benchmark_case_code": "RAG-11",
-        "citation_support": false,
+        "citation_support": true,
         "expected_source": "SYN-COMP-2026-METRO-SLA",
-        "latency_ms": 2190.372,
+        "latency_ms": 1891.137,
         "snapshot_leakage": false,
-        "top_1_hit": false,
-        "top_3_hit": false,
-        "top_5_hit": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
         "top_sources": [
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-OPERATIONS-LIFECYCLE-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026"
+          "SYN-COMP-2026-METRO-SLA",
+          "SYN-COMP-2026-METRO-SLA",
+          "SYN-COMP-2026-METRO-SLA",
+          "SYN-COMP-2026-METRO-SLA",
+          "SYN-COMP-2026-METRO-SLA"
         ]
       },
       {
         "benchmark_case_code": "RAG-12",
-        "citation_support": false,
+        "citation_support": true,
         "expected_source": "SYN-COMP-2026-METRO-SLA",
-        "latency_ms": 2070.494,
+        "latency_ms": 1909.399,
         "snapshot_leakage": false,
         "top_1_hit": false,
         "top_3_hit": false,
-        "top_5_hit": false,
+        "top_5_hit": true,
         "top_sources": [
+          "SYN-COMP-2026-BROADBAND",
           "SYN-ALARM-CATALOG-2026",
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026"
+          "SYN-COMP-2026-BROADBAND",
+          "SYN-COMP-2026-BROADBAND",
+          "SYN-COMP-2026-METRO-SLA"
         ]
       },
       {
         "benchmark_case_code": "RAG-13",
-        "citation_support": false,
+        "citation_support": true,
         "expected_source": "SYN-COMP-2026-OVERVIEW",
-        "latency_ms": 2575.598,
+        "latency_ms": 2265.284,
         "snapshot_leakage": false,
-        "top_1_hit": false,
-        "top_3_hit": false,
-        "top_5_hit": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
         "top_sources": [
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-COMP-2026-ELIGIBILITY"
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-OVERVIEW"
         ]
       },
       {
         "benchmark_case_code": "RAG-14",
-        "citation_support": false,
+        "citation_support": true,
         "expected_source": "SYN-COMP-2026-OVERVIEW",
-        "latency_ms": 2520.506,
+        "latency_ms": 2400.706,
         "snapshot_leakage": false,
-        "top_1_hit": false,
-        "top_3_hit": false,
-        "top_5_hit": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
         "top_sources": [
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026"
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-OVERVIEW",
+          "SYN-COMP-2026-BROADBAND"
         ]
       },
       {
         "benchmark_case_code": "RAG-15",
-        "citation_support": false,
+        "citation_support": true,
         "expected_source": "SYN-COMP-2026-REVIEW-CAPS",
-        "latency_ms": 1885.301,
+        "latency_ms": 1992.214,
         "snapshot_leakage": false,
-        "top_1_hit": false,
-        "top_3_hit": false,
-        "top_5_hit": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
         "top_sources": [
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-COMP-2026-ELIGIBILITY"
+          "SYN-COMP-2026-REVIEW-CAPS",
+          "SYN-COMP-2026-REVIEW-CAPS",
+          "SYN-COMP-2026-REVIEW-CAPS",
+          "SYN-COMP-2026-REVIEW-CAPS",
+          "SYN-COMP-2026-REVIEW-CAPS"
         ]
       }
     ],
-    "critical_citation_mismatch_count": 9,
-    "p95_latency_ms": 2520.506,
+    "critical_citation_mismatch_count": 2,
+    "p95_latency_ms": 2801.314,
     "snapshot_leakage_count": 0,
-    "top_1_hit_rate": 0.4,
-    "top_3_hit_rate": 0.4,
-    "top_5_hit_rate": 0.4
+    "top_1_hit_rate": 0.6666666666666666,
+    "top_3_hit_rate": 0.8,
+    "top_5_hit_rate": 0.8666666666666667
   },
   "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
 }

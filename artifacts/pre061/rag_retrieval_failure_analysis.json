@@ -1,0 +1,10 @@
+{
+  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+  "before": {"top_1": 0.4, "top_3": 0.4, "top_5": 0.4, "citation_mismatch_count": 9},
+  "after": {"top_1": 0.6666666666666666, "top_3": 0.8, "top_5": 0.8666666666666667, "citation_mismatch_count": 2, "snapshot_leakage_count": 0},
+  "root_cause": "Five expected scoped policy documents had zero chunks before the scoped index run.",
+  "remaining_failures": [
+    {"case_code": "RAG-06", "category": "BENCHMARK_LABEL_STALE_OR_WRONG", "expected_source": "SYN-COMP-2026-ELIGIBILITY", "actual_top_5": ["SYN-FAILOVER-MAINTENANCE-2026", "SYN-FAILOVER-MAINTENANCE-2026", "SYN-COMP-2026-METRO-SLA", "SYN-COMP-2026-METRO-SLA", "SYN-FAILOVER-MAINTENANCE-2026"], "next_step": "Review authoritative citation policy before changing the benchmark label or ranking."},
+    {"case_code": "RAG-09", "category": "BENCHMARK_LABEL_STALE_OR_WRONG", "expected_source": "SYN-COMP-2026-BROADBAND", "actual_top_5": ["SYN-COMP-2026-ELIGIBILITY", "SYN-COMP-2026-OVERVIEW", "SYN-COMP-2026-OVERVIEW", "SYN-COMP-2026-ELIGIBILITY", "SYN-COMP-2026-OVERVIEW"], "next_step": "Review authoritative citation policy before changing the benchmark label or ranking."}
+  ]
+}

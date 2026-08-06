@@ -196,8 +196,9 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
   precondition'larında güvenli biçimde durdu; yeni canlı sayı iddia edilmedi.
   Ana plan takibinde 052–060 tamamlanmıştır. `PRE-061 — Live RAG + MCP + LLM
   Core Acceptance Gate` gerçek yerel smoke yolunu doğruladı. Genişletilmiş 15
-  vakalık gerçek Qwen retrieval benchmarkında top-5 expected-source hit oranı
-  %40 ve kritik citation mismatch sayısı 9 çıktığı için **FAIL** durumundadır.
+  vakalık gerçek Qwen retrieval benchmarkında post-index top-5 expected-source
+  hit oranı %86.67 ve kritik citation mismatch sayısı 2 çıktığı için **FAIL**
+  durumundadır.
   `MAIN-061 — Frontend uygulama kabuğunu tasarla` başlatılmamalıdır.
 
 ## 12. Açık Sorular
