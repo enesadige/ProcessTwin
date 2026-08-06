@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import os
@@ -160,9 +161,7 @@ def _retrieval_benchmark(headers: dict[str, str]) -> dict[str, Any]:
         "top_1_hit_rate": sum(case["top_1_hit"] for case in cases) / total,
         "top_3_hit_rate": sum(case["top_3_hit"] for case in cases) / total,
         "top_5_hit_rate": sum(case["top_5_hit"] for case in cases) / total,
-        "critical_citation_mismatch_count": sum(
-            not case["citation_support"] for case in cases
-        ),
+        "critical_citation_mismatch_count": sum(not case["citation_support"] for case in cases),
         "snapshot_leakage_count": sum(case["snapshot_leakage"] for case in cases),
         "average_latency_ms": round(sum(latencies) / total, 3),
         "p95_latency_ms": latencies[percentile_index],
@@ -173,13 +172,14 @@ def _retrieval_benchmark(headers: dict[str, str]) -> dict[str, Any]:
 def _unload_model(model: str) -> bool:
     subprocess.run(["ollama", "stop", model], check=False, capture_output=True, text=True)
     time.sleep(2)
-    output = subprocess.run(
-        ["ollama", "ps"], check=True, capture_output=True, text=True
-    ).stdout
+    output = subprocess.run(["ollama", "ps"], check=True, capture_output=True, text=True).stdout
     return model not in output
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--retrieval-only", action="store_true")
+    options = parser.parse_args()
     token = secrets.token_urlsafe(32)
     env = {
         **os.environ,
@@ -234,6 +234,24 @@ def main() -> int:
         }
         report["retrieval_benchmark"] = _retrieval_benchmark(headers)
         report["qwen_unloaded_before_gemma"] = _unload_model("qwen3-embedding:4b")
+        if options.retrieval_only:
+            benchmark = report["retrieval_benchmark"]
+            report["decision"] = (
+                "PASS"
+                if benchmark["top_5_hit_rate"] >= 0.9
+                and benchmark["top_3_hit_rate"] >= 0.8
+                and benchmark["critical_citation_mismatch_count"] == 0
+                and benchmark["snapshot_leakage_count"] == 0
+                else "FAIL"
+            )
+            report["duration_seconds"] = round(time.monotonic() - started, 3)
+            ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
+            ARTIFACT.write_text(
+                json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            print(json.dumps(report, ensure_ascii=True, sort_keys=True))
+            return 0 if report["decision"] == "PASS" else 1
         report["mcp"] = {
             key: asyncio.run(
                 _mcp_call(module, token, *MCP_CALLS[key][:1], MCP_CALLS[key][1](causal_code))

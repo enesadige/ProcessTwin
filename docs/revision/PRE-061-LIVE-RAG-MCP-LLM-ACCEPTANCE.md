@@ -59,3 +59,18 @@ snapshot has only 23 scoped chunks while retrieval also surfaces active global
 documents; the acceptance criteria require corpus/metadata/hybrid-ranking work
 before the remaining Gemma, Gemini, and endpoint scenario benchmarks can be
 meaningfully accepted. Qwen and Gemma were gracefully unloaded after the run.
+
+## Retrieval Root-Cause Follow-up
+
+The failure analysis established that the expected broadband, Metro SLA,
+overview, and review-cap SourceDocuments existed in the causal snapshot but
+had zero indexed chunks. The initial live embedding run therefore covered only
+the 23 pre-existing alarm-catalog and eligibility chunks. The scoped idempotent
+index command added the missing policy chunks, increasing the scoped corpus to
+54 chunks before generating only the missing Qwen embeddings.
+
+The final retrieval-only run exposed a harness early-return persistence bug:
+its in-memory metrics were not written to the artefact. The writer is fixed,
+but the 15-case benchmark was not launched a third time. The gate remains
+**FAIL** until a single persisted post-index benchmark supplies the required
+top-k and citation metrics.
