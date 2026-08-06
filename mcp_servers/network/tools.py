@@ -278,6 +278,19 @@ class NetworkMCPTools:
                 "role_counts": correlation.get("role_counts", {}),
                 "propagation_summary": correlation.get("propagation_summary"),
             }
+        elif tool_name == "rank_root_cause_candidates" and getattr(model, "outage_code", None):
+            candidates = data.get("candidates", [])
+            candidate = candidates[0] if isinstance(candidates, list) and candidates else {}
+            data = {
+                "outage_code": data.get("outage_code"),
+                "root_resource_type": candidate.get("candidate_resource_kind")
+                or candidate.get("candidate_device_type"),
+                "root_resource_reference": candidate.get("candidate_resource_code")
+                or candidate.get("candidate_device_code"),
+                "reason_codes": candidate.get("reason_codes", []),
+                "role_counts": {},
+                "propagation_summary": candidate.get("description"),
+            }
         return MCPToolResponse[dict[str, Any]](
             success=True,
             data=data,

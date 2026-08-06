@@ -13,10 +13,12 @@
 
 - **PRE-061 — Live RAG + MCP + LLM Core Acceptance:** Retrieval aşaması PASS
   (8 source, 54 chunk, 54 gerçek Qwen embedding; top-3 %93.33, top-5 %100,
-  citation mismatch/leakage 0). Genel gate **FAIL**: bir gerçek Gemma
-  narrative çağrısı guard tarafından fact sheet dışı public reference nedeniyle
-  fallback'e alındı; 12-vaka Gemma ve 10-vaka endpoint matrisi tamamlanmadı.
-  Gerçek Gemini smoke `invalid_request` ile blocklandı. `MAIN-061` başlamaz.
+  citation mismatch/leakage 0). Genel gate **FAIL**: endpoint HTTP/lifecycle
+  matrisi LIVE-08 outage root-cause normalizasyonu sonrası 10/10'a ulaştı,
+  ancak LIVE-07 gerçek RAG citation üretmeden planner clarification döndü.
+  Dokuz gerçek Gemma narrative çağrısı 12-vaka eşiğinin altında kaldı. Gemini
+  canlı hata sınıfı gerçek SDK işaretine göre `invalid_api_key` olarak düzeltildi.
+  `MAIN-061` başlamaz.
 
 - **MAIN-xxx — Ana kümülatif görev planı:** Ek orchestration serisinden önce
   son tamamlanan ana plan maddesi `MAIN-051.5 — Çoklu embedding seti ve lokal

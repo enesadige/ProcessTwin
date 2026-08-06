@@ -56,6 +56,37 @@ def test_causal_network_call_requires_no_legacy_identifier_and_maps_analysis():
     assert response.data["propagation_summary"] == "Delayed downstream propagation."
 
 
+def test_outage_root_cause_call_normalizes_the_first_allowlisted_candidate():
+    client = FakeBackendClient(
+        data={
+            "outage_code": "OUT-001",
+            "candidates": [
+                {
+                    "candidate_resource_kind": "device",
+                    "candidate_resource_code": "OLT-001",
+                    "reason_codes": ["shared_failure_domain"],
+                    "description": "Root candidate is supported by alarms.",
+                }
+            ],
+        }
+    )
+
+    response = NetworkMCPTools(client).run(
+        "rank_root_cause_candidates",
+        {"snapshot_identifier": "snapshot-1", "outage_code": "OUT-001"},
+    )
+
+    assert response.success is True
+    assert response.data == {
+        "outage_code": "OUT-001",
+        "root_resource_type": "device",
+        "root_resource_reference": "OLT-001",
+        "reason_codes": ["shared_failure_domain"],
+        "role_counts": {},
+        "propagation_summary": "Root candidate is supported by alarms.",
+    }
+
+
 def test_network_correlation_rejects_missing_or_ambiguous_scope():
     client = FakeBackendClient()
     for arguments in (

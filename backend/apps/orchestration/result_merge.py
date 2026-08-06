@@ -210,6 +210,24 @@ def _network_causal(data: Mapping[str, Any]) -> _ExtractedToolResult:
     )
 
 
+def _network_root_cause(data: Mapping[str, Any]) -> _ExtractedToolResult:
+    if data.get("causal_event_code") is not None:
+        return _network_causal(data)
+    return _ExtractedToolResult(
+        category=EvidenceCategory.NETWORK_CAUSAL,
+        causal={
+            "outage_code": _string(data.get("outage_code"), "outage_code", required=True),
+            "root_resource_type": _string(data.get("root_resource_type"), "root_resource_type"),
+            "root_resource_reference": _string(
+                data.get("root_resource_reference"), "root_resource_reference"
+            ),
+            "root_cause_reason_codes": _string_list(data.get("reason_codes"), "reason_codes"),
+            "role_counts": _count_mapping(data.get("role_counts"), "role_counts"),
+            "propagation_summary": _string(data.get("propagation_summary"), "propagation_summary"),
+        },
+    )
+
+
 def _customer_causal_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
     return _ExtractedToolResult(
         category=EvidenceCategory.CUSTOMER_IMPACT,
@@ -366,7 +384,7 @@ def _document_retrieval(data: Mapping[str, Any]) -> _ExtractedToolResult:
 
 NORMALIZERS: dict[tuple[MCPServer, str], Normalizer] = {
     (MCPServer.NETWORK, "correlate_alarms"): _network_causal,
-    (MCPServer.NETWORK, "rank_root_cause_candidates"): _network_causal,
+    (MCPServer.NETWORK, "rank_root_cause_candidates"): _network_root_cause,
     (MCPServer.NETWORK, "get_outage_details"): _network_outage_details,
     (MCPServer.NETWORK, "calculate_customer_impact"): _network_outage_impact,
     (MCPServer.CUSTOMER, "get_customer_outage_history"): _customer_causal_impact,

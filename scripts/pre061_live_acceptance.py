@@ -23,6 +23,7 @@ SNAPSHOT = (
     "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
 )
 ARTIFACT = ROOT / "artifacts" / "pre061" / "live_acceptance_report.json"
+LLM_ARTIFACT = ROOT / "artifacts" / "pre061" / "llm_narrative_acceptance.json"
 MCP_MODULES = {
     "network": "mcp_servers.network",
     "customer": "mcp_servers.customer",
@@ -176,9 +177,173 @@ def _unload_model(model: str) -> bool:
     return model not in output
 
 
+def _snapshot_context(env: dict[str, str]) -> dict[str, str]:
+    code = (
+        "import json; "
+        "from apps.datasets.models import DataSnapshot, GroundTruthCase; "
+        "from apps.operations.models import CausalEvent; "
+        f"s=DataSnapshot.objects.get(snapshot_key='{SNAPSHOT}'); "
+        "c=CausalEvent.objects.filter(data_snapshot=s).order_by('event_code').first(); "
+        "g=GroundTruthCase.objects.filter(data_snapshot=s).order_by('case_code').first(); "
+        "print(json.dumps({'causal_event_code':c.event_code,'outage_code':g.outage_code}))"
+    )
+    return json.loads(_run_shell(code, env))
+
+
+def _endpoint_matrix(
+    headers: dict[str, str], context: dict[str, str], *, only_case: str | None = None
+) -> list[dict[str, Any]]:
+    causal_code = context["causal_event_code"]
+    outage_code = context["outage_code"]
+    cases = (
+        ("LIVE-01", "outage_impact", ["summary", "impact"], {"outage_code": outage_code}, 200),
+        (
+            "LIVE-02",
+            "network_investigation",
+            ["summary", "root_cause"],
+            {"causal_event_code": causal_code},
+            200,
+        ),
+        (
+            "LIVE-03",
+            "outage_impact",
+            ["summary", "impact"],
+            {"causal_event_code": causal_code},
+            200,
+        ),
+        (
+            "LIVE-04",
+            "customer_history",
+            ["summary", "impact"],
+            {"causal_event_code": causal_code},
+            200,
+        ),
+        (
+            "LIVE-05",
+            "rule_evidence",
+            ["summary", "evidence"],
+            {"causal_event_code": causal_code},
+            200,
+        ),
+        (
+            "LIVE-06",
+            "compensation_evaluation",
+            ["summary", "eligibility", "evidence"],
+            {"causal_event_code": causal_code},
+            200,
+        ),
+        ("LIVE-07", "rule_document_retrieval", ["summary", "evidence"], {}, 422),
+        (
+            "LIVE-08",
+            "network_investigation",
+            ["summary", "details"],
+            {"outage_code": outage_code},
+            200,
+        ),
+        (
+            "LIVE-09",
+            "network_investigation",
+            [],
+            {
+                "clarification_required": True,
+                "clarification_reasons": ["missing_scope_filter"],
+            },
+            422,
+        ),
+    )
+    results = []
+    for case_code, intent, outputs, extra, expected_status in cases:
+        if only_case and case_code != only_case:
+            continue
+        started = time.monotonic()
+        structured_query = {
+            "intent": intent,
+            "requested_outputs": outputs,
+            "snapshot_identifier": SNAPSHOT,
+            **extra,
+        }
+        response = httpx.post(
+            "http://127.0.0.1:8000/api/internal/v1/orchestration/queries/execute/",
+            headers={**headers, "X-Correlation-ID": f"pre061-{case_code.lower()}"},
+            json={
+                "snapshot_identifier": SNAPSHOT,
+                "idempotency_key": f"pre061-{case_code.lower()}-{secrets.token_hex(8)}",
+                "original_query": "Canli kabul sorgusu.",
+                "structured_query": structured_query,
+                "response_mode": "llm_assisted",
+            },
+            timeout=180,
+        )
+        payload = (
+            response.json()
+            if response.headers.get("content-type", "").startswith("application/json")
+            else {}
+        )
+        results.append(
+            {
+                "case_code": case_code,
+                "expected_status_code": expected_status,
+                "status_code": response.status_code,
+                "query_run_code": payload.get("query_run_code"),
+                "query_run_status": payload.get("status"),
+                "generation_mode": (payload.get("response") or {}).get("generation_mode"),
+                "error_code": (payload.get("error") or {}).get("code"),
+                "clarification_code": (payload.get("clarification") or {}).get("code"),
+                "passed": response.status_code == expected_status,
+                "latency_ms": round((time.monotonic() - started) * 1000, 3),
+            }
+        )
+    if only_case and only_case != "LIVE-10":
+        return results
+
+    # This final request intentionally verifies the provider-outage fallback with real transport.
+    _unload_model("gemma4:12b-it-qat")
+    started = time.monotonic()
+    response = httpx.post(
+        "http://127.0.0.1:8000/api/internal/v1/orchestration/queries/execute/",
+        headers={**headers, "X-Correlation-ID": "pre061-live-10"},
+        json={
+            "snapshot_identifier": SNAPSHOT,
+            "idempotency_key": f"pre061-live-10-{secrets.token_hex(8)}",
+            "original_query": "Canli fallback kabul sorgusu.",
+            "structured_query": {
+                "intent": "network_investigation",
+                "requested_outputs": ["summary", "root_cause"],
+                "snapshot_identifier": SNAPSHOT,
+                "causal_event_code": causal_code,
+            },
+            "response_mode": "llm_assisted",
+        },
+        timeout=180,
+    )
+    payload = (
+        response.json()
+        if response.headers.get("content-type", "").startswith("application/json")
+        else {}
+    )
+    results.append(
+        {
+            "case_code": "LIVE-10",
+            "expected_status_code": 200,
+            "status_code": response.status_code,
+            "query_run_code": payload.get("query_run_code"),
+            "query_run_status": payload.get("status"),
+            "generation_mode": (payload.get("response") or {}).get("generation_mode"),
+            "error_code": (payload.get("error") or {}).get("code"),
+            "clarification_code": None,
+            "passed": response.status_code == 200
+            and (payload.get("response") or {}).get("generation_mode") == "deterministic_fallback",
+            "latency_ms": round((time.monotonic() - started) * 1000, 3),
+        }
+    )
+    return results
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--retrieval-only", action="store_true")
+    parser.add_argument("--final-llm-acceptance", action="store_true")
+    parser.add_argument("--endpoint-case")
     options = parser.parse_args()
     token = secrets.token_urlsafe(32)
     env = {
@@ -214,6 +379,37 @@ def main() -> int:
     try:
         _wait_ready(token)
         headers = {"Authorization": f"Bearer {token}", "X-Correlation-ID": "pre061-rag-001"}
+        if options.final_llm_acceptance:
+            context = _snapshot_context(env)
+            endpoint_cases = _endpoint_matrix(
+                headers, context, only_case=options.endpoint_case
+            )
+            report["endpoint_acceptance"] = {
+                "case_count": len(endpoint_cases),
+                "passed_count": sum(case["passed"] for case in endpoint_cases),
+                "cases": endpoint_cases,
+            }
+            report["qwen_retrieval_reused"] = True
+            report["gemma_unloaded_after_acceptance"] = _unload_model("gemma4:12b-it-qat")
+            report["decision"] = (
+                "PASS"
+                if report["endpoint_acceptance"]["passed_count"] == len(endpoint_cases)
+                else "FAIL"
+            )
+            report["duration_seconds"] = round(time.monotonic() - started, 3)
+            artifact = (
+                LLM_ARTIFACT
+                if options.endpoint_case is None
+                else LLM_ARTIFACT.with_name(
+                    f"live_{options.endpoint_case.lower().replace('-', '_')}.json"
+                )
+            )
+            artifact.write_text(
+                json.dumps(report, ensure_ascii=True, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            print(json.dumps(report, ensure_ascii=True, sort_keys=True))
+            return 0 if report["decision"] == "PASS" else 1
         rag = httpx.post(
             "http://127.0.0.1:8000/api/internal/v1/rag/search/",
             headers=headers,

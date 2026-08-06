@@ -150,6 +150,7 @@ def test_empty_or_malformed_response_is_safe_invalid_response(settings, response
         (FakeProviderException(status_code=429), "rate_limited"),
         (FakeProviderException(status_code=408), "timeout"),
         (FakeProviderException(status_code=400), "invalid_request"),
+        (FakeProviderException(status_code=400, message="API key is invalid"), "invalid_api_key"),
         (FakeProviderException(status_code=500), "provider_unavailable"),
         (FakeProviderException(message="network failure 192.0.2.1"), "network_error"),
     ],

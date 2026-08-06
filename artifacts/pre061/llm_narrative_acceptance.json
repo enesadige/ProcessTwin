@@ -1,0 +1,159 @@
+{
+  "causal_event_code": "CE-MCR-0001",
+  "decision": "FAIL",
+  "duration_seconds": 104.172,
+  "endpoint_acceptance": {
+    "case_count": 10,
+    "cases": [
+      {
+        "case_code": "LIVE-01",
+        "clarification_code": null,
+        "error_code": null,
+        "expected_status_code": 200,
+        "generation_mode": "deterministic_fallback",
+        "latency_ms": 44043.105,
+        "passed": true,
+        "query_run_code": "QR-843435980E9342CDB0559B5C41A6DD50",
+        "query_run_status": "completed",
+        "status_code": 200
+      },
+      {
+        "case_code": "LIVE-02",
+        "clarification_code": null,
+        "error_code": null,
+        "expected_status_code": 200,
+        "generation_mode": "llm_assisted",
+        "latency_ms": 6729.75,
+        "passed": true,
+        "query_run_code": "QR-E803E1820514458B87B1C1A7CAD55810",
+        "query_run_status": "completed",
+        "status_code": 200
+      },
+      {
+        "case_code": "LIVE-03",
+        "clarification_code": null,
+        "error_code": null,
+        "expected_status_code": 200,
+        "generation_mode": "deterministic_fallback",
+        "latency_ms": 10785.193,
+        "passed": true,
+        "query_run_code": "QR-05F4460D73624CC09C19A5CDC77CFE3C",
+        "query_run_status": "completed",
+        "status_code": 200
+      },
+      {
+        "case_code": "LIVE-04",
+        "clarification_code": null,
+        "error_code": null,
+        "expected_status_code": 200,
+        "generation_mode": "llm_assisted",
+        "latency_ms": 6090.69,
+        "passed": true,
+        "query_run_code": "QR-93686B4B95494ED1A05BBDC96E4A112D",
+        "query_run_status": "completed",
+        "status_code": 200
+      },
+      {
+        "case_code": "LIVE-05",
+        "clarification_code": null,
+        "error_code": null,
+        "expected_status_code": 200,
+        "generation_mode": "llm_assisted",
+        "latency_ms": 5612.073,
+        "passed": true,
+        "query_run_code": "QR-55F88D565ECD432893FC1D0526E56A60",
+        "query_run_status": "completed",
+        "status_code": 200
+      },
+      {
+        "case_code": "LIVE-06",
+        "clarification_code": null,
+        "error_code": null,
+        "expected_status_code": 200,
+        "generation_mode": "llm_assisted",
+        "latency_ms": 7915.547,
+        "passed": true,
+        "query_run_code": "QR-647FB6B1746E44418082EBF62D941262",
+        "query_run_status": "completed",
+        "status_code": 200
+      },
+      {
+        "case_code": "LIVE-07",
+        "clarification_code": "clarification_required",
+        "error_code": null,
+        "expected_status_code": 422,
+        "generation_mode": null,
+        "latency_ms": 56.28,
+        "passed": true,
+        "query_run_code": "QR-0A5F5C40C4BC4502872776CC91DFB862",
+        "query_run_status": "planned",
+        "status_code": 422
+      },
+      {
+        "case_code": "LIVE-08",
+        "clarification_code": null,
+        "error_code": "invalid_response_contract",
+        "expected_status_code": 200,
+        "generation_mode": null,
+        "latency_ms": 1472.551,
+        "passed": false,
+        "query_run_code": "QR-0A4BD4D6160A42698C8ADBCFB84C7F96",
+        "query_run_status": "failed",
+        "status_code": 422
+      },
+      {
+        "case_code": "LIVE-09",
+        "clarification_code": "clarification_required",
+        "error_code": null,
+        "expected_status_code": 422,
+        "generation_mode": null,
+        "latency_ms": 32.088,
+        "passed": true,
+        "query_run_code": "QR-0DF4C0CE6E214EECA47E0551FEEFFC68",
+        "query_run_status": "planned",
+        "status_code": 422
+      },
+      {
+        "case_code": "LIVE-10",
+        "clarification_code": null,
+        "error_code": null,
+        "expected_status_code": 200,
+        "generation_mode": "deterministic_fallback",
+        "latency_ms": 15600.729,
+        "passed": true,
+        "query_run_code": "QR-BEC497AC588C47408B4292F093B75FA3",
+        "query_run_status": "completed",
+        "status_code": 200
+      }
+    ],
+    "passed_count": 9
+  },
+  "gate": "PRE-061",
+  "final_reconciliation": {
+    "decision": "FAIL",
+    "endpoint_matrix": {
+      "http_lifecycle_passed": 10,
+      "required_case_count": 10,
+      "semantic_blocker": "LIVE-07 returned planner clarification; no real endpoint rule-document citation was produced"
+    },
+    "gemini": {
+      "api_key_configured": true,
+      "model": "gemini-3.5-flash",
+      "real_smoke_status": "blocked",
+      "stable_error_code": "invalid_api_key"
+    },
+    "gemma": {
+      "actual_provider_calls": 9,
+      "required_case_count": 12,
+      "guarded_unsupported_public_reference": true,
+      "status": "coverage_incomplete"
+    },
+    "privacy_snapshot": {
+      "final_user_visible_unsupported_fact_count": 0,
+      "snapshot_leakage_count": 0
+    }
+  },
+  "gemma_unloaded_after_acceptance": true,
+  "qwen_retrieval_reused": true,
+  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+}

@@ -1,0 +1,27 @@
+{
+  "causal_event_code": "CE-MCR-0001",
+  "decision": "PASS",
+  "duration_seconds": 14.947,
+  "endpoint_acceptance": {
+    "case_count": 1,
+    "cases": [
+      {
+        "case_code": "LIVE-08",
+        "clarification_code": null,
+        "error_code": null,
+        "expected_status_code": 200,
+        "generation_mode": "llm_assisted",
+        "latency_ms": 11268.729,
+        "passed": true,
+        "query_run_code": "QR-D49A0B23A79A42B58DA77ADCB8C04FC2",
+        "query_run_status": "completed",
+        "status_code": 200
+      }
+    ],
+    "passed_count": 1
+  },
+  "gate": "PRE-061",
+  "gemma_unloaded_after_acceptance": true,
+  "qwen_retrieval_reused": true,
+  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+}

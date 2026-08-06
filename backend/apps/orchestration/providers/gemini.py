@@ -197,6 +197,21 @@ class GeminiLLMProvider(LLMProvider):
         if status_code is None:
             response = getattr(exc, "response", None)
             status_code = getattr(response, "status_code", None)
+        message = str(exc).lower()
+        # Gemini may report an invalid API key as HTTP 400 rather than 401.
+        # Classify only stable provider categories before the generic 400 mapping.
+        if any(marker in message for marker in ("api key", "apikey", "unauthenticated")):
+            return GeminiLLMProviderError(
+                message="Gemini authentication failed.", code="invalid_api_key"
+            )
+        if "permission" in message or "forbidden" in message:
+            return GeminiLLMProviderError(
+                message="Gemini permission was denied.", code="permission_denied"
+            )
+        if "not found" in message or ("model" in message and "found" in message):
+            return GeminiLLMProviderError(
+                message="Gemini model was not found.", code="model_not_found"
+            )
         if status_code == 401:
             return GeminiLLMProviderError(
                 message="Gemini authentication failed.", code="invalid_api_key"
@@ -223,7 +238,6 @@ class GeminiLLMProvider(LLMProvider):
             return GeminiLLMProviderError(
                 message="Gemini provider is unavailable.", code="provider_unavailable"
             )
-        message = str(exc).lower()
         if "timeout" in message:
             return GeminiLLMProviderError(message="Gemini request timed out.", code="timeout")
         if any(marker in message for marker in ("connect", "network", "dns", "socket")):
@@ -231,14 +245,6 @@ class GeminiLLMProvider(LLMProvider):
         if any(marker in message for marker in ("api key", "authentication", "unauthenticated")):
             return GeminiLLMProviderError(
                 message="Gemini authentication failed.", code="invalid_api_key"
-            )
-        if "permission" in message or "forbidden" in message:
-            return GeminiLLMProviderError(
-                message="Gemini permission was denied.", code="permission_denied"
-            )
-        if "not found" in message or "model" in message and "found" in message:
-            return GeminiLLMProviderError(
-                message="Gemini model was not found.", code="model_not_found"
             )
         if isinstance(exc, (TypeError, ValueError)):
             return GeminiLLMProviderError(

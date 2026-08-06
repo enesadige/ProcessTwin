@@ -8,8 +8,9 @@
     "endpoint": {
       "historical_real_stdio_smoke_passed": true,
       "required_case_count": 10,
-      "completed_case_count": 1,
-      "status": "coverage_incomplete"
+      "completed_case_count": 10,
+      "semantic_blocker": "rule-document retrieval remains planner clarification",
+      "status": "semantic_coverage_incomplete"
     },
     "gemini": {
       "api_key_configured": true,
@@ -17,10 +18,10 @@
       "model": "gemini-3.5-flash",
       "required_case_count": 4,
       "status": "blocked",
-      "stable_error_code": "invalid_request"
+      "stable_error_code": "invalid_api_key"
     },
     "gemma": {
-      "attempted_case_count": 1,
+      "attempted_case_count": 9,
       "fact_guard": "rejected",
       "model": "gemma4:12b-it-qat",
       "reason": "unsupported_public_reference",

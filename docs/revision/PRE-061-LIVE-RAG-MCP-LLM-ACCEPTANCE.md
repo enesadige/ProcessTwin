@@ -95,6 +95,29 @@ The final persisted run reached top-1 **73.33%**, top-3 **93.33%**, top-5
 p95 1747.204 ms). The PRE-061 retrieval stage is **PASS**; Gemma/Gemini
 acceptance may proceed in its dedicated phase.
 
+## Final LLM Acceptance Correction
+
+**Overall PRE-061 decision remains FAIL.** The Gemini 400 classification was
+corrected without changing the fixed `gemini-3.5-flash` descriptor or retry
+policy: the real SDK response has an API-key marker and is now safely mapped
+to `invalid_api_key`, not `invalid_request`. The real smoke remains blocked;
+no key, prompt, or provider body was persisted.
+
+The non-retrieval endpoint matrix ran once through the real backend, stdio
+MCP transport, Internal API, native snapshot, and Ollama provider. LIVE-08
+initially exposed an outage-scoped root-cause response normalization gap. The
+Network MCP now projects only allowlisted first-candidate fields; the targeted
+real rerun completed `200`, `completed`, and `llm_assisted`. HTTP/lifecycle
+expectations are therefore 10/10 after reconciliation.
+
+This is not a gate PASS. LIVE-07 is still planner clarification because the
+current schema/planner has no safe retrieval-query field, so no real endpoint
+RAG-citation answer exists. Nine real Gemma narrative calls are recorded,
+below the required 12-case set. Observed final responses retained validated
+deterministic blocks with zero unsupported user-visible facts, but this does
+not replace the incomplete narrative benchmark. Gemma was gracefully unloaded
+and no Qwen/Gemma co-residency was observed.
+
 ## Final Live LLM Attempt
 
 **Overall PRE-061 decision: FAIL.** Retrieval remains PASS, but the mandatory
