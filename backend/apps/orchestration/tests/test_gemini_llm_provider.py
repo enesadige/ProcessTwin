@@ -136,7 +136,12 @@ def test_interactions_family_normalizes_output_text(settings):
     )
 
     assert client.interactions.calls == [
-        {"model": "gemini-3.6-flash", "input": "safe"}
+        {
+            "model": "gemini-3.6-flash",
+            "input": "safe",
+            "stream": False,
+            "response_format": None,
+        }
     ]
     assert response["content"] == "Safe interaction answer."
     assert response["finish_reason"] == "completed"
@@ -156,13 +161,41 @@ def test_usage_unavailable_does_not_claim_estimated_token_counts(settings):
 
 
 @pytest.mark.parametrize(
-    "input_value", [{}, {"contents": ""}, {"contents": "ok", "model": "override"}]
+    "input_value",
+    [
+        {},
+        {"contents": ""},
+        {"contents": "ok", "model": "override"},
+        {"contents": "ok", "format_schema": "override"},
+    ],
 )
 def test_invalid_request_is_rejected_without_network(settings, input_value):
     settings.GEMINI_API_KEY = "test-secret-key"
     with pytest.raises(GeminiLLMProviderError) as exc_info:
         GeminiLLMProvider().generate(request=input_value)
     assert exc_info.value.code == "invalid_request"
+
+
+def test_interactions_uses_native_response_format_for_statement_schema(settings):
+    settings.GEMINI_API_KEY = "test-secret-key"
+    settings.GEMINI_LLM_API_FAMILY = "interactions"
+    interaction = SimpleNamespace(
+        output_text='{"headline_id":null,"selected_statement_ids":[]}',
+        status="completed",
+        usage_metadata=None,
+    )
+    client = FakeClient([interaction])
+    schema = {"type": "object", "additionalProperties": False}
+
+    GeminiLLMProvider(client_factory=lambda api_key, timeout_ms: client).generate(
+        request={"contents": "safe", "format_schema": schema}
+    )
+
+    assert client.interactions.calls[0]["response_format"] == {
+        "type": "text",
+        "mime_type": "application/json",
+        "schema": schema,
+    }
 
 
 @pytest.mark.parametrize("response", [success_response(content=""), SimpleNamespace(candidates=[])])

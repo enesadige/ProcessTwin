@@ -8,6 +8,7 @@ from pydantic import BaseModel, ValidationError
 
 from mcp_servers.network import NETWORK_MCP_VERSION
 from mcp_servers.network.models import (
+    AggregateLocationImpactInput,
     CalculateCustomerImpactInput,
     CorrelateAlarmsInput,
     GetDeviceDetailsInput,
@@ -75,15 +76,23 @@ def _causal_or_path(path: str, field_name: str):
             if code
             else path.format(value=getattr(model, field_name))
         )
+
     return build
 
 
 NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
+    "aggregate_location_impact": NetworkToolDefinition(
+        name="aggregate_location_impact",
+        description="Return canonical aggregate impact counts for an explicit date/location scope.",
+        input_model=AggregateLocationImpactInput,
+        method="GET",
+        path_builder=_path("/api/internal/v1/network/outages/aggregate-impact/"),
+        params_builder=_params,
+    ),
     "get_device_details": NetworkToolDefinition(
         name="get_device_details",
         description=(
-            "Return deterministic details, links, ports, and risk domains "
-            "for one network device."
+            "Return deterministic details, links, ports, and risk domains for one network device."
         ),
         input_model=GetDeviceDetailsInput,
         method="GET",
@@ -104,8 +113,7 @@ NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
     "search_alarms": NetworkToolDefinition(
         name="search_alarms",
         description=(
-            "Search alarms with explicit structured filters and deterministic "
-            "cursor pagination."
+            "Search alarms with explicit structured filters and deterministic cursor pagination."
         ),
         input_model=SearchAlarmsInput,
         method="GET",
@@ -115,8 +123,7 @@ NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
     "search_outages": NetworkToolDefinition(
         name="search_outages",
         description=(
-            "Search outage records with explicit structured filters and "
-            "deterministic durations."
+            "Search outage records with explicit structured filters and deterministic durations."
         ),
         input_model=SearchOutagesInput,
         method="GET",
@@ -137,8 +144,7 @@ NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
     "calculate_customer_impact": NetworkToolDefinition(
         name="calculate_customer_impact",
         description=(
-            "Return aggregate customer-impact counts without personal "
-            "or commercial details."
+            "Return aggregate customer-impact counts without personal or commercial details."
         ),
         input_model=CalculateCustomerImpactInput,
         method="GET",
@@ -162,8 +168,7 @@ NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
     "rank_root_cause_candidates": NetworkToolDefinition(
         name="rank_root_cause_candidates",
         description=(
-            "Rank deterministic root-cause candidates for an outage using "
-            "backend evidence."
+            "Rank deterministic root-cause candidates for an outage using backend evidence."
         ),
         input_model=RankRootCauseCandidatesInput,
         method="GET",
@@ -296,12 +301,10 @@ class NetworkMCPTools:
             data=data,
             metadata=metadata,
             warnings=[
-                MCPWarning.model_validate(warning)
-                for warning in payload.get("warnings", [])
+                MCPWarning.model_validate(warning) for warning in payload.get("warnings", [])
             ],
             evidence=[
-                MCPEvidence.model_validate(evidence)
-                for evidence in payload.get("evidence", [])
+                MCPEvidence.model_validate(evidence) for evidence in payload.get("evidence", [])
             ],
         )
 

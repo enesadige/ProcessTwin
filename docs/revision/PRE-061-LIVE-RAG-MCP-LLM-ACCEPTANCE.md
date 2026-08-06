@@ -298,3 +298,30 @@ black-box chain were **not started**. Gemma was unloaded after the run.
 
 PRE-061 remains **FAIL / BLOCKED** and `MAIN-061` must not start. No second
 prompt-tuning or black-box run was opened in this task.
+
+## Deterministic Intake And Final E2E
+
+**Decision: PASS.** The LLM parser was removed from the normal intake path
+because scope extraction is deterministic work and its local-provider retries
+made it both slower and less reliable. `DeterministicStructuredQueryParser`
+now extracts only user-supplied dates, locations and public references, and
+persists the validated query before planning. Its real snapshot gate passed
+6/6 with zero LLM calls, invented fields or unexpected missing fields.
+
+The real original-query baseline then passed 6/6 with Gemma and Qwen. The
+aggregate location tool uses `CustomerImpactAssessment` as the canonical
+counter source and carries outage count, potential, verified, no-impact,
+insufficient-evidence and failover-protected values through result merge and
+the canonical statement builder. All six HTTP requests completed with
+LLM-assisted statement selection; machine facts and citations are persisted
+in `final_black_box_acceptance.json`.
+
+Provider parity passed 4/4 combinations and 8/8 real HTTP cases: Gemma+Qwen,
+Gemma+Gemini Embedding, Gemini+Qwen and Gemini+Gemini Embedding. Gemini uses
+the 3.6 Interactions API with native `response_format` JSON Schema; it selects
+only backend-generated statement IDs. The acceptance snapshot has independent
+Qwen and Gemini embedding coverage of 54/54 canonical chunks, with zero
+cross-provider vector contamination. Exact fact and citation checks passed;
+unsupported fact/reference/decision, privacy violations, snapshot leakage and
+critical citation mismatches were all zero. PRE-061 is therefore **PASS** and
+`MAIN-061` may start.

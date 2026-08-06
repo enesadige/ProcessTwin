@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
@@ -12,13 +12,14 @@ from apps.datasets.models import DataSnapshot
 from apps.orchestration.executor import ExecutorResult, ToolExecutor
 from apps.orchestration.models import QueryRun, QueryRunStatus
 from apps.orchestration.natural_language_intake import (
+    DeterministicStructuredQueryParser,
     NaturalLanguageQueryParseError,
-    NaturalLanguageStructuredQueryParser,
 )
 from apps.orchestration.planner import (
     DeterministicToolPlanner,
     PlannerResultStatus,
 )
+from apps.orchestration.providers.registry import get_llm_descriptor
 from apps.orchestration.response_builder import (
     ResponseGenerationMode,
     ValidatedNaturalLanguageResponse,
@@ -31,6 +32,7 @@ from apps.orchestration.services import (
     QueryRunService,
 )
 from apps.orchestration.structured_query import StructuredQuery
+from apps.rag.providers.registry import get_embedding_descriptor
 
 
 class OrchestrationRequest(BaseModel):
@@ -40,6 +42,8 @@ class OrchestrationRequest(BaseModel):
     idempotency_key: str = Field(min_length=1, max_length=160)
     original_query: str = Field(min_length=1, max_length=10000)
     structured_query: StructuredQuery | None = None
+    llm_provider: Literal["ollama", "gemini"] | None = None
+    embedding_provider: Literal["ollama", "gemini"] | None = None
     response_mode: ResponseGenerationMode = ResponseGenerationMode.DETERMINISTIC
 
     @model_validator(mode="after")
@@ -102,14 +106,14 @@ class OrchestrationFacade:
         merger: ResultMergerValidator | None = None,
         response_builder: ValidatedResponseBuilder | None = None,
         response_provider=None,
-        intake_parser: NaturalLanguageStructuredQueryParser | None = None,
+        intake_parser: DeterministicStructuredQueryParser | None = None,
     ) -> None:
         self._planner = planner or DeterministicToolPlanner()
         self._executor = executor or ToolExecutor()
         self._merger = merger or ResultMergerValidator()
         self._response_builder = response_builder or ValidatedResponseBuilder()
         self._response_provider = response_provider
-        self._intake_parser = intake_parser or NaturalLanguageStructuredQueryParser()
+        self._intake_parser = intake_parser or DeterministicStructuredQueryParser()
         self._query_run_service = QueryRunService()
 
     def execute(
@@ -142,6 +146,12 @@ class OrchestrationFacade:
                 409, "idempotency_conflict", "Idempotency key conflicts with another run."
             )
 
+        try:
+            llm_descriptor = get_llm_descriptor(normalized_request.llm_provider)
+            embedding_descriptor = get_embedding_descriptor(normalized_request.embedding_provider)
+        except Exception:
+            return self._error(400, "validation_error", "Requested provider is invalid.")
+
         structured_query = normalized_request.structured_query
         if structured_query is None:
             try:
@@ -157,9 +167,22 @@ class OrchestrationFacade:
                     query_run=query_run,
                 )
             structured_query = parsed.structured_query
+            parser_name = "deterministic"
+            parser_version = parsed.prompt_version
             response_mode = ResponseGenerationMode.LLM_ASSISTED
         else:
+            parser_name = "replay"
+            parser_version = "structured-query.v1"
             response_mode = normalized_request.response_mode
+        structured_query = structured_query.model_copy(
+            update={
+                "embedding_provider": (
+                    embedding_descriptor.provider
+                    if embedding_descriptor.provider in {"ollama", "gemini"}
+                    else None
+                )
+            }
+        )
         if not created and query_run.structured_query != structured_query.to_audit_dict():
             return self._error(
                 409, "idempotency_conflict", "Idempotency key conflicts with another request."
@@ -172,6 +195,18 @@ class OrchestrationFacade:
 
         try:
             if created:
+                self._query_run_service.save_provider_provenance(
+                    query_run,
+                    requested_llm_provider=normalized_request.llm_provider,
+                    resolved_llm_provider=llm_descriptor.provider,
+                    resolved_llm_model=llm_descriptor.model,
+                    requested_embedding_provider=normalized_request.embedding_provider,
+                    resolved_embedding_provider=embedding_descriptor.provider,
+                    resolved_embedding_model=embedding_descriptor.model,
+                    embedding_prompt_version=embedding_descriptor.query_prompt_version,
+                    structured_query_parser=parser_name,
+                    structured_query_parser_version=parser_version,
+                )
                 self._query_run_service.save_structured_query(
                     query_run, structured_query=structured_query
                 )
@@ -191,6 +226,7 @@ class OrchestrationFacade:
             response = self._response_builder.build(
                 finalized_run,
                 mode=response_mode,
+                provider_name=llm_descriptor.provider,
                 provider=self._response_provider,
             )
             return OrchestrationOutcome(

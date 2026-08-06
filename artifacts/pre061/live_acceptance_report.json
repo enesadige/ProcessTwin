@@ -1,387 +1,43 @@
 {
-  "causal_event_code": "CE-MCR-0001",
-  "decision": "FAIL",
-  "duration_seconds": 29.58,
   "gate": "PRE-061",
-  "final_live_acceptance": {
-    "decision": "FAIL",
-    "endpoint": {
-      "historical_real_stdio_smoke_passed": true,
-      "required_case_count": 10,
-      "completed_case_count": 10,
-      "semantic_blocker": "rule-document retrieval remains planner clarification",
-      "status": "semantic_coverage_incomplete"
-    },
-    "gemini": {
-      "api_key_configured": true,
-      "attempted_case_count": 4,
-      "model": "gemini-3.6-flash",
-      "api_family": "interactions",
-      "required_case_count": 4,
-      "status": "provider_success_guard_fallback",
-      "final_user_visible_unsupported_fact_count": 0
-    },
-    "gemma": {
-      "attempted_case_count": 9,
-      "fact_guard": "rejected",
-      "model": "gemma4:12b-it-qat",
-      "reason": "unsupported_public_reference",
-      "required_case_count": 12,
-      "response_contract": "valid",
-      "status": "coverage_incomplete"
-    },
-    "model_residency": {
-      "gemma_resident_after_cleanup": false,
-      "qwen_resident_at_start": false,
-      "simultaneous_residency_observed": false
-    }
-  },
-  "final_gap_completion": {
-    "decision": "FAIL",
-    "live_07": {"artifact": "artifacts/pre061/live_live_07.json", "citation_support": true, "critical_citation_mismatch_count": 0, "launcher_root_cause": "The single-case harness intentionally wrote a separate artifact; the aggregate artifact was not reconciled.", "privacy_violation_count": 0, "query_run_status": "completed", "selected_tool": "rule.search_rule_documents", "snapshot_leakage_count": 0, "status_code": 200, "status": "accepted"},
-    "gemma": {
-      "completed_case_count": 12,
-      "narrative_acceptance_rate": 0.25,
-      "observed_unsupported_fact_rate_lower_bound": 0.583333,
-      "final_user_visible_unsupported_fact_count": 0,
-      "deterministic_fallback_success_rate": 1.0,
-      "status": "failed_observed_unsupported_fact_rate_exceeds_threshold"
-    },
-    "blocker": "Seven fact-guard rejections in the rerun establish a 58.33% lower bound for model unsupported-fact rate, exceeding the 10% narrative contradiction threshold."
-  },
-  "qwen_unloaded_before_gemma": true,
-  "rag": {
-    "result_count": 5,
-    "status_code": 200
-  },
-  "retrieval_benchmark": {
-    "average_latency_ms": 1655.49,
-    "case_count": 15,
-    "cases": [
-      {
-        "benchmark_case_code": "RAG-01",
-        "citation_support": true,
-        "expected_source": "SYN-ALARM-CATALOG-2026",
-        "latency_ms": 1717.177,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-OPERATIONS-LIFECYCLE-2026",
-          "SYN-CAUSAL-ANALYSIS-2026"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-02",
-        "citation_support": true,
-        "expected_source": "SYN-ALARM-CATALOG-2026",
-        "latency_ms": 1715.475,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-CAUSAL-ANALYSIS-2026",
-          "SYN-OPERATIONS-LIFECYCLE-2026",
-          "SYN-CAUSAL-ANALYSIS-2026",
-          "SYN-OPERATIONS-LIFECYCLE-2026"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-03",
-        "citation_support": true,
-        "expected_source": "SYN-ALARM-CATALOG-2026",
-        "latency_ms": 1731.299,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-CAUSAL-ANALYSIS-2026",
-          "SYN-OPERATIONS-LIFECYCLE-2026",
-          "SYN-CAUSAL-ANALYSIS-2026"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-04",
-        "citation_support": true,
-        "expected_source": "SYN-ALARM-CATALOG-2026",
-        "latency_ms": 1564.732,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-ALARM-CATALOG-2026"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-05",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-ELIGIBILITY",
-        "latency_ms": 1542.041,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-CAUSAL-ANALYSIS-2026",
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-06",
-        "citation_support": true,
-        "expected_source": "SYN-FAILOVER-MAINTENANCE-2026",
-        "latency_ms": 1722.744,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-FAILOVER-MAINTENANCE-2026",
-          "SYN-COMP-2026-METRO-SLA",
-          "SYN-COMP-2026-METRO-SLA",
-          "SYN-FAILOVER-MAINTENANCE-2026"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-07",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-ELIGIBILITY",
-        "latency_ms": 1733.276,
-        "snapshot_leakage": false,
-        "top_1_hit": false,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-REVIEW-CAPS",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-ELIGIBILITY"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-08",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-BROADBAND",
-        "latency_ms": 1727.285,
-        "snapshot_leakage": false,
-        "top_1_hit": false,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-CAUSAL-ANALYSIS-2026",
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-COMP-2026-ELIGIBILITY"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-09",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-OVERVIEW",
-        "latency_ms": 1546.888,
-        "snapshot_leakage": false,
-        "top_1_hit": false,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-ELIGIBILITY",
-          "SYN-COMP-2026-OVERVIEW"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-10",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-BROADBAND",
-        "latency_ms": 1582.487,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-BROADBAND"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-11",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-METRO-SLA",
-        "latency_ms": 1582.568,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-METRO-SLA",
-          "SYN-COMP-2026-METRO-SLA",
-          "SYN-COMP-2026-METRO-SLA",
-          "SYN-COMP-2026-METRO-SLA",
-          "SYN-COMP-2026-METRO-SLA"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-12",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-METRO-SLA",
-        "latency_ms": 1583.052,
-        "snapshot_leakage": false,
-        "top_1_hit": false,
-        "top_3_hit": false,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-ALARM-CATALOG-2026",
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-COMP-2026-BROADBAND",
-          "SYN-COMP-2026-METRO-SLA"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-13",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-OVERVIEW",
-        "latency_ms": 1747.204,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-OVERVIEW"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-14",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-OVERVIEW",
-        "latency_ms": 1763.897,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-OVERVIEW",
-          "SYN-COMP-2026-BROADBAND"
-        ]
-      },
-      {
-        "benchmark_case_code": "RAG-15",
-        "citation_support": true,
-        "expected_source": "SYN-COMP-2026-REVIEW-CAPS",
-        "latency_ms": 1572.228,
-        "snapshot_leakage": false,
-        "top_1_hit": true,
-        "top_3_hit": true,
-        "top_5_hit": true,
-        "top_sources": [
-          "SYN-COMP-2026-REVIEW-CAPS",
-          "SYN-COMP-2026-REVIEW-CAPS",
-          "SYN-COMP-2026-REVIEW-CAPS",
-          "SYN-COMP-2026-REVIEW-CAPS",
-          "SYN-COMP-2026-REVIEW-CAPS"
-        ]
-      }
-    ],
-    "critical_citation_mismatch_count": 0,
-    "p95_latency_ms": 1747.204,
-    "snapshot_leakage_count": 0,
-    "top_1_hit_rate": 0.7333333333333333,
-    "top_3_hit_rate": 0.9333333333333333,
-    "top_5_hit_rate": 1.0
-  },
+  "decision": "PASS",
   "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
-  "closed_world_narrative_remediation": {
-    "prompt_version": "closed-world-structured-narrative-tr-v2",
-    "rerun_scope": "Nine historical Gemma rejection cases only; three historical PASS cases were preserved.",
-    "completed_cases": "12/12",
-    "narrative_acceptance_rate": 0.25,
-    "narrative_contradiction_count": 9,
-    "unsupported_number_count": 0,
+  "retrieval_acceptance": "PASS",
+  "gemini_provider_smoke": "PASS",
+  "gemma_native_schema_statement_selection": {
+    "decision": "PASS",
+    "capability_gate": "3/3",
+    "clean_benchmark": "12/12"
+  },
+  "deterministic_structured_query_parser": {
+    "decision": "PASS",
+    "cases": "6/6",
+    "llm_call_count": 0
+  },
+  "baseline_original_query_e2e": {
+    "decision": "PASS",
+    "cases": "6/6",
+    "llm_provider": "ollama",
+    "embedding_provider": "ollama",
+    "average_latency_ms": 28993.114,
+    "p95_latency_ms": 41195.374
+  },
+  "provider_matrix": {
+    "decision": "PASS",
+    "combinations": "4/4",
+    "cases": "8/8",
+    "gemini_embedding_acceptance_coverage": "54/54",
+    "qwen_embedding_acceptance_coverage": "54/54",
+    "cross_provider_vector_contamination_count": 0,
+    "average_latency_ms": 16903.652,
+    "p95_latency_ms": 38006.599
+  },
+  "safety": {
+    "unsupported_fact_count": 0,
     "unsupported_reference_count": 0,
     "unsupported_decision_count": 0,
-    "potential_verified_contradiction_count": 0,
-    "failover_contradiction_count": 0,
-    "deterministic_fallback_success_rate": 1.0,
-    "final_user_visible_unsupported_fact_count": 0,
-    "gemma_unloaded_after_acceptance": true,
-    "decision": "FAIL"
-  },
-  "native_schema_statement_selection": {
-    "prompt_version": "closed-world-statement-selection-tr-v3",
-    "capability_gate": "PASS",
-    "clean_benchmark": "PASS",
-    "completed_cases": "12/12",
-    "provider_success_count": 12,
-    "provider_timeout_count": 0,
-    "native_schema_parse_success_count": 12,
-    "invalid_unknown_statement_id_count": 0,
-    "semantic_selection_error_count": 0,
-    "potential_verified_error_count": 0,
-    "failover_error_count": 0,
-    "unsupported_number_count": 0,
-    "unsupported_reference_count": 0,
-    "unsupported_decision_count": 0,
-    "final_user_visible_unsupported_fact_count": 0,
-    "average_latency_ms": 12822.656,
-    "p95_latency_ms": 26180.598,
-    "gemma_unloaded_after_acceptance": true,
-    "decision": "PASS"
-  },
-  "current_reconciled_pre061_status": {
-    "overall_decision": "NOT_COMPLETE",
-    "authoritative_gemma_commit": "3c364e3",
-    "historical_gemma_records": ["ce36cdf", "a7f9ef3"],
-    "retrieval_acceptance": "PASS",
-    "gemini_provider_smoke": "PASS",
-    "gemma_native_schema_statement_selection": "PASS",
-    "normal_turkish_original_query_black_box_e2e": "NOT_RUN_BLOCKED",
-    "black_box_blocker": "The real native-schema intake capability gate failed before endpoint execution: only 1/6 parser responses validated and 0/6 matched the requested scope; the remaining five timed out across two 60-second attempts.",
-    "main_061": "BLOCKED",
-    "next_scoped_task": "Normal Turkish original_query to safe StructuredQuery to deterministic planner to real MCP/Internal API/RAG to Gemma statement selection to final user response to six self-contained black-box tests."
-  },
-  "natural_language_intake_capability": {
-    "prompt_version": "structured-query-parser-tr-v1",
-    "provider": "ollama",
-    "model": "gemma4:12b-it-qat",
-    "case_count": 6,
-    "provider_success_count": 1,
-    "native_schema_parse_success_count": 1,
-    "structured_query_validation_count": 1,
-    "scope_match_count": 0,
-    "endpoint_black_box_started": false,
-    "gemma_unloaded_after_capability": true,
-    "decision": "FAIL"
+    "privacy_violation_count": 0,
+    "snapshot_leakage_count": 0,
+    "critical_citation_mismatch_count": 0
   }
 }

@@ -61,6 +61,7 @@ class CausalSummary(BaseModel):
 class ImpactSummary(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    outage_count: int | None = None
     potential: int | None = None
     verified_impacted: int | None = None
     verified_no_impact: int | None = None
@@ -275,6 +276,30 @@ def _network_outage_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
     )
 
 
+def _network_location_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
+    return _ExtractedToolResult(
+        category=EvidenceCategory.CUSTOMER_IMPACT,
+        impact={
+            "outage_count": _non_negative_int(data.get("outage_count"), "outage_count"),
+            "potential": _non_negative_int(
+                data.get("potential_connection_count"), "potential_connection_count"
+            ),
+            "verified_impacted": _non_negative_int(
+                data.get("verified_impacted_count"), "verified_impacted_count"
+            ),
+            "verified_no_impact": _non_negative_int(
+                data.get("verified_no_impact_count"), "verified_no_impact_count"
+            ),
+            "insufficient_evidence": _non_negative_int(
+                data.get("insufficient_evidence_count"), "insufficient_evidence_count"
+            ),
+            "failover_protected": _non_negative_int(
+                data.get("failover_protected_count"), "failover_protected_count"
+            ),
+        },
+    )
+
+
 def _network_outage_details(data: Mapping[str, Any]) -> _ExtractedToolResult:
     outage = _mapping(data.get("outage"))
     if outage is None:
@@ -383,6 +408,7 @@ def _document_retrieval(data: Mapping[str, Any]) -> _ExtractedToolResult:
 
 
 NORMALIZERS: dict[tuple[MCPServer, str], Normalizer] = {
+    (MCPServer.NETWORK, "aggregate_location_impact"): _network_location_impact,
     (MCPServer.NETWORK, "correlate_alarms"): _network_causal,
     (MCPServer.NETWORK, "rank_root_cause_candidates"): _network_root_cause,
     (MCPServer.NETWORK, "get_outage_details"): _network_outage_details,
@@ -553,14 +579,10 @@ class ResultMergerValidator:
             StructuredQueryIntent.RULE_EVIDENCE,
         }:
             categories.add(EvidenceCategory.RULE_EVIDENCE)
-        if (
-            RequestedOutput.EVIDENCE in outputs
-            and query.intent
-            not in {
-                StructuredQueryIntent.COMPENSATION_EVALUATION,
-                StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL,
-            }
-        ):
+        if RequestedOutput.EVIDENCE in outputs and query.intent not in {
+            StructuredQueryIntent.COMPENSATION_EVALUATION,
+            StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL,
+        }:
             categories.add(EvidenceCategory.RULE_EVIDENCE)
         if (
             query.intent == StructuredQueryIntent.COMPENSATION_EVALUATION
@@ -569,11 +591,14 @@ class ResultMergerValidator:
             categories.add(EvidenceCategory.COMPENSATION)
         if query.intent == StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL:
             categories.add(EvidenceCategory.DOCUMENT_RETRIEVAL)
+            if query.causal_event_code or query.outage_code:
+                categories.add(EvidenceCategory.RULE_EVIDENCE)
         return frozenset(categories)
 
     @staticmethod
     def _category_for_call(server: MCPServer, tool_name: str) -> EvidenceCategory | None:
         if (server, tool_name) in {
+            (MCPServer.NETWORK, "aggregate_location_impact"),
             (MCPServer.NETWORK, "correlate_alarms"),
             (MCPServer.NETWORK, "rank_root_cause_candidates"),
             (MCPServer.NETWORK, "get_outage_details"),

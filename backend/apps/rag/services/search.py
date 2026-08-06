@@ -72,6 +72,7 @@ class SearchRequest:
     rule_code: str | None = None
     rule_version: int | None = None
     include_scores: bool = True
+    embedding_provider: str | None = None
 
 
 def validate_request(request: SearchRequest):

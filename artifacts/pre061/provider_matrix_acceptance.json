@@ -1,0 +1,1798 @@
+{
+  "cases": [
+    {
+      "actual_machine_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {
+            "child": 6,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-KON-001",
+          "root_resource_type": "device"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:correlate",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:root_cause",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "actual_structured_query": {
+        "causal_event_code": "CE-MCR-0018",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "ollama",
+        "intent": "network_investigation",
+        "requested_outputs": [
+          "evidence",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "case_kind": "root_cause",
+      "citation_support": true,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0018",
+          "reference_kind": "causal_event"
+        }
+      ],
+      "embedding_prompt_version": "qwen3-telecom-query-v1",
+      "embedding_provider": "ollama",
+      "exact_fact_match": true,
+      "executed_tools": [],
+      "expected_machine_facts": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {
+            "child": 6,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-KON-001",
+          "root_resource_type": "device"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:correlate",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:root_cause",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "failure_reason": null,
+      "final_user_text": "Kesinti de\u011ferlendirmesi\nK\u00f6k neden gerek\u00e7esi: same_resource, temporal_propagation.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 31635.082,
+      "lifecycle": "completed",
+      "llm_provider": "ollama",
+      "pass": true,
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-976291502BBA4F3D82E12309D0B7F3FB",
+      "requested_embedding_provider": "ollama",
+      "requested_llm_provider": "ollama",
+      "resolved_embedding_model": "qwen3-embedding:4b",
+      "resolved_embedding_provider": "ollama",
+      "resolved_llm_model": "gemma4:12b-it-qat",
+      "resolved_llm_provider": "ollama",
+      "selected_tools": [
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "correlate",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "snapshot_leakage_count": 0,
+      "structured_query_parser": "deterministic",
+      "structured_query_parser_version": "deterministic-structured-query-tr-v1",
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "user_prompt": "Public olay kodu CE-MCR-0018 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp belirti mi?",
+      "vector_corpus": {
+        "model": "qwen3-embedding:4b",
+        "prompt_version": "qwen3-telecom-query-v1",
+        "provider": "ollama"
+      }
+    },
+    {
+      "actual_machine_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "role_counts": {},
+          "root_cause_reason_codes": []
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-rag-001:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "691ed34620afb85ca2861f3d6a648491ba591a831a2d93ceea2ae8a94b649d4e",
+        "retrieval_sources": [
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Immutable DecisionEvidence",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 2
+          },
+          {
+            "section": "De\u011ferlendirme S\u0131ras\u0131",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Tan\u0131mlar",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          }
+        ],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "actual_structured_query": {
+        "causal_event_code": "CE-MCR-0018",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "eligibility",
+        "embedding_provider": "ollama",
+        "intent": "rule_document_retrieval",
+        "requested_outputs": [
+          "details",
+          "evidence",
+          "summary"
+        ],
+        "retrieval_query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "case_kind": "rag_citation",
+      "citation_support": true,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0018",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Immutable DecisionEvidence",
+          "version": 2
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "De\u011ferlendirme S\u0131ras\u0131",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "Tan\u0131mlar",
+          "version": 1
+        }
+      ],
+      "embedding_prompt_version": "qwen3-telecom-query-v1",
+      "embedding_provider": "ollama",
+      "exact_fact_match": true,
+      "executed_tools": [],
+      "expected_machine_facts": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "role_counts": {},
+          "root_cause_reason_codes": []
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-rag-001:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "691ed34620afb85ca2861f3d6a648491ba591a831a2d93ceea2ae8a94b649d4e",
+        "retrieval_sources": [
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Immutable DecisionEvidence",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 2
+          },
+          {
+            "section": "De\u011ferlendirme S\u0131ras\u0131",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Tan\u0131mlar",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          }
+        ],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "failure_reason": null,
+      "final_user_text": "Kesinti de\u011ferlendirmesi\nDo\u011frulanm\u0131\u015f kaynaklar: SYN-COMP-2026-ELIGIBILITY v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / De\u011ferlendirme S\u0131ras\u0131; SYN-COMP-2026-OVERVIEW v1 / Kan\u0131t ve A\u00e7\u0131klanabilirlik; SYN-COMP-2026-OVERVIEW v1 / Tan\u0131mlar.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 38006.599,
+      "lifecycle": "completed",
+      "llm_provider": "ollama",
+      "pass": true,
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-802CB71EF25243FC8B72BC5D5BE11003",
+      "requested_embedding_provider": "ollama",
+      "requested_llm_provider": "ollama",
+      "resolved_embedding_model": "qwen3-embedding:4b",
+      "resolved_embedding_provider": "ollama",
+      "resolved_llm_model": "gemma4:12b-it-qat",
+      "resolved_llm_provider": "ollama",
+      "selected_tools": [
+        {
+          "arguments": {
+            "embedding_provider": "ollama",
+            "include_scores": true,
+            "query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+            "search_mode": "hybrid",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "top_k": 5
+          },
+          "call_id": "rule_documents",
+          "call_kind": "document_retrieval",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "search_rule_documents"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "snapshot_leakage_count": 0,
+      "structured_query_parser": "deterministic",
+      "structured_query_parser_version": "deterministic-structured-query-tr-v1",
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "user_prompt": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+      "vector_corpus": {
+        "model": "qwen3-embedding:4b",
+        "prompt_version": "qwen3-telecom-query-v1",
+        "provider": "ollama"
+      }
+    },
+    {
+      "actual_machine_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {
+            "child": 6,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-KON-001",
+          "root_resource_type": "device"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:correlate",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:root_cause",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "actual_structured_query": {
+        "causal_event_code": "CE-MCR-0018",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "network_investigation",
+        "requested_outputs": [
+          "evidence",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "case_kind": "root_cause",
+      "citation_support": true,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0018",
+          "reference_kind": "causal_event"
+        }
+      ],
+      "embedding_prompt_version": "gemini-search-query-v1",
+      "embedding_provider": "gemini",
+      "exact_fact_match": true,
+      "executed_tools": [],
+      "expected_machine_facts": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {
+            "child": 6,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-KON-001",
+          "root_resource_type": "device"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:correlate",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:root_cause",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "failure_reason": null,
+      "final_user_text": "Kesinti de\u011ferlendirmesi\nK\u00f6k neden gerek\u00e7esi: same_resource, temporal_propagation.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 13520.608,
+      "lifecycle": "completed",
+      "llm_provider": "ollama",
+      "pass": true,
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-314B240608AD40209D8E38CB321D2A26",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "ollama",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemma4:12b-it-qat",
+      "resolved_llm_provider": "ollama",
+      "selected_tools": [
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "correlate",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "snapshot_leakage_count": 0,
+      "structured_query_parser": "deterministic",
+      "structured_query_parser_version": "deterministic-structured-query-tr-v1",
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "user_prompt": "Public olay kodu CE-MCR-0018 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp belirti mi?",
+      "vector_corpus": {
+        "model": "gemini-embedding-2",
+        "prompt_version": "gemini-search-query-v1",
+        "provider": "gemini"
+      }
+    },
+    {
+      "actual_machine_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "role_counts": {},
+          "root_cause_reason_codes": []
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-rag-001:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "df2e80bab6d9f74f934d0d971379f6f17ea6ed6a4315405626ce970cf37138ae",
+        "retrieval_sources": [
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-BROADBAND",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Immutable DecisionEvidence",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 2
+          },
+          {
+            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-OPERATIONS-LIFECYCLE-2026",
+            "version": 1
+          }
+        ],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "actual_structured_query": {
+        "causal_event_code": "CE-MCR-0018",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "eligibility",
+        "embedding_provider": "gemini",
+        "intent": "rule_document_retrieval",
+        "requested_outputs": [
+          "details",
+          "evidence",
+          "summary"
+        ],
+        "retrieval_query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "case_kind": "rag_citation",
+      "citation_support": true,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0018",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "SYN-COMP-2026-BROADBAND",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Immutable DecisionEvidence",
+          "version": 2
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-OPERATIONS-LIFECYCLE-2026",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve Referanslar",
+          "version": 1
+        }
+      ],
+      "embedding_prompt_version": "gemini-search-query-v1",
+      "embedding_provider": "gemini",
+      "exact_fact_match": true,
+      "executed_tools": [],
+      "expected_machine_facts": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "role_counts": {},
+          "root_cause_reason_codes": []
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-rag-001:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "df2e80bab6d9f74f934d0d971379f6f17ea6ed6a4315405626ce970cf37138ae",
+        "retrieval_sources": [
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-BROADBAND",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Immutable DecisionEvidence",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 2
+          },
+          {
+            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-OPERATIONS-LIFECYCLE-2026",
+            "version": 1
+          }
+        ],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "failure_reason": null,
+      "final_user_text": "Kesinti de\u011ferlendirmesi\nDo\u011frulanm\u0131\u015f kaynaklar: SYN-COMP-2026-BROADBAND v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / Kan\u0131t ve A\u00e7\u0131klanabilirlik; SYN-OPERATIONS-LIFECYCLE-2026 v1 / Kan\u0131t ve Referanslar.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 17060.432,
+      "lifecycle": "completed",
+      "llm_provider": "ollama",
+      "pass": true,
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-8EA13F8AC1C64FB2AD583C7BAD3CA9EE",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "ollama",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemma4:12b-it-qat",
+      "resolved_llm_provider": "ollama",
+      "selected_tools": [
+        {
+          "arguments": {
+            "embedding_provider": "gemini",
+            "include_scores": true,
+            "query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+            "search_mode": "hybrid",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "top_k": 5
+          },
+          "call_id": "rule_documents",
+          "call_kind": "document_retrieval",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "search_rule_documents"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "snapshot_leakage_count": 0,
+      "structured_query_parser": "deterministic",
+      "structured_query_parser_version": "deterministic-structured-query-tr-v1",
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "user_prompt": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+      "vector_corpus": {
+        "model": "gemini-embedding-2",
+        "prompt_version": "gemini-search-query-v1",
+        "provider": "gemini"
+      }
+    },
+    {
+      "actual_machine_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {
+            "child": 6,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-KON-001",
+          "root_resource_type": "device"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:correlate",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:root_cause",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "actual_structured_query": {
+        "causal_event_code": "CE-MCR-0018",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "ollama",
+        "intent": "network_investigation",
+        "requested_outputs": [
+          "evidence",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "case_kind": "root_cause",
+      "citation_support": true,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0018",
+          "reference_kind": "causal_event"
+        }
+      ],
+      "embedding_prompt_version": "qwen3-telecom-query-v1",
+      "embedding_provider": "ollama",
+      "exact_fact_match": true,
+      "executed_tools": [],
+      "expected_machine_facts": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {
+            "child": 6,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-KON-001",
+          "root_resource_type": "device"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:correlate",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:root_cause",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "failure_reason": null,
+      "final_user_text": "Kesinti de\u011ferlendirmesi\nK\u00f6k neden gerek\u00e7esi: same_resource, temporal_propagation.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 7770.377,
+      "lifecycle": "completed",
+      "llm_provider": "gemini",
+      "pass": true,
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-F3A9510E6A784CC78BDA6A0369573561",
+      "requested_embedding_provider": "ollama",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "qwen3-embedding:4b",
+      "resolved_embedding_provider": "ollama",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "selected_tools": [
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "correlate",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "snapshot_leakage_count": 0,
+      "structured_query_parser": "deterministic",
+      "structured_query_parser_version": "deterministic-structured-query-tr-v1",
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "user_prompt": "Public olay kodu CE-MCR-0018 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp belirti mi?",
+      "vector_corpus": {
+        "model": "qwen3-embedding:4b",
+        "prompt_version": "qwen3-telecom-query-v1",
+        "provider": "ollama"
+      }
+    },
+    {
+      "actual_machine_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "role_counts": {},
+          "root_cause_reason_codes": []
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-rag-001:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "691ed34620afb85ca2861f3d6a648491ba591a831a2d93ceea2ae8a94b649d4e",
+        "retrieval_sources": [
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Immutable DecisionEvidence",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 2
+          },
+          {
+            "section": "De\u011ferlendirme S\u0131ras\u0131",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Tan\u0131mlar",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          }
+        ],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "actual_structured_query": {
+        "causal_event_code": "CE-MCR-0018",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "eligibility",
+        "embedding_provider": "ollama",
+        "intent": "rule_document_retrieval",
+        "requested_outputs": [
+          "details",
+          "evidence",
+          "summary"
+        ],
+        "retrieval_query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "case_kind": "rag_citation",
+      "citation_support": true,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0018",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Immutable DecisionEvidence",
+          "version": 2
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "De\u011ferlendirme S\u0131ras\u0131",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "Tan\u0131mlar",
+          "version": 1
+        }
+      ],
+      "embedding_prompt_version": "qwen3-telecom-query-v1",
+      "embedding_provider": "ollama",
+      "exact_fact_match": true,
+      "executed_tools": [],
+      "expected_machine_facts": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "role_counts": {},
+          "root_cause_reason_codes": []
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-rag-001:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "691ed34620afb85ca2861f3d6a648491ba591a831a2d93ceea2ae8a94b649d4e",
+        "retrieval_sources": [
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Immutable DecisionEvidence",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 2
+          },
+          {
+            "section": "De\u011ferlendirme S\u0131ras\u0131",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Tan\u0131mlar",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          }
+        ],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "failure_reason": null,
+      "final_user_text": "Kesinti de\u011ferlendirmesi\nDo\u011frulanm\u0131\u015f kaynaklar: SYN-COMP-2026-ELIGIBILITY v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / De\u011ferlendirme S\u0131ras\u0131; SYN-COMP-2026-OVERVIEW v1 / Kan\u0131t ve A\u00e7\u0131klanabilirlik; SYN-COMP-2026-OVERVIEW v1 / Tan\u0131mlar.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 14081.405,
+      "lifecycle": "completed",
+      "llm_provider": "gemini",
+      "pass": true,
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-A504D7A4CD1B416AA75D9F586DB31ED4",
+      "requested_embedding_provider": "ollama",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "qwen3-embedding:4b",
+      "resolved_embedding_provider": "ollama",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "selected_tools": [
+        {
+          "arguments": {
+            "embedding_provider": "ollama",
+            "include_scores": true,
+            "query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+            "search_mode": "hybrid",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "top_k": 5
+          },
+          "call_id": "rule_documents",
+          "call_kind": "document_retrieval",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "search_rule_documents"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "snapshot_leakage_count": 0,
+      "structured_query_parser": "deterministic",
+      "structured_query_parser_version": "deterministic-structured-query-tr-v1",
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "user_prompt": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+      "vector_corpus": {
+        "model": "qwen3-embedding:4b",
+        "prompt_version": "qwen3-telecom-query-v1",
+        "provider": "ollama"
+      }
+    },
+    {
+      "actual_machine_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {
+            "child": 6,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-KON-001",
+          "root_resource_type": "device"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:correlate",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:root_cause",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "actual_structured_query": {
+        "causal_event_code": "CE-MCR-0018",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "network_investigation",
+        "requested_outputs": [
+          "evidence",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "case_kind": "root_cause",
+      "citation_support": true,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0018",
+          "reference_kind": "causal_event"
+        }
+      ],
+      "embedding_prompt_version": "gemini-search-query-v1",
+      "embedding_provider": "gemini",
+      "exact_fact_match": true,
+      "executed_tools": [],
+      "expected_machine_facts": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {
+            "child": 6,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-KON-001",
+          "root_resource_type": "device"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:correlate",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-rag-001:root_cause",
+            "result_fingerprint": "f80316c465c7d2b330f96c586261d7b5f7d75657bfeca70525a573ba38a8f0d8",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "40c7a68d94bb30a8ca6b39821c0999b44c7b36af997674ea75a6f8ba276756aa",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "failure_reason": null,
+      "final_user_text": "Kesinti de\u011ferlendirmesi\nK\u00f6k neden gerek\u00e7esi: same_resource, temporal_propagation.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 7233.72,
+      "lifecycle": "completed",
+      "llm_provider": "gemini",
+      "pass": true,
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-042B42C215E84D1AA4C493A15557ECE0",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "selected_tools": [
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "correlate",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "snapshot_leakage_count": 0,
+      "structured_query_parser": "deterministic",
+      "structured_query_parser_version": "deterministic-structured-query-tr-v1",
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "user_prompt": "Public olay kodu CE-MCR-0018 olan kesintinin dogrulanmis ana kok nedeni nedir? Dying Gasp belirti mi?",
+      "vector_corpus": {
+        "model": "gemini-embedding-2",
+        "prompt_version": "gemini-search-query-v1",
+        "provider": "gemini"
+      }
+    },
+    {
+      "actual_machine_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "role_counts": {},
+          "root_cause_reason_codes": []
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-rag-001:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "df2e80bab6d9f74f934d0d971379f6f17ea6ed6a4315405626ce970cf37138ae",
+        "retrieval_sources": [
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-BROADBAND",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Immutable DecisionEvidence",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 2
+          },
+          {
+            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-OPERATIONS-LIFECYCLE-2026",
+            "version": 1
+          }
+        ],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "actual_structured_query": {
+        "causal_event_code": "CE-MCR-0018",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "eligibility",
+        "embedding_provider": "gemini",
+        "intent": "rule_document_retrieval",
+        "requested_outputs": [
+          "details",
+          "evidence",
+          "summary"
+        ],
+        "retrieval_query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "case_kind": "rag_citation",
+      "citation_support": true,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0018",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "SYN-COMP-2026-BROADBAND",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Immutable DecisionEvidence",
+          "version": 2
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-OPERATIONS-LIFECYCLE-2026",
+          "reference_kind": "retrieval_source",
+          "section": "Kan\u0131t ve Referanslar",
+          "version": 1
+        }
+      ],
+      "embedding_prompt_version": "gemini-search-query-v1",
+      "embedding_provider": "gemini",
+      "exact_fact_match": true,
+      "executed_tools": [],
+      "expected_machine_facts": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "role_counts": {},
+          "root_cause_reason_codes": []
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-rag-001:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-rag-001:rule_evidence",
+            "result_fingerprint": "64784573479ac15880f54e9a907cb82ac142a4485917a2d51d8c77d63dfc5510",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "df2e80bab6d9f74f934d0d971379f6f17ea6ed6a4315405626ce970cf37138ae",
+        "retrieval_sources": [
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-BROADBAND",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Immutable DecisionEvidence",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 2
+          },
+          {
+            "section": "Kan\u0131t ve A\u00e7\u0131klanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kan\u0131t ve Referanslar",
+            "source_code": "SYN-OPERATIONS-LIFECYCLE-2026",
+            "version": 1
+          }
+        ],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "failure_reason": null,
+      "final_user_text": "Kesinti de\u011ferlendirmesi\nDo\u011frulanm\u0131\u015f kaynaklar: SYN-COMP-2026-BROADBAND v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v1 / Kan\u0131t ve Referanslar; SYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence; SYN-COMP-2026-OVERVIEW v1 / Kan\u0131t ve A\u00e7\u0131klanabilirlik; SYN-OPERATIONS-LIFECYCLE-2026 v1 / Kan\u0131t ve Referanslar.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 5920.992,
+      "lifecycle": "completed",
+      "llm_provider": "gemini",
+      "pass": true,
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-1B20812F9D404EB7950FBAA34F1E403A",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "selected_tools": [
+        {
+          "arguments": {
+            "embedding_provider": "gemini",
+            "include_scores": true,
+            "query": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+            "search_mode": "hybrid",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "top_k": 5
+          },
+          "call_id": "rule_documents",
+          "call_kind": "document_retrieval",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "search_rule_documents"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0018",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "snapshot_leakage_count": 0,
+      "structured_query_parser": "deterministic",
+      "structured_query_parser_version": "deterministic-structured-query-tr-v1",
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "user_prompt": "Public olay kodu CE-MCR-0018 icin eligibility karari hangi RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin source, version ve section bolumune dayanir?",
+      "vector_corpus": {
+        "model": "gemini-embedding-2",
+        "prompt_version": "gemini-search-query-v1",
+        "provider": "gemini"
+      }
+    }
+  ],
+  "decision": "PASS",
+  "gate": "PRE-061-provider-matrix",
+  "gemma_unloaded": true,
+  "passed_count": 8,
+  "qwen_unloaded": true,
+  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+}

@@ -136,3 +136,16 @@ class GetLongestOutageInput(TemporalSnapshotInput):
         if value.tzinfo is None or value.utcoffset() is None:
             raise ValueError("datetime filters must be timezone-aware")
         return value
+
+
+class AggregateLocationImpactInput(TemporalSnapshotInput):
+    from_time: datetime
+    to_time: datetime
+    city: str | None = None
+    district: str | None = None
+
+    @model_validator(mode="after")
+    def require_location(self):
+        if not self.city and not self.district:
+            raise ValueError("city or district is required")
+        return self

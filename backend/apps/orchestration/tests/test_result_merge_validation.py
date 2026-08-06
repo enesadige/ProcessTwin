@@ -110,6 +110,7 @@ def failed(call_id: str, server: str, tool_name: str) -> ToolExecutionResult:
 
 def full_result(snapshot_identifier: str, *, impact=None, compensation=None) -> ExecutorResult:
     impact = impact or {
+        "outage_count": 2,
         "causal_event_code": "CE-GPON-001",
         "potential_connection_count": 3,
         "verified_impacted_count": 1,
@@ -405,3 +406,22 @@ def test_rule_document_retrieval_requires_only_document_retrieval_evidence():
     categories = ResultMergerValidator.required_categories(query)
 
     assert {category.value for category in categories} == {"document_retrieval"}
+
+
+def test_rule_document_retrieval_with_public_event_requires_rule_evidence_too():
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "rule_document_retrieval",
+            "requested_outputs": ["summary", "evidence"],
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1",
+            "causal_event_code": "CE-GPON-001",
+            "retrieval_query": "failover protected bağlantı",
+        }
+    )
+
+    categories = ResultMergerValidator.required_categories(query)
+
+    assert {category.value for category in categories} == {
+        "document_retrieval",
+        "rule_evidence",
+    }

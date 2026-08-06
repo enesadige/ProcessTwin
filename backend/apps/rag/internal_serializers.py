@@ -45,6 +45,9 @@ def parse_search_request(payload: dict) -> SearchRequest:
     include_scores = payload.get("include_scores", True)
     if not isinstance(include_scores, bool):
         raise ValidationError("include_scores must be boolean.")
+    embedding_provider = payload.get("embedding_provider")
+    if embedding_provider is not None and embedding_provider not in {"ollama", "gemini"}:
+        raise ValidationError("embedding_provider is invalid.")
     return SearchRequest(
         query=query,
         snapshot_identifier=snapshot_identifier,
@@ -57,6 +60,7 @@ def parse_search_request(payload: dict) -> SearchRequest:
         rule_code=rule_code,
         rule_version=rule_version,
         include_scores=include_scores,
+        embedding_provider=embedding_provider,
     )
 
 

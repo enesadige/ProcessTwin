@@ -22,6 +22,11 @@ urlpatterns = [
         name="alarm-correlations",
     ),
     path("outages/", internal_views.search_outages, name="outage-search"),
+    path(
+        "outages/aggregate-impact/",
+        internal_views.aggregate_location_impact,
+        name="aggregate-impact",
+    ),
     path("outages/longest/", internal_views.get_longest_outage, name="longest-outage"),
     path(
         "outages/<str:outage_code>/",

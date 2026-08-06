@@ -236,6 +236,49 @@ class QueryRunService:
         query_run.structured_query = normalized
         return self.transition(query_run, target_status=QueryRunStatus.PLANNED)
 
+    def save_provider_provenance(
+        self,
+        query_run: QueryRun,
+        *,
+        requested_llm_provider: str | None,
+        resolved_llm_provider: str,
+        resolved_llm_model: str | None,
+        requested_embedding_provider: str | None,
+        resolved_embedding_provider: str,
+        resolved_embedding_model: str,
+        embedding_prompt_version: str,
+        structured_query_parser: str,
+        structured_query_parser_version: str,
+    ) -> QueryRun:
+        """Persist resolved allowlisted provider choices before planning begins."""
+        if QueryRunStatus(query_run.status) != QueryRunStatus.PENDING:
+            return query_run
+        query_run.requested_llm_provider = requested_llm_provider or ""
+        query_run.resolved_llm_provider = resolved_llm_provider
+        query_run.resolved_llm_model = resolved_llm_model or ""
+        query_run.requested_embedding_provider = requested_embedding_provider or ""
+        query_run.resolved_embedding_provider = resolved_embedding_provider
+        query_run.resolved_embedding_model = resolved_embedding_model
+        query_run.embedding_prompt_version = embedding_prompt_version
+        query_run.structured_query_parser = structured_query_parser
+        query_run.structured_query_parser_version = structured_query_parser_version
+        query_run.full_clean()
+        query_run.save(
+            update_fields=[
+                "requested_llm_provider",
+                "resolved_llm_provider",
+                "resolved_llm_model",
+                "requested_embedding_provider",
+                "resolved_embedding_provider",
+                "resolved_embedding_model",
+                "embedding_prompt_version",
+                "structured_query_parser",
+                "structured_query_parser_version",
+                "updated_at",
+            ]
+        )
+        return query_run
+
     def save_tool_plan(
         self,
         query_run: QueryRun,

@@ -8,7 +8,9 @@ import pytest
 from apps.operations.tests.test_causal_models import create_causal_event
 from apps.operations.tests.test_operations_models import create_snapshot
 from apps.orchestration.natural_language_intake import (
+    DETERMINISTIC_STRUCTURED_QUERY_PARSER_VERSION,
     STRUCTURED_QUERY_PARSER_PROMPT_VERSION,
+    DeterministicStructuredQueryParser,
     NaturalLanguageQueryParseError,
     NaturalLanguageStructuredQueryParser,
 )
@@ -139,3 +141,60 @@ def test_parser_rejects_public_reference_not_found_in_snapshot():
             original_query="CE-UNKNOWN-001 olayini incele.", snapshot=snapshot
         )
     assert exc_info.value.code == "reference_not_found"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("prompt", "expected_intent"),
+    [
+        ("CE-INTAKE-001 olayinin kok nedeni nedir?", "network_investigation"),
+        ("CE-INTAKE-001 icin failover ve yedek baglanti durumunu acikla.", "outage_impact"),
+        (
+            "CE-INTAKE-001 ve SUB-INTAKE-001 icin tazminat uygunlugu nedir?",
+            "compensation_evaluation",
+        ),
+        ("CE-INTAKE-001 hangi kaynak ve section'a dayaniyor?", "rule_document_retrieval"),
+        ("CE-INTAKE-001 icin kanit yetersiz mi, gercekten etkilendi mi?", "outage_impact"),
+    ],
+)
+def test_deterministic_parser_extracts_supported_intents_without_provider(prompt, expected_intent):
+    snapshot = create_snapshot("deterministic-intents")
+    create_causal_event(snapshot, code="CE-INTAKE-001")
+    from apps.customers.models import Subscription
+    from apps.operations.tests.test_operations_models import (
+        create_access_line,
+        create_subscription_connection,
+    )
+
+    _, _, _, _, line = create_access_line(snapshot)
+    connection = create_subscription_connection(snapshot, line)
+    subscription = connection.subscription
+    subscription.subscription_number = "SUB-INTAKE-001"
+    subscription.save()
+
+    parsed = DeterministicStructuredQueryParser().parse(original_query=prompt, snapshot=snapshot)
+
+    assert parsed.prompt_version == DETERMINISTIC_STRUCTURED_QUERY_PARSER_VERSION
+    assert parsed.structured_query.intent.value == expected_intent
+    assert Subscription.objects.filter(pk=subscription.pk).exists()
+
+
+@pytest.mark.django_db
+def test_deterministic_parser_resolves_district_to_snapshot_parent_city_and_dates():
+    snapshot = create_snapshot("deterministic-location")
+    from apps.operations.tests.test_operations_models import create_maltepe_bng
+
+    device = create_maltepe_bng(snapshot)
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "2026-01-01 ile 2026-01-02 arasinda Maltepe ilcesinde kac kesinti oldu? "
+            "Potansiyel kapsam ve failover ile korunanlari belirt."
+        ),
+        snapshot=snapshot,
+    )
+
+    assert parsed.structured_query.location is not None
+    assert parsed.structured_query.location.city == device.city.name
+    assert parsed.structured_query.location.district == "Maltepe"
+    assert parsed.structured_query.time_window is not None
+    assert parsed.missing_fields == ()

@@ -25,9 +25,7 @@ class QueryRunStatus(models.TextChoices):
     FAILED = "failed", "Failed"
 
 
-TERMINAL_QUERY_RUN_STATUSES = frozenset(
-    {QueryRunStatus.COMPLETED, QueryRunStatus.FAILED}
-)
+TERMINAL_QUERY_RUN_STATUSES = frozenset({QueryRunStatus.COMPLETED, QueryRunStatus.FAILED})
 
 
 class QueryRun(TimeStampedModel):
@@ -60,6 +58,15 @@ class QueryRun(TimeStampedModel):
     final_result = models.JSONField(null=True, blank=True)
     model_version = models.CharField(max_length=160, blank=True)
     prompt_version = models.CharField(max_length=160, blank=True)
+    requested_llm_provider = models.CharField(max_length=32, blank=True)
+    resolved_llm_provider = models.CharField(max_length=32, blank=True)
+    resolved_llm_model = models.CharField(max_length=160, blank=True)
+    requested_embedding_provider = models.CharField(max_length=32, blank=True)
+    resolved_embedding_provider = models.CharField(max_length=32, blank=True)
+    resolved_embedding_model = models.CharField(max_length=160, blank=True)
+    embedding_prompt_version = models.CharField(max_length=160, blank=True)
+    structured_query_parser = models.CharField(max_length=64, blank=True)
+    structured_query_parser_version = models.CharField(max_length=160, blank=True)
     error_code = models.CharField(max_length=80, blank=True)
     error_summary = models.CharField(max_length=500, blank=True)
     started_at = models.DateTimeField(null=True, blank=True)
@@ -74,20 +81,14 @@ class QueryRun(TimeStampedModel):
             models.CheckConstraint(
                 condition=(
                     ~models.Q(status=QueryRunStatus.COMPLETED)
-                    | (
-                        models.Q(completed_at__isnull=False)
-                        & models.Q(final_result__isnull=False)
-                    )
+                    | (models.Q(completed_at__isnull=False) & models.Q(final_result__isnull=False))
                 ),
                 name="query_run_completed_requires_result",
             ),
             models.CheckConstraint(
                 condition=(
                     ~models.Q(status=QueryRunStatus.FAILED)
-                    | (
-                        models.Q(completed_at__isnull=False)
-                        & ~models.Q(error_code="")
-                    )
+                    | (models.Q(completed_at__isnull=False) & ~models.Q(error_code=""))
                 ),
                 name="query_run_failed_requires_error",
             ),
@@ -131,25 +132,38 @@ class QueryRun(TimeStampedModel):
         elif self.completed_at is not None:
             errors["completed_at"] = "Only terminal runs can have completed_at."
         if self.pk:
-            persisted = QueryRun.objects.filter(pk=self.pk).values(
-                "status",
-                "data_snapshot_id",
-                "idempotency_key",
-                "retry_of_id",
-                "original_query",
-                "structured_query",
-                "planned_tools",
-                "executed_tools",
-                "final_result",
-                "model_version",
-                "prompt_version",
-                "error_code",
-                "error_summary",
-                "started_at",
-                "completed_at",
-                "request_id",
-                "query_run_code",
-            ).first()
+            persisted = (
+                QueryRun.objects.filter(pk=self.pk)
+                .values(
+                    "status",
+                    "data_snapshot_id",
+                    "idempotency_key",
+                    "retry_of_id",
+                    "original_query",
+                    "structured_query",
+                    "planned_tools",
+                    "executed_tools",
+                    "final_result",
+                    "model_version",
+                    "prompt_version",
+                    "requested_llm_provider",
+                    "resolved_llm_provider",
+                    "resolved_llm_model",
+                    "requested_embedding_provider",
+                    "resolved_embedding_provider",
+                    "resolved_embedding_model",
+                    "embedding_prompt_version",
+                    "structured_query_parser",
+                    "structured_query_parser_version",
+                    "error_code",
+                    "error_summary",
+                    "started_at",
+                    "completed_at",
+                    "request_id",
+                    "query_run_code",
+                )
+                .first()
+            )
             if persisted and persisted["status"] in TERMINAL_QUERY_RUN_STATUSES:
                 current = {
                     "status": self.status,
@@ -163,6 +177,15 @@ class QueryRun(TimeStampedModel):
                     "final_result": self.final_result,
                     "model_version": self.model_version,
                     "prompt_version": self.prompt_version,
+                    "requested_llm_provider": self.requested_llm_provider,
+                    "resolved_llm_provider": self.resolved_llm_provider,
+                    "resolved_llm_model": self.resolved_llm_model,
+                    "requested_embedding_provider": self.requested_embedding_provider,
+                    "resolved_embedding_provider": self.resolved_embedding_provider,
+                    "resolved_embedding_model": self.resolved_embedding_model,
+                    "embedding_prompt_version": self.embedding_prompt_version,
+                    "structured_query_parser": self.structured_query_parser,
+                    "structured_query_parser_version": self.structured_query_parser_version,
                     "error_code": self.error_code,
                     "error_summary": self.error_summary,
                     "started_at": self.started_at,

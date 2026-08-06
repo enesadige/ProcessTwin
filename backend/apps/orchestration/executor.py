@@ -33,6 +33,7 @@ MAX_EXECUTOR_ATTEMPTS = 3
 # read-only subset is therefore deliberately narrow and reviewed with the plan.
 RETRYABLE_TOOL_KEYS = frozenset(
     {
+        (MCPServer.NETWORK, "aggregate_location_impact"),
         (MCPServer.NETWORK, "correlate_alarms"),
         (MCPServer.NETWORK, "rank_root_cause_candidates"),
         (MCPServer.NETWORK, "get_outage_details"),
@@ -177,9 +178,7 @@ class ToolExecutor:
             if call.call_id in results:
                 continue
             dependency_results = [results[dependency] for dependency in call.depends_on]
-            if any(
-                result.status != ToolExecutionStatus.SUCCEEDED for result in dependency_results
-            ):
+            if any(result.status != ToolExecutionStatus.SUCCEEDED for result in dependency_results):
                 result = self._skipped_dependency_result(prepared.query_run, call)
             else:
                 result = self._execute_call(prepared.query_run, call)
@@ -189,9 +188,7 @@ class ToolExecutor:
         ordered_results = [results[call.call_id] for call in plan.calls]
         return self._build_executor_result(plan.snapshot_identifier, ordered_results)
 
-    def _prepare_execution(
-        self, *, query_run: QueryRun, tool_plan: ToolPlan
-    ) -> _PreparedExecution:
+    def _prepare_execution(self, *, query_run: QueryRun, tool_plan: ToolPlan) -> _PreparedExecution:
         with transaction.atomic():
             locked_run = (
                 QueryRun.objects.select_for_update()
@@ -330,9 +327,7 @@ class ToolExecutor:
     def _runner_for(self, server: MCPServer) -> MCPToolRunner:
         if self._tool_runners is None:
             if getattr(settings, "ORCHESTRATION_MCP_TRANSPORT", "direct") == "stdio":
-                self._tool_runners = {
-                    item: StdioMCPToolRunner(item) for item in MCPServer
-                }
+                self._tool_runners = {item: StdioMCPToolRunner(item) for item in MCPServer}
                 return self._tool_runners[server]
             config = InternalAPIClientConfig.from_env()
             client = InternalAPIClient(config=config)

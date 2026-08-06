@@ -123,9 +123,12 @@ def test_rule_document_retrieval_plans_the_existing_rule_mcp_tool_with_safe_quer
     result = DeterministicToolPlanner().plan(query)
 
     assert result.status == PlannerResultStatus.PLANNED
-    assert result.tool_plan.calls[0].server.value == "rule"
-    assert result.tool_plan.calls[0].tool_name == "search_rule_documents"
+    assert [(call.server.value, call.tool_name) for call in result.tool_plan.calls] == [
+        ("rule", "search_rule_documents"),
+        ("rule", "get_rule_evidence"),
+    ]
     assert result.tool_plan.calls[0].arguments["query"] == "failover protected bağlantı"
+    assert result.tool_plan.calls[1].arguments["causal_event_code"] == "CE-GPON-001"
 
 
 def test_compensation_prefers_safe_causal_evidence_path_without_personal_identifiers():

@@ -11,13 +11,15 @@
 
 ## Görev Takip Durumu
 
-- **PRE-061 — Current reconciled status:** Retrieval acceptance **PASS**
+- **PRE-061 — Final status: PASS.** Retrieval acceptance **PASS**
   (8 source, 54 chunk, 54 real Qwen embeddings; top-3 %93.33, top-5 %100,
   citation mismatch/leakage 0). Real Gemini provider/smoke is **PASS**. Gemma
   native-schema statement selection is **PASS** at `3c364e3` (capability 3/3;
-  clean 12/12). Normal Turkish `original_query` black-box E2E is **NOT RUN /
-  BLOCKED**: the internal endpoint requires a prebuilt `structured_query` and
-  has no `original_query -> StructuredQuery` intake/parser. Overall PRE-061 is
+  clean 12/12). Deterministic original-query intake passed 6/6 without LLM
+  calls; the Gemma+Qwen baseline passed 6/6 and the real provider matrix passed
+  4/4 combinations (8/8 cases). Qwen and Gemini canonical corpora each cover
+  54/54 chunks with zero contamination. Overall PRE-061 is **PASS**;
+  `MAIN-061` may start.
   therefore **NOT COMPLETE** and `MAIN-061` must not start.
 
 - **PRE-061 final Gemini/LIVE-07 follow-up:** Aynı ephemeral key ile gerçek

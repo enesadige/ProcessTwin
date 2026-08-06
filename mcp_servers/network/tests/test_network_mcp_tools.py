@@ -10,8 +10,9 @@ from mcp_servers.shared.backend_client import InternalAPIClientError
 from mcp_servers.shared.contracts import MCPError, MCPErrorCode
 
 
-def test_all_nine_network_tools_are_registered():
+def test_all_ten_network_tools_are_registered():
     assert sorted(NETWORK_TOOL_DEFINITIONS) == [
+        "aggregate_location_impact",
         "calculate_customer_impact",
         "correlate_alarms",
         "get_device_details",

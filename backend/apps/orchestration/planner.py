@@ -169,7 +169,7 @@ class DeterministicToolPlanner:
                 return PlannerResult.clarification(
                     PlannerReasonCode.MISSING_DOCUMENT_RETRIEVAL_QUERY.value
                 )
-            return [
+            calls = [
                 self._call(
                     "rule_documents",
                     "rule",
@@ -180,15 +180,31 @@ class DeterministicToolPlanner:
                         search_mode="hybrid",
                         top_k=5,
                         include_scores=True,
+                        embedding_provider=query.embedding_provider,
                     ),
                     1,
+                    parallel_group="rule_document_context",
                 )
             ]
+            if query.causal_event_code:
+                calls.append(
+                    self._call(
+                        "rule_evidence",
+                        "rule",
+                        "get_rule_evidence",
+                        self._snapshot_args(query, causal_event_code=query.causal_event_code),
+                        1,
+                        parallel_group="rule_document_context",
+                    )
+                )
+            return calls
         return PlannerResult.unplannable(PlannerReasonCode.NO_SAFE_TOOL_MAPPING.value)
 
     def _network_calls(self, query: StructuredQuery) -> list[dict[str, object]] | PlannerResult:
         if query.causal_event_code:
-            return self._causal_analysis_calls(query)
+            calls = self._causal_analysis_calls(query)
+            self._append_rule_evidence_if_requested(query, calls)
+            return calls
         if query.outage_code:
             return [
                 self._call(
@@ -244,6 +260,7 @@ class DeterministicToolPlanner:
                     depends_on=["correlate", "root_cause"],
                 )
             )
+            self._append_rule_evidence_if_requested(query, calls)
             return calls
         if query.incident_code:
             return self._incident_search_calls(query)
@@ -318,6 +335,22 @@ class DeterministicToolPlanner:
             ),
         ]
 
+    def _append_rule_evidence_if_requested(
+        self, query: StructuredQuery, calls: list[dict[str, object]]
+    ) -> None:
+        if RequestedOutput.EVIDENCE not in query.requested_outputs:
+            return
+        calls.append(
+            self._call(
+                "rule_evidence",
+                "rule",
+                "get_rule_evidence",
+                self._snapshot_args(query, causal_event_code=query.causal_event_code),
+                1,
+                parallel_group="causal_analysis",
+            )
+        )
+
     def _incident_search_calls(self, query: StructuredQuery) -> list[dict[str, object]]:
         arguments = self._snapshot_args(query, incident_code=query.incident_code)
         return [
@@ -356,12 +389,20 @@ class DeterministicToolPlanner:
                 from_time=query.time_window.from_time,
                 to_time=query.time_window.to_time,
             )
+        if query.location and query.time_window:
+            return [
+                self._call(
+                    "aggregate_location_impact",
+                    "network",
+                    "aggregate_location_impact",
+                    arguments,
+                    1,
+                )
+            ]
         return [self._call("scoped_outages", "network", "get_longest_outage", arguments, 1)]
 
     @staticmethod
-    def _snapshot_args(
-        structured_query: StructuredQuery, **values: object
-    ) -> dict[str, object]:
+    def _snapshot_args(structured_query: StructuredQuery, **values: object) -> dict[str, object]:
         return {"snapshot_identifier": structured_query.snapshot_identifier, **values}
 
     @staticmethod

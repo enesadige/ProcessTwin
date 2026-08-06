@@ -182,6 +182,8 @@ class ValidatedResponseBuilder:
         impact = result.impact_summary
         if impact:
             sections.extend(["", "Müşteri etkisi"])
+            if impact.outage_count is not None:
+                sections.append(f"Kesinti sayısı: {impact.outage_count}.")
             if impact.potential is not None:
                 sections.append(f"Potansiyel etki: {impact.potential} bağlantı.")
             if impact.verified_impacted is not None:
@@ -292,6 +294,8 @@ class ValidatedResponseBuilder:
             add("Kök neden gerekçesi: " + ", ".join(causal.root_cause_reason_codes) + ".")
         impact = result.impact_summary
         if impact:
+            if impact.outage_count is not None:
+                add(f"Kesinti sayısı: {impact.outage_count}.")
             for label, value in (
                 ("Potansiyel kapsam", impact.potential),
                 ("Doğrulanmış etki", impact.verified_impacted),

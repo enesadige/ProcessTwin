@@ -185,6 +185,7 @@ class SearchRuleDocumentsInput(TemporalSnapshotInput):
     rule_code: str | None = None
     rule_version: int | None = Field(default=None, ge=1)
     include_scores: bool = True
+    embedding_provider: Literal["ollama", "gemini"] | None = None
 
     @field_validator("query")
     @classmethod

@@ -39,13 +39,18 @@ class GeminiLLMProvider(LLMProvider):
         self._client: Any | None = None
 
     def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
-        contents = self._validate_request(request)
+        contents, format_schema = self._validate_request(request)
         client = self._get_client()
         max_attempts = self._max_attempts()
         for attempt in range(max_attempts):
             try:
                 if self._api_family() == GEMINI_INTERACTIONS_API_FAMILY:
-                    response = client.interactions.create(model=self.model_name, input=contents)
+                    response = client.interactions.create(
+                        model=self.model_name,
+                        input=contents,
+                        stream=False,
+                        response_format=self._interaction_response_format(format_schema),
+                    )
                     return self._normalize_interaction_response(response)
                 response = client.models.generate_content(model=self.model_name, contents=contents)
                 return self._normalize_response(response)
@@ -82,12 +87,12 @@ class GeminiLLMProvider(LLMProvider):
         return genai.Client(api_key=api_key, http_options={"timeout": timeout_ms})
 
     @staticmethod
-    def _validate_request(request: Mapping[str, Any]) -> str:
+    def _validate_request(request: Mapping[str, Any]) -> tuple[str, Mapping[str, Any] | None]:
         if not isinstance(request, Mapping):
             raise GeminiLLMProviderError(
                 message="Gemini request must be an object.", code="invalid_request"
             )
-        if set(request) != {"contents"}:
+        if set(request) - {"contents", "format_schema"}:
             raise GeminiLLMProviderError(
                 message="Gemini request contains unsupported fields.", code="invalid_request"
             )
@@ -96,7 +101,24 @@ class GeminiLLMProvider(LLMProvider):
             raise GeminiLLMProviderError(
                 message="Gemini request contents are invalid.", code="invalid_request"
             )
-        return contents
+        format_schema = request.get("format_schema")
+        if format_schema is not None and not isinstance(format_schema, Mapping):
+            raise GeminiLLMProviderError(
+                message="Gemini format schema is invalid.", code="invalid_request"
+            )
+        return contents, format_schema
+
+    @staticmethod
+    def _interaction_response_format(
+        format_schema: Mapping[str, Any] | None,
+    ) -> dict[str, Any] | None:
+        if format_schema is None:
+            return None
+        return {
+            "type": "text",
+            "mime_type": "application/json",
+            "schema": dict(format_schema),
+        }
 
     @staticmethod
     def _timeout_ms() -> int:

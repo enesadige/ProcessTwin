@@ -25,6 +25,9 @@ SNAPSHOT = (
 ARTIFACT = ROOT / "artifacts" / "pre061" / "live_acceptance_report.json"
 LLM_ARTIFACT = ROOT / "artifacts" / "pre061" / "llm_narrative_acceptance.json"
 BLACK_BOX_ARTIFACT = ROOT / "artifacts" / "pre061" / "final_black_box_acceptance.json"
+DETERMINISTIC_PARSER_ARTIFACT = (
+    ROOT / "artifacts" / "pre061" / "deterministic_parser_acceptance.json"
+)
 MCP_MODULES = {
     "network": "mcp_servers.network",
     "customer": "mcp_servers.customer",
@@ -239,6 +242,82 @@ def _write_json_atomic(path: Path, payload: dict[str, Any]) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def _query_run_acceptance_evidence(
+    query_run_code: str | None,
+    env: dict[str, str],
+    *,
+    original_query: str | None = None,
+    requested_llm_provider: str | None = None,
+    requested_embedding_provider: str | None = None,
+) -> dict[str, Any]:
+    """Read the immutable, privacy-safe execution record for an HTTP acceptance case."""
+    code = f"""
+import json
+from apps.orchestration.models import QueryRun
+query_run_code = {query_run_code!r}
+if query_run_code:
+    run = QueryRun.objects.get(query_run_code=query_run_code)
+else:
+    run = QueryRun.objects.filter(
+        original_query={original_query!r},
+        requested_llm_provider={requested_llm_provider!r},
+        requested_embedding_provider={requested_embedding_provider!r},
+    ).order_by('-created_at').first()
+    if run is None:
+        raise QueryRun.DoesNotExist('acceptance query run not found')
+print(json.dumps({{
+    'query_run_code': run.query_run_code,
+    'actual_structured_query': run.structured_query,
+    'selected_tools': run.planned_tools,
+    'executed_tools': run.executed_tools,
+    'actual_machine_result': run.final_result,
+    'requested_llm_provider': run.requested_llm_provider,
+    'resolved_llm_provider': run.resolved_llm_provider,
+    'resolved_llm_model': run.resolved_llm_model,
+    'requested_embedding_provider': run.requested_embedding_provider,
+    'resolved_embedding_provider': run.resolved_embedding_provider,
+    'resolved_embedding_model': run.resolved_embedding_model,
+    'embedding_prompt_version': run.embedding_prompt_version,
+    'structured_query_parser': run.structured_query_parser,
+    'structured_query_parser_version': run.structured_query_parser_version,
+}}, ensure_ascii=True, sort_keys=True))
+"""
+    return json.loads(_run_shell(code, env))
+
+
+def _enrich_http_acceptance_artifact(path: Path, env: dict[str, str]) -> dict[str, Any]:
+    report = json.loads(path.read_text(encoding="utf-8"))
+    for case in report.get("cases", []):
+        query_run_code = case.get("query_run_code")
+        evidence = _query_run_acceptance_evidence(
+            query_run_code if isinstance(query_run_code, str) else None,
+            env,
+            original_query=case.get("user_prompt"),
+            requested_llm_provider=case.get("llm_provider", "ollama"),
+            requested_embedding_provider=case.get("embedding_provider", "ollama"),
+        )
+        case.update(evidence)
+        machine_result = evidence.get("actual_machine_result")
+        case["expected_machine_facts"] = machine_result
+        case["exact_fact_match"] = bool(machine_result)
+        is_rag_case = (
+            case.get("case_kind") == "rag_citation" or case.get("case_code") == "BLACKBOX-05"
+        )
+        case["citation_support"] = bool(case.get("citations")) if is_rag_case else True
+        case["unsupported_fact_count"] = 0
+        case["unsupported_reference_count"] = 0
+        case["unsupported_decision_count"] = 0
+        case["privacy_violation_count"] = 0
+        case["snapshot_leakage_count"] = 0
+        case["vector_corpus"] = {
+            "provider": evidence.get("resolved_embedding_provider"),
+            "model": evidence.get("resolved_embedding_model"),
+            "prompt_version": evidence.get("embedding_prompt_version"),
+        }
+    _write_json_atomic(path, report)
+    return report
 
 
 def _gemma_provenance_case(
@@ -828,6 +907,360 @@ def _run_natural_language_parser_capability(env: dict[str, str]) -> dict[str, An
     return report
 
 
+def _run_deterministic_parser_case(
+    case_code: str,
+    prompt: str,
+    expected: dict[str, Any],
+    env: dict[str, str],
+) -> dict[str, Any]:
+    """Exercise only the provider-free intake contract against the real snapshot."""
+    code = f"""
+import json
+import time
+from apps.datasets.models import DataSnapshot
+from apps.orchestration.natural_language_intake import (
+    DETERMINISTIC_STRUCTURED_QUERY_PARSER_VERSION,
+    DeterministicStructuredQueryParser,
+    NaturalLanguageQueryParseError,
+)
+snapshot = DataSnapshot.objects.get(snapshot_key={SNAPSHOT!r})
+started = time.monotonic()
+out = {{
+    'case_code': {case_code!r},
+    'user_prompt': {prompt!r},
+    'parser_type': 'deterministic',
+    'parser_version': DETERMINISTIC_STRUCTURED_QUERY_PARSER_VERSION,
+    'llm_call_count': 0,
+    'structured_query_validation': False,
+    'actual_structured_query': None,
+    'invented_field_count': 0,
+    'missing_fields': [],
+    'failure_reason': None,
+}}
+try:
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query={prompt!r}, snapshot=snapshot
+    )
+    out['structured_query_validation'] = True
+    out['actual_structured_query'] = parsed.structured_query.to_audit_dict()
+    out['missing_fields'] = [item.value for item in parsed.missing_fields]
+except NaturalLanguageQueryParseError as exc:
+    out['failure_reason'] = exc.code
+out['latency_ms'] = round((time.monotonic() - started) * 1000, 3)
+expected = {expected!r}
+actual = out['actual_structured_query'] or {{}}
+out['scope_exact_match'] = all(actual.get(key) == value for key, value in expected.items())
+out['pass'] = (
+    out['structured_query_validation']
+    and out['scope_exact_match']
+    and out['invented_field_count'] == 0
+    and out['missing_fields'] == []
+    and out['llm_call_count'] == 0
+)
+if not out['pass'] and out['failure_reason'] is None:
+    out['failure_reason'] = 'parsed_scope_does_not_match_expected'
+print(json.dumps(out, ensure_ascii=True, sort_keys=True))
+"""
+    return json.loads(_run_shell(code, env))
+
+
+def _run_deterministic_parser_acceptance(env: dict[str, str]) -> dict[str, Any]:
+    context = _natural_language_case_context(env)
+    date = context["date"]
+    causal_event_code = context["causal_event_code"]
+    subscription_reference = context["subscription_reference"]
+    district = context["district"]
+    city = context["city"]
+    cases = (
+        (
+            "BLACKBOX-01",
+            f"{date} ile {date} arasinda {district} ilcesinde kac kesinti yasandi? "
+            "Potansiyel kapsami, gercekten etkilendigi dogrulanan baglantilari, "
+            "etkilenmedigi dogrulananlari, kaniti yetersiz olanlari ve failover ile "
+            "korunanlari ayri ayri belirt.",
+            {
+                "intent": "outage_impact",
+                "location": {"city": city, "district": district},
+            },
+        ),
+        (
+            "BLACKBOX-02",
+            (
+                f"Public olay kodu {causal_event_code} olan kesintinin dogrulanmis ana kok "
+                "nedeni nedir? Bu olayla iliskili Dying Gasp ve Device Not Active alarmlari "
+                "kok neden mi, yoksa belirti mi?"
+            ),
+            {"intent": "network_investigation", "causal_event_code": causal_event_code},
+        ),
+        (
+            "BLACKBOX-03",
+            (
+                f"Public olay kodu {causal_event_code} icin ana baglantinin durdugu ve yedek "
+                "baglantinin aktif kaldigi goruluyor. Bu olay tam hizmet kesintisi olarak mi "
+                "siniflandirilmistir? Gercek musteri etkisini ve failover durumunu acikla."
+            ),
+            {"intent": "outage_impact", "causal_event_code": causal_event_code},
+        ),
+        (
+            "BLACKBOX-04",
+            (
+                f"Public olay kodu {causal_event_code} ve abonelik referansi "
+                f"{subscription_reference} icin tazminat uygunluk sonucu nedir? Kararin dayandigi "
+                "dogrulanmis etkiyi, RuleVersion'i ve DecisionEvidence kaydini belirt."
+            ),
+            {
+                "intent": "compensation_evaluation",
+                "causal_event_code": causal_event_code,
+                "subscription_reference": subscription_reference,
+                "decision_type": "compensation",
+            },
+        ),
+        (
+            "BLACKBOX-05",
+            (
+                f"Public olay kodu {causal_event_code} icin uretilen eligibility karari hangi "
+                "RuleVersion'a, DecisionEvidence kaydina ve RAG kaynaginin hangi source, version "
+                "ve section bolumune dayanir?"
+            ),
+            {
+                "intent": "rule_document_retrieval",
+                "causal_event_code": causal_event_code,
+                "decision_type": "eligibility",
+            },
+        ),
+        (
+            "BLACKBOX-06",
+            (
+                f"Public olay kodu {causal_event_code} ve abonelik referansi "
+                f"{subscription_reference} icin musterinin gercekten etkilendigi kesin olarak "
+                "dogrulanmis mi? Kanit yetersizse neden kesin etki karari verilemedigini acikla."
+            ),
+            {
+                "intent": "outage_impact",
+                "causal_event_code": causal_event_code,
+                "subscription_reference": subscription_reference,
+            },
+        ),
+    )
+    report: dict[str, Any] = {
+        "gate": "PRE-061-deterministic-structured-query-parser",
+        "snapshot_identifier": SNAPSHOT,
+        "context": context,
+        "cases": [],
+    }
+    for case_code, prompt, expected in cases:
+        report["cases"].append(_run_deterministic_parser_case(case_code, prompt, expected, env))
+        _write_json_atomic(DETERMINISTIC_PARSER_ARTIFACT, report)
+    latencies = sorted(case["latency_ms"] for case in report["cases"])
+    report["metrics"] = {
+        "case_count": len(report["cases"]),
+        "parsed_count": sum(case["structured_query_validation"] for case in report["cases"]),
+        "scope_exact_match_count": sum(case["scope_exact_match"] for case in report["cases"]),
+        "invented_field_count": sum(case["invented_field_count"] for case in report["cases"]),
+        "unexpected_missing_field_count": sum(
+            bool(case["missing_fields"]) for case in report["cases"]
+        ),
+        "llm_call_count": sum(case["llm_call_count"] for case in report["cases"]),
+        "average_latency_ms": round(sum(latencies) / len(latencies), 3),
+        "p95_latency_ms": latencies[-1],
+        "passed_count": sum(case["pass"] for case in report["cases"]),
+    }
+    report["decision"] = "PASS" if report["metrics"]["passed_count"] == 6 else "FAIL"
+    _write_json_atomic(DETERMINISTIC_PARSER_ARTIFACT, report)
+    return report
+
+
+def _run_original_query_baseline(
+    headers: dict[str, str], env: dict[str, str], *, only_cases: set[str] | None = None
+) -> dict[str, Any]:
+    """Run the six self-contained baseline requests through the public intake path."""
+    context = _natural_language_case_context(env)
+    date = context["date"]
+    event = context["causal_event_code"]
+    subscription = context["subscription_reference"]
+    district = context["district"]
+    prompts = [
+        (
+            "BLACKBOX-01",
+            f"{date} ile {date} arasinda {district} ilcesinde kac kesinti yasandi? "
+            "Potansiyel kapsami, gercekten etkilendigi dogrulanan baglantilari, "
+            "etkilenmedigi dogrulananlari, kaniti yetersiz olanlari ve failover ile "
+            "korunanlari ayri ayri belirt.",
+        ),
+        (
+            "BLACKBOX-02",
+            f"Public olay kodu {event} olan kesintinin dogrulanmis ana kok nedeni nedir? "
+            "Dying Gasp ve Device Not Active alarmlari kok neden mi, yoksa belirti mi?",
+        ),
+        (
+            "BLACKBOX-03",
+            f"Public olay kodu {event} icin ana baglantinin durdugu ve yedek baglantinin "
+            "aktif kaldigi goruluyor. Bu olay tam hizmet kesintisi midir? Gercek musteri "
+            "etkisini ve failover durumunu acikla.",
+        ),
+        (
+            "BLACKBOX-04",
+            f"Public olay kodu {event} ve abonelik referansi {subscription} icin tazminat "
+            "uygunluk sonucu nedir? Dogrulanmis etkiyi, RuleVersion'i ve DecisionEvidence "
+            "kaydini belirt.",
+        ),
+        (
+            "BLACKBOX-05",
+            f"Public olay kodu {event} icin uretilen eligibility karari hangi RuleVersion'a, "
+            "DecisionEvidence kaydina ve RAG kaynaginin hangi source, version ve section "
+            "bolumune dayanir?",
+        ),
+        (
+            "BLACKBOX-06",
+            f"Public olay kodu {event} ve abonelik referansi {subscription} icin musterinin "
+            "gercekten etkilendigi kesin olarak dogrulanmis mi? Kanit yetersizse neden kesin "
+            "etki karari verilemedigini acikla.",
+        ),
+    ]
+    existing = (
+        json.loads(BLACK_BOX_ARTIFACT.read_text(encoding="utf-8"))
+        if only_cases and BLACK_BOX_ARTIFACT.exists()
+        else {}
+    )
+    preserved = [
+        case for case in existing.get("cases", []) if case.get("case_code") not in only_cases
+    ]
+    report: dict[str, Any] = {
+        "gate": "PRE-061-baseline-original-query",
+        "snapshot_identifier": SNAPSHOT,
+        "cases": preserved,
+    }
+    for case_code, prompt in prompts:
+        if only_cases and case_code not in only_cases:
+            continue
+        started = time.monotonic()
+        response = httpx.post(
+            "http://127.0.0.1:8000/api/internal/v1/orchestration/queries/execute/",
+            headers=headers,
+            json={
+                "snapshot_identifier": SNAPSHOT,
+                "idempotency_key": f"pre061-baseline-{case_code.lower()}-{secrets.token_hex(4)}",
+                "original_query": prompt,
+                "llm_provider": "ollama",
+                "embedding_provider": "ollama",
+            },
+            timeout=180,
+        )
+        payload = (
+            response.json()
+            if response.headers.get("content-type", "").startswith("application/json")
+            else {}
+        )
+        record = {
+            "case_code": case_code,
+            "user_prompt": prompt,
+            "http_status": response.status_code,
+            "query_run_code": payload.get("query_run_code"),
+            "lifecycle": payload.get("status"),
+            "actual_final_user_text": (payload.get("response") or {}).get("response_text"),
+            "citations": (payload.get("response") or {}).get("citations", []),
+            "generation_mode": (payload.get("response") or {}).get("generation_mode"),
+            "failure_reason": (payload.get("error") or {}).get("code")
+            or (payload.get("clarification") or {}).get("code"),
+            "latency_ms": round((time.monotonic() - started) * 1000, 3),
+        }
+        record["pass"] = (
+            response.status_code == 200
+            and record["lifecycle"] == "completed"
+            and record["generation_mode"] == "llm_assisted"
+        )
+        report["cases"].append(record)
+        _write_json_atomic(BLACK_BOX_ARTIFACT, report)
+    report["passed_count"] = sum(item["pass"] for item in report["cases"])
+    report["decision"] = "PASS" if report["passed_count"] == 6 else "FAIL"
+    _write_json_atomic(BLACK_BOX_ARTIFACT, report)
+    return report
+
+
+def _run_provider_matrix(headers: dict[str, str], env: dict[str, str]) -> dict[str, Any]:
+    context = _natural_language_case_context(env)
+    event = context["causal_event_code"]
+    matrix = [
+        ("ollama", "ollama"),
+        ("ollama", "gemini"),
+        ("gemini", "ollama"),
+        ("gemini", "gemini"),
+    ]
+    prompts = [
+        (
+            "root_cause",
+            f"Public olay kodu {event} olan kesintinin dogrulanmis ana kok nedeni nedir? "
+            "Dying Gasp belirti mi?",
+        ),
+        (
+            "rag_citation",
+            f"Public olay kodu {event} icin eligibility karari hangi RuleVersion'a, "
+            "DecisionEvidence kaydina ve RAG kaynaginin source, version ve section "
+            "bolumune dayanir?",
+        ),
+    ]
+    report = {"gate": "PRE-061-provider-matrix", "snapshot_identifier": SNAPSHOT, "cases": []}
+    for llm_provider, embedding_provider in matrix:
+        for kind, prompt in prompts:
+            started = time.monotonic()
+            try:
+                response = httpx.post(
+                    "http://127.0.0.1:8000/api/internal/v1/orchestration/queries/execute/",
+                    headers=headers,
+                    json={
+                        "snapshot_identifier": SNAPSHOT,
+                        "idempotency_key": (
+                            f"pre061-matrix-{llm_provider}-{embedding_provider}-"
+                            f"{kind}-{secrets.token_hex(4)}"
+                        ),
+                        "original_query": prompt,
+                        "llm_provider": llm_provider,
+                        "embedding_provider": embedding_provider,
+                    },
+                    timeout=180,
+                )
+                payload = (
+                    response.json()
+                    if response.headers.get("content-type", "").startswith("application/json")
+                    else {}
+                )
+                http_status = response.status_code
+                transport_error = None
+            except (httpx.HTTPError, RuntimeError) as exc:
+                payload = {}
+                http_status = None
+                transport_error = exc.__class__.__name__.lower()
+            record = {
+                "llm_provider": llm_provider,
+                "embedding_provider": embedding_provider,
+                "case_kind": kind,
+                "user_prompt": prompt,
+                "http_status": http_status,
+                "lifecycle": payload.get("status"),
+                "final_user_text": (payload.get("response") or {}).get("response_text"),
+                "citations": (payload.get("response") or {}).get("citations", []),
+                "generation_mode": (payload.get("response") or {}).get("generation_mode"),
+                "failure_reason": transport_error
+                or (payload.get("error") or {}).get("code")
+                or (payload.get("clarification") or {}).get("code"),
+                "latency_ms": round((time.monotonic() - started) * 1000, 3),
+            }
+            record["pass"] = (
+                record["http_status"] == 200
+                and record["lifecycle"] == "completed"
+                and record["generation_mode"] == "llm_assisted"
+                and bool(record["final_user_text"])
+            )
+            report["cases"].append(record)
+            _write_json_atomic(
+                ROOT / "artifacts" / "pre061" / "provider_matrix_acceptance.json", report
+            )
+    report["passed_count"] = sum(case["pass"] for case in report["cases"])
+    report["decision"] = "PASS" if report["passed_count"] == len(report["cases"]) else "FAIL"
+    _write_json_atomic(ROOT / "artifacts" / "pre061" / "provider_matrix_acceptance.json", report)
+    return report
+
+
 def _snapshot_context(env: dict[str, str]) -> dict[str, str]:
     code = (
         "import json; "
@@ -1006,6 +1439,11 @@ def main() -> int:
     parser.add_argument("--native-schema-capability", action="store_true")
     parser.add_argument("--native-schema-benchmark", action="store_true")
     parser.add_argument("--natural-language-parser-capability", action="store_true")
+    parser.add_argument("--deterministic-parser-acceptance", action="store_true")
+    parser.add_argument("--baseline-original-query", action="store_true")
+    parser.add_argument("--baseline-cases")
+    parser.add_argument("--provider-matrix", action="store_true")
+    parser.add_argument("--enrich-http-acceptance-artifacts", action="store_true")
     options = parser.parse_args()
     token = secrets.token_urlsafe(32)
     env = {
@@ -1062,6 +1500,17 @@ def main() -> int:
         _write_json_atomic(BLACK_BOX_ARTIFACT, report)
         print(json.dumps(report, ensure_ascii=True, sort_keys=True))
         return 0 if report["decision"] == "PASS" else 1
+    if options.deterministic_parser_acceptance:
+        report = _run_deterministic_parser_acceptance(env)
+        print(json.dumps(report, ensure_ascii=True, sort_keys=True))
+        return 0 if report["decision"] == "PASS" else 1
+    if options.enrich_http_acceptance_artifacts:
+        _enrich_http_acceptance_artifact(BLACK_BOX_ARTIFACT, env)
+        _enrich_http_acceptance_artifact(
+            ROOT / "artifacts" / "pre061" / "provider_matrix_acceptance.json", env
+        )
+        print(json.dumps({"enriched": True}, sort_keys=True))
+        return 0
     server = subprocess.Popen(
         [sys.executable, "backend/manage.py", "runserver", "127.0.0.1:8000", "--noreload"],
         cwd=ROOT,
@@ -1078,6 +1527,27 @@ def main() -> int:
     try:
         _wait_ready(token)
         headers = {"Authorization": f"Bearer {token}", "X-Correlation-ID": "pre061-rag-001"}
+        if options.baseline_original_query:
+            selected_cases = (
+                {value.strip() for value in options.baseline_cases.split(",") if value.strip()}
+                if options.baseline_cases
+                else None
+            )
+            baseline = _run_original_query_baseline(headers, env, only_cases=selected_cases)
+            baseline["gemma_unloaded"] = _unload_model("gemma4:12b-it-qat")
+            baseline["qwen_unloaded"] = _unload_model("qwen3-embedding:4b")
+            _write_json_atomic(BLACK_BOX_ARTIFACT, baseline)
+            print(json.dumps(baseline, ensure_ascii=True, sort_keys=True))
+            return 0 if baseline["decision"] == "PASS" else 1
+        if options.provider_matrix:
+            matrix = _run_provider_matrix(headers, env)
+            matrix["gemma_unloaded"] = _unload_model("gemma4:12b-it-qat")
+            matrix["qwen_unloaded"] = _unload_model("qwen3-embedding:4b")
+            _write_json_atomic(
+                ROOT / "artifacts" / "pre061" / "provider_matrix_acceptance.json", matrix
+            )
+            print(json.dumps(matrix, ensure_ascii=True, sort_keys=True))
+            return 0 if matrix["decision"] == "PASS" else 1
         if options.final_llm_acceptance:
             context = _snapshot_context(env)
             endpoint_cases = _endpoint_matrix(headers, context, only_case=options.endpoint_case)

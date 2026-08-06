@@ -35,7 +35,11 @@ def _ok(request, data):
 def search_documents(request):
     try:
         search_request = parse_search_request(parse_json_body(request))
-        data = search(search_request)
+        data = (
+            search(search_request, embedding_provider=search_request.embedding_provider)
+            if search_request.embedding_provider is not None
+            else search(search_request)
+        )
     except ValidationError as exc:
         return _error("validation_error", str(exc), 400)
     except EmbeddingProviderError as exc:

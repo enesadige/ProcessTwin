@@ -32,7 +32,7 @@ from apps.orchestration.tool_plan import MCPServer
 SAFE_STRUCTURED_NARRATIVE = json.dumps(
     {
         "headline_id": "H1",
-        "selected_statement_ids": [f"S{index}" for index in range(1, 11)],
+        "selected_statement_ids": [f"S{index}" for index in range(1, 12)],
     }
 )
 
@@ -71,6 +71,7 @@ def valid_result(snapshot_identifier: str, *, warnings: list[str] | None = None)
             propagation_summary="Üst katman etkisi doğrulandı.",
         ),
         impact_summary=ImpactSummary(
+            outage_count=3,
             potential=5,
             verified_impacted=2,
             verified_no_impact=1,
@@ -197,6 +198,7 @@ def test_llm_assisted_mode_uses_only_safe_fact_sheet_and_preserves_deterministic
     assert response.provider == "recording"
     assert response.model == "recording-v1"
     assert response.response_text.startswith("Kesinti değerlendirmesi")
+    assert "Kesinti sayısı: 3." in response.response_text
     assert "Potansiyel kapsam: 5 bağlantı." in response.response_text
     prompt = provider.requests[0]["contents"]
     for value in ("CUST-001", "198.51.100.10", "original_query", "raw_payload", "token"):

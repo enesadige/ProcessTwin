@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -116,6 +117,7 @@ class StructuredQuery(BaseModel):
     outage_code: str | None = Field(default=None, max_length=80)
     subscription_reference: str | None = Field(default=None, max_length=80)
     decision_type: str | None = Field(default=None, max_length=40)
+    embedding_provider: Literal["ollama", "gemini"] | None = None
     retrieval_query: str | None = Field(default=None, max_length=500)
     location: StructuredQueryLocation | None = None
     technology: Technology | None = None

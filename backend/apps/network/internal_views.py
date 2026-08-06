@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -32,7 +32,14 @@ from apps.network.services.topology import (
     NetworkTopologyCycleError,
     NetworkTopologyService,
 )
-from apps.operations.models import Alarm, IncidentAlarm, MaintenanceWindow, Outage
+from apps.operations.contracts import CustomerImpactStatus, ImpactReason
+from apps.operations.models import (
+    Alarm,
+    CustomerImpactAssessment,
+    IncidentAlarm,
+    MaintenanceWindow,
+    Outage,
+)
 from apps.operations.services.alarm_correlation import (
     AlarmCorrelationService,
     AlarmCorrelationServiceError,
@@ -242,20 +249,17 @@ def _get_device(snapshot: DataSnapshot, code: str) -> NetworkDevice:
 
 def _get_outage(snapshot: DataSnapshot, code: str) -> Outage:
     try:
-        return (
-            Outage.objects.select_related(
-                "incident",
-                "incident__primary_device",
-                "incident__primary_device__city",
-                "incident__primary_device__district",
-                "incident__primary_device__neighborhood",
-                "source_device",
-                "source_device__city",
-                "source_device__district",
-                "source_device__neighborhood",
-            )
-            .get(data_snapshot=snapshot, outage_code=code)
-        )
+        return Outage.objects.select_related(
+            "incident",
+            "incident__primary_device",
+            "incident__primary_device__city",
+            "incident__primary_device__district",
+            "incident__primary_device__neighborhood",
+            "source_device",
+            "source_device__city",
+            "source_device__district",
+            "source_device__neighborhood",
+        ).get(data_snapshot=snapshot, outage_code=code)
     except Outage.DoesNotExist as exc:
         raise InternalNetworkAPIError(
             "not_found",
@@ -613,10 +617,7 @@ def search_outages(request):
         service = OutageService()
         items = list(queryset[cursor : cursor + limit + 1])
         page = items[:limit]
-        durations = [
-            _duration_payload(service, outage, evaluation_time)
-            for outage in page
-        ]
+        durations = [_duration_payload(service, outage, evaluation_time) for outage in page]
         next_cursor = str(cursor + limit) if len(items) > limit else None
         return _ok(
             request=request,
@@ -713,10 +714,7 @@ def get_outage_details(request, outage_code: str):
             )
         data = {
             "outage": outage_summary(outage, duration=duration),
-            "alarms": [
-                {"role": item.role, **alarm_summary(item.alarm)}
-                for item in alarm_links
-            ],
+            "alarms": [{"role": item.role, **alarm_summary(item.alarm)} for item in alarm_links],
             "maintenance_window": (
                 None
                 if maintenance is None
@@ -795,14 +793,71 @@ def calculate_customer_impact(request, outage_code: str):
 
 @require_GET
 @internal_service_required
+def aggregate_location_impact(request):
+    """Return only canonical aggregate assessment counts for an explicit scope."""
+    try:
+        snapshot = _resolve_snapshot(request.GET.get("snapshot_identifier"))
+        from_time, to_time = _parse_date_range(request)
+        city = request.GET.get("city")
+        district = request.GET.get("district")
+        if from_time is None or to_time is None or not (city or district):
+            raise InternalNetworkAPIError(
+                "validation_error",
+                "A date range and city or district are required.",
+                status=400,
+            )
+        outages = Outage.objects.filter(
+            data_snapshot=snapshot,
+            started_at__gte=from_time,
+            started_at__lte=to_time,
+        )
+        assessments = CustomerImpactAssessment.objects.filter(
+            data_snapshot=snapshot,
+            causal_event__started_at__gte=from_time,
+            causal_event__started_at__lte=to_time,
+        )
+        if city:
+            outages = outages.filter(source_device__city__name=city)
+            assessments = assessments.filter(causal_event__root_device__city__name=city)
+        if district:
+            outages = outages.filter(source_device__district__name=district)
+            assessments = assessments.filter(causal_event__root_device__district__name=district)
+        status_counts = dict(assessments.values_list("status").annotate(count=Count("id")))
+        return _ok(
+            request=request,
+            snapshot=snapshot,
+            data={
+                "outage_count": outages.count(),
+                "potential_connection_count": assessments.count(),
+                "verified_impacted_count": status_counts.get(
+                    CustomerImpactStatus.VERIFIED_IMPACT.value, 0
+                ),
+                "verified_no_impact_count": status_counts.get(
+                    CustomerImpactStatus.VERIFIED_NO_IMPACT.value, 0
+                ),
+                "insufficient_evidence_count": status_counts.get(
+                    CustomerImpactStatus.INSUFFICIENT_EVIDENCE.value, 0
+                ),
+                "failover_protected_count": assessments.filter(
+                    reasons__contains=[ImpactReason.FAILOVER_PROTECTED.value]
+                ).count(),
+            },
+        )
+    except InternalNetworkAPIError as exc:
+        return _error(exc)
+    except Exception as exc:  # noqa: BLE001
+        return _sanitize_error(exc)
+
+
+@require_GET
+@internal_service_required
 def correlate_alarms(request, anchor_alarm_id: str):
     try:
         snapshot = _resolve_snapshot(request.GET.get("snapshot_identifier"))
         limit = _parse_limit(request)
         try:
-            anchor = (
-                Alarm.objects.select_related("alarm_type", "device")
-                .get(data_snapshot=snapshot, alarm_id=anchor_alarm_id)
+            anchor = Alarm.objects.select_related("alarm_type", "device").get(
+                data_snapshot=snapshot, alarm_id=anchor_alarm_id
             )
         except Alarm.DoesNotExist as exc:
             raise InternalNetworkAPIError(
@@ -899,9 +954,7 @@ def get_longest_outage(request):
                 if impact["package_technology_counts"].get(technology, 0) == 0:
                     continue
             candidates.append((outage, duration, impact))
-        candidates.sort(
-            key=lambda item: (-item[1]["seconds"], item[0].outage_code)
-        )
+        candidates.sort(key=lambda item: (-item[1]["seconds"], item[0].outage_code))
         ranked = []
         for rank, (outage, duration, impact) in enumerate(candidates[:limit], start=1):
             if impact is None:
