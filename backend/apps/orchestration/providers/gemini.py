@@ -10,9 +10,11 @@ from django.conf import settings
 from apps.core.exceptions import ProcessTwinError
 from apps.orchestration.providers.base import LLMProvider
 
-GEMINI_LLM_MODEL = "gemini-3.5-flash"
+GEMINI_LLM_MODEL = "gemini-3.6-flash"
 GEMINI_LLM_PROVIDER = "gemini"
 GEMINI_LLM_PROMPT_VERSION = "llm-provider-contract-v1"
+GEMINI_INTERACTIONS_API_FAMILY = "interactions"
+GEMINI_GENERATE_CONTENT_API_FAMILY = "generate_content"
 TRANSIENT_ERROR_CODES = frozenset(
     {"timeout", "network_error", "rate_limited", "provider_unavailable"}
 )
@@ -42,10 +44,10 @@ class GeminiLLMProvider(LLMProvider):
         max_attempts = self._max_attempts()
         for attempt in range(max_attempts):
             try:
-                response = client.models.generate_content(
-                    model=self.model_name,
-                    contents=contents,
-                )
+                if self._api_family() == GEMINI_INTERACTIONS_API_FAMILY:
+                    response = client.interactions.create(model=self.model_name, input=contents)
+                    return self._normalize_interaction_response(response)
+                response = client.models.generate_content(model=self.model_name, contents=contents)
                 return self._normalize_response(response)
             except GeminiLLMProviderError:
                 raise
@@ -113,6 +115,29 @@ class GeminiLLMProvider(LLMProvider):
                 message="Gemini retry configuration is invalid.", code="invalid_request"
             )
         return max_attempts
+
+    @staticmethod
+    def _api_family() -> str:
+        family = getattr(settings, "GEMINI_LLM_API_FAMILY", GEMINI_INTERACTIONS_API_FAMILY)
+        if family not in {GEMINI_INTERACTIONS_API_FAMILY, GEMINI_GENERATE_CONTENT_API_FAMILY}:
+            raise GeminiLLMProviderError(
+                message="Gemini API family configuration is invalid.", code="invalid_request"
+            )
+        return family
+
+    def _normalize_interaction_response(self, response: Any) -> Mapping[str, Any]:
+        content = getattr(response, "output_text", None)
+        if not isinstance(content, str) or not content.strip():
+            raise GeminiLLMProviderError(
+                message="Gemini response is invalid.", code="invalid_response"
+            )
+        return {
+            "content": content.strip(),
+            "finish_reason": str(getattr(response, "status", "completed")).lower(),
+            "provider": self.provider_name,
+            "model": self.model_name,
+            "usage": self._usage(response),
+        }
 
     def _normalize_response(self, response: Any) -> Mapping[str, Any]:
         content = self._response_content(response)

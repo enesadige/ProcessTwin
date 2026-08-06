@@ -101,6 +101,21 @@ def test_location_text_and_technology_are_normalized_without_control_characters(
         StructuredQuery.model_validate(valid_query(location={"city": "Bad\nvalue"}))
 
 
+def test_rule_document_retrieval_query_is_normalized_and_control_characters_are_rejected():
+    query = StructuredQuery.model_validate(
+        valid_query(
+            intent="rule_document_retrieval",
+            retrieval_query="  failover protected bağlantı  ",
+        )
+    )
+    assert query.retrieval_query == "failover protected bağlantı"
+
+    with pytest.raises(ValidationError):
+        StructuredQuery.model_validate(
+            valid_query(intent="rule_document_retrieval", retrieval_query="bad\nquery")
+        )
+
+
 def test_operational_anchor_priority_rejects_ambiguous_multiple_references():
     with pytest.raises(ValidationError, match="Only one operational reference"):
         StructuredQuery.model_validate(valid_query(incident_code="INC-MAL-001"))

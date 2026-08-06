@@ -12,6 +12,7 @@ from apps.orchestration.executor import (
 from apps.orchestration.models import QueryRunStatus
 from apps.orchestration.result_merge import ResultMergerValidator, ValidationStatus
 from apps.orchestration.services import QueryRunError, QueryRunService
+from apps.orchestration.structured_query import StructuredQuery
 from apps.orchestration.tool_plan import ToolPlan
 
 
@@ -389,3 +390,18 @@ def test_terminal_query_run_cannot_be_finalized_twice():
         validator.finalize_query_run(run, merged)
 
     assert getattr(exc_info.value, "code", None) == "query_run_finalization_requires_execution"
+
+
+def test_rule_document_retrieval_requires_only_document_retrieval_evidence():
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "rule_document_retrieval",
+            "requested_outputs": ["summary", "evidence"],
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1",
+            "retrieval_query": "failover protected bağlantı",
+        }
+    )
+
+    categories = ResultMergerValidator.required_categories(query)
+
+    assert {category.value for category in categories} == {"document_retrieval"}

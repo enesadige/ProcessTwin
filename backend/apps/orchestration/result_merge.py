@@ -555,7 +555,11 @@ class ResultMergerValidator:
             categories.add(EvidenceCategory.RULE_EVIDENCE)
         if (
             RequestedOutput.EVIDENCE in outputs
-            and query.intent != StructuredQueryIntent.COMPENSATION_EVALUATION
+            and query.intent
+            not in {
+                StructuredQueryIntent.COMPENSATION_EVALUATION,
+                StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL,
+            }
         ):
             categories.add(EvidenceCategory.RULE_EVIDENCE)
         if (

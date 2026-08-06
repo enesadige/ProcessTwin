@@ -113,6 +113,21 @@ def test_rule_evidence_and_rule_document_retrieval_remain_separate():
     assert documents.reason_codes == (PlannerReasonCode.MISSING_DOCUMENT_RETRIEVAL_QUERY.value,)
 
 
+def test_rule_document_retrieval_plans_the_existing_rule_mcp_tool_with_safe_query():
+    query = query_payload(
+        intent="rule_document_retrieval",
+        requested_outputs=["summary", "evidence"],
+        retrieval_query="failover protected bağlantı",
+    )
+
+    result = DeterministicToolPlanner().plan(query)
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert result.tool_plan.calls[0].server.value == "rule"
+    assert result.tool_plan.calls[0].tool_name == "search_rule_documents"
+    assert result.tool_plan.calls[0].arguments["query"] == "failover protected bağlantı"
+
+
 def test_compensation_prefers_safe_causal_evidence_path_without_personal_identifiers():
     result = DeterministicToolPlanner().plan(
         query_payload(

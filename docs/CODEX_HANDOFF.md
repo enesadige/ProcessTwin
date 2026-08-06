@@ -20,6 +20,14 @@
   canlı hata sınıfı gerçek SDK işaretine göre `invalid_api_key` olarak düzeltildi.
   `MAIN-061` başlamaz.
 
+- **PRE-061 final Gemini/LIVE-07 follow-up:** Aynı ephemeral key ile gerçek
+  Gemini 3.6 interactions, 3.5 interactions ve 2.5 generate-content
+  diagnosticleri başarılı oldu. Canonical production seçimi
+  `gemini-3.6-flash` + `interactions`; dört gerçek fact-sheet smoke guard
+  fallback'iyle güvenli kaldı. LIVE-07 planner/required-evidence dar
+  düzeltmesi kod/test düzeyinde tamamlandı, fakat post-fix canlı artefact
+  oluşmadı. Gemma 9/12 olduğundan PRE-061 FAIL ve `MAIN-061` bloklu kalır.
+
 - **MAIN-xxx — Ana kümülatif görev planı:** Ek orchestration serisinden önce
   son tamamlanan ana plan maddesi `MAIN-051.5 — Çoklu embedding seti ve lokal
   provider`dır. Dosyadaki ilk tamamlanmamış ana plan maddesi

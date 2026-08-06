@@ -14,11 +14,12 @@
     },
     "gemini": {
       "api_key_configured": true,
-      "attempted_case_count": 1,
-      "model": "gemini-3.5-flash",
+      "attempted_case_count": 4,
+      "model": "gemini-3.6-flash",
+      "api_family": "interactions",
       "required_case_count": 4,
-      "status": "blocked",
-      "stable_error_code": "invalid_api_key"
+      "status": "provider_success_guard_fallback",
+      "final_user_visible_unsupported_fact_count": 0
     },
     "gemma": {
       "attempted_case_count": 9,

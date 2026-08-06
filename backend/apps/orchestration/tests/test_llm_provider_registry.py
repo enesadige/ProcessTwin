@@ -24,11 +24,11 @@ def test_known_ollama_descriptor_is_fixed_and_disables_thinking():
 def test_gemini_descriptor_uses_the_fixed_allowlisted_model_and_factory():
     descriptor = get_llm_descriptor("gemini")
 
-    assert descriptor.model == "gemini-3.5-flash"
+    assert descriptor.model == "gemini-3.6-flash"
     assert descriptor.is_local is False
     assert descriptor.thinking_enabled is False
     assert descriptor.production_allowed is True
-    assert descriptor.model_version == "gemini-3.5-flash-v1"
+    assert descriptor.model_version == "gemini-3.6-flash-interactions-v1"
     assert descriptor.adapter_factory is GeminiLLMProvider
 
 

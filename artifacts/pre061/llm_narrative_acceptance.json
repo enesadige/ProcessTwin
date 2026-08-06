@@ -153,6 +153,27 @@
       "snapshot_leakage_count": 0
     }
   },
+  "gemini_live_matrix": {
+    "api_key_present": true,
+    "canonical_config_matches_process_env": true,
+    "production_api_family": "interactions",
+    "production_model": "gemini-3.6-flash",
+    "tests": [
+      {"model": "gemini-3.6-flash", "api_family": "interactions", "success": true, "latency_ms": 3078.713},
+      {"model": "gemini-3.5-flash", "api_family": "interactions", "success": true, "latency_ms": 2510.039},
+      {"model": "gemini-2.5-flash", "api_family": "generate_content", "success": true, "latency_ms": 1085.279}
+    ],
+    "four_case_smoke": {
+      "provider_success_count": 4,
+      "fact_guard_fallback_count": 4,
+      "final_user_visible_unsupported_fact_count": 0
+    }
+  },
+  "live_07": {
+    "initial_real_result": "failed_required_evidence_missing",
+    "post_fix_live_result": "unavailable_orphaned_launcher_no_persisted_result",
+    "status": "not_accepted"
+  },
   "gemma_unloaded_after_acceptance": true,
   "qwen_retrieval_reused": true,
   "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"

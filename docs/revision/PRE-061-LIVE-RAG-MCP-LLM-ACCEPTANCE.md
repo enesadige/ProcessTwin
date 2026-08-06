@@ -118,6 +118,32 @@ deterministic blocks with zero unsupported user-visible facts, but this does
 not replace the incomplete narrative benchmark. Gemma was gracefully unloaded
 and no Qwen/Gemma co-residency was observed.
 
+## Gemini Matrix And LIVE-07 Follow-up
+
+The ephemeral configured key was present in the diagnostic process and passed
+explicitly to `genai.Client`; `GOOGLE_API_KEY` was absent. The real matrix
+returned `API_TEST_OK` for `gemini-3.6-flash` through `interactions.create`
+(3078.713 ms), `gemini-3.5-flash` through `interactions.create` (2510.039 ms),
+and `gemini-2.5-flash` through `models.generate_content` (1085.279 ms).
+Production Gemini is therefore the deterministic first choice:
+`gemini-3.6-flash` with the interactions family. The adapter receives the
+resolved API key explicitly; request payloads cannot select model, API family,
+or credentials.
+
+Four real completed-QueryRun fact-sheet smokes reached the selected Gemini
+provider. All four safely fell back to deterministic output after fact guard;
+no user-visible unsupported fact was observed. The earlier `invalid_api_key`
+classification was an old process/config result, not a failure of the supplied
+ephemeral key.
+
+LIVE-07 was fixed at schema/planner level with a strict `retrieval_query` that
+plans the existing Rule MCP `search_rule_documents` tool. Its first live call
+then found a required-evidence policy conflict, fixed by making document
+retrieval the sole required category for that intent. The post-fix live
+launcher did not persist an artefact and was gracefully stopped; this is not
+accepted as a passing live result. Together with Gemma still at 9/12 cases,
+the overall gate remains **FAIL**.
+
 ## Final Live LLM Attempt
 
 **Overall PRE-061 decision: FAIL.** Retrieval remains PASS, but the mandatory

@@ -232,7 +232,13 @@ def _endpoint_matrix(
             {"causal_event_code": causal_code},
             200,
         ),
-        ("LIVE-07", "rule_document_retrieval", ["summary", "evidence"], {}, 422),
+        (
+            "LIVE-07",
+            "rule_document_retrieval",
+            ["summary", "evidence"],
+            {"retrieval_query": "failover protected bağlantı"},
+            200,
+        ),
         (
             "LIVE-08",
             "network_investigation",

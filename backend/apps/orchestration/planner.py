@@ -165,9 +165,25 @@ class DeterministicToolPlanner:
                 missing_reason=PlannerReasonCode.MISSING_COMPENSATION_REFERENCE,
             )
         if query.intent == StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL:
-            return PlannerResult.clarification(
-                PlannerReasonCode.MISSING_DOCUMENT_RETRIEVAL_QUERY.value
-            )
+            if not query.retrieval_query:
+                return PlannerResult.clarification(
+                    PlannerReasonCode.MISSING_DOCUMENT_RETRIEVAL_QUERY.value
+                )
+            return [
+                self._call(
+                    "rule_documents",
+                    "rule",
+                    "search_rule_documents",
+                    self._snapshot_args(
+                        query,
+                        query=query.retrieval_query,
+                        search_mode="hybrid",
+                        top_k=5,
+                        include_scores=True,
+                    ),
+                    1,
+                )
+            ]
         return PlannerResult.unplannable(PlannerReasonCode.NO_SAFE_TOOL_MAPPING.value)
 
     def _network_calls(self, query: StructuredQuery) -> list[dict[str, object]] | PlannerResult:
@@ -343,8 +359,10 @@ class DeterministicToolPlanner:
         return [self._call("scoped_outages", "network", "get_longest_outage", arguments, 1)]
 
     @staticmethod
-    def _snapshot_args(query: StructuredQuery, **values: object) -> dict[str, object]:
-        return {"snapshot_identifier": query.snapshot_identifier, **values}
+    def _snapshot_args(
+        structured_query: StructuredQuery, **values: object
+    ) -> dict[str, object]:
+        return {"snapshot_identifier": structured_query.snapshot_identifier, **values}
 
     @staticmethod
     def _call(

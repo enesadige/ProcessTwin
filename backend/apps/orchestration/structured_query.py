@@ -114,6 +114,7 @@ class StructuredQuery(BaseModel):
     causal_event_code: str | None = Field(default=None, max_length=80)
     incident_code: str | None = Field(default=None, max_length=80)
     outage_code: str | None = Field(default=None, max_length=80)
+    retrieval_query: str | None = Field(default=None, max_length=500)
     location: StructuredQueryLocation | None = None
     technology: Technology | None = None
     time_window: StructuredQueryTimeWindow | None = None
@@ -137,6 +138,13 @@ class StructuredQuery(BaseModel):
         if not _PUBLIC_CODE_RE.fullmatch(normalized):
             raise ValueError(f"{info.field_name} is invalid")
         return normalized
+
+    @field_validator("retrieval_query")
+    @classmethod
+    def validate_retrieval_query(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return _normalized_text(value, field_name="retrieval_query", max_length=500)
 
     @model_validator(mode="after")
     def normalize_and_validate_scope(self):

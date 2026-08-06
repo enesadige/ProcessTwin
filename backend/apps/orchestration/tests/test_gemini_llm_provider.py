@@ -28,9 +28,19 @@ class FakeModels:
         return outcome
 
 
+class FakeInteractions(FakeModels):
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        outcome = self.outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+
 class FakeClient:
     def __init__(self, outcomes):
         self.models = FakeModels(outcomes)
+        self.interactions = FakeInteractions(outcomes)
 
 
 def success_response(*, content="Safe answer.", usage=True, finish_reason="STOP"):
@@ -54,6 +64,7 @@ def success_response(*, content="Safe answer.", usage=True, finish_reason="STOP"
 
 def provider_with_outcomes(settings, outcomes):
     settings.GEMINI_API_KEY = "test-secret-key"
+    settings.GEMINI_LLM_API_FAMILY = "generate_content"
     client = FakeClient(outcomes)
     provider = GeminiLLMProvider(client_factory=lambda api_key, timeout_ms: client)
     return provider, client
@@ -67,7 +78,7 @@ def test_gemini_provider_matches_registry_metadata_and_factory_without_network(s
     assert isinstance(provider, GeminiLLMProvider)
     assert provider.metadata() == {
         "provider": "gemini",
-        "model": "gemini-3.5-flash",
+        "model": "gemini-3.6-flash",
         "supports_thinking": False,
         "thinking_enabled": False,
     }
@@ -94,13 +105,13 @@ def test_normalized_request_response_finish_reason_and_usage(settings):
     response = provider.generate(request={"contents": "Kısa bir yanıt üret."})
 
     assert client.models.calls == [
-        {"model": "gemini-3.5-flash", "contents": "Kısa bir yanıt üret."}
+        {"model": "gemini-3.6-flash", "contents": "Kısa bir yanıt üret."}
     ]
     assert response == {
         "content": "Safe answer.",
         "finish_reason": "stop",
         "provider": "gemini",
-        "model": "gemini-3.5-flash",
+        "model": "gemini-3.6-flash",
         "usage": {
             "input_tokens": 11,
             "output_tokens": 7,
@@ -108,6 +119,27 @@ def test_normalized_request_response_finish_reason_and_usage(settings):
             "available": True,
         },
     }
+
+
+def test_interactions_family_normalizes_output_text(settings):
+    settings.GEMINI_API_KEY = "test-secret-key"
+    settings.GEMINI_LLM_API_FAMILY = "interactions"
+    interaction = SimpleNamespace(
+        output_text="Safe interaction answer.",
+        status="completed",
+        usage_metadata=None,
+    )
+    client = FakeClient([interaction])
+
+    response = GeminiLLMProvider(client_factory=lambda api_key, timeout_ms: client).generate(
+        request={"contents": "safe"}
+    )
+
+    assert client.interactions.calls == [
+        {"model": "gemini-3.6-flash", "input": "safe"}
+    ]
+    assert response["content"] == "Safe interaction answer."
+    assert response["finish_reason"] == "completed"
 
 
 def test_usage_unavailable_does_not_claim_estimated_token_counts(settings):

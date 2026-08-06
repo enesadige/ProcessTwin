@@ -10,7 +10,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
 from apps.orchestration.providers.base import LLMProvider
-from apps.orchestration.providers.gemini import GeminiLLMProvider
+from apps.orchestration.providers.gemini import GEMINI_LLM_MODEL, GeminiLLMProvider
 from apps.orchestration.providers.mock import MockLLMProvider
 from apps.orchestration.providers.ollama import OllamaLLMProvider
 
@@ -79,8 +79,8 @@ LLM_PROVIDER_REGISTRY = MappingProxyType(
         GEMINI_PROVIDER: LLMProviderDescriptor(
             registry_key=GEMINI_PROVIDER,
             provider=GEMINI_PROVIDER,
-            model="gemini-3.5-flash",
-            model_version="gemini-3.5-flash-v1",
+            model=GEMINI_LLM_MODEL,
+            model_version="gemini-3.6-flash-interactions-v1",
             prompt_version="llm-provider-contract-v1",
             is_local=False,
             supports_thinking=False,
