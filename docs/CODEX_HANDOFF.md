@@ -77,6 +77,13 @@
   ham runtime response taşımadığından audit-only resume güvenli biçimde
   `runtime_result_unavailable` olur. Doğal dil response builder henüz yoktur;
   sıradaki görev Görev 059'dur.
+- Görev 059 tamamlandı: `ValidatedResponseBuilder`, yalnız completed ve valid
+  `QueryRun.final_result` üzerinden Türkçe kullanıcı cevabı üretir; QueryRun
+  veya final_result değiştirilmez. Deterministik fact blokları source of truth
+  kalır. LLM-assisted mod yalnız privacy-safe fact sheet'ten kısa anlatı
+  üretebilir; yeni sayı/reference/karar tespiti veya provider hatasında
+  deterministik fallback kullanılır. Endpoint ve E2E entegrasyonu Görev 060'a
+  bırakıldı.
 - REV-00–REV-12, PRE-052 ve Görev 052 tamamlandı. QueryRun kayıtları
   explicit `multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1`
   snapshot'ını native kullanımda explicit almalıdır; model herhangi bir

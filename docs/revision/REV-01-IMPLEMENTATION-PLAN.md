@@ -131,6 +131,14 @@ ozetlerinde raw runtime response olmadigindan audit-only resume
 `runtime_result_unavailable` ile guvenli bicimde durur. Dogal dil response
 builder siradaki Gorev 059'a birakildi.
 
+Gorev 059 — **Tamamlandi.** `ValidatedResponseBuilder`, yalniz completed ve
+valid `QueryRun.final_result` uzerinden canonical Turkce fact bloklari render
+eder; QueryRun ve persisted final_result degistirilmez. LLM-assisted mod yalniz
+privacy-safe fact sheet ile kisa anlatim ekleyebilir. Yeni sayi, public
+reference veya karar terimi tespitinde ya da provider hatasinda deterministic
+fallback kullanilir. Retrieval sonuclari citation olarak kalir; endpoint ve
+E2E orchestration Gorev 060'a birakildi.
+
 ## Zorunlu domain consistency validator'ları
 
 - Alarm type kaynak teknoloji ve source level ile uyumludur.
