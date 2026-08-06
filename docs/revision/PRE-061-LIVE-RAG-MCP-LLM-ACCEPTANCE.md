@@ -83,3 +83,14 @@ mismatches fell from 9 to 2; snapshot leakage remained 0. Average latency was
 2206.707 ms and p95 was 2801.314 ms. The top-5 and zero-mismatch requirements
 are not met, so retrieval remains **FAIL**. The two remaining cases are in
 `artifacts/pre061/rag_retrieval_failure_analysis.json`.
+
+## Final Citation Correction
+
+RAG-06 and RAG-09 were stale benchmark labels, not retrieval failures. The
+failover procedure's `İstisnalar ve Kanıt` section is authoritative for RAG-06;
+the overview document's `Kanıt ve Açıklanabilirlik` section is authoritative
+for RAG-09. No chunk, embedding, prompt, model, or ranking change was made.
+The final persisted run reached top-1 **73.33%**, top-3 **93.33%**, top-5
+**100%**, zero citation mismatches, and zero leakage (average 1655.490 ms,
+p95 1747.204 ms). The PRE-061 retrieval stage is **PASS**; Gemma/Gemini
+acceptance may proceed in its dedicated phase.
