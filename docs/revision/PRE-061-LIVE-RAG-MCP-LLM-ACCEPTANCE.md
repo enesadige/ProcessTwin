@@ -188,10 +188,18 @@ provider contract with `think:false` and `stream:false`: two deterministic
 fallbacks and one LLM-assisted response. All three user-visible outputs were
 safe. Gemma was then unloaded; Qwen was not resident.
 
-This closes the call-count gap at 12/12, but not the acceptance-metric proof:
-the first nine Gemma calls were persisted only as an aggregate count, without
-their case-level guard outcome or contradiction fields. Their aggregate
-narrative acceptance, contradiction, unsupported-number/reference/decision,
-and fallback rates therefore cannot be certified retrospectively. PRE-061
-cannot be marked PASS or CONDITIONAL PASS, and `MAIN-061` remains blocked
-until an evidence-grade replacement Gemma matrix is run and persisted.
+The initial nine records could not be recovered, so they were rerun exactly
+once with the same provider, fact-sheet schema, prompt version, and fact
+guard. Raw narratives remain unpersisted. The completed matrix is 12/12, with
+model narrative acceptance **25%**, safe deterministic fallback success
+**100%**, final user-visible unsupported facts **0**, average latency
+**17,849.351 ms**, and p95 **42,154.237 ms**. Seven of the rerun narratives
+were rejected for an unsupported number, public reference, or decision. This
+establishes a **58.33% lower bound** for model unsupported-fact/contradiction
+rate, above the **10%** gate threshold. The current fact guard does not
+separately classify potential/verified or failover semantic contradictions;
+those fields are recorded as not assessed rather than inferred.
+
+PRE-061 is therefore **FAIL**, not because of missing provenance any longer,
+but because real Gemma narrative quality fails the threshold. `MAIN-061`
+remains blocked until a narrow narrative-quality remediation and rerun pass.

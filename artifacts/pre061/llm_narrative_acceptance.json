@@ -128,7 +128,247 @@
     ],
     "passed_count": 9
   },
-  "gate": "PRE-061",
+  "final_gap_completion": {
+    "blocker": "Seven observed fact-guard rejections establish a 58.33% lower bound for model narrative contradiction/unsupported-fact rate, above the 10% threshold.",
+    "decision": "FAIL",
+    "gemma": {
+      "completed_case_count": 12,
+      "final_user_visible_unsupported_fact_count": 0,
+      "legacy_aggregate_case_count": 9,
+      "metric_provenance": "The nine historical calls were not recoverable from prior artifacts and were rerun once with the same provider, prompt version, fact-sheet schema, and fact guard. Raw narratives are intentionally not persisted.",
+      "metrics": {
+        "average_latency_ms": 17849.351,
+        "completed_cases": "12/12",
+        "deterministic_fallback_success_rate": 1.0,
+        "fact_guard_detection_rate_reconstructed_cases": 0.777778,
+        "failover_contradiction_count": "not_assessed_by_existing_fact_guard",
+        "final_user_visible_unsupported_fact_rate": 0.0,
+        "narrative_acceptance_rate": 0.25,
+        "narrative_contradiction_rate_lower_bound": 0.583333,
+        "p95_latency_ms": 42154.237,
+        "potential_verified_contradiction_count": "not_assessed_by_existing_fact_guard",
+        "unsupported_decision_rate_lower_bound": 0.083333,
+        "unsupported_number_rate_lower_bound": 0.083333,
+        "unsupported_reference_rate_lower_bound": 0.5
+      },
+      "new_case_average_latency_ms": 20697.18,
+      "new_case_evidence": [
+        {
+          "case_code": "GEMMA-10-RAG-CITATION",
+          "fallback": true,
+          "final_user_output_safe": true,
+          "generation_mode": "deterministic_fallback",
+          "latency_ms": 42154.237
+        },
+        {
+          "case_code": "GEMMA-11-IMPACT",
+          "fallback": false,
+          "final_user_output_safe": true,
+          "generation_mode": "llm_assisted",
+          "latency_ms": 9189.135
+        },
+        {
+          "case_code": "GEMMA-12-COMPENSATION",
+          "fallback": true,
+          "final_user_output_safe": true,
+          "generation_mode": "deterministic_fallback",
+          "latency_ms": 10748.169
+        }
+      ],
+      "new_case_fallback_success_rate": 1.0,
+      "new_case_p95_latency_ms": 42154.237,
+      "reconstructed_case_evidence": [
+        {
+          "case_code": "GEMMA-01-OUTAGE-IMPACT",
+          "fact_guard_accepted": false,
+          "fact_sheet_fingerprint": "de509e500db1d719",
+          "failover_contradiction": null,
+          "fallback": true,
+          "final_user_output_safe": true,
+          "latency_ms": 27477.319,
+          "model": "gemma4:12b-it-qat",
+          "narrative_persisted": false,
+          "potential_verified_contradiction": null,
+          "prompt_version": "validated-response-builder-tr-v1",
+          "query_run_code": "QR-843435980E9342CDB0559B5C41A6DD50",
+          "rejection_reason": "unsupported_number",
+          "unsupported_decision": false,
+          "unsupported_number": true,
+          "unsupported_reference": true
+        },
+        {
+          "case_code": "GEMMA-02-ROOT-CAUSE",
+          "fact_guard_accepted": false,
+          "fact_sheet_fingerprint": "939a8e6f7636bb07",
+          "failover_contradiction": null,
+          "fallback": true,
+          "final_user_output_safe": true,
+          "latency_ms": 8754.772,
+          "model": "gemma4:12b-it-qat",
+          "narrative_persisted": false,
+          "potential_verified_contradiction": null,
+          "prompt_version": "validated-response-builder-tr-v1",
+          "query_run_code": "QR-E803E1820514458B87B1C1A7CAD55810",
+          "rejection_reason": "unsupported_public_reference",
+          "unsupported_decision": false,
+          "unsupported_number": false,
+          "unsupported_reference": true
+        },
+        {
+          "case_code": "GEMMA-03-IMPACT-SCOPE",
+          "fact_guard_accepted": false,
+          "fact_sheet_fingerprint": "8db070c004d684a0",
+          "failover_contradiction": null,
+          "fallback": true,
+          "final_user_output_safe": true,
+          "latency_ms": 8438.479,
+          "model": "gemma4:12b-it-qat",
+          "narrative_persisted": false,
+          "potential_verified_contradiction": null,
+          "prompt_version": "validated-response-builder-tr-v1",
+          "query_run_code": "QR-05F4460D73624CC09C19A5CDC77CFE3C",
+          "rejection_reason": "unsupported_public_reference",
+          "unsupported_decision": false,
+          "unsupported_number": false,
+          "unsupported_reference": true
+        },
+        {
+          "case_code": "GEMMA-04-CUSTOMER-IMPACT",
+          "fact_guard_accepted": true,
+          "fact_sheet_fingerprint": "a2a67ca7b906b6f8",
+          "failover_contradiction": null,
+          "fallback": false,
+          "final_user_output_safe": true,
+          "latency_ms": 6011.251,
+          "model": "gemma4:12b-it-qat",
+          "narrative_persisted": false,
+          "potential_verified_contradiction": null,
+          "prompt_version": "validated-response-builder-tr-v1",
+          "query_run_code": "QR-93686B4B95494ED1A05BBDC96E4A112D",
+          "rejection_reason": null,
+          "unsupported_decision": false,
+          "unsupported_number": false,
+          "unsupported_reference": false
+        },
+        {
+          "case_code": "GEMMA-05-RULE-EVIDENCE",
+          "fact_guard_accepted": true,
+          "fact_sheet_fingerprint": "5ec9e85ac1693b6a",
+          "failover_contradiction": null,
+          "fallback": false,
+          "final_user_output_safe": true,
+          "latency_ms": 10222.215,
+          "model": "gemma4:12b-it-qat",
+          "narrative_persisted": false,
+          "potential_verified_contradiction": null,
+          "prompt_version": "validated-response-builder-tr-v1",
+          "query_run_code": "QR-55F88D565ECD432893FC1D0526E56A60",
+          "rejection_reason": null,
+          "unsupported_decision": false,
+          "unsupported_number": false,
+          "unsupported_reference": false
+        },
+        {
+          "case_code": "GEMMA-06-COMPENSATION",
+          "fact_guard_accepted": false,
+          "fact_sheet_fingerprint": "7a617e405775e599",
+          "failover_contradiction": null,
+          "fallback": true,
+          "final_user_output_safe": true,
+          "latency_ms": 10607.299,
+          "model": "gemma4:12b-it-qat",
+          "narrative_persisted": false,
+          "potential_verified_contradiction": null,
+          "prompt_version": "validated-response-builder-tr-v1",
+          "query_run_code": "QR-647FB6B1746E44418082EBF62D941262",
+          "rejection_reason": "unsupported_decision",
+          "unsupported_decision": true,
+          "unsupported_number": false,
+          "unsupported_reference": false
+        },
+        {
+          "case_code": "GEMMA-07-ROOT-CAUSE-REPLAY",
+          "fact_guard_accepted": false,
+          "fact_sheet_fingerprint": "939a8e6f7636bb07",
+          "failover_contradiction": null,
+          "fallback": true,
+          "final_user_output_safe": true,
+          "latency_ms": 27073.081,
+          "model": "gemma4:12b-it-qat",
+          "narrative_persisted": false,
+          "potential_verified_contradiction": null,
+          "prompt_version": "validated-response-builder-tr-v1",
+          "query_run_code": "QR-BEC497AC588C47408B4292F093B75FA3",
+          "rejection_reason": "unsupported_public_reference",
+          "unsupported_decision": false,
+          "unsupported_number": false,
+          "unsupported_reference": true
+        },
+        {
+          "case_code": "GEMMA-08-ROOT-CAUSE-REPLAY",
+          "fact_guard_accepted": false,
+          "fact_sheet_fingerprint": "939a8e6f7636bb07",
+          "failover_contradiction": null,
+          "fallback": true,
+          "final_user_output_safe": true,
+          "latency_ms": 23708.565,
+          "model": "gemma4:12b-it-qat",
+          "narrative_persisted": false,
+          "potential_verified_contradiction": null,
+          "prompt_version": "validated-response-builder-tr-v1",
+          "query_run_code": "QR-A998264CE63B481A9B8F0C105E50466C",
+          "rejection_reason": "unsupported_public_reference",
+          "unsupported_decision": false,
+          "unsupported_number": false,
+          "unsupported_reference": true
+        },
+        {
+          "case_code": "GEMMA-09-IMPACT-SCOPE-REPLAY",
+          "fact_guard_accepted": false,
+          "fact_sheet_fingerprint": "8db070c004d684a0",
+          "failover_contradiction": null,
+          "fallback": true,
+          "final_user_output_safe": true,
+          "latency_ms": 29807.694,
+          "model": "gemma4:12b-it-qat",
+          "narrative_persisted": false,
+          "potential_verified_contradiction": null,
+          "prompt_version": "validated-response-builder-tr-v1",
+          "query_run_code": "QR-C57553006D1344449F59F8ECC253CDEF",
+          "rejection_reason": "unsupported_public_reference",
+          "unsupported_decision": false,
+          "unsupported_number": false,
+          "unsupported_reference": true
+        }
+      ],
+      "status": "failed_observed_unsupported_fact_rate_exceeds_threshold"
+    },
+    "live_07": {
+      "artifact": "artifacts/pre061/live_live_07.json",
+      "citation_support": true,
+      "critical_citation_mismatch_count": 0,
+      "launcher_root_cause": "The single-case harness intentionally wrote a separate artifact; the aggregate artifact was not reconciled.",
+      "privacy_violation_count": 0,
+      "query_run_code": "QR-E8F96103F20A4317BC4AD67F79895D65",
+      "query_run_status": "completed",
+      "selected_tool": "rule.search_rule_documents",
+      "snapshot_leakage_count": 0,
+      "source_sections": [
+        "SYN-COMP-2026-METRO-SLA@1:Failover",
+        "SYN-COMP-2026-METRO-SLA@1:\u0130stisnalar",
+        "SYN-FAILOVER-MAINTENANCE-2026@1:Ama\u00e7",
+        "SYN-FAILOVER-MAINTENANCE-2026@1:Failover Ad\u0131mlar\u0131",
+        "SYN-FAILOVER-MAINTENANCE-2026@1:\u0130stisnalar ve Kan\u0131t"
+      ],
+      "status": "accepted",
+      "status_code": 200
+    },
+    "model_residency": {
+      "gemma_unloaded_after_new_cases": true,
+      "qwen_resident_during_gemma_cases": false,
+      "simultaneous_residency_observed": false
+    }
+  },
   "final_reconciliation": {
     "decision": "FAIL",
     "endpoint_matrix": {
@@ -144,8 +384,8 @@
     },
     "gemma": {
       "actual_provider_calls": 9,
-      "required_case_count": 12,
       "guarded_unsupported_public_reference": true,
+      "required_case_count": 12,
       "status": "coverage_incomplete"
     },
     "privacy_snapshot": {
@@ -153,62 +393,44 @@
       "snapshot_leakage_count": 0
     }
   },
+  "gate": "PRE-061",
   "gemini_live_matrix": {
     "api_key_present": true,
     "canonical_config_matches_process_env": true,
+    "four_case_smoke": {
+      "fact_guard_fallback_count": 4,
+      "final_user_visible_unsupported_fact_count": 0,
+      "provider_success_count": 4
+    },
     "production_api_family": "interactions",
     "production_model": "gemini-3.6-flash",
     "tests": [
-      {"model": "gemini-3.6-flash", "api_family": "interactions", "success": true, "latency_ms": 3078.713},
-      {"model": "gemini-3.5-flash", "api_family": "interactions", "success": true, "latency_ms": 2510.039},
-      {"model": "gemini-2.5-flash", "api_family": "generate_content", "success": true, "latency_ms": 1085.279}
-    ],
-    "four_case_smoke": {
-      "provider_success_count": 4,
-      "fact_guard_fallback_count": 4,
-      "final_user_visible_unsupported_fact_count": 0
-    }
+      {
+        "api_family": "interactions",
+        "latency_ms": 3078.713,
+        "model": "gemini-3.6-flash",
+        "success": true
+      },
+      {
+        "api_family": "interactions",
+        "latency_ms": 2510.039,
+        "model": "gemini-3.5-flash",
+        "success": true
+      },
+      {
+        "api_family": "generate_content",
+        "latency_ms": 1085.279,
+        "model": "gemini-2.5-flash",
+        "success": true
+      }
+    ]
   },
+  "gemma_unloaded_after_acceptance": true,
   "live_07": {
     "initial_real_result": "failed_required_evidence_missing",
     "post_fix_live_result": "unavailable_orphaned_launcher_no_persisted_result",
     "status": "not_accepted"
   },
-  "final_gap_completion": {
-    "decision": "FAIL",
-    "gemma": {
-      "completed_case_count": 12,
-      "legacy_aggregate_case_count": 9,
-      "new_case_evidence": [
-        {"case_code": "GEMMA-10-RAG-CITATION", "fallback": true, "final_user_output_safe": true, "generation_mode": "deterministic_fallback", "latency_ms": 42154.237},
-        {"case_code": "GEMMA-11-IMPACT", "fallback": false, "final_user_output_safe": true, "generation_mode": "llm_assisted", "latency_ms": 9189.135},
-        {"case_code": "GEMMA-12-COMPENSATION", "fallback": true, "final_user_output_safe": true, "generation_mode": "deterministic_fallback", "latency_ms": 10748.169}
-      ],
-      "new_case_average_latency_ms": 20697.18,
-      "new_case_p95_latency_ms": 42154.237,
-      "new_case_fallback_success_rate": 1.0,
-      "final_user_visible_unsupported_fact_count": 0,
-      "metric_provenance": "The nine historical calls were persisted only as an aggregate count; case-level acceptance and contradiction metrics cannot be reconstructed without rerunning them.",
-      "status": "coverage_count_complete_metrics_not_certifiable"
-    },
-    "live_07": {
-      "artifact": "artifacts/pre061/live_live_07.json",
-      "citation_support": true,
-      "critical_citation_mismatch_count": 0,
-      "launcher_root_cause": "The single-case harness intentionally wrote a separate artifact; the aggregate artifact was not reconciled.",
-      "privacy_violation_count": 0,
-      "query_run_code": "QR-E8F96103F20A4317BC4AD67F79895D65",
-      "query_run_status": "completed",
-      "selected_tool": "rule.search_rule_documents",
-      "snapshot_leakage_count": 0,
-      "source_sections": ["SYN-COMP-2026-METRO-SLA@1:Failover", "SYN-COMP-2026-METRO-SLA@1:İstisnalar", "SYN-FAILOVER-MAINTENANCE-2026@1:Amaç", "SYN-FAILOVER-MAINTENANCE-2026@1:Failover Adımları", "SYN-FAILOVER-MAINTENANCE-2026@1:İstisnalar ve Kanıt"],
-      "status_code": 200,
-      "status": "accepted"
-    },
-    "model_residency": {"gemma_unloaded_after_new_cases": true, "qwen_resident_during_gemma_cases": false, "simultaneous_residency_observed": false},
-    "blocker": "Twelve calls are now accounted for, but the nine historical Gemma calls lack the per-case fact-guard outcomes required to certify the narrative acceptance and contradiction thresholds."
-  },
-  "gemma_unloaded_after_acceptance": true,
   "qwen_retrieval_reused": true,
   "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
 }

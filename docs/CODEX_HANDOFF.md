@@ -33,10 +33,12 @@
   completed QueryRun, gerçek `rule.search_rule_documents`, citation support ve
   sıfır critical mismatch/leakage/privacy ihlali ile kabul edildi. Üç eksik
   gerçek Gemma çağrısı (`GEMMA-10-RAG-CITATION`, `GEMMA-11-IMPACT`,
-  `GEMMA-12-COMPENSATION`) tamamlandı ve model unload edildi. Buna rağmen ilk
-  dokuz çağrının vaka bazlı fact-guard/contradiction metrikleri persist
-  edilmediğinden 12-vaka narrative acceptance eşiği kanıtlanamıyor. PRE-061
-  **FAIL**, `MAIN-061` bloklu kalır.
+  `GEMMA-12-COMPENSATION`) tamamlandı ve model unload edildi. İlk dokuz
+  provenance kaydı kurtarılamadığı için aynı koşullarda birer kez yeniden
+  çalıştırıldı. Toplam 12/12; narrative acceptance %25, güvenli fallback %100,
+  final user-visible unsupported fact 0'dır. Ancak yedi gerçek fact-guard
+  reddi, model unsupported-fact/contradiction oranı için %58.33 alt sınırını
+  verir ve %10 eşiğini aşar. PRE-061 **FAIL**, `MAIN-061` bloklu kalır.
 
 - **MAIN-xxx — Ana kümülatif görev planı:** Ek orchestration serisinden önce
   son tamamlanan ana plan maddesi `MAIN-051.5 — Çoklu embedding seti ve lokal
