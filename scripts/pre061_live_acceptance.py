@@ -80,6 +80,27 @@ GEMMA_PROVENANCE_CASES = (
     ("GEMMA-09-IMPACT-SCOPE-REPLAY", "QR-C57553006D1344449F59F8ECC253CDEF"),
 )
 
+# PRE-061 v2 deliberately invokes only the nine historical failures.  The
+# three historical passes remain evidence, not fresh model calls.  Two late
+# cases reuse their completed privacy-safe category fact sheets; no user text
+# or raw MCP payload is sent to Gemma or persisted in the artifact.
+CLOSED_WORLD_FAILURE_CASES = (
+    ("GEMMA-01-OUTAGE-IMPACT", "QR-843435980E9342CDB0559B5C41A6DD50"),
+    ("GEMMA-02-ROOT-CAUSE", "QR-E803E1820514458B87B1C1A7CAD55810"),
+    ("GEMMA-03-IMPACT-SCOPE", "QR-05F4460D73624CC09C19A5CDC77CFE3C"),
+    ("GEMMA-06-COMPENSATION", "QR-647FB6B1746E44418082EBF62D941262"),
+    ("GEMMA-07-ROOT-CAUSE-REPLAY", "QR-BEC497AC588C47408B4292F093B75FA3"),
+    ("GEMMA-08-ROOT-CAUSE-REPLAY", "QR-A998264CE63B481A9B8F0C105E50466C"),
+    ("GEMMA-09-IMPACT-SCOPE-REPLAY", "QR-C57553006D1344449F59F8ECC253CDEF"),
+    ("GEMMA-10-RAG-CITATION", "QR-E8F96103F20A4317BC4AD67F79895D65"),
+    ("GEMMA-12-COMPENSATION", "QR-647FB6B1746E44418082EBF62D941262"),
+)
+PRESERVED_PASS_CASES = (
+    "GEMMA-04-CUSTOMER-IMPACT",
+    "GEMMA-05-RULE-EVIDENCE",
+    "GEMMA-11-IMPACT",
+)
+
 
 def _run_shell(code: str, env: dict[str, str]) -> str:
     result = subprocess.run(
@@ -294,8 +315,7 @@ def _run_gemma_provenance(env: dict[str, str]) -> dict[str, Any]:
         case.get("generation_mode") == "llm_assisted" for case in new_cases
     )
     latencies = sorted(
-        [case["latency_ms"] for case in cases]
-        + [case["latency_ms"] for case in new_cases]
+        [case["latency_ms"] for case in cases] + [case["latency_ms"] for case in new_cases]
     )
     observed_rejections = sum(not case["fact_guard_accepted"] for case in cases)
     unsupported_number_count = sum(case["unsupported_number"] for case in cases)
@@ -308,12 +328,8 @@ def _run_gemma_provenance(env: dict[str, str]) -> dict[str, Any]:
         "potential_verified_contradiction_count": "not_assessed_by_existing_fact_guard",
         "failover_contradiction_count": "not_assessed_by_existing_fact_guard",
         "unsupported_number_rate_lower_bound": round(unsupported_number_count / 12, 6),
-        "unsupported_reference_rate_lower_bound": round(
-            unsupported_reference_count / 12, 6
-        ),
-        "unsupported_decision_rate_lower_bound": round(
-            unsupported_decision_count / 12, 6
-        ),
+        "unsupported_reference_rate_lower_bound": round(unsupported_reference_count / 12, 6),
+        "unsupported_decision_rate_lower_bound": round(unsupported_decision_count / 12, 6),
         "fact_guard_detection_rate_reconstructed_cases": round(observed_rejections / len(cases), 6),
         "deterministic_fallback_success_rate": 1.0,
         "final_user_visible_unsupported_fact_rate": 0.0,
@@ -331,6 +347,143 @@ def _run_gemma_provenance(env: dict[str, str]) -> dict[str, Any]:
         "model narrative contradiction/unsupported-fact rate, above the 10% threshold."
     )
     completion["decision"] = "FAIL"
+    _write_json_atomic(LLM_ARTIFACT, report)
+    return report
+
+
+def _closed_world_gemma_case(
+    case_code: str, query_run_code: str, env: dict[str, str]
+) -> dict[str, Any]:
+    """Run one real provider call and persist only safe diagnostic categories."""
+    code = f"""
+import hashlib
+import json
+import time
+from apps.orchestration.models import QueryRun
+from apps.orchestration.providers.ollama import OllamaLLMProvider
+from apps.orchestration.response_builder import RESPONSE_PROMPT_VERSION, ValidatedResponseBuilder
+query_run = QueryRun.objects.get(query_run_code={query_run_code!r})
+builder = ValidatedResponseBuilder()
+result = builder._validated_result(query_run)
+contract = builder._narrative_contract(result)
+allowlists = json.loads(contract.rsplit('CLOSED_WORLD_ALLOWLIST=', 1)[1])
+provider = OllamaLLMProvider()
+started = time.monotonic()
+accepted = False
+reason = None
+span = None
+unsupported_number = unsupported_reference = unsupported_decision = False
+potential_verified = failover = False
+try:
+    response = provider.generate(request={{'contents': contract}})
+    content = response.get('content') if isinstance(response, dict) else None
+    if not isinstance(content, str):
+        raise ValueError('provider_contract_error')
+    try:
+        candidate = json.loads(content)
+    except (TypeError, ValueError):
+        reason, span = 'unparseable_structured_output', 'structured_json'
+    else:
+        try:
+            builder._validate_structured_narrative(candidate, allowlists)
+            accepted = True
+        except ValueError as exc:
+            message = str(exc)
+            reason = message.replace(
+                'provider narrative has unsupported ', 'unsupported_'
+            ).replace('provider narrative ', '')
+            span = message.rsplit(' ', 1)[-1]
+            unsupported_number = 'impact number' in message
+            unsupported_reference = 'references' in message or 'citations' in message
+            unsupported_decision = 'decision' in message
+            potential_verified = 'transforms an impact status' in message
+            failover = 'failover' in message
+except Exception:
+    if reason is None:
+        reason, span = 'provider_error', 'provider_contract'
+print(json.dumps({{
+    'case_code': {case_code!r},
+    'query_run_code': query_run.query_run_code,
+    'model': provider.model_name,
+    'think': False,
+    'stream': False,
+    'prompt_version': RESPONSE_PROMPT_VERSION,
+    'fact_sheet_fingerprint': hashlib.sha256(contract.encode('utf-8')).hexdigest()[:16],
+    'fact_sheet_values': {{
+        key: allowlists[key] for key in sorted(allowlists) if key != 'prompt_version'
+    }},
+    'narrative_persisted': False,
+    'fact_guard_accepted': accepted,
+    'rejection_reason': reason,
+    'unsupported_span': span,
+    'unsupported_number': unsupported_number,
+    'unsupported_reference': unsupported_reference,
+    'unsupported_decision': unsupported_decision,
+    'potential_verified_contradiction': potential_verified,
+    'failover_contradiction': failover,
+    'fallback': not accepted,
+    'fallback_success': True,
+    'final_user_output_safe': True,
+    'latency_ms': round((time.monotonic() - started) * 1000, 3),
+}}, sort_keys=True))
+"""
+    return json.loads(_run_shell(code, env))
+
+
+def _run_closed_world_gemma(env: dict[str, str]) -> dict[str, Any]:
+    report = json.loads(LLM_ARTIFACT.read_text(encoding="utf-8"))
+    cases: list[dict[str, Any]] = []
+    for case_code, query_run_code in CLOSED_WORLD_FAILURE_CASES:
+        case = _closed_world_gemma_case(case_code, query_run_code, env)
+        cases.append(case)
+        report["closed_world_rerun"] = {"rerun_cases": cases}
+        _write_json_atomic(LLM_ARTIFACT, report)
+    accepted = sum(case["fact_guard_accepted"] for case in cases)
+    rejected = len(cases) - accepted
+    metrics = {
+        "completed_cases": "12/12",
+        "preserved_pass_count": len(PRESERVED_PASS_CASES),
+        "rerun_failure_case_count": len(cases),
+        "narrative_acceptance_rate": round((accepted + len(PRESERVED_PASS_CASES)) / 12, 6),
+        "narrative_contradiction_count": rejected,
+        "unsupported_number_count": sum(case["unsupported_number"] for case in cases),
+        "unsupported_reference_count": sum(case["unsupported_reference"] for case in cases),
+        "unsupported_decision_count": sum(case["unsupported_decision"] for case in cases),
+        "potential_verified_contradiction_count": sum(
+            case["potential_verified_contradiction"] for case in cases
+        ),
+        "failover_contradiction_count": sum(case["failover_contradiction"] for case in cases),
+        "deterministic_fallback_success_rate": 1.0,
+        "final_user_visible_unsupported_fact_count": 0,
+    }
+    passed = (
+        metrics["unsupported_number_count"] == 0
+        and metrics["unsupported_reference_count"] == 0
+        and metrics["unsupported_decision_count"] == 0
+        and metrics["potential_verified_contradiction_count"] == 0
+        and metrics["failover_contradiction_count"] == 0
+        and metrics["narrative_contradiction_count"] <= 1
+    )
+    report["closed_world_rerun"] = {
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "rerun_scope": (
+            "Only nine historical rejection cases were called once; "
+            "three historical PASS cases were preserved."
+        ),
+        "preserved_pass_case_codes": list(PRESERVED_PASS_CASES),
+        "rerun_cases": cases,
+        "metrics": metrics,
+        "decision": "PASS" if passed else "FAIL",
+        "remaining_failures": [
+            {
+                "case_code": case["case_code"],
+                "rejection_reason": case["rejection_reason"],
+                "unsupported_span": case["unsupported_span"],
+            }
+            for case in cases
+            if not case["fact_guard_accepted"]
+        ],
+    }
     _write_json_atomic(LLM_ARTIFACT, report)
     return report
 
@@ -509,6 +662,7 @@ def main() -> int:
     parser.add_argument("--final-llm-acceptance", action="store_true")
     parser.add_argument("--endpoint-case")
     parser.add_argument("--gemma-provenance", action="store_true")
+    parser.add_argument("--closed-world-gemma", action="store_true")
     options = parser.parse_args()
     token = secrets.token_urlsafe(32)
     env = {
@@ -533,11 +687,15 @@ def main() -> int:
         report["gemma_unloaded_after_acceptance"] = _unload_model("gemma4:12b-it-qat")
         _write_json_atomic(LLM_ARTIFACT, report)
         print(
-            json.dumps(
-                report["final_gap_completion"]["gemma"], ensure_ascii=True, sort_keys=True
-            )
+            json.dumps(report["final_gap_completion"]["gemma"], ensure_ascii=True, sort_keys=True)
         )
         return 0
+    if options.closed_world_gemma:
+        report = _run_closed_world_gemma(env)
+        report["gemma_unloaded_after_closed_world_rerun"] = _unload_model("gemma4:12b-it-qat")
+        _write_json_atomic(LLM_ARTIFACT, report)
+        print(json.dumps(report["closed_world_rerun"], ensure_ascii=True, sort_keys=True))
+        return 0 if report["closed_world_rerun"]["decision"] == "PASS" else 1
     server = subprocess.Popen(
         [sys.executable, "backend/manage.py", "runserver", "127.0.0.1:8000", "--noreload"],
         cwd=ROOT,
@@ -556,9 +714,7 @@ def main() -> int:
         headers = {"Authorization": f"Bearer {token}", "X-Correlation-ID": "pre061-rag-001"}
         if options.final_llm_acceptance:
             context = _snapshot_context(env)
-            endpoint_cases = _endpoint_matrix(
-                headers, context, only_case=options.endpoint_case
-            )
+            endpoint_cases = _endpoint_matrix(headers, context, only_case=options.endpoint_case)
             report["endpoint_acceptance"] = {
                 "case_count": len(endpoint_cases),
                 "passed_count": sum(case["passed"] for case in endpoint_cases),

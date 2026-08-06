@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import re
+import json
 from collections.abc import Mapping
 from enum import StrEnum
 
@@ -18,13 +18,25 @@ from apps.orchestration.result_merge import (
     ValidationStatus,
 )
 
-RESPONSE_PROMPT_VERSION = "validated-response-builder-tr-v1"
-_NUMBER_RE = re.compile(r"(?<![A-Za-z0-9._-])\d+(?:[.,]\d+)?(?![A-Za-z0-9._-])")
-_PUBLIC_REFERENCE_RE = re.compile(r"\b[A-Z][A-Z0-9]{1,15}(?:-[A-Z0-9][A-Z0-9_-]{0,63})+\b")
-_DECISION_WORD_RE = re.compile(
-    r"\b(eligible|ineligible|eligibility|compensation|uygun|uygun değil|telafi)\b",
-    re.IGNORECASE,
+RESPONSE_PROMPT_VERSION = "closed-world-structured-narrative-tr-v2"
+_NARRATIVE_KEYS = frozenset(
+    {
+        "summary",
+        "root_cause",
+        "impact_status",
+        "impact_numbers",
+        "failover_status",
+        "decision",
+        "references",
+        "citations",
+        "uncertainty",
+    }
 )
+_IMPACT_STATUSES = frozenset(
+    {"potential_scope", "verified_impacted", "verified_no_impact", "insufficient_evidence"}
+)
+_FAILOVER_PRIMARY_DOWN_BACKUP_HEALTHY = "primary_down_backup_healthy"
+_UNCERTAINTY_STATEMENT = "Yeterli doğrulanmış bilgi yok."
 
 
 class ResponseBuilderError(ProcessTwinError):
@@ -96,7 +108,7 @@ class ValidatedResponseBuilder:
             descriptor = get_llm_descriptor(provider_name)
             active_provider = descriptor.create_provider()
         try:
-            narrative = self._safe_narrative(active_provider, self._fact_sheet(result))
+            narrative = self._safe_narrative(active_provider, self._narrative_contract(result))
         except Exception:
             response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
             response.warnings = sorted(set([*response.warnings, "llm_narrative_fallback"]))
@@ -266,35 +278,97 @@ class ValidatedResponseBuilder:
         )
 
     @staticmethod
-    def _fact_sheet(result: ValidatedExecutionResult) -> str:
-        """A minimal, already-safe prompt input; no query text or raw runtime data."""
-        safe = {
-            "causal_summary": None
-            if result.causal_summary is None
-            else result.causal_summary.model_dump(),
-            "impact_summary": None
-            if result.impact_summary is None
-            else result.impact_summary.model_dump(),
-            "rule_summary": None
-            if result.rule_summary is None
-            else result.rule_summary.model_dump(),
-            "compensation_summary": (
-                None
-                if result.compensation_summary is None
-                else result.compensation_summary.model_dump()
-            ),
-            "warnings": sorted(set(result.warnings)),
-        }
-        return (
-            "Yalnız kısa Türkçe açıklama yaz. Yeni sayı, tutar, karar, public referans veya "
-            "kaynak ekleme. Potansiyel etkiyi doğrulanmış etki gibi, failover korumasını "
-            "tam kesinti gibi ve retrieval kaynağını karar gibi anlatma.\n"
-            f"DOĞRULANMIŞ_FACT_SHEET={safe!r}"
+    def _narrative_contract(result: ValidatedExecutionResult) -> str:
+        """Return the closed-world prompt and the only values an LLM may select.
+
+        This is deliberately a JSON contract instead of a prose fact sheet: an
+        LLM response is never rendered verbatim, and each selected value is
+        checked against these per-run allowlists before deterministic rendering.
+        """
+        causal = result.causal_summary
+        impact = result.impact_summary
+        rule = result.rule_summary
+        compensation = result.compensation_summary
+        numbers = []
+        impact_statuses = []
+        impact_numbers_by_status: dict[str, list[int]] = {}
+        if impact:
+            for status, value in (
+                ("potential_scope", impact.potential),
+                ("verified_impacted", impact.verified_impacted),
+                ("verified_no_impact", impact.verified_no_impact),
+                ("insufficient_evidence", impact.insufficient_evidence),
+            ):
+                if value is not None:
+                    impact_statuses.append(status)
+                    numbers.append(value)
+                    impact_numbers_by_status[status] = [value]
+            if impact.failover_protected is not None:
+                numbers.append(impact.failover_protected)
+        references = []
+        if causal:
+            references.extend(
+                value for value in (causal.causal_event_code, causal.outage_code) if value
+            )
+        if rule:
+            references.extend([*rule.rule_codes, *rule.rule_versions, *rule.evidence_references])
+        if compensation:
+            references.extend(compensation.evidence_references)
+        citations = []
+        for source in result.retrieval_sources:
+            version = source.version if source.version is not None else ""
+            citations.append(f"{source.source_code}@{version}:{source.section or ''}")
+        root_causes = (
+            []
+            if causal is None
+            else [
+                *causal.root_cause_reason_codes,
+                *([causal.propagation_summary] if causal.propagation_summary else []),
+            ]
         )
+        decisions = []
+        if rule and rule.eligibility_status:
+            decisions.append(rule.eligibility_status)
+        if compensation and compensation.status:
+            decisions.append(compensation.status)
+        failover_statuses = (
+            [_FAILOVER_PRIMARY_DOWN_BACKUP_HEALTHY]
+            if impact and impact.failover_protected is not None and impact.failover_protected > 0
+            else []
+        )
+        contract = {
+            "prompt_version": RESPONSE_PROMPT_VERSION,
+            "ALLOWED_NUMBERS": sorted(set(numbers)),
+            "ALLOWED_PUBLIC_REFERENCES": sorted(set(references)),
+            "ALLOWED_DECISIONS": sorted(set(decisions)),
+            "ALLOWED_ROOT_CAUSES": sorted(set(root_causes)),
+            "ALLOWED_IMPACT_STATUSES": sorted(set(impact_statuses)),
+            "ALLOWED_IMPACT_NUMBERS_BY_STATUS": impact_numbers_by_status,
+            "ALLOWED_FAILOVER_STATUSES": failover_statuses,
+            "ALLOWED_CITATIONS": sorted(set(citations)),
+            "ALLOWED_UNCERTAINTY_STATEMENTS": [_UNCERTAINTY_STATEMENT],
+        }
+        instructions = (
+            "Yalnız aşağıdaki JSON nesnesini üret; Markdown veya başka metin üretme. "
+            "Anahtarlar tam olarak summary, root_cause, impact_status, impact_numbers, "
+            "failover_status, decision, references, citations, uncertainty olmalıdır. "
+            "Her string değer ilgili ALLOWED listesinden karakter karakter kopyalanmalı; "
+            "bilinmeyen alan için null, liste için [] kullan. Yeni sayı, doküman, standart, "
+            "politika, kayıt, kaynak, karar veya durum üretme. 'Kayıtlara göre', 'ilgili "
+            "standart kapsamında' ve 'sistem verilerine göre' gibi dayanak cümleleri yasaktır. "
+            "Potential scope verified impact değildir. primary_down_backup_healthy tam kesinti, "
+            "tüm müşteriler etkilendi veya hizmet tamamen kesildi anlamına gelmez. Kaynak listesi "
+            "boşsa references ve citations [] olmalıdır. Hatalı örnek: "
+            '{"impact_status":"verified_impacted"} (allowlist yalnız potential_scope iken). '
+            'Olumlu örnek: {"summary":null,"root_cause":null,'
+            '"impact_status":null,"impact_numbers":[],"failover_status":null,"decision":null,'
+            '"references":[],"citations":[],"uncertainty":null}.\nCLOSED_WORLD_ALLOWLIST='
+        )
+        return instructions + json.dumps(contract, ensure_ascii=False, sort_keys=True)
 
     @classmethod
-    def _safe_narrative(cls, provider: LLMProvider, fact_sheet: str) -> str:
-        response = provider.generate(request={"contents": fact_sheet})
+    def _safe_narrative(cls, provider: LLMProvider, contract: str) -> str:
+        response = provider.generate(request={"contents": contract})
         if not isinstance(response, Mapping):
             raise ValueError("provider response is invalid")
         content = response.get("content")
@@ -313,11 +387,87 @@ class ValidatedResponseBuilder:
             for field in ("input_tokens", "output_tokens", "total_tokens")
         ):
             raise ValueError("provider usage is invalid")
-        narrative = content.strip()
-        if (
-            _NUMBER_RE.search(narrative)
-            or _PUBLIC_REFERENCE_RE.search(narrative)
-            or _DECISION_WORD_RE.search(narrative)
+        try:
+            allowlists = json.loads(contract.rsplit("CLOSED_WORLD_ALLOWLIST=", 1)[1])
+            narrative = json.loads(content)
+        except (IndexError, TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("provider narrative is not valid structured JSON") from exc
+        cls._validate_structured_narrative(narrative, allowlists)
+        return cls._render_structured_narrative(narrative)
+
+    @staticmethod
+    def _validate_structured_narrative(narrative: object, allowlists: Mapping[str, object]) -> None:
+        if not isinstance(narrative, Mapping) or set(narrative) != _NARRATIVE_KEYS:
+            raise ValueError("provider narrative schema is invalid")
+        for field, allowlist in (
+            ("root_cause", "ALLOWED_ROOT_CAUSES"),
+            ("impact_status", "ALLOWED_IMPACT_STATUSES"),
+            ("failover_status", "ALLOWED_FAILOVER_STATUSES"),
+            ("decision", "ALLOWED_DECISIONS"),
+            ("uncertainty", "ALLOWED_UNCERTAINTY_STATEMENTS"),
         ):
-            raise ValueError("provider narrative contains unsupported facts")
-        return narrative
+            value = narrative[field]
+            if value is not None and (
+                not isinstance(value, str) or value not in allowlists[allowlist]
+            ):
+                raise ValueError(f"provider narrative has unsupported {field}")
+        for field, allowlist in (
+            ("references", "ALLOWED_PUBLIC_REFERENCES"),
+            ("citations", "ALLOWED_CITATIONS"),
+        ):
+            value = narrative[field]
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) and item in allowlists[allowlist] for item in value
+            ):
+                raise ValueError(f"provider narrative has unsupported {field}")
+        numbers = narrative["impact_numbers"]
+        if not isinstance(numbers, list) or not all(
+            isinstance(item, int)
+            and not isinstance(item, bool)
+            and item in allowlists["ALLOWED_NUMBERS"]
+            for item in numbers
+        ):
+            raise ValueError("provider narrative has unsupported impact number")
+        if narrative["summary"] is not None:
+            raise ValueError("provider narrative summary must be null")
+        # Canonical status values are never transformed into a different impact class.
+        status = narrative["impact_status"]
+        if status is not None and status not in _IMPACT_STATUSES:
+            raise ValueError("provider narrative has invalid impact status")
+        if status is None and numbers:
+            raise ValueError("provider narrative has unclassified impact number")
+        if status is not None and any(
+            number not in allowlists["ALLOWED_IMPACT_NUMBERS_BY_STATUS"].get(status, [])
+            for number in numbers
+        ):
+            raise ValueError("provider narrative transforms an impact status")
+
+    @staticmethod
+    def _render_structured_narrative(narrative: Mapping[str, object]) -> str:
+        """Render only fixed Turkish labels plus validated allowlist values."""
+        lines = []
+        if narrative["root_cause"]:
+            lines.append(f"Kök neden: {narrative['root_cause']}.")
+        if narrative["impact_status"]:
+            labels = {
+                "potential_scope": "Potansiyel kapsam",
+                "verified_impacted": "Doğrulanmış etki",
+                "verified_no_impact": "Doğrulanmış etkisizlik",
+                "insufficient_evidence": "Kanıt yetersiz",
+            }
+            values = ", ".join(str(value) for value in narrative["impact_numbers"])
+            lines.append(
+                f"{labels[narrative['impact_status']]}: {values}."
+                if values
+                else f"{labels[narrative['impact_status']]}."
+            )
+        if narrative["failover_status"]:
+            lines.append(
+                "Failover durumu: birincil yol aşağıda, yedek yol sağlıklı/aktif; "
+                "tam kesinti değildir."
+            )
+        if narrative["decision"]:
+            lines.append(f"Doğrulanmış karar durumu: {narrative['decision']}.")
+        if narrative["uncertainty"]:
+            lines.append(str(narrative["uncertainty"]))
+        return "\n".join(lines) or _UNCERTAINTY_STATEMENT

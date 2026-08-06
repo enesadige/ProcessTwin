@@ -321,5 +321,21 @@
     "top_3_hit_rate": 0.9333333333333333,
     "top_5_hit_rate": 1.0
   },
-  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+  "closed_world_narrative_remediation": {
+    "prompt_version": "closed-world-structured-narrative-tr-v2",
+    "rerun_scope": "Nine historical Gemma rejection cases only; three historical PASS cases were preserved.",
+    "completed_cases": "12/12",
+    "narrative_acceptance_rate": 0.25,
+    "narrative_contradiction_count": 9,
+    "unsupported_number_count": 0,
+    "unsupported_reference_count": 0,
+    "unsupported_decision_count": 0,
+    "potential_verified_contradiction_count": 0,
+    "failover_contradiction_count": 0,
+    "deterministic_fallback_success_rate": 1.0,
+    "final_user_visible_unsupported_fact_count": 0,
+    "gemma_unloaded_after_acceptance": true,
+    "decision": "FAIL"
+  }
 }

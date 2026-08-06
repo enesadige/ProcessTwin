@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from typing import Any
 
@@ -28,6 +29,20 @@ from apps.orchestration.result_merge import (
 from apps.orchestration.services import QueryRunService
 from apps.orchestration.tool_plan import MCPServer
 
+SAFE_STRUCTURED_NARRATIVE = json.dumps(
+    {
+        "summary": None,
+        "root_cause": "shared_upstream",
+        "impact_status": "potential_scope",
+        "impact_numbers": [5],
+        "failover_status": "primary_down_backup_healthy",
+        "decision": "eligible",
+        "references": ["CE-GPON-001", "REFUND-001"],
+        "citations": ["SYN-COMP-2026@2:Uygunluk koşulları"],
+        "uncertainty": None,
+    }
+)
+
 
 class RecordingProvider(LLMProvider):
     provider_name = "recording"
@@ -35,7 +50,7 @@ class RecordingProvider(LLMProvider):
     supports_thinking = False
     thinking_enabled = False
 
-    def __init__(self, content: str = "Doğrulanmış özet sunulmaktadır.") -> None:
+    def __init__(self, content: str = SAFE_STRUCTURED_NARRATIVE) -> None:
         self.content = content
         self.requests: list[Mapping[str, Any]] = []
 
@@ -188,7 +203,7 @@ def test_llm_assisted_mode_uses_only_safe_fact_sheet_and_preserves_deterministic
     assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
     assert response.provider == "recording"
     assert response.model == "recording-v1"
-    assert response.response_text.startswith("Doğrulanmış özet sunulmaktadır.")
+    assert response.response_text.startswith("Kök neden: shared_upstream.")
     assert "Potansiyel etki: 5 bağlantı." in response.response_text
     prompt = provider.requests[0]["contents"]
     for value in ("CUST-001", "198.51.100.10", "original_query", "raw_payload", "token"):
@@ -200,8 +215,8 @@ def test_llm_assisted_mode_uses_only_safe_fact_sheet_and_preserves_deterministic
     "content",
     [
         "999 bağlantı etkilendi.",
-        "CE-UNKNOWN-999 kök nedendir.",
-        "Yeni telafi kararı uygundur.",
+        '{"summary":null,"root_cause":"CE-UNKNOWN-999","impact_status":null,"impact_numbers":[],"failover_status":null,"decision":null,"references":[],"citations":[],"uncertainty":null}',
+        '{"summary":null,"root_cause":null,"impact_status":"verified_impacted","impact_numbers":[5],"failover_status":null,"decision":null,"references":[],"citations":[],"uncertainty":null}',
     ],
 )
 def test_unsupported_llm_facts_use_deterministic_fallback(content):
@@ -220,7 +235,7 @@ def test_unsupported_llm_facts_use_deterministic_fallback(content):
 
 
 @pytest.mark.django_db
-def test_provider_failure_and_mock_narrative_are_safe_and_deterministic():
+def test_provider_failure_and_nonstructured_mock_narrative_are_safe_and_deterministic():
     run = completed_run("response-mock")
 
     mock_response = ValidatedResponseBuilder().build(
@@ -228,8 +243,8 @@ def test_provider_failure_and_mock_narrative_are_safe_and_deterministic():
         mode=ResponseGenerationMode.LLM_ASSISTED,
         provider=MockLLMProvider(),
     )
-    assert mock_response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
-    assert mock_response.response_text.startswith("mock-response:")
+    assert mock_response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
+    assert "mock-response:" not in mock_response.response_text
 
     fallback = ValidatedResponseBuilder().build(
         run,
@@ -237,6 +252,42 @@ def test_provider_failure_and_mock_narrative_are_safe_and_deterministic():
         provider=RecordingProvider(""),
     )
     assert fallback.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
+
+
+@pytest.mark.django_db
+def test_closed_world_semantic_guards_reject_impact_transform_and_full_outage_claim():
+    run = completed_run("response-semantic-guard")
+    transformed = json.dumps(
+        {
+            "summary": None,
+            "root_cause": None,
+            "impact_status": "verified_impacted",
+            "impact_numbers": [5],
+            "failover_status": None,
+            "decision": None,
+            "references": [],
+            "citations": [],
+            "uncertainty": None,
+        }
+    )
+    full_outage = json.dumps(
+        {
+            "summary": None,
+            "root_cause": None,
+            "impact_status": None,
+            "impact_numbers": [],
+            "failover_status": "full_outage",
+            "decision": None,
+            "references": [],
+            "citations": [],
+            "uncertainty": None,
+        }
+    )
+    for content in (transformed, full_outage):
+        response = ValidatedResponseBuilder().build(
+            run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=RecordingProvider(content)
+        )
+        assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
 
 
 @pytest.mark.django_db

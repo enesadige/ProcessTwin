@@ -40,6 +40,15 @@
   reddi, model unsupported-fact/contradiction oranı için %58.33 alt sınırını
   verir ve %10 eşiğini aşar. PRE-061 **FAIL**, `MAIN-061` bloklu kalır.
 
+- **PRE-061 closed-world narrative remediation:** `closed-world-structured-
+  narrative-tr-v2` per-case JSON allowlist ve structured validator ile dokuz
+  eski Gemma reddini birer kez çalıştırdı; üç eski PASS korundu. Dokuz çağrının
+  dördü provider error, beşi parse edilemeyen JSON döndürdü. Unsupported
+  number/reference/decision ve potential/failover contradiction 0, fallback
+  %100, user-visible unsupported fact 0; fakat doğrudan narrative acceptance
+  %25 ve contradiction 9/12 olduğundan gate **FAIL**. Gemma unload edildi;
+  `MAIN-061` ve altı kullanıcı promptu black-box turu başlamaz.
+
 - **MAIN-xxx — Ana kümülatif görev planı:** Ek orchestration serisinden önce
   son tamamlanan ana plan maddesi `MAIN-051.5 — Çoklu embedding seti ve lokal
   provider`dır. Dosyadaki ilk tamamlanmamış ana plan maddesi

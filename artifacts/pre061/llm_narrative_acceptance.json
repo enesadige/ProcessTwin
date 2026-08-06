@@ -1,5 +1,490 @@
 {
   "causal_event_code": "CE-MCR-0001",
+  "closed_world_rerun": {
+    "decision": "FAIL",
+    "metrics": {
+      "completed_cases": "12/12",
+      "deterministic_fallback_success_rate": 1.0,
+      "failover_contradiction_count": 0,
+      "final_user_visible_unsupported_fact_count": 0,
+      "narrative_acceptance_rate": 0.25,
+      "narrative_contradiction_count": 9,
+      "potential_verified_contradiction_count": 0,
+      "preserved_pass_count": 3,
+      "rerun_failure_case_count": 9,
+      "unsupported_decision_count": 0,
+      "unsupported_number_count": 0,
+      "unsupported_reference_count": 0
+    },
+    "preserved_pass_case_codes": [
+      "GEMMA-04-CUSTOMER-IMPACT",
+      "GEMMA-05-RULE-EVIDENCE",
+      "GEMMA-11-IMPACT"
+    ],
+    "prompt_version": "closed-world-structured-narrative-tr-v2",
+    "remaining_failures": [
+      {
+        "case_code": "GEMMA-01-OUTAGE-IMPACT",
+        "rejection_reason": "provider_error",
+        "unsupported_span": "provider_contract"
+      },
+      {
+        "case_code": "GEMMA-02-ROOT-CAUSE",
+        "rejection_reason": "provider_error",
+        "unsupported_span": "provider_contract"
+      },
+      {
+        "case_code": "GEMMA-03-IMPACT-SCOPE",
+        "rejection_reason": "unparseable_structured_output",
+        "unsupported_span": "structured_json"
+      },
+      {
+        "case_code": "GEMMA-06-COMPENSATION",
+        "rejection_reason": "unparseable_structured_output",
+        "unsupported_span": "structured_json"
+      },
+      {
+        "case_code": "GEMMA-07-ROOT-CAUSE-REPLAY",
+        "rejection_reason": "provider_error",
+        "unsupported_span": "provider_contract"
+      },
+      {
+        "case_code": "GEMMA-08-ROOT-CAUSE-REPLAY",
+        "rejection_reason": "provider_error",
+        "unsupported_span": "provider_contract"
+      },
+      {
+        "case_code": "GEMMA-09-IMPACT-SCOPE-REPLAY",
+        "rejection_reason": "unparseable_structured_output",
+        "unsupported_span": "structured_json"
+      },
+      {
+        "case_code": "GEMMA-10-RAG-CITATION",
+        "rejection_reason": "unparseable_structured_output",
+        "unsupported_span": "structured_json"
+      },
+      {
+        "case_code": "GEMMA-12-COMPENSATION",
+        "rejection_reason": "unparseable_structured_output",
+        "unsupported_span": "structured_json"
+      }
+    ],
+    "rerun_cases": [
+      {
+        "case_code": "GEMMA-01-OUTAGE-IMPACT",
+        "fact_guard_accepted": false,
+        "fact_sheet_fingerprint": "d242683f4f514663",
+        "fact_sheet_values": {
+          "ALLOWED_CITATIONS": [],
+          "ALLOWED_DECISIONS": [],
+          "ALLOWED_FAILOVER_STATUSES": [
+            "primary_down_backup_healthy"
+          ],
+          "ALLOWED_IMPACT_NUMBERS_BY_STATUS": {
+            "potential_scope": [
+              673
+            ]
+          },
+          "ALLOWED_IMPACT_STATUSES": [
+            "potential_scope"
+          ],
+          "ALLOWED_NUMBERS": [
+            25,
+            673
+          ],
+          "ALLOWED_PUBLIC_REFERENCES": [
+            "OUT-MCR-0001"
+          ],
+          "ALLOWED_ROOT_CAUSES": [],
+          "ALLOWED_UNCERTAINTY_STATEMENTS": [
+            "Yeterli do\u011frulanm\u0131\u015f bilgi yok."
+          ]
+        },
+        "failover_contradiction": false,
+        "fallback": true,
+        "fallback_success": true,
+        "final_user_output_safe": true,
+        "latency_ms": 60213.926,
+        "model": "gemma4:12b-it-qat",
+        "narrative_persisted": false,
+        "potential_verified_contradiction": false,
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "query_run_code": "QR-843435980E9342CDB0559B5C41A6DD50",
+        "rejection_reason": "provider_error",
+        "stream": false,
+        "think": false,
+        "unsupported_decision": false,
+        "unsupported_number": false,
+        "unsupported_reference": false,
+        "unsupported_span": "provider_contract"
+      },
+      {
+        "case_code": "GEMMA-02-ROOT-CAUSE",
+        "fact_guard_accepted": false,
+        "fact_sheet_fingerprint": "d294007022bc9230",
+        "fact_sheet_values": {
+          "ALLOWED_CITATIONS": [],
+          "ALLOWED_DECISIONS": [],
+          "ALLOWED_FAILOVER_STATUSES": [],
+          "ALLOWED_IMPACT_NUMBERS_BY_STATUS": {},
+          "ALLOWED_IMPACT_STATUSES": [],
+          "ALLOWED_NUMBERS": [],
+          "ALLOWED_PUBLIC_REFERENCES": [
+            "CE-MCR-0001"
+          ],
+          "ALLOWED_ROOT_CAUSES": [
+            "Candidate matches the causal event physical root resource.",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "ALLOWED_UNCERTAINTY_STATEMENTS": [
+            "Yeterli do\u011frulanm\u0131\u015f bilgi yok."
+          ]
+        },
+        "failover_contradiction": false,
+        "fallback": true,
+        "fallback_success": true,
+        "final_user_output_safe": true,
+        "latency_ms": 60068.914,
+        "model": "gemma4:12b-it-qat",
+        "narrative_persisted": false,
+        "potential_verified_contradiction": false,
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "query_run_code": "QR-E803E1820514458B87B1C1A7CAD55810",
+        "rejection_reason": "provider_error",
+        "stream": false,
+        "think": false,
+        "unsupported_decision": false,
+        "unsupported_number": false,
+        "unsupported_reference": false,
+        "unsupported_span": "provider_contract"
+      },
+      {
+        "case_code": "GEMMA-03-IMPACT-SCOPE",
+        "fact_guard_accepted": false,
+        "fact_sheet_fingerprint": "27db1b0215c7dedf",
+        "fact_sheet_values": {
+          "ALLOWED_CITATIONS": [],
+          "ALLOWED_DECISIONS": [],
+          "ALLOWED_FAILOVER_STATUSES": [],
+          "ALLOWED_IMPACT_NUMBERS_BY_STATUS": {
+            "insufficient_evidence": [
+              0
+            ],
+            "potential_scope": [
+              0
+            ],
+            "verified_impacted": [
+              0
+            ],
+            "verified_no_impact": [
+              0
+            ]
+          },
+          "ALLOWED_IMPACT_STATUSES": [
+            "insufficient_evidence",
+            "potential_scope",
+            "verified_impacted",
+            "verified_no_impact"
+          ],
+          "ALLOWED_NUMBERS": [
+            0
+          ],
+          "ALLOWED_PUBLIC_REFERENCES": [
+            "CE-MCR-0001"
+          ],
+          "ALLOWED_ROOT_CAUSES": [
+            "Candidate matches the causal event physical root resource.",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "ALLOWED_UNCERTAINTY_STATEMENTS": [
+            "Yeterli do\u011frulanm\u0131\u015f bilgi yok."
+          ]
+        },
+        "failover_contradiction": false,
+        "fallback": true,
+        "fallback_success": true,
+        "final_user_output_safe": true,
+        "latency_ms": 58486.834,
+        "model": "gemma4:12b-it-qat",
+        "narrative_persisted": false,
+        "potential_verified_contradiction": false,
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "query_run_code": "QR-05F4460D73624CC09C19A5CDC77CFE3C",
+        "rejection_reason": "unparseable_structured_output",
+        "stream": false,
+        "think": false,
+        "unsupported_decision": false,
+        "unsupported_number": false,
+        "unsupported_reference": false,
+        "unsupported_span": "structured_json"
+      },
+      {
+        "case_code": "GEMMA-06-COMPENSATION",
+        "fact_guard_accepted": false,
+        "fact_sheet_fingerprint": "6868ccd009866d6a",
+        "fact_sheet_values": {
+          "ALLOWED_CITATIONS": [],
+          "ALLOWED_DECISIONS": [
+            "pending"
+          ],
+          "ALLOWED_FAILOVER_STATUSES": [],
+          "ALLOWED_IMPACT_NUMBERS_BY_STATUS": {},
+          "ALLOWED_IMPACT_STATUSES": [],
+          "ALLOWED_NUMBERS": [],
+          "ALLOWED_PUBLIC_REFERENCES": [
+            "CE-MCR-0001"
+          ],
+          "ALLOWED_ROOT_CAUSES": [],
+          "ALLOWED_UNCERTAINTY_STATEMENTS": [
+            "Yeterli do\u011frulanm\u0131\u015f bilgi yok."
+          ]
+        },
+        "failover_contradiction": false,
+        "fallback": true,
+        "fallback_success": true,
+        "final_user_output_safe": true,
+        "latency_ms": 29144.153,
+        "model": "gemma4:12b-it-qat",
+        "narrative_persisted": false,
+        "potential_verified_contradiction": false,
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "query_run_code": "QR-647FB6B1746E44418082EBF62D941262",
+        "rejection_reason": "unparseable_structured_output",
+        "stream": false,
+        "think": false,
+        "unsupported_decision": false,
+        "unsupported_number": false,
+        "unsupported_reference": false,
+        "unsupported_span": "structured_json"
+      },
+      {
+        "case_code": "GEMMA-07-ROOT-CAUSE-REPLAY",
+        "fact_guard_accepted": false,
+        "fact_sheet_fingerprint": "d294007022bc9230",
+        "fact_sheet_values": {
+          "ALLOWED_CITATIONS": [],
+          "ALLOWED_DECISIONS": [],
+          "ALLOWED_FAILOVER_STATUSES": [],
+          "ALLOWED_IMPACT_NUMBERS_BY_STATUS": {},
+          "ALLOWED_IMPACT_STATUSES": [],
+          "ALLOWED_NUMBERS": [],
+          "ALLOWED_PUBLIC_REFERENCES": [
+            "CE-MCR-0001"
+          ],
+          "ALLOWED_ROOT_CAUSES": [
+            "Candidate matches the causal event physical root resource.",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "ALLOWED_UNCERTAINTY_STATEMENTS": [
+            "Yeterli do\u011frulanm\u0131\u015f bilgi yok."
+          ]
+        },
+        "failover_contradiction": false,
+        "fallback": true,
+        "fallback_success": true,
+        "final_user_output_safe": true,
+        "latency_ms": 60070.801,
+        "model": "gemma4:12b-it-qat",
+        "narrative_persisted": false,
+        "potential_verified_contradiction": false,
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "query_run_code": "QR-BEC497AC588C47408B4292F093B75FA3",
+        "rejection_reason": "provider_error",
+        "stream": false,
+        "think": false,
+        "unsupported_decision": false,
+        "unsupported_number": false,
+        "unsupported_reference": false,
+        "unsupported_span": "provider_contract"
+      },
+      {
+        "case_code": "GEMMA-08-ROOT-CAUSE-REPLAY",
+        "fact_guard_accepted": false,
+        "fact_sheet_fingerprint": "d294007022bc9230",
+        "fact_sheet_values": {
+          "ALLOWED_CITATIONS": [],
+          "ALLOWED_DECISIONS": [],
+          "ALLOWED_FAILOVER_STATUSES": [],
+          "ALLOWED_IMPACT_NUMBERS_BY_STATUS": {},
+          "ALLOWED_IMPACT_STATUSES": [],
+          "ALLOWED_NUMBERS": [],
+          "ALLOWED_PUBLIC_REFERENCES": [
+            "CE-MCR-0001"
+          ],
+          "ALLOWED_ROOT_CAUSES": [
+            "Candidate matches the causal event physical root resource.",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "ALLOWED_UNCERTAINTY_STATEMENTS": [
+            "Yeterli do\u011frulanm\u0131\u015f bilgi yok."
+          ]
+        },
+        "failover_contradiction": false,
+        "fallback": true,
+        "fallback_success": true,
+        "final_user_output_safe": true,
+        "latency_ms": 60128.381,
+        "model": "gemma4:12b-it-qat",
+        "narrative_persisted": false,
+        "potential_verified_contradiction": false,
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "query_run_code": "QR-A998264CE63B481A9B8F0C105E50466C",
+        "rejection_reason": "provider_error",
+        "stream": false,
+        "think": false,
+        "unsupported_decision": false,
+        "unsupported_number": false,
+        "unsupported_reference": false,
+        "unsupported_span": "provider_contract"
+      },
+      {
+        "case_code": "GEMMA-09-IMPACT-SCOPE-REPLAY",
+        "fact_guard_accepted": false,
+        "fact_sheet_fingerprint": "27db1b0215c7dedf",
+        "fact_sheet_values": {
+          "ALLOWED_CITATIONS": [],
+          "ALLOWED_DECISIONS": [],
+          "ALLOWED_FAILOVER_STATUSES": [],
+          "ALLOWED_IMPACT_NUMBERS_BY_STATUS": {
+            "insufficient_evidence": [
+              0
+            ],
+            "potential_scope": [
+              0
+            ],
+            "verified_impacted": [
+              0
+            ],
+            "verified_no_impact": [
+              0
+            ]
+          },
+          "ALLOWED_IMPACT_STATUSES": [
+            "insufficient_evidence",
+            "potential_scope",
+            "verified_impacted",
+            "verified_no_impact"
+          ],
+          "ALLOWED_NUMBERS": [
+            0
+          ],
+          "ALLOWED_PUBLIC_REFERENCES": [
+            "CE-MCR-0001"
+          ],
+          "ALLOWED_ROOT_CAUSES": [
+            "Candidate matches the causal event physical root resource.",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "ALLOWED_UNCERTAINTY_STATEMENTS": [
+            "Yeterli do\u011frulanm\u0131\u015f bilgi yok."
+          ]
+        },
+        "failover_contradiction": false,
+        "fallback": true,
+        "fallback_success": true,
+        "final_user_output_safe": true,
+        "latency_ms": 29520.134,
+        "model": "gemma4:12b-it-qat",
+        "narrative_persisted": false,
+        "potential_verified_contradiction": false,
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "query_run_code": "QR-C57553006D1344449F59F8ECC253CDEF",
+        "rejection_reason": "unparseable_structured_output",
+        "stream": false,
+        "think": false,
+        "unsupported_decision": false,
+        "unsupported_number": false,
+        "unsupported_reference": false,
+        "unsupported_span": "structured_json"
+      },
+      {
+        "case_code": "GEMMA-10-RAG-CITATION",
+        "fact_guard_accepted": false,
+        "fact_sheet_fingerprint": "3608a20c92bbcc04",
+        "fact_sheet_values": {
+          "ALLOWED_CITATIONS": [
+            "SYN-COMP-2026-METRO-SLA@1:Failover",
+            "SYN-COMP-2026-METRO-SLA@1:\u0130stisnalar",
+            "SYN-FAILOVER-MAINTENANCE-2026@1:Ama\u00e7",
+            "SYN-FAILOVER-MAINTENANCE-2026@1:Failover Ad\u0131mlar\u0131",
+            "SYN-FAILOVER-MAINTENANCE-2026@1:\u0130stisnalar ve Kan\u0131t"
+          ],
+          "ALLOWED_DECISIONS": [],
+          "ALLOWED_FAILOVER_STATUSES": [],
+          "ALLOWED_IMPACT_NUMBERS_BY_STATUS": {},
+          "ALLOWED_IMPACT_STATUSES": [],
+          "ALLOWED_NUMBERS": [],
+          "ALLOWED_PUBLIC_REFERENCES": [],
+          "ALLOWED_ROOT_CAUSES": [],
+          "ALLOWED_UNCERTAINTY_STATEMENTS": [
+            "Yeterli do\u011frulanm\u0131\u015f bilgi yok."
+          ]
+        },
+        "failover_contradiction": false,
+        "fallback": true,
+        "fallback_success": true,
+        "final_user_output_safe": true,
+        "latency_ms": 27676.35,
+        "model": "gemma4:12b-it-qat",
+        "narrative_persisted": false,
+        "potential_verified_contradiction": false,
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "query_run_code": "QR-E8F96103F20A4317BC4AD67F79895D65",
+        "rejection_reason": "unparseable_structured_output",
+        "stream": false,
+        "think": false,
+        "unsupported_decision": false,
+        "unsupported_number": false,
+        "unsupported_reference": false,
+        "unsupported_span": "structured_json"
+      },
+      {
+        "case_code": "GEMMA-12-COMPENSATION",
+        "fact_guard_accepted": false,
+        "fact_sheet_fingerprint": "6868ccd009866d6a",
+        "fact_sheet_values": {
+          "ALLOWED_CITATIONS": [],
+          "ALLOWED_DECISIONS": [
+            "pending"
+          ],
+          "ALLOWED_FAILOVER_STATUSES": [],
+          "ALLOWED_IMPACT_NUMBERS_BY_STATUS": {},
+          "ALLOWED_IMPACT_STATUSES": [],
+          "ALLOWED_NUMBERS": [],
+          "ALLOWED_PUBLIC_REFERENCES": [
+            "CE-MCR-0001"
+          ],
+          "ALLOWED_ROOT_CAUSES": [],
+          "ALLOWED_UNCERTAINTY_STATEMENTS": [
+            "Yeterli do\u011frulanm\u0131\u015f bilgi yok."
+          ]
+        },
+        "failover_contradiction": false,
+        "fallback": true,
+        "fallback_success": true,
+        "final_user_output_safe": true,
+        "latency_ms": 29000.547,
+        "model": "gemma4:12b-it-qat",
+        "narrative_persisted": false,
+        "potential_verified_contradiction": false,
+        "prompt_version": "closed-world-structured-narrative-tr-v2",
+        "query_run_code": "QR-647FB6B1746E44418082EBF62D941262",
+        "rejection_reason": "unparseable_structured_output",
+        "stream": false,
+        "think": false,
+        "unsupported_decision": false,
+        "unsupported_number": false,
+        "unsupported_reference": false,
+        "unsupported_span": "structured_json"
+      }
+    ],
+    "rerun_scope": "Only nine historical rejection cases were called once; three historical PASS cases were preserved."
+  },
   "decision": "FAIL",
   "duration_seconds": 104.172,
   "endpoint_acceptance": {
@@ -426,6 +911,7 @@
     ]
   },
   "gemma_unloaded_after_acceptance": true,
+  "gemma_unloaded_after_closed_world_rerun": true,
   "live_07": {
     "initial_real_result": "failed_required_evidence_missing",
     "post_fix_live_result": "unavailable_orphaned_launcher_no_persisted_result",

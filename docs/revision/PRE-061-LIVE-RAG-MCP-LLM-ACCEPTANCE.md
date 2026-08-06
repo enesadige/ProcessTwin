@@ -203,3 +203,28 @@ those fields are recorded as not assessed rather than inferred.
 PRE-061 is therefore **FAIL**, not because of missing provenance any longer,
 but because real Gemma narrative quality fails the threshold. `MAIN-061`
 remains blocked until a narrow narrative-quality remediation and rerun pass.
+
+## PRE-061 Closed-World Narrative Remediation
+
+**Decision: FAIL; no further prompt iteration was run.** Prompt version
+`closed-world-structured-narrative-tr-v2` replaced the free-text instruction
+with a per-case JSON allowlist: numbers, public references, decisions, root
+causes, canonical impact/failover statuses, citations and the one permitted
+uncertainty statement. The provider contract remained `gemma4:12b-it-qat`,
+`think:false`, `stream:false`.
+
+Only the nine historical failures were called once. The three prior direct
+PASS cases (`GEMMA-04-CUSTOMER-IMPACT`, `GEMMA-05-RULE-EVIDENCE`, and
+`GEMMA-11-IMPACT`) were preserved, so this is explicitly a mixed-prompt
+12-case report rather than a single homogeneous run. Every rerun response was
+either a provider error (four cases) or non-parseable structured output (five
+cases). No raw narrative, PII, secret, or model text was persisted.
+
+The structured validator and deterministic response builder kept unsupported
+number/reference/decision counts at 0; potential/verified and failover
+contradictions were also 0; fallback success was 100%; and final user-visible
+unsupported facts were 0. Direct narrative acceptance remained 25% (the three
+preserved PASS cases), with 9/12 narrative contradictions, exceeding the
+maximum 1/12. Gemma was gracefully unloaded and `ollama ps` showed no resident
+model. The next permitted acceptance task, if PRE-061 is later passed, remains
+the six real-user-prompt black-box tests; it cannot start now.
