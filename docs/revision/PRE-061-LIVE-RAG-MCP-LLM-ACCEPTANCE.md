@@ -228,3 +228,30 @@ preserved PASS cases), with 9/12 narrative contradictions, exceeding the
 maximum 1/12. Gemma was gracefully unloaded and `ollama ps` showed no resident
 model. The next permitted acceptance task, if PRE-061 is later passed, remains
 the six real-user-prompt black-box tests; it cannot start now.
+
+## PRE-061 Native Schema Statement Selection
+
+**Decision: PASS.** The previous parse failures were caused by asking Gemma to
+honour JSON only through prompt text: the adapter used `/api/chat` with
+`think:false` and `stream:false`, but sent no `format` schema. Its timeout was
+30 seconds. Historical provider errors contain no persisted HTTP status,
+exception subtype, or Ollama timing fields, so they are recorded as unknown
+rather than misclassified as semantic contradictions.
+
+Version `closed-world-statement-selection-tr-v3` sends a real per-case native
+Ollama JSON Schema in `format`, plus `raw:false` and `temperature:0`. Backend
+constructs canonical privacy-safe statement IDs from validated results; Gemma
+can select and order IDs only. The final Turkish response is assembled solely
+from those backend statements. A measured prior p95 above 30 seconds justified
+a benchmark-only 60-second timeout; no unlimited timeout was introduced.
+
+The three-case capability gate passed 3/3 provider calls and native-schema
+parses, with zero unknown IDs and semantic selection errors. It enabled one
+clean 12-case, single-prompt run: provider success 12/12, timeout 0,
+native-schema parse 12/12, invalid/unknown ID 0, semantic selection error 0,
+potential/verified error 0, failover error 0, unsupported
+number/reference/decision 0, and final user-visible unsupported fact 0.
+Average latency was 12,822.656 ms and p95 26,180.598 ms. Gemma was unloaded
+after the run. This supersedes the prior mixed-run narrative result; the six
+user-prompt black-box test remains the next acceptance work, not part of this
+task.

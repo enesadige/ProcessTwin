@@ -18,7 +18,7 @@ from apps.orchestration.result_merge import (
     ValidationStatus,
 )
 
-RESPONSE_PROMPT_VERSION = "closed-world-structured-narrative-tr-v2"
+RESPONSE_PROMPT_VERSION = "closed-world-statement-selection-tr-v3"
 _NARRATIVE_KEYS = frozenset(
     {
         "summary",
@@ -108,13 +108,15 @@ class ValidatedResponseBuilder:
             descriptor = get_llm_descriptor(provider_name)
             active_provider = descriptor.create_provider()
         try:
-            narrative = self._safe_narrative(active_provider, self._narrative_contract(result))
+            narrative = self._safe_statement_selection(
+                active_provider, self._statement_contract(result)
+            )
         except Exception:
             response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
             response.warnings = sorted(set([*response.warnings, "llm_narrative_fallback"]))
             return response
 
-        response.response_text = f"{narrative}\n\n{deterministic_text}"
+        response.response_text = narrative
         response.generation_mode = ResponseGenerationMode.LLM_ASSISTED
         response.provider = active_provider.provider_name
         response.model = active_provider.model_name
@@ -276,6 +278,116 @@ class ValidatedResponseBuilder:
         return sorted(
             citations.values(), key=lambda item: (item.reference_kind, item.reference_code)
         )
+
+    @staticmethod
+    def _statement_contract(result: ValidatedExecutionResult) -> tuple[str, dict[str, str]]:
+        """Build immutable, privacy-safe sentences; the model may select IDs only."""
+        statements: dict[str, str] = {}
+
+        def add(text: str) -> None:
+            statements[f"S{len(statements) + 1}"] = text
+
+        causal = result.causal_summary
+        if causal and causal.root_cause_reason_codes:
+            add("Kök neden gerekçesi: " + ", ".join(causal.root_cause_reason_codes) + ".")
+        impact = result.impact_summary
+        if impact:
+            for label, value in (
+                ("Potansiyel kapsam", impact.potential),
+                ("Doğrulanmış etki", impact.verified_impacted),
+                ("Doğrulanmış etkisizlik", impact.verified_no_impact),
+                ("Kanıt yetersiz", impact.insufficient_evidence),
+            ):
+                if value is not None:
+                    add(f"{label}: {value} bağlantı.")
+            if impact.failover_protected is not None and impact.failover_protected > 0:
+                add(
+                    f"Failover ile korunan: {impact.failover_protected} bağlantı; "
+                    "tam kesinti sayılmaz."
+                )
+        rule = result.rule_summary
+        if rule and rule.rule_versions:
+            add("Doğrulanmış kural sürümü: " + ", ".join(rule.rule_versions) + ".")
+        if rule and rule.evidence_references:
+            add("Doğrulanmış karar kanıtı: " + ", ".join(rule.evidence_references) + ".")
+        compensation = result.compensation_summary
+        if compensation and compensation.status:
+            add(f"Telafi durumu: {compensation.status}.")
+        if result.retrieval_sources:
+            source_labels = []
+            for source in result.retrieval_sources:
+                version = f" v{source.version}" if source.version is not None else ""
+                section = f" / {source.section}" if source.section else ""
+                source_labels.append(f"{source.source_code}{version}{section}")
+            add("Doğrulanmış kaynaklar: " + "; ".join(source_labels) + ".")
+        if not statements:
+            add(_UNCERTAINTY_STATEMENT)
+        schema = {
+            "type": "object",
+            "properties": {
+                "headline_id": {"type": ["string", "null"], "enum": ["H1", None]},
+                "selected_statement_ids": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": list(statements)},
+                    "uniqueItems": True,
+                    "maxItems": len(statements),
+                },
+            },
+            "required": ["headline_id", "selected_statement_ids"],
+            "additionalProperties": False,
+        }
+        prompt = (
+            "Yalnız native schema nesnesini üret. Cümle yazma, cümleleri değiştirme, "
+            "yeni ID üretme. Kritik tüm statement ID'lerini birer kez seç ve güvenli sırada diz.\n"
+            "HEADLINES={'H1': 'Kesinti değerlendirmesi'}\nSTATEMENTS="
+            + json.dumps(statements, ensure_ascii=False)
+        )
+        return prompt, {"schema": schema, "statements": statements}
+
+    @classmethod
+    def _safe_statement_selection(
+        cls, provider: LLMProvider, contract: tuple[str, dict[str, object]]
+    ) -> str:
+        prompt, data = contract
+        response = provider.generate(request={"contents": prompt, "format_schema": data["schema"]})
+        if not isinstance(response, Mapping) or response.get("provider") != provider.provider_name:
+            raise ValueError("provider response is invalid")
+        if response.get("model") != provider.model_name or not isinstance(
+            response.get("content"), str
+        ):
+            raise ValueError("provider response is invalid")
+        try:
+            selection = json.loads(response["content"])
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("native schema response is not JSON") from exc
+        statements = data["statements"]
+        if not isinstance(statements, Mapping):
+            raise ValueError("statement contract is invalid")
+        cls._validate_statement_selection(selection, statements)
+        headline = "Kesinti değerlendirmesi" if selection["headline_id"] == "H1" else None
+        lines = [headline] if headline else []
+        lines.extend(
+            statements[statement_id] for statement_id in selection["selected_statement_ids"]
+        )
+        return "\n".join(lines)
+
+    @staticmethod
+    def _validate_statement_selection(selection: object, statements: Mapping[str, str]) -> None:
+        if not isinstance(selection, Mapping) or set(selection) != {
+            "headline_id",
+            "selected_statement_ids",
+        }:
+            raise ValueError("statement selection schema is invalid")
+        if selection["headline_id"] not in {"H1", None}:
+            raise ValueError("unknown headline ID")
+        selected = selection["selected_statement_ids"]
+        if not isinstance(selected, list) or not all(isinstance(item, str) for item in selected):
+            raise ValueError("statement selection IDs are invalid")
+        if len(selected) != len(set(selected)) or any(item not in statements for item in selected):
+            raise ValueError("unknown or duplicate statement ID")
+        # All candidates are canonical and critical; omission can hide an impact class.
+        if set(selected) != set(statements):
+            raise ValueError("critical statement missing")
 
     @staticmethod
     def _narrative_contract(result: ValidatedExecutionResult) -> str:

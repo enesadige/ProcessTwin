@@ -70,13 +70,14 @@ def test_ollama_provider_matches_registry_metadata_and_factory_without_network()
     }
 
 
-def test_request_body_has_fixed_model_thinking_and_stream_contract(settings):
+def test_request_body_has_fixed_model_thinking_stream_and_native_schema_contract(settings):
     provider, client, base_urls = provider_with_outcomes(settings, [success_response()])
-    request = {"contents": "Kisa ve guvenli yanit."}
+    schema = {"type": "object", "properties": {}, "additionalProperties": False}
+    request = {"contents": "Kisa ve guvenli yanit.", "format_schema": schema}
 
     response = provider.generate(request=request)
 
-    assert request == {"contents": "Kisa ve guvenli yanit."}
+    assert request == {"contents": "Kisa ve guvenli yanit.", "format_schema": schema}
     assert base_urls == [("http://127.0.0.1:11434", 30.0)]
     assert client.calls == [
         {
@@ -86,6 +87,9 @@ def test_request_body_has_fixed_model_thinking_and_stream_contract(settings):
                 "messages": [{"role": "user", "content": "Kisa ve guvenli yanit."}],
                 "think": False,
                 "stream": False,
+                "raw": False,
+                "options": {"temperature": 0},
+                "format": schema,
             },
         }
     ]
@@ -100,6 +104,11 @@ def test_request_body_has_fixed_model_thinking_and_stream_contract(settings):
             "total_tokens": 18,
             "available": True,
         },
+        "timings": {
+            "load_duration": None,
+            "prompt_eval_duration": None,
+            "eval_duration": None,
+        },
     }
 
 
@@ -111,6 +120,7 @@ def test_request_body_has_fixed_model_thinking_and_stream_contract(settings):
         {"contents": "safe", "model": "override"},
         {"contents": "safe", "think": True},
         {"contents": "safe", "stream": True},
+        {"contents": "safe", "format_schema": "override"},
     ],
 )
 def test_request_overrides_are_rejected_before_network(settings, input_data):

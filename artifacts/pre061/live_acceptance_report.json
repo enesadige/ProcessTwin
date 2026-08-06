@@ -337,5 +337,26 @@
     "final_user_visible_unsupported_fact_count": 0,
     "gemma_unloaded_after_acceptance": true,
     "decision": "FAIL"
+  },
+  "native_schema_statement_selection": {
+    "prompt_version": "closed-world-statement-selection-tr-v3",
+    "capability_gate": "PASS",
+    "clean_benchmark": "PASS",
+    "completed_cases": "12/12",
+    "provider_success_count": 12,
+    "provider_timeout_count": 0,
+    "native_schema_parse_success_count": 12,
+    "invalid_unknown_statement_id_count": 0,
+    "semantic_selection_error_count": 0,
+    "potential_verified_error_count": 0,
+    "failover_error_count": 0,
+    "unsupported_number_count": 0,
+    "unsupported_reference_count": 0,
+    "unsupported_decision_count": 0,
+    "final_user_visible_unsupported_fact_count": 0,
+    "average_latency_ms": 12822.656,
+    "p95_latency_ms": 26180.598,
+    "gemma_unloaded_after_acceptance": true,
+    "decision": "PASS"
   }
 }

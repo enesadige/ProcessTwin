@@ -31,15 +31,8 @@ from apps.orchestration.tool_plan import MCPServer
 
 SAFE_STRUCTURED_NARRATIVE = json.dumps(
     {
-        "summary": None,
-        "root_cause": "shared_upstream",
-        "impact_status": "potential_scope",
-        "impact_numbers": [5],
-        "failover_status": "primary_down_backup_healthy",
-        "decision": "eligible",
-        "references": ["CE-GPON-001", "REFUND-001"],
-        "citations": ["SYN-COMP-2026@2:Uygunluk koşulları"],
-        "uncertainty": None,
+        "headline_id": "H1",
+        "selected_statement_ids": [f"S{index}" for index in range(1, 11)],
     }
 )
 
@@ -203,8 +196,8 @@ def test_llm_assisted_mode_uses_only_safe_fact_sheet_and_preserves_deterministic
     assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
     assert response.provider == "recording"
     assert response.model == "recording-v1"
-    assert response.response_text.startswith("Kök neden: shared_upstream.")
-    assert "Potansiyel etki: 5 bağlantı." in response.response_text
+    assert response.response_text.startswith("Kesinti değerlendirmesi")
+    assert "Potansiyel kapsam: 5 bağlantı." in response.response_text
     prompt = provider.requests[0]["contents"]
     for value in ("CUST-001", "198.51.100.10", "original_query", "raw_payload", "token"):
         assert value not in prompt
@@ -215,8 +208,8 @@ def test_llm_assisted_mode_uses_only_safe_fact_sheet_and_preserves_deterministic
     "content",
     [
         "999 bağlantı etkilendi.",
-        '{"summary":null,"root_cause":"CE-UNKNOWN-999","impact_status":null,"impact_numbers":[],"failover_status":null,"decision":null,"references":[],"citations":[],"uncertainty":null}',
-        '{"summary":null,"root_cause":null,"impact_status":"verified_impacted","impact_numbers":[5],"failover_status":null,"decision":null,"references":[],"citations":[],"uncertainty":null}',
+        '{"headline_id":"H2","selected_statement_ids":["S1"]}',
+        '{"headline_id":"H1","selected_statement_ids":["S1","S1"]}',
     ],
 )
 def test_unsupported_llm_facts_use_deterministic_fallback(content):
@@ -255,32 +248,29 @@ def test_provider_failure_and_nonstructured_mock_narrative_are_safe_and_determin
 
 
 @pytest.mark.django_db
-def test_closed_world_semantic_guards_reject_impact_transform_and_full_outage_claim():
+def test_statement_selection_rejects_missing_or_unknown_canonical_ids():
     run = completed_run("response-semantic-guard")
     transformed = json.dumps(
         {
-            "summary": None,
-            "root_cause": None,
-            "impact_status": "verified_impacted",
-            "impact_numbers": [5],
-            "failover_status": None,
-            "decision": None,
-            "references": [],
-            "citations": [],
-            "uncertainty": None,
+            "headline_id": "H1",
+            "selected_statement_ids": ["S1"],
         }
     )
     full_outage = json.dumps(
         {
-            "summary": None,
-            "root_cause": None,
-            "impact_status": None,
-            "impact_numbers": [],
-            "failover_status": "full_outage",
-            "decision": None,
-            "references": [],
-            "citations": [],
-            "uncertainty": None,
+            "headline_id": "H1",
+            "selected_statement_ids": [
+                "S1",
+                "S2",
+                "S3",
+                "S4",
+                "S5",
+                "S6",
+                "S7",
+                "S8",
+                "S9",
+                "S999",
+            ],
         }
     )
     for content in (transformed, full_outage):

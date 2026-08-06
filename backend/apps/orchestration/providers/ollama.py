@@ -35,9 +35,9 @@ class OllamaLLMProvider(LLMProvider):
         self._client: Any | None = None
 
     def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
-        contents = self._validate_request(request)
+        contents, format_schema = self._validate_request(request)
         max_attempts = self._max_attempts()
-        payload = self._request_payload(contents)
+        payload = self._request_payload(contents, format_schema)
 
         for attempt in range(max_attempts):
             try:
@@ -54,9 +54,7 @@ class OllamaLLMProvider(LLMProvider):
             except OllamaLLMProviderError:
                 raise
             except httpx.TimeoutException as exc:
-                error = OllamaLLMProviderError(
-                    message="Ollama request timed out.", code="timeout"
-                )
+                error = OllamaLLMProviderError(message="Ollama request timed out.", code="timeout")
                 if attempt + 1 < max_attempts:
                     continue
                 raise error from exc
@@ -82,12 +80,12 @@ class OllamaLLMProvider(LLMProvider):
         return httpx.Client(base_url=base_url, timeout=timeout_seconds)
 
     @staticmethod
-    def _validate_request(request: Mapping[str, Any]) -> str:
+    def _validate_request(request: Mapping[str, Any]) -> tuple[str, Mapping[str, Any] | None]:
         if not isinstance(request, Mapping):
             raise OllamaLLMProviderError(
                 message="Ollama request must be an object.", code="invalid_request"
             )
-        if set(request) != {"contents"}:
+        if set(request) - {"contents", "format_schema"}:
             raise OllamaLLMProviderError(
                 message="Ollama request contains unsupported fields.", code="invalid_request"
             )
@@ -96,16 +94,28 @@ class OllamaLLMProvider(LLMProvider):
             raise OllamaLLMProviderError(
                 message="Ollama request contents are invalid.", code="invalid_request"
             )
-        return contents
+        format_schema = request.get("format_schema")
+        if format_schema is not None and not isinstance(format_schema, Mapping):
+            raise OllamaLLMProviderError(
+                message="Ollama format schema is invalid.", code="invalid_request"
+            )
+        return contents, format_schema
 
     @classmethod
-    def _request_payload(cls, contents: str) -> dict[str, Any]:
-        return {
+    def _request_payload(
+        cls, contents: str, format_schema: Mapping[str, Any] | None = None
+    ) -> dict[str, Any]:
+        payload: dict[str, Any] = {
             "model": cls.model_name,
             "messages": [{"role": "user", "content": contents}],
             "think": False,
             "stream": False,
+            "raw": False,
+            "options": {"temperature": 0},
         }
+        if format_schema is not None:
+            payload["format"] = dict(format_schema)
+        return payload
 
     @staticmethod
     def _base_url() -> str:
@@ -185,6 +195,7 @@ class OllamaLLMProvider(LLMProvider):
             "provider": self.provider_name,
             "model": self.model_name,
             "usage": self._usage(payload),
+            "timings": self._timings(payload),
         }
 
     @staticmethod
@@ -209,4 +220,13 @@ class OllamaLLMProvider(LLMProvider):
             "output_tokens": output_tokens,
             "total_tokens": input_tokens + output_tokens,
             "available": True,
+        }
+
+    @staticmethod
+    def _timings(payload: Mapping[str, Any]) -> dict[str, int | None]:
+        """Keep non-sensitive Ollama timing telemetry when the server supplies it."""
+        fields = ("load_duration", "prompt_eval_duration", "eval_duration")
+        return {
+            field: value if isinstance(value := payload.get(field), int) and value >= 0 else None
+            for field in fields
         }

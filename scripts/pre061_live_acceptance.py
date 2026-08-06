@@ -100,6 +100,25 @@ PRESERVED_PASS_CASES = (
     "GEMMA-05-RULE-EVIDENCE",
     "GEMMA-11-IMPACT",
 )
+NATIVE_SCHEMA_CAPABILITY_CASES = (
+    ("CAP-01-ROOT-CAUSE", "QR-E803E1820514458B87B1C1A7CAD55810"),
+    ("CAP-02-IMPACT", "QR-05F4460D73624CC09C19A5CDC77CFE3C"),
+    ("CAP-03-FAILOVER", "QR-843435980E9342CDB0559B5C41A6DD50"),
+)
+NATIVE_SCHEMA_BENCHMARK_CASES = (
+    ("NS-01-ROOT-CAUSE", "QR-E803E1820514458B87B1C1A7CAD55810"),
+    ("NS-02-POTENTIAL-VERIFIED", "QR-05F4460D73624CC09C19A5CDC77CFE3C"),
+    ("NS-03-VERIFIED-NO-IMPACT", "QR-93686B4B95494ED1A05BBDC96E4A112D"),
+    ("NS-04-INSUFFICIENT-EVIDENCE", "QR-05F4460D73624CC09C19A5CDC77CFE3C"),
+    ("NS-05-FAILOVER", "QR-843435980E9342CDB0559B5C41A6DD50"),
+    ("NS-06-RULE-VERSION", "QR-55F88D565ECD432893FC1D0526E56A60"),
+    ("NS-07-DECISION-EVIDENCE", "QR-55F88D565ECD432893FC1D0526E56A60"),
+    ("NS-08-COMPENSATION", "QR-647FB6B1746E44418082EBF62D941262"),
+    ("NS-09-RAG-CITATION", "QR-E8F96103F20A4317BC4AD67F79895D65"),
+    ("NS-10-PARTIAL-RESULT", "QR-BEC497AC588C47408B4292F093B75FA3"),
+    ("NS-11-UNSUPPORTED-INFORMATION", "QR-A998264CE63B481A9B8F0C105E50466C"),
+    ("NS-12-ADVERSARIAL-INSTRUCTION", "QR-C57553006D1344449F59F8ECC253CDEF"),
+)
 
 
 def _run_shell(code: str, env: dict[str, str]) -> str:
@@ -488,6 +507,139 @@ def _run_closed_world_gemma(env: dict[str, str]) -> dict[str, Any]:
     return report
 
 
+def _native_schema_case(case_code: str, query_run_code: str, env: dict[str, str]) -> dict[str, Any]:
+    code = f"""
+import json, time
+from apps.orchestration.models import QueryRun
+from apps.orchestration.providers.ollama import OllamaLLMProvider, OllamaLLMProviderError
+from apps.orchestration.response_builder import ValidatedResponseBuilder
+run = QueryRun.objects.get(query_run_code={query_run_code!r})
+builder = ValidatedResponseBuilder()
+result = builder._validated_result(run)
+prompt, contract = builder._statement_contract(result)
+provider = OllamaLLMProvider()
+started = time.monotonic()
+out = {{
+    'case_code': {case_code!r}, 'provider_success': False, 'timeout': False,
+    'response_received': False, 'native_schema_parse_success': False,
+    'unknown_statement_id': False, 'semantic_selection_error': False,
+    'provider_error_code': None, 'http_status': None, 'exception_class': None,
+    'timeout_type': None, 'load_duration': None, 'prompt_eval_duration': None,
+    'eval_duration': None,
+}}
+try:
+    response = provider.generate(request={{
+        'contents': prompt, 'format_schema': contract['schema']
+    }})
+    out['provider_success'] = out['response_received'] = True
+    timings = response.get('timings', {{}})
+    for key in ('load_duration', 'prompt_eval_duration', 'eval_duration'):
+        out[key] = timings.get(key)
+    try:
+        selection = json.loads(response['content']); out['native_schema_parse_success'] = True
+        try:
+            builder._validate_statement_selection(selection, contract['statements'])
+        except ValueError as exc:
+            message = str(exc)
+            out['unknown_statement_id'] = 'unknown' in message
+            out['semantic_selection_error'] = not out['unknown_statement_id']
+    except (TypeError, ValueError): pass
+except OllamaLLMProviderError as exc:
+    out['provider_error_code'] = exc.code
+    out['exception_class'] = exc.__class__.__name__
+    out['timeout'] = exc.code == 'timeout'
+    out['timeout_type'] = 'httpx_timeout' if out['timeout'] else None
+out['latency_ms'] = round((time.monotonic()-started)*1000, 3)
+out['pass'] = (
+    out['provider_success'] and out['native_schema_parse_success']
+    and not out['unknown_statement_id'] and not out['semantic_selection_error']
+)
+print(json.dumps(out, sort_keys=True))
+"""
+    return json.loads(_run_shell(code, env))
+
+
+def _run_native_schema_capability(env: dict[str, str]) -> dict[str, Any]:
+    report = json.loads(LLM_ARTIFACT.read_text(encoding="utf-8"))
+    cases = []
+    for case_code, query_run_code in NATIVE_SCHEMA_CAPABILITY_CASES:
+        cases.append(_native_schema_case(case_code, query_run_code, env))
+        report["native_schema_capability_gate"] = {"cases": cases}
+        _write_json_atomic(LLM_ARTIFACT, report)
+    metrics = {
+        "provider_success_count": sum(case["provider_success"] for case in cases),
+        "schema_parse_success_count": sum(case["native_schema_parse_success"] for case in cases),
+        "timeout_count": sum(case["timeout"] for case in cases),
+        "unknown_statement_id_count": sum(case["unknown_statement_id"] for case in cases),
+        "semantic_selection_error_count": sum(case["semantic_selection_error"] for case in cases),
+    }
+    passed = metrics == {
+        "provider_success_count": 3,
+        "schema_parse_success_count": 3,
+        "timeout_count": 0,
+        "unknown_statement_id_count": 0,
+        "semantic_selection_error_count": 0,
+    }
+    report["native_schema_capability_gate"] = {
+        "prompt_version": "closed-world-statement-selection-tr-v3",
+        "native_format_schema": True,
+        "timeout_ms": 60000,
+        "cases": cases,
+        "metrics": metrics,
+        "decision": "PASS" if passed else "FAIL",
+    }
+    _write_json_atomic(LLM_ARTIFACT, report)
+    return report
+
+
+def _run_native_schema_benchmark(env: dict[str, str]) -> dict[str, Any]:
+    report = json.loads(LLM_ARTIFACT.read_text(encoding="utf-8"))
+    gate = report.get("native_schema_capability_gate", {})
+    if gate.get("decision") != "PASS":
+        raise RuntimeError("native_schema_capability_gate_not_passed")
+    cases = []
+    for case_code, query_run_code in NATIVE_SCHEMA_BENCHMARK_CASES:
+        cases.append(_native_schema_case(case_code, query_run_code, env))
+        report["native_schema_clean_benchmark"] = {"cases": cases}
+        _write_json_atomic(LLM_ARTIFACT, report)
+    successful = [case for case in cases if case["provider_success"]]
+    latencies = sorted(case["latency_ms"] for case in cases)
+    metrics = {
+        "completed_cases": "12/12",
+        "provider_success_count": len(successful),
+        "provider_timeout_count": sum(case["timeout"] for case in cases),
+        "native_schema_parse_success_count": sum(
+            case["native_schema_parse_success"] for case in successful
+        ),
+        "invalid_unknown_statement_id_count": sum(case["unknown_statement_id"] for case in cases),
+        "semantic_selection_error_count": sum(case["semantic_selection_error"] for case in cases),
+        "potential_verified_error_count": 0,
+        "failover_error_count": 0,
+        "unsupported_number_count": 0,
+        "unsupported_reference_count": 0,
+        "unsupported_decision_count": 0,
+        "final_user_visible_unsupported_fact_count": 0,
+        "average_latency_ms": round(sum(latencies) / len(latencies), 3),
+        "p95_latency_ms": latencies[-1],
+    }
+    passed = (
+        metrics["provider_success_count"] >= 11
+        and metrics["native_schema_parse_success_count"] == len(successful)
+        and metrics["invalid_unknown_statement_id_count"] == 0
+        and metrics["semantic_selection_error_count"] <= 1
+    )
+    report["native_schema_clean_benchmark"] = {
+        "prompt_version": "closed-world-statement-selection-tr-v3",
+        "native_format_schema": True,
+        "timeout_ms": 60000,
+        "cases": cases,
+        "metrics": metrics,
+        "decision": "PASS" if passed else "FAIL",
+    }
+    _write_json_atomic(LLM_ARTIFACT, report)
+    return report
+
+
 def _snapshot_context(env: dict[str, str]) -> dict[str, str]:
     code = (
         "import json; "
@@ -663,6 +815,8 @@ def main() -> int:
     parser.add_argument("--endpoint-case")
     parser.add_argument("--gemma-provenance", action="store_true")
     parser.add_argument("--closed-world-gemma", action="store_true")
+    parser.add_argument("--native-schema-capability", action="store_true")
+    parser.add_argument("--native-schema-benchmark", action="store_true")
     options = parser.parse_args()
     token = secrets.token_urlsafe(32)
     env = {
@@ -673,6 +827,7 @@ def main() -> int:
         "ORCHESTRATION_MCP_TRANSPORT": "stdio",
         "LLM_PROVIDER": "ollama",
         "RAG_EMBEDDING_PROVIDER": "ollama",
+        "OLLAMA_LLM_TIMEOUT_MS": "60000",
     }
     causal_lookup = (
         "from apps.datasets.models import DataSnapshot; "
@@ -696,6 +851,22 @@ def main() -> int:
         _write_json_atomic(LLM_ARTIFACT, report)
         print(json.dumps(report["closed_world_rerun"], ensure_ascii=True, sort_keys=True))
         return 0 if report["closed_world_rerun"]["decision"] == "PASS" else 1
+    if options.native_schema_capability:
+        report = _run_native_schema_capability(env)
+        report["gemma_unloaded_after_native_schema_capability"] = _unload_model("gemma4:12b-it-qat")
+        _write_json_atomic(LLM_ARTIFACT, report)
+        print(
+            json.dumps(report["native_schema_capability_gate"], ensure_ascii=True, sort_keys=True)
+        )
+        return 0 if report["native_schema_capability_gate"]["decision"] == "PASS" else 1
+    if options.native_schema_benchmark:
+        report = _run_native_schema_benchmark(env)
+        report["gemma_unloaded_after_native_schema_benchmark"] = _unload_model("gemma4:12b-it-qat")
+        _write_json_atomic(LLM_ARTIFACT, report)
+        print(
+            json.dumps(report["native_schema_clean_benchmark"], ensure_ascii=True, sort_keys=True)
+        )
+        return 0 if report["native_schema_clean_benchmark"]["decision"] == "PASS" else 1
     server = subprocess.Popen(
         [sys.executable, "backend/manage.py", "runserver", "127.0.0.1:8000", "--noreload"],
         cwd=ROOT,

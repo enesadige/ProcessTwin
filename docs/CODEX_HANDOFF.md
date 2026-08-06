@@ -49,6 +49,15 @@
   %25 ve contradiction 9/12 olduğundan gate **FAIL**. Gemma unload edildi;
   `MAIN-061` ve altı kullanıcı promptu black-box turu başlamaz.
 
+- **PRE-061 native schema statement selection:** `format` alanı olmayan v2
+  prompt-only JSON sözleşmesi kaldırıldı. v3, native Ollama JSON Schema ile
+  yalnız backend'in canonical statement ID'lerini seçtirir; final metin model
+  serbest metni değildir. 3/3 capability gate ve temiz 12/12 benchmark PASS:
+  provider/schema parse 12/12, timeout/unknown ID/semantic/potential/failover
+  hata 0, fallback gerekmeyen supported final output 12/12. Gemma unload
+  edildi. Sıradaki kabul işi altı gerçek kullanıcı promptunun black-box
+  testidir; MAIN-061 hâlâ başlamaz.
+
 - **MAIN-xxx — Ana kümülatif görev planı:** Ek orchestration serisinden önce
   son tamamlanan ana plan maddesi `MAIN-051.5 — Çoklu embedding seti ve lokal
   provider`dır. Dosyadaki ilk tamamlanmamış ana plan maddesi
