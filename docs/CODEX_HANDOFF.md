@@ -194,8 +194,10 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
   REV-12 full suite sonucu 667 passed; MCP tool sayıları 9/7/8/6, RAG manifest
   13 ve benchmark 25'tir. Native multi-city/RAG gates eski snapshot data
   precondition'larında güvenli biçimde durdu; yeni canlı sayı iddia edilmedi.
-  Ana plan takibinde sıradaki görev `MAIN-061 — Frontend uygulama kabuğunu
-  tasarla`dır; `ORCH-052–ORCH-060` tamamlanmış ek seridir.
+  Ana plan takibinde 052–060 tamamlanmıştır. `PRE-061 — Live RAG + MCP + LLM
+  Core Acceptance Gate` gerçek yerel smoke yolunu doğruladı fakat kapsamlı
+  benchmark/citation kabul eşiği henüz tamamlanmadığı için **FAIL** durumundadır.
+  `MAIN-061 — Frontend uygulama kabuğunu tasarla` başlatılmamalıdır.
 
 ## 12. Açık Sorular
 

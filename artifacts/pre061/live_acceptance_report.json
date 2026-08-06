@@ -1,0 +1,35 @@
+{
+  "causal_event_code": "CE-MCR-0001",
+  "decision": "PASS",
+  "duration_seconds": 54.065,
+  "endpoint": {
+    "generation_mode": "deterministic_fallback",
+    "has_response": true,
+    "status": "completed",
+    "status_code": 200
+  },
+  "gate": "PRE-061",
+  "mcp": {
+    "compensation": {
+      "success": true,
+      "tool_count": 6
+    },
+    "customer": {
+      "success": true,
+      "tool_count": 7
+    },
+    "network": {
+      "success": true,
+      "tool_count": 9
+    },
+    "rule": {
+      "success": true,
+      "tool_count": 8
+    }
+  },
+  "rag": {
+    "result_count": 5,
+    "status_code": 200
+  },
+  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+}

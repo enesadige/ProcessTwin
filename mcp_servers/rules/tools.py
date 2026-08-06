@@ -231,6 +231,8 @@ class RuleMCPTools:
         backend_metadata = payload.get("metadata", {})
         data = self._response_data(tool_name, payload)
         snapshot_details = backend_metadata.get("snapshot", {}) or data.get("snapshot", {})
+        if not isinstance(snapshot_details, dict):
+            snapshot_details = {"snapshot_key": snapshot_details}
         metadata = MCPMetadata(
             tool_name=f"rules.{tool_name}",
             tool_version=RULE_MCP_VERSION,

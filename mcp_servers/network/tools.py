@@ -250,6 +250,8 @@ class NetworkMCPTools:
     ) -> MCPToolResponse[dict[str, Any]]:
         backend_metadata = payload.get("metadata", {})
         snapshot_details = backend_metadata.get("snapshot", {})
+        if not isinstance(snapshot_details, dict):
+            snapshot_details = {"snapshot_key": snapshot_details}
         metadata = MCPMetadata(
             tool_name=f"network.{tool_name}",
             tool_version=NETWORK_MCP_VERSION,

@@ -10,6 +10,7 @@ from enum import StrEnum
 from time import monotonic
 from typing import Any, Protocol
 
+from django.conf import settings
 from django.db import transaction
 from mcp_servers.compensation.tools import CompensationMCPTools
 from mcp_servers.customer.tools import CustomerMCPTools
@@ -22,6 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from apps.core.correlation import is_valid_correlation_id
 from apps.orchestration.models import TERMINAL_QUERY_RUN_STATUSES, QueryRun, QueryRunStatus
 from apps.orchestration.services import QueryRunError, QueryRunService, sanitize_text
+from apps.orchestration.stdio_runner import StdioMCPToolRunner
 from apps.orchestration.tool_plan import MCP_TOOL_REGISTRIES, MCPServer, ToolCall, ToolPlan
 
 DEFAULT_MAX_ATTEMPTS = 2
@@ -167,6 +169,8 @@ class ToolExecutor:
     ) -> ExecutorResult:
         plan = tool_plan if isinstance(tool_plan, ToolPlan) else ToolPlan.model_validate(tool_plan)
         prepared = self._prepare_execution(query_run=query_run, tool_plan=plan)
+        # The facade retains its original instance for result finalization.
+        query_run.refresh_from_db()
         results = dict(prepared.existing_results)
 
         for call in plan.calls:
@@ -325,6 +329,11 @@ class ToolExecutor:
 
     def _runner_for(self, server: MCPServer) -> MCPToolRunner:
         if self._tool_runners is None:
+            if getattr(settings, "ORCHESTRATION_MCP_TRANSPORT", "direct") == "stdio":
+                self._tool_runners = {
+                    item: StdioMCPToolRunner(item) for item in MCPServer
+                }
+                return self._tool_runners[server]
             config = InternalAPIClientConfig.from_env()
             client = InternalAPIClient(config=config)
             self._tool_runners = {
