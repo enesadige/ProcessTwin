@@ -1,7 +1,7 @@
 {
   "causal_event_code": "CE-MCR-0001",
   "decision": "PASS",
-  "duration_seconds": 54.065,
+  "duration_seconds": 96.034,
   "endpoint": {
     "generation_mode": "deterministic_fallback",
     "has_response": true,
@@ -27,9 +27,277 @@
       "tool_count": 8
     }
   },
+  "qwen_unloaded_before_gemma": true,
   "rag": {
     "result_count": 5,
     "status_code": 200
+  },
+  "retrieval_benchmark": {
+    "average_latency_ms": 2209.851,
+    "case_count": 15,
+    "cases": [
+      {
+        "benchmark_case_code": "RAG-01",
+        "citation_support": true,
+        "expected_source": "SYN-ALARM-CATALOG-2026",
+        "latency_ms": 2396.896,
+        "snapshot_leakage": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
+        "top_sources": [
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-OPERATIONS-LIFECYCLE-2026",
+          "SYN-CAUSAL-ANALYSIS-2026"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-02",
+        "citation_support": true,
+        "expected_source": "SYN-ALARM-CATALOG-2026",
+        "latency_ms": 2252.895,
+        "snapshot_leakage": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
+        "top_sources": [
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-CAUSAL-ANALYSIS-2026",
+          "SYN-OPERATIONS-LIFECYCLE-2026",
+          "SYN-CAUSAL-ANALYSIS-2026",
+          "SYN-OPERATIONS-LIFECYCLE-2026"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-03",
+        "citation_support": true,
+        "expected_source": "SYN-ALARM-CATALOG-2026",
+        "latency_ms": 2305.664,
+        "snapshot_leakage": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
+        "top_sources": [
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-CAUSAL-ANALYSIS-2026",
+          "SYN-OPERATIONS-LIFECYCLE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-04",
+        "citation_support": true,
+        "expected_source": "SYN-ALARM-CATALOG-2026",
+        "latency_ms": 1941.957,
+        "snapshot_leakage": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
+        "top_sources": [
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-CAUSAL-ANALYSIS-2026",
+          "SYN-OPERATIONS-LIFECYCLE-2026"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-05",
+        "citation_support": true,
+        "expected_source": "SYN-COMP-2026-ELIGIBILITY",
+        "latency_ms": 1921.608,
+        "snapshot_leakage": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
+        "top_sources": [
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-CAUSAL-ANALYSIS-2026",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-06",
+        "citation_support": false,
+        "expected_source": "SYN-COMP-2026-ELIGIBILITY",
+        "latency_ms": 2336.257,
+        "snapshot_leakage": false,
+        "top_1_hit": false,
+        "top_3_hit": false,
+        "top_5_hit": false,
+        "top_sources": [
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-07",
+        "citation_support": true,
+        "expected_source": "SYN-COMP-2026-ELIGIBILITY",
+        "latency_ms": 2260.576,
+        "snapshot_leakage": false,
+        "top_1_hit": true,
+        "top_3_hit": true,
+        "top_5_hit": true,
+        "top_sources": [
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-CAUSAL-ANALYSIS-2026",
+          "SYN-COMP-2026-ELIGIBILITY"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-08",
+        "citation_support": false,
+        "expected_source": "SYN-COMP-2026-BROADBAND",
+        "latency_ms": 2435.219,
+        "snapshot_leakage": false,
+        "top_1_hit": false,
+        "top_3_hit": false,
+        "top_5_hit": false,
+        "top_sources": [
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-CAUSAL-ANALYSIS-2026",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-09",
+        "citation_support": false,
+        "expected_source": "SYN-COMP-2026-BROADBAND",
+        "latency_ms": 1898.25,
+        "snapshot_leakage": false,
+        "top_1_hit": false,
+        "top_3_hit": false,
+        "top_5_hit": false,
+        "top_sources": [
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-OPERATIONS-LIFECYCLE-2026"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-10",
+        "citation_support": false,
+        "expected_source": "SYN-COMP-2026-BROADBAND",
+        "latency_ms": 2156.165,
+        "snapshot_leakage": false,
+        "top_1_hit": false,
+        "top_3_hit": false,
+        "top_5_hit": false,
+        "top_sources": [
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-COMP-2026-ELIGIBILITY"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-11",
+        "citation_support": false,
+        "expected_source": "SYN-COMP-2026-METRO-SLA",
+        "latency_ms": 2190.372,
+        "snapshot_leakage": false,
+        "top_1_hit": false,
+        "top_3_hit": false,
+        "top_5_hit": false,
+        "top_sources": [
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-OPERATIONS-LIFECYCLE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-12",
+        "citation_support": false,
+        "expected_source": "SYN-COMP-2026-METRO-SLA",
+        "latency_ms": 2070.494,
+        "snapshot_leakage": false,
+        "top_1_hit": false,
+        "top_3_hit": false,
+        "top_5_hit": false,
+        "top_sources": [
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-ALARM-CATALOG-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-13",
+        "citation_support": false,
+        "expected_source": "SYN-COMP-2026-OVERVIEW",
+        "latency_ms": 2575.598,
+        "snapshot_leakage": false,
+        "top_1_hit": false,
+        "top_3_hit": false,
+        "top_5_hit": false,
+        "top_sources": [
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-COMP-2026-ELIGIBILITY"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-14",
+        "citation_support": false,
+        "expected_source": "SYN-COMP-2026-OVERVIEW",
+        "latency_ms": 2520.506,
+        "snapshot_leakage": false,
+        "top_1_hit": false,
+        "top_3_hit": false,
+        "top_5_hit": false,
+        "top_sources": [
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-FAILOVER-MAINTENANCE-2026"
+        ]
+      },
+      {
+        "benchmark_case_code": "RAG-15",
+        "citation_support": false,
+        "expected_source": "SYN-COMP-2026-REVIEW-CAPS",
+        "latency_ms": 1885.301,
+        "snapshot_leakage": false,
+        "top_1_hit": false,
+        "top_3_hit": false,
+        "top_5_hit": false,
+        "top_sources": [
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-COMP-2026-ELIGIBILITY",
+          "SYN-FAILOVER-MAINTENANCE-2026",
+          "SYN-COMP-2026-ELIGIBILITY"
+        ]
+      }
+    ],
+    "critical_citation_mismatch_count": 9,
+    "p95_latency_ms": 2520.506,
+    "snapshot_leakage_count": 0,
+    "top_1_hit_rate": 0.4,
+    "top_3_hit_rate": 0.4,
+    "top_5_hit_rate": 0.4
   },
   "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
 }

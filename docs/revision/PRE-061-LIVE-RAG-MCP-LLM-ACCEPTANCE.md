@@ -45,3 +45,17 @@ the gate's full acceptance threshold. `MAIN-061` must not start from this gate.
 The machine-readable smoke artifact is
 `artifacts/pre061/live_acceptance_report.json`; it contains only public codes,
 counts, statuses, and timings.
+
+## Extended Run: Retrieval Benchmark
+
+The second live run reused the existing 23 corpus embeddings and executed 15
+real Qwen hybrid queries before a graceful Qwen unload. It recorded **0.40**
+top-1, **0.40** top-3, and **0.40** top-5 expected-source hit rates; 9 cases
+had a critical citation mismatch. Snapshot leakage remained **0**. Average
+latency was 2209.851 ms and p95 was 2520.506 ms.
+
+This is a real retrieval-quality failure, not a mock limitation. The causal
+snapshot has only 23 scoped chunks while retrieval also surfaces active global
+documents; the acceptance criteria require corpus/metadata/hybrid-ranking work
+before the remaining Gemma, Gemini, and endpoint scenario benchmarks can be
+meaningfully accepted. Qwen and Gemma were gracefully unloaded after the run.

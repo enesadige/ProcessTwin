@@ -46,6 +46,23 @@ MCP_CALLS = {
         lambda code: {"snapshot_identifier": SNAPSHOT, "causal_event_code": code},
     ),
 }
+RETRIEVAL_CASES = (
+    ("RAG-01", "OLT PON port arızası alarm korelasyonu", "SYN-ALARM-CATALOG-2026"),
+    ("RAG-02", "Dying Gasp semptom alarmıdır", "SYN-ALARM-CATALOG-2026"),
+    ("RAG-03", "Device Not Active otomatik kök neden değildir", "SYN-ALARM-CATALOG-2026"),
+    ("RAG-04", "GPON LOS optical signal degradation", "SYN-ALARM-CATALOG-2026"),
+    ("RAG-05", "potential ve verified impact ayrımı", "SYN-COMP-2026-ELIGIBILITY"),
+    ("RAG-06", "failover protected bağlantı tam kesinti değildir", "SYN-COMP-2026-ELIGIBILITY"),
+    ("RAG-07", "kanıt yetersizliği değerlendirmesi", "SYN-COMP-2026-ELIGIBILITY"),
+    ("RAG-08", "verified impact compensation için zorunludur", "SYN-COMP-2026-BROADBAND"),
+    ("RAG-09", "RuleVersion ve DecisionEvidence", "SYN-COMP-2026-BROADBAND"),
+    ("RAG-10", "broadband full outage eligibility", "SYN-COMP-2026-BROADBAND"),
+    ("RAG-11", "Metro Ethernet SLA degradation", "SYN-COMP-2026-METRO-SLA"),
+    ("RAG-12", "dedicated port degradation telafi", "SYN-COMP-2026-METRO-SLA"),
+    ("RAG-13", "sentetik telafi politikası kapsamı", "SYN-COMP-2026-OVERVIEW"),
+    ("RAG-14", "telafi politika dokümanı", "SYN-COMP-2026-OVERVIEW"),
+    ("RAG-15", "manual review sınırları", "SYN-COMP-2026-REVIEW-CAPS"),
+)
 
 
 def _run_shell(code: str, env: dict[str, str]) -> str:
@@ -102,6 +119,66 @@ def _wait_ready(token: str) -> None:
     raise RuntimeError("backend_not_ready")
 
 
+def _retrieval_benchmark(headers: dict[str, str]) -> dict[str, Any]:
+    cases = []
+    for case_code, query, expected_source in RETRIEVAL_CASES:
+        started = time.monotonic()
+        response = httpx.post(
+            "http://127.0.0.1:8000/api/internal/v1/rag/search/",
+            headers=headers,
+            json={
+                "query": query,
+                "snapshot_identifier": SNAPSHOT,
+                "search_mode": "hybrid",
+                "top_k": 5,
+                "include_scores": True,
+            },
+            timeout=90,
+        )
+        payload = response.json().get("data", {}) if response.status_code == 200 else {}
+        results = payload.get("results", [])
+        sources = [item.get("document_code") for item in results]
+        leakage = any(item.get("snapshot_key") not in {SNAPSHOT, None} for item in results)
+        cases.append(
+            {
+                "benchmark_case_code": case_code,
+                "expected_source": expected_source,
+                "top_sources": sources,
+                "top_1_hit": bool(sources[:1] == [expected_source]),
+                "top_3_hit": expected_source in sources[:3],
+                "top_5_hit": expected_source in sources,
+                "citation_support": expected_source in sources,
+                "snapshot_leakage": leakage,
+                "latency_ms": round((time.monotonic() - started) * 1000, 3),
+            }
+        )
+    total = len(cases)
+    percentile_index = max(0, min(total - 1, round(total * 0.95) - 1))
+    latencies = sorted(case["latency_ms"] for case in cases)
+    return {
+        "case_count": total,
+        "top_1_hit_rate": sum(case["top_1_hit"] for case in cases) / total,
+        "top_3_hit_rate": sum(case["top_3_hit"] for case in cases) / total,
+        "top_5_hit_rate": sum(case["top_5_hit"] for case in cases) / total,
+        "critical_citation_mismatch_count": sum(
+            not case["citation_support"] for case in cases
+        ),
+        "snapshot_leakage_count": sum(case["snapshot_leakage"] for case in cases),
+        "average_latency_ms": round(sum(latencies) / total, 3),
+        "p95_latency_ms": latencies[percentile_index],
+        "cases": cases,
+    }
+
+
+def _unload_model(model: str) -> bool:
+    subprocess.run(["ollama", "stop", model], check=False, capture_output=True, text=True)
+    time.sleep(2)
+    output = subprocess.run(
+        ["ollama", "ps"], check=True, capture_output=True, text=True
+    ).stdout
+    return model not in output
+
+
 def main() -> int:
     token = secrets.token_urlsafe(32)
     env = {
@@ -155,6 +232,8 @@ def main() -> int:
             if rag.headers.get("content-type", "").startswith("application/json")
             else 0,
         }
+        report["retrieval_benchmark"] = _retrieval_benchmark(headers)
+        report["qwen_unloaded_before_gemma"] = _unload_model("qwen3-embedding:4b")
         report["mcp"] = {
             key: asyncio.run(
                 _mcp_call(module, token, *MCP_CALLS[key][:1], MCP_CALLS[key][1](causal_code))
