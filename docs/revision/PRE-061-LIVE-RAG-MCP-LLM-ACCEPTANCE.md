@@ -94,3 +94,29 @@ The final persisted run reached top-1 **73.33%**, top-3 **93.33%**, top-5
 **100%**, zero citation mismatches, and zero leakage (average 1655.490 ms,
 p95 1747.204 ms). The PRE-061 retrieval stage is **PASS**; Gemma/Gemini
 acceptance may proceed in its dedicated phase.
+
+## Final Live LLM Attempt
+
+**Overall PRE-061 decision: FAIL.** Retrieval remains PASS, but the mandatory
+live LLM and endpoint acceptance matrix is incomplete; `MAIN-061` must not
+start from this gate.
+
+- One real Gemma call used the completed QueryRun's privacy-safe fact sheet
+  through `OllamaLLMProvider` (`gemma4:12b-it-qat`, `think:false`,
+  `stream:false`). The provider response contract was valid, but the narrative
+  introduced a public reference absent from the fact sheet. The fact guard
+  correctly rejected it and the user-visible path remains deterministic
+  fallback. This is a model narrative failure, not a guard false positive.
+- The required 12-case Gemma narrative/adversarial matrix was not completed,
+  so its acceptance, contradiction, fallback, and final-output rates cannot
+  be claimed.
+- `GEMINI_API_KEY` was configured. One real `gemini-3.5-flash` adapter smoke
+  attempt returned the redacted stable provider code `invalid_request`; no
+  credential, prompt, or provider body was recorded. The required four-case
+  Gemini smoke matrix therefore remains blocked.
+- The prior real stdio MCP/Internal API/Gemma endpoint smoke remains recorded,
+  but only one of the required ten endpoint scenarios has live evidence. The
+  current planner also returns clarification for rule-document retrieval, so
+  a real endpoint RAG-citation case cannot yet satisfy the requested matrix.
+- Qwen was not resident at phase start. Gemma was gracefully unloaded after
+  the diagnostic; no simultaneous Qwen/Gemma residency was observed.
