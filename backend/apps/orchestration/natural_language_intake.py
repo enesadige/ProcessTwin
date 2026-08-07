@@ -102,7 +102,16 @@ class DeterministicStructuredQueryParser:
         causal_event_code = self._extract_code(_CAUSAL_CODE_RE, text)
         outage_code = self._extract_code(_OUTAGE_CODE_RE, text)
         subscription_reference = self._extract_code(_SUBSCRIPTION_RE, text)
-        self._validate_references(snapshot, causal_event_code, outage_code, subscription_reference)
+        device_code = self._extract_device_code(snapshot, text)
+        self._validate_references(
+            snapshot,
+            causal_event_code,
+            outage_code,
+            subscription_reference,
+            device_code,
+        )
+        if device_code and causal_event_code is None and outage_code is None:
+            causal_event_code = self._causal_event_for_device(snapshot, device_code)
         location, ambiguous_location = self._resolve_location(snapshot, folded)
         dates = _DATE_RE.findall(text)
         intent, requested_outputs = self._intent_and_outputs(folded)
@@ -112,6 +121,7 @@ class DeterministicStructuredQueryParser:
             causal_event_code=causal_event_code,
             outage_code=outage_code,
             subscription_reference=subscription_reference,
+            device_code=device_code,
             location=location,
             dates=dates,
             ambiguous_location=ambiguous_location,
@@ -130,6 +140,7 @@ class DeterministicStructuredQueryParser:
                 "snapshot_identifier": snapshot.snapshot_key,
                 "causal_event_code": causal_event_code,
                 "outage_code": outage_code,
+                "device_code": device_code,
                 "subscription_reference": subscription_reference,
                 "decision_type": decision_type,
                 "location": location,
@@ -153,17 +164,64 @@ class DeterministicStructuredQueryParser:
         return match.group(0).upper() if match else None
 
     @staticmethod
+    def _extract_device_code(snapshot: DataSnapshot, text: str) -> str | None:
+        """Return one exact, canonical snapshot device code mentioned by the user."""
+        from apps.network.models import NetworkDevice
+
+        matches = [
+            code
+            for code in NetworkDevice.objects.filter(data_snapshot=snapshot)
+            .order_by("code")
+            .values_list("code", flat=True)
+            if re.search(
+                rf"(?<![A-Z0-9_-]){re.escape(code)}(?![A-Z0-9_-])",
+                text,
+                flags=re.IGNORECASE,
+            )
+        ]
+        return matches[0] if len(matches) == 1 else None
+
+    @staticmethod
+    def _causal_event_for_device(snapshot: DataSnapshot, device_code: str) -> str | None:
+        """Resolve an unambiguous device-rooted event without inventing scope."""
+        from apps.operations.models import CausalEvent, Outage
+
+        events = list(
+            CausalEvent.objects.filter(data_snapshot=snapshot, root_device__code=device_code)
+            .order_by("event_code")
+            .values_list("event_code", flat=True)[:2]
+        )
+        if len(events) == 1:
+            return events[0]
+        outages = list(
+            Outage.objects.filter(
+                data_snapshot=snapshot,
+                source_device__code=device_code,
+                causal_event__isnull=False,
+            )
+            .order_by("outage_code")
+            .values_list("causal_event__event_code", flat=True)[:2]
+        )
+        return outages[0] if len(outages) == 1 else None
+
+    @staticmethod
     def _validate_references(
         snapshot: DataSnapshot,
         causal_event_code: str | None,
         outage_code: str | None,
         subscription_reference: str | None,
+        device_code: str | None,
     ) -> None:
         if (
             causal_event_code
             and not CausalEvent.objects.filter(
                 data_snapshot=snapshot, event_code=causal_event_code
             ).exists()
+        ):
+            raise NaturalLanguageQueryParseError("reference_not_found")
+        if (
+            device_code
+            and not NetworkDevice.objects.filter(data_snapshot=snapshot, code=device_code).exists()
         ):
             raise NaturalLanguageQueryParseError("reference_not_found")
         if (
@@ -265,7 +323,9 @@ class DeterministicStructuredQueryParser:
     @staticmethod
     def _missing_fields(**values: object) -> list[MissingField]:
         intent = values["intent"]
-        anchors = bool(values["causal_event_code"] or values["outage_code"])
+        anchors = bool(
+            values["causal_event_code"] or values["outage_code"] or values["device_code"]
+        )
         if (
             intent == StructuredQueryIntent.OUTAGE_IMPACT
             and values["location"] is not None

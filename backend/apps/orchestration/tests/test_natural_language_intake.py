@@ -198,3 +198,41 @@ def test_deterministic_parser_resolves_district_to_snapshot_parent_city_and_date
     assert parsed.structured_query.location.district == "Maltepe"
     assert parsed.structured_query.time_window is not None
     assert parsed.missing_fields == ()
+
+
+@pytest.mark.django_db
+def test_deterministic_parser_uses_a_snapshot_device_code_as_operational_scope():
+    snapshot = create_snapshot("deterministic-device-scope")
+    from apps.operations.tests.test_operations_models import create_maltepe_bng
+
+    device = create_maltepe_bng(snapshot, code="AGG-ANK-002")
+    create_causal_event(snapshot, code="CE-DEVICE-002", root_device=device)
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "AGG-ANK-002 cihazindaki kesintinin potansiyel kapsamini, "
+            "dogrulanmis etkisini, failover durumunu ve kok nedenini acikla."
+        ),
+        snapshot=snapshot,
+    )
+
+    assert parsed.structured_query.device_code == "AGG-ANK-002"
+    assert parsed.structured_query.causal_event_code == "CE-DEVICE-002"
+    assert parsed.structured_query.clarification_required is False
+    assert parsed.missing_fields == ()
+
+
+@pytest.mark.django_db
+def test_deterministic_parser_does_not_match_a_device_code_prefix():
+    snapshot = create_snapshot("deterministic-device-prefix")
+    from apps.operations.tests.test_operations_models import create_maltepe_bng
+
+    create_maltepe_bng(snapshot, code="AGG-ANK-002")
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query="AGG-ANK-0020 cihazindaki kesintiyi acikla.",
+        snapshot=snapshot,
+    )
+
+    assert parsed.structured_query.device_code is None
+    assert parsed.structured_query.clarification_required is True

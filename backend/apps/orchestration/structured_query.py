@@ -115,6 +115,7 @@ class StructuredQuery(BaseModel):
     causal_event_code: str | None = Field(default=None, max_length=80)
     incident_code: str | None = Field(default=None, max_length=80)
     outage_code: str | None = Field(default=None, max_length=80)
+    device_code: str | None = Field(default=None, max_length=80)
     subscription_reference: str | None = Field(default=None, max_length=80)
     decision_type: str | None = Field(default=None, max_length=40)
     embedding_provider: Literal["ollama", "gemini"] | None = None
@@ -133,7 +134,9 @@ class StructuredQuery(BaseModel):
             raise ValueError("snapshot_identifier is invalid")
         return normalized
 
-    @field_validator("causal_event_code", "incident_code", "outage_code", "subscription_reference")
+    @field_validator(
+        "causal_event_code", "incident_code", "outage_code", "device_code", "subscription_reference"
+    )
     @classmethod
     def validate_public_code(cls, value: str | None, info) -> str | None:
         if value is None:
@@ -192,7 +195,7 @@ class StructuredQuery(BaseModel):
                 StructuredQueryIntent.RULE_EVIDENCE,
             }
             and not anchors
-            and not any((self.location, self.technology, self.time_window))
+            and not any((self.device_code, self.location, self.technology, self.time_window))
         ):
             raise ValueError("The query requires an operational reference or scope filter")
         return self

@@ -93,6 +93,30 @@ def test_outage_impact_has_deterministic_details_then_customer_impact_dependency
     )
 
 
+def test_outage_impact_device_scope_uses_device_and_customer_tools_when_unresolved():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            intent="outage_impact",
+            requested_outputs=["summary", "impact"],
+            causal_event_code=None,
+            device_code="AGG-ANK-002",
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    device, customers = result.tool_plan.calls
+    assert (device.server.value, device.tool_name, device.arguments["device_code"]) == (
+        "network",
+        "get_device_details",
+        "AGG-ANK-002",
+    )
+    assert (customers.server.value, customers.tool_name, customers.depends_on) == (
+        "customer",
+        "list_customers_by_device",
+        ["device_details"],
+    )
+
+
 def test_rule_evidence_and_rule_document_retrieval_remain_separate():
     evidence = DeterministicToolPlanner().plan(
         query_payload(

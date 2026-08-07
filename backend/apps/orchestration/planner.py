@@ -280,6 +280,24 @@ class DeterministicToolPlanner:
             )
             self._append_rule_evidence_if_requested(query, calls)
             return calls
+        if query.device_code:
+            return [
+                self._call(
+                    "device_details",
+                    "network",
+                    "get_device_details",
+                    self._snapshot_args(query, device_code=query.device_code),
+                    1,
+                ),
+                self._call(
+                    "customers_by_device",
+                    "customer",
+                    "list_customers_by_device",
+                    self._snapshot_args(query, device_code=query.device_code),
+                    2,
+                    depends_on=["device_details"],
+                ),
+            ]
         if query.incident_code:
             return self._incident_search_calls(query)
         return self._scoped_network_calls(query)
