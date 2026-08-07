@@ -76,6 +76,8 @@ class ImpactSummary(BaseModel):
     verified_no_impact: int | None = None
     insufficient_evidence: int | None = None
     failover_protected: int | None = None
+    affected_subscription_count: int | None = None
+    affected_customer_count: int | None = None
     reason_code_distribution: dict[str, int] = Field(default_factory=dict)
     assessment_record_count: int | None = None
     missing_evidence_categories: list[str] = Field(default_factory=list)
@@ -310,12 +312,18 @@ def _customer_causal_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
 
 
 def _network_outage_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
+    affected_subscriptions = _non_negative_int(
+        data.get("affected_subscription_count"), "affected_subscription_count"
+    )
     return _ExtractedToolResult(
         category=EvidenceCategory.CUSTOMER_IMPACT,
         causal={"outage_code": _string(data.get("outage_code"), "outage_code", required=True)},
         impact={
-            "potential": _non_negative_int(
-                data.get("affected_subscription_count"), "affected_subscription_count"
+            "potential": affected_subscriptions,
+            "verified_impacted": affected_subscriptions,
+            "affected_subscription_count": affected_subscriptions,
+            "affected_customer_count": _non_negative_int(
+                data.get("affected_customer_count"), "affected_customer_count"
             ),
             "failover_protected": _non_negative_int(
                 (_mapping(data.get("protected_failover")) or {}).get("subscription_count", 0),
@@ -353,9 +361,24 @@ def _network_outage_details(data: Mapping[str, Any]) -> _ExtractedToolResult:
     outage = _mapping(data.get("outage"))
     if outage is None:
         raise ValueError("outage must be an object")
+    incident = _mapping(outage.get("incident"))
+    source = _mapping(outage.get("source_device"))
+    impact_class = _string(outage.get("impact_class"), "impact_class")
     return _ExtractedToolResult(
         category=EvidenceCategory.NETWORK_CAUSAL,
-        causal={"outage_code": _string(outage.get("outage_code"), "outage_code", required=True)},
+        causal={
+            "outage_code": _string(outage.get("outage_code"), "outage_code", required=True),
+            "causal_event_code": _string(outage.get("causal_event_code"), "causal_event_code"),
+            "root_resource_type": "device" if source else None,
+            "root_resource_reference": (
+                _string(source.get("code"), "source_device.code") if source else None
+            ),
+            "root_cause_summary": _string(
+                outage.get("root_cause_summary") or (incident or {}).get("root_cause_summary"),
+                "root_cause_summary",
+            ),
+            "full_outage": impact_class == "full_outage" if impact_class else None,
+        },
     )
 
 
@@ -749,9 +772,17 @@ class ResultMergerValidator:
     ) -> list[ValidationErrorItem]:
         errors: list[ValidationErrorItem] = []
         query = plan.structured_query_context
-        planned_reference = query.causal_event_code or query.outage_code
-        actual_reference = causal.get("causal_event_code") or causal.get("outage_code")
-        if planned_reference and actual_reference and planned_reference != actual_reference:
+        if (
+            query.causal_event_code
+            and causal.get("causal_event_code")
+            and query.causal_event_code != causal["causal_event_code"]
+        ):
+            errors.append(ValidationErrorItem(code="public_reference_conflict"))
+        if (
+            query.outage_code
+            and causal.get("outage_code")
+            and query.outage_code != causal["outage_code"]
+        ):
             errors.append(ValidationErrorItem(code="public_reference_conflict"))
         potential = impact.get("potential")
         verified = impact.get("verified_impacted")

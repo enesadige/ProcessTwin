@@ -207,6 +207,7 @@ def incident_summary(incident: Incident | None) -> dict[str, Any] | None:
 def outage_summary(outage: Outage, *, duration: dict[str, Any] | None = None) -> dict[str, Any]:
     return {
         "outage_code": outage.outage_code,
+        "causal_event_code": (outage.causal_event.event_code if outage.causal_event_id else None),
         "status": outage.status,
         "outage_type": outage.outage_type,
         "impact_class": outage.impact_type,

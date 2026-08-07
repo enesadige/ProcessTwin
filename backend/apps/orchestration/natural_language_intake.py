@@ -111,7 +111,7 @@ class DeterministicStructuredQueryParser:
             device_code,
         )
         if device_code and causal_event_code is None and outage_code is None:
-            causal_event_code = self._causal_event_for_device(snapshot, device_code)
+            outage_code = self._outage_for_device(snapshot, device_code)
         location, ambiguous_location = self._resolve_location(snapshot, folded)
         dates = _DATE_RE.findall(text)
         intent, requested_outputs = self._intent_and_outputs(folded)
@@ -182,25 +182,14 @@ class DeterministicStructuredQueryParser:
         return matches[0] if len(matches) == 1 else None
 
     @staticmethod
-    def _causal_event_for_device(snapshot: DataSnapshot, device_code: str) -> str | None:
-        """Resolve an unambiguous device-rooted event without inventing scope."""
-        from apps.operations.models import CausalEvent, Outage
+    def _outage_for_device(snapshot: DataSnapshot, device_code: str) -> str | None:
+        """Resolve only a unique source outage so impact uses the outage service."""
+        from apps.operations.models import Outage
 
-        events = list(
-            CausalEvent.objects.filter(data_snapshot=snapshot, root_device__code=device_code)
-            .order_by("event_code")
-            .values_list("event_code", flat=True)[:2]
-        )
-        if len(events) == 1:
-            return events[0]
         outages = list(
-            Outage.objects.filter(
-                data_snapshot=snapshot,
-                source_device__code=device_code,
-                causal_event__isnull=False,
-            )
+            Outage.objects.filter(data_snapshot=snapshot, source_device__code=device_code)
             .order_by("outage_code")
-            .values_list("causal_event__event_code", flat=True)[:2]
+            .values_list("outage_code", flat=True)[:2]
         )
         return outages[0] if len(outages) == 1 else None
 
@@ -323,9 +312,7 @@ class DeterministicStructuredQueryParser:
     @staticmethod
     def _missing_fields(**values: object) -> list[MissingField]:
         intent = values["intent"]
-        anchors = bool(
-            values["causal_event_code"] or values["outage_code"] or values["device_code"]
-        )
+        anchors = bool(values["causal_event_code"] or values["outage_code"])
         if (
             intent == StructuredQueryIntent.OUTAGE_IMPACT
             and values["location"] is not None

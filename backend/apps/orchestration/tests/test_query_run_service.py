@@ -12,12 +12,29 @@ from apps.orchestration.services import (
     QueryRunIdempotencyConflictError,
     QueryRunService,
     QueryRunTransitionError,
+    sanitize_json,
 )
 
 
 @pytest.fixture
 def service():
     return QueryRunService()
+
+
+def test_sanitize_json_preserves_aggregate_subscription_counts_and_removes_ip_fields():
+    sanitized = sanitize_json(
+        {
+            "affected_subscription_count": 572,
+            "affected_customer_count": 495,
+            "source_ip": "192.0.2.10",
+            "raw_payload": {"token": "secret"},
+        }
+    )
+
+    assert sanitized == {
+        "affected_subscription_count": 572,
+        "affected_customer_count": 495,
+    }
 
 
 @pytest.fixture

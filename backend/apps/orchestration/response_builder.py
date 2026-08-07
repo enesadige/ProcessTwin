@@ -201,9 +201,19 @@ class ValidatedResponseBuilder:
             if impact.outage_count is not None:
                 sections.append(f"Kesinti sayısı: {impact.outage_count}.")
             if impact.potential is not None:
-                sections.append(f"Potansiyel etki: {impact.potential} bağlantı.")
+                if impact.affected_subscription_count is not None:
+                    sections.append(f"Potansiyel kapsam: {impact.potential} abonelik.")
+                else:
+                    sections.append(f"Potansiyel etki: {impact.potential} bağlantı.")
             if impact.verified_impacted is not None:
-                sections.append(f"Doğrulanmış etki: {impact.verified_impacted} bağlantı.")
+                if impact.affected_customer_count is not None:
+                    sections.append(
+                        "Doğrulanmış etki: "
+                        f"{impact.affected_subscription_count} abonelik / "
+                        f"{impact.affected_customer_count} müşteri."
+                    )
+                else:
+                    sections.append(f"Doğrulanmış etki: {impact.verified_impacted} bağlantı.")
             if impact.verified_no_impact is not None:
                 sections.append(f"Etkilenmediği doğrulanan: {impact.verified_no_impact} bağlantı.")
             if impact.insufficient_evidence is not None:
@@ -359,14 +369,22 @@ class ValidatedResponseBuilder:
         if impact:
             if impact.outage_count is not None:
                 add(f"Kesinti sayısı: {impact.outage_count}.")
-            for label, value in (
-                ("Potansiyel kapsam", impact.potential),
-                ("Doğrulanmış etki", impact.verified_impacted),
-                ("Doğrulanmış etkisizlik", impact.verified_no_impact),
-                ("Kanıt yetersiz", impact.insufficient_evidence),
-            ):
-                if value is not None:
-                    add(f"{label}: {value} bağlantı.")
+            if impact.affected_subscription_count is not None:
+                add(f"Potansiyel kapsam: {impact.potential} abonelik.")
+                add(
+                    "Doğrulanmış etki: "
+                    f"{impact.affected_subscription_count} abonelik / "
+                    f"{impact.affected_customer_count} müşteri."
+                )
+            else:
+                for label, value in (
+                    ("Potansiyel kapsam", impact.potential),
+                    ("Doğrulanmış etki", impact.verified_impacted),
+                    ("Doğrulanmış etkisizlik", impact.verified_no_impact),
+                    ("Kanıt yetersiz", impact.insufficient_evidence),
+                ):
+                    if value is not None:
+                        add(f"{label}: {value} bağlantı.")
             if impact.failover_protected is not None:
                 add(
                     f"Failover ile korunan: {impact.failover_protected} bağlantı; "

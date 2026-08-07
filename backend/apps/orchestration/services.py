@@ -118,8 +118,9 @@ def sanitize_json(value: Any) -> Any:
         sanitized: dict[str, Any] = {}
         for key, item in value.items():
             normalized_key = str(key).lower()
-            if normalized_key.startswith("raw_") or any(
-                part in normalized_key for part in SENSITIVE_KEY_PARTS
+            key_parts = set(re.split(r"[^a-z0-9]+", normalized_key))
+            if normalized_key.startswith("raw_") or normalized_key in SENSITIVE_KEY_PARTS or any(
+                part in key_parts for part in SENSITIVE_KEY_PARTS
             ):
                 continue
             sanitized[str(key)] = sanitize_json(item)

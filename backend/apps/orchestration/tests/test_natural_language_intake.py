@@ -203,10 +203,34 @@ def test_deterministic_parser_resolves_district_to_snapshot_parent_city_and_date
 @pytest.mark.django_db
 def test_deterministic_parser_uses_a_snapshot_device_code_as_operational_scope():
     snapshot = create_snapshot("deterministic-device-scope")
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.operations.models import (
+        Outage,
+        OutageStatus,
+        OutageType,
+        RootCauseCategory,
+        ServiceImpactClass,
+    )
     from apps.operations.tests.test_operations_models import create_maltepe_bng
 
     device = create_maltepe_bng(snapshot, code="AGG-ANK-002")
-    create_causal_event(snapshot, code="CE-DEVICE-002", root_device=device)
+    started_at = timezone.now() - timedelta(minutes=20)
+    Outage.objects.create(
+        data_snapshot=snapshot,
+        outage_code="OUT-DEVICE-002",
+        source_device=device,
+        outage_type=OutageType.DEVICE,
+        impact_type=ServiceImpactClass.FULL_OUTAGE,
+        status=OutageStatus.RESOLVED,
+        root_cause_category=RootCauseCategory.UNKNOWN,
+        detected_at=started_at,
+        started_at=started_at,
+        ended_at=started_at + timedelta(minutes=10),
+        resolved_at=started_at + timedelta(minutes=10),
+    )
 
     parsed = DeterministicStructuredQueryParser().parse(
         original_query=(
@@ -217,7 +241,7 @@ def test_deterministic_parser_uses_a_snapshot_device_code_as_operational_scope()
     )
 
     assert parsed.structured_query.device_code == "AGG-ANK-002"
-    assert parsed.structured_query.causal_event_code == "CE-DEVICE-002"
+    assert parsed.structured_query.outage_code == "OUT-DEVICE-002"
     assert parsed.structured_query.clarification_required is False
     assert parsed.missing_fields == ()
 
