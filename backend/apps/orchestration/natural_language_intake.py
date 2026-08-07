@@ -7,7 +7,7 @@ import re
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -28,6 +28,30 @@ from apps.orchestration.structured_query import (
 STRUCTURED_QUERY_PARSER_PROMPT_VERSION = "structured-query-parser-tr-v1"
 DETERMINISTIC_STRUCTURED_QUERY_PARSER_VERSION = "deterministic-structured-query-tr-v1"
 _DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
+_TURKISH_DATE_RE = re.compile(
+    r"\b(\d{1,2})\s+(ocak|şubat|subat|mart|nisan|mayıs|mayis|haziran|temmuz|ağustos|agustos|eylül|eylul|ekim|kasım|kasim|aralık|aralik)\s+(\d{4})\b",
+    re.IGNORECASE,
+)
+_TURKISH_MONTHS = {
+    "ocak": 1,
+    "şubat": 2,
+    "subat": 2,
+    "mart": 3,
+    "nisan": 4,
+    "mayıs": 5,
+    "mayis": 5,
+    "haziran": 6,
+    "temmuz": 7,
+    "ağustos": 8,
+    "agustos": 8,
+    "eylül": 9,
+    "eylul": 9,
+    "ekim": 10,
+    "kasım": 11,
+    "kasim": 11,
+    "aralık": 12,
+    "aralik": 12,
+}
 _CAUSAL_CODE_RE = re.compile(r"\bCE-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
 _OUTAGE_CODE_RE = re.compile(r"\bOUT-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
 _SUBSCRIPTION_RE = re.compile(r"\bSUB-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
@@ -110,10 +134,10 @@ class DeterministicStructuredQueryParser:
             subscription_reference,
             device_code,
         )
+        dates = self._extract_dates(text)
         if device_code and causal_event_code is None and outage_code is None:
-            outage_code = self._outage_for_device(snapshot, device_code)
+            outage_code = self._outage_for_device(snapshot, device_code, dates=dates)
         location, ambiguous_location = self._resolve_location(snapshot, folded)
-        dates = _DATE_RE.findall(text)
         intent, requested_outputs = self._intent_and_outputs(folded)
         decision_type = self._decision_type(folded)
         missing = self._missing_fields(
@@ -182,16 +206,40 @@ class DeterministicStructuredQueryParser:
         return matches[0] if len(matches) == 1 else None
 
     @staticmethod
-    def _outage_for_device(snapshot: DataSnapshot, device_code: str) -> str | None:
-        """Resolve only a unique source outage so impact uses the outage service."""
+    def _outage_for_device(
+        snapshot: DataSnapshot, device_code: str, *, dates: list[str]
+    ) -> str | None:
+        """Resolve a unique outage through source, incident, or causal root device."""
+        from django.db.models import Q
+
         from apps.operations.models import Outage
 
+        outages_query = Outage.objects.filter(data_snapshot=snapshot).filter(
+            Q(source_device__code=device_code)
+            | Q(incident__primary_device__code=device_code)
+            | Q(causal_event__root_device__code=device_code)
+        )
+        if dates:
+            outage_dates = [date.fromisoformat(item) for item in dates]
+            outages_query = outages_query.filter(
+                started_at__date__gte=min(outage_dates), started_at__date__lte=max(outage_dates)
+            )
         outages = list(
-            Outage.objects.filter(data_snapshot=snapshot, source_device__code=device_code)
-            .order_by("outage_code")
-            .values_list("outage_code", flat=True)[:2]
+            outages_query.order_by("outage_code").values_list("outage_code", flat=True)[:2]
         )
         return outages[0] if len(outages) == 1 else None
+
+    @staticmethod
+    def _extract_dates(text: str) -> list[str]:
+        dates = list(_DATE_RE.findall(text))
+        for day, month, year in _TURKISH_DATE_RE.findall(text):
+            try:
+                dates.append(
+                    date(int(year), _TURKISH_MONTHS[month.casefold()], int(day)).isoformat()
+                )
+            except (KeyError, ValueError):
+                raise NaturalLanguageQueryParseError("invalid_structured_query") from None
+        return sorted(set(dates))
 
     @staticmethod
     def _validate_references(
@@ -253,12 +301,6 @@ class DeterministicStructuredQueryParser:
 
     @staticmethod
     def _intent_and_outputs(folded: str) -> tuple[StructuredQueryIntent, list[RequestedOutput]]:
-        if any(term in folded for term in ("tazminat", "telafi", "uygunluk")):
-            return StructuredQueryIntent.COMPENSATION_EVALUATION, [
-                RequestedOutput.SUMMARY,
-                RequestedOutput.ELIGIBILITY,
-                RequestedOutput.EVIDENCE,
-            ]
         if any(
             term in folded
             for term in ("hangi kural", "hangi kaynak", "source", "section", "citation")
@@ -266,6 +308,40 @@ class DeterministicStructuredQueryParser:
             return StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL, [
                 RequestedOutput.SUMMARY,
                 RequestedOutput.DETAILS,
+                RequestedOutput.EVIDENCE,
+            ]
+        impact_requested = any(
+            term in folded
+            for term in (
+                "kaç müşteri",
+                "kaç abonelik",
+                "etkilendi",
+                "potansiyel kapsam",
+                "tam kesinti",
+                "kısmi kesinti",
+                "failover",
+                "yedek",
+                "ana bağlantı",
+            )
+        )
+        compensation_requested = any(term in folded for term in ("tazminat", "telafi", "uygunluk"))
+        root_requested = any(
+            term in folded
+            for term in ("kok neden", "ana sebep", "dying gasp", "device not active", "belirti mi")
+        )
+        if impact_requested:
+            outputs = [RequestedOutput.SUMMARY, RequestedOutput.DETAILS, RequestedOutput.IMPACT]
+            if root_requested:
+                outputs.append(RequestedOutput.ROOT_CAUSE)
+            if compensation_requested:
+                outputs.extend([RequestedOutput.ELIGIBILITY, RequestedOutput.EVIDENCE])
+            return StructuredQueryIntent.OUTAGE_IMPACT, sorted(
+                set(outputs), key=lambda item: item.value
+            )
+        if compensation_requested:
+            return StructuredQueryIntent.COMPENSATION_EVALUATION, [
+                RequestedOutput.SUMMARY,
+                RequestedOutput.ELIGIBILITY,
                 RequestedOutput.EVIDENCE,
             ]
         if any(
@@ -277,10 +353,7 @@ class DeterministicStructuredQueryParser:
                 RequestedOutput.DETAILS,
                 RequestedOutput.IMPACT,
             ]
-        if any(
-            term in folded
-            for term in ("kok neden", "ana sebep", "dying gasp", "device not active", "belirti mi")
-        ):
+        if root_requested:
             return StructuredQueryIntent.NETWORK_INVESTIGATION, [
                 RequestedOutput.SUMMARY,
                 RequestedOutput.ROOT_CAUSE,
@@ -327,11 +400,13 @@ class DeterministicStructuredQueryParser:
             return []
         if intent == StructuredQueryIntent.COMPENSATION_EVALUATION:
             missing = []
-            if not values["causal_event_code"]:
+            if not (values["causal_event_code"] or values["outage_code"] or values["device_code"]):
                 missing.append(MissingField.COMPENSATION_ANCHOR)
             if not values["subscription_reference"]:
                 missing.append(MissingField.SCOPE_FILTER)
             return missing
+        if values["device_code"] and anchors:
+            return []
         return [MissingField.SCOPE_FILTER] if values["ambiguous_location"] or not anchors else []
 
     @staticmethod

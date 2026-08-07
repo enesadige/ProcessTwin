@@ -315,20 +315,21 @@ def _network_outage_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
     affected_subscriptions = _non_negative_int(
         data.get("affected_subscription_count"), "affected_subscription_count"
     )
+    failover_protected = _non_negative_int(
+        (_mapping(data.get("protected_failover")) or {}).get("subscription_count", 0),
+        "failover_protected_subscription_count",
+    )
     return _ExtractedToolResult(
         category=EvidenceCategory.CUSTOMER_IMPACT,
         causal={"outage_code": _string(data.get("outage_code"), "outage_code", required=True)},
         impact={
-            "potential": affected_subscriptions,
+            "potential": affected_subscriptions + failover_protected,
             "verified_impacted": affected_subscriptions,
             "affected_subscription_count": affected_subscriptions,
             "affected_customer_count": _non_negative_int(
                 data.get("affected_customer_count"), "affected_customer_count"
             ),
-            "failover_protected": _non_negative_int(
-                (_mapping(data.get("protected_failover")) or {}).get("subscription_count", 0),
-                "failover_protected_subscription_count",
-            ),
+            "failover_protected": failover_protected,
         },
     )
 
@@ -658,6 +659,7 @@ class ResultMergerValidator:
             categories.add(EvidenceCategory.RULE_EVIDENCE)
         if (
             query.intent == StructuredQueryIntent.COMPENSATION_EVALUATION
+            or RequestedOutput.ELIGIBILITY in outputs
             or RequestedOutput.COMPENSATION_AMOUNT in outputs
         ):
             categories.add(EvidenceCategory.COMPENSATION)

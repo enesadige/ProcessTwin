@@ -76,7 +76,7 @@ def test_minimal_tool_plan_is_sorted_and_deterministic_without_mutating_input():
 
 def test_current_mcp_registries_are_the_allowlist_source_and_keep_expected_counts():
     assert {server: len(tools) for server, tools in MCP_TOOL_REGISTRIES.items()} == {
-        MCPServer.NETWORK: 9,
+        MCPServer.NETWORK: 10,
         MCPServer.CUSTOMER: 7,
         MCPServer.RULE: 8,
         MCPServer.COMPENSATION: 6,

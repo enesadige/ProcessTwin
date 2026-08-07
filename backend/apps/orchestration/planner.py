@@ -50,6 +50,7 @@ _SUPPORTED_OUTPUTS = {
             RequestedOutput.IMPACT,
             RequestedOutput.ROOT_CAUSE,
             RequestedOutput.EVIDENCE,
+            RequestedOutput.ELIGIBILITY,
         }
     ),
     StructuredQueryIntent.CUSTOMER_HISTORY: frozenset(
@@ -224,7 +225,7 @@ class DeterministicToolPlanner:
             self._append_rule_evidence_if_requested(query, calls)
             return calls
         if query.outage_code:
-            return [
+            calls = [
                 self._call(
                     "outage_details",
                     "network",
@@ -249,7 +250,7 @@ class DeterministicToolPlanner:
         self, query: StructuredQuery
     ) -> list[dict[str, object]] | PlannerResult:
         if query.outage_code:
-            return [
+            calls = [
                 self._call(
                     "outage_details",
                     "network",
@@ -266,6 +267,9 @@ class DeterministicToolPlanner:
                     depends_on=["outage_details"],
                 ),
             ]
+            self._append_rule_evidence_if_requested(query, calls)
+            self._append_compensation_if_requested(query, calls)
+            return calls
         if query.causal_event_code:
             calls = self._causal_analysis_calls(query)
             calls.append(
@@ -279,6 +283,7 @@ class DeterministicToolPlanner:
                 )
             )
             self._append_rule_evidence_if_requested(query, calls)
+            self._append_compensation_if_requested(query, calls)
             return calls
         if query.device_code:
             return [
@@ -391,6 +396,28 @@ class DeterministicToolPlanner:
                 self._snapshot_args(query, causal_event_code=query.causal_event_code),
                 1,
                 parallel_group="causal_analysis",
+            )
+        )
+
+    def _append_compensation_if_requested(
+        self, query: StructuredQuery, calls: list[dict[str, object]]
+    ) -> None:
+        if RequestedOutput.ELIGIBILITY not in query.requested_outputs:
+            return
+        arguments = self._snapshot_args(
+            query,
+            subscription_number=query.subscription_reference,
+            outage_code=query.outage_code,
+            causal_event_code=query.causal_event_code,
+        )
+        calls.append(
+            self._call(
+                "compensation_evidence",
+                "compensation",
+                "get_compensation_evidence",
+                {key: value for key, value in arguments.items() if value is not None},
+                max((int(call["execution_order"]) for call in calls), default=0) + 1,
+                depends_on=[str(calls[-1]["call_id"])] if calls else None,
             )
         )
 

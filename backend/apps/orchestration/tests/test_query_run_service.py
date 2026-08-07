@@ -140,6 +140,43 @@ def test_status_lifecycle_completion_and_terminal_immutability(snapshot, service
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("terminal_method", ["complete", "fail"])
+def test_stale_terminal_finalization_preserves_execution_audit(snapshot, service, terminal_method):
+    run, _ = service.create_or_get(
+        data_snapshot=snapshot,
+        idempotency_key=f"query-run-stale-{terminal_method}",
+        original_query="Stale audit regression.",
+    )
+    planned = service.save_plan(
+        run,
+        structured_query={"intent": "outage_analysis"},
+        planned_tools=[{"tool_name": "network.get_outage", "status": "planned"}],
+    )
+    executing = service.transition(planned, target_status=QueryRunStatus.EXECUTING)
+    stale = QueryRun.objects.get(pk=executing.pk)
+    service.append_execution_record(
+        executing,
+        record={
+            "call_id": f"audit-{terminal_method}",
+            "server": "network",
+            "tool_name": "get_outage_details",
+            "status": "completed" if terminal_method == "complete" else "failed",
+            "error_code": "tool_failed" if terminal_method == "fail" else "",
+        },
+    )
+
+    if terminal_method == "complete":
+        finalized = service.complete(stale, final_result={"summary": "safe"})
+    else:
+        finalized = service.fail(stale, error_code="tool_failed", error_summary="tool failed")
+
+    assert finalized.status in {QueryRunStatus.COMPLETED, QueryRunStatus.FAILED}
+    assert [record["call_id"] for record in finalized.executed_tools] == [
+        f"audit-{terminal_method}"
+    ]
+
+
+@pytest.mark.django_db
 def test_failed_lifecycle_and_database_terminal_constraints(snapshot, service):
     run, _ = service.create_or_get(
         data_snapshot=snapshot,

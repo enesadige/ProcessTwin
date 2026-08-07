@@ -134,9 +134,7 @@ class StructuredQuery(BaseModel):
             raise ValueError("snapshot_identifier is invalid")
         return normalized
 
-    @field_validator(
-        "causal_event_code", "incident_code", "outage_code", "device_code", "subscription_reference"
-    )
+    @field_validator("causal_event_code", "incident_code", "outage_code", "subscription_reference")
     @classmethod
     def validate_public_code(cls, value: str | None, info) -> str | None:
         if value is None:
@@ -144,6 +142,20 @@ class StructuredQuery(BaseModel):
         normalized = _normalized_text(value, field_name=info.field_name, max_length=80).upper()
         if not _PUBLIC_CODE_RE.fullmatch(normalized):
             raise ValueError(f"{info.field_name} is invalid")
+        return normalized
+
+    @field_validator("device_code")
+    @classmethod
+    def validate_device_code(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = _normalized_text(value, field_name="device_code", max_length=80)
+        if (
+            not normalized[0].isalnum()
+            or any(not (character.isalnum() or character in "-_") for character in normalized)
+            or "-" not in normalized
+        ):
+            raise ValueError("device_code is invalid")
         return normalized
 
     @field_validator("decision_type")

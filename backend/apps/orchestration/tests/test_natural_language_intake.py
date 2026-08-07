@@ -260,3 +260,23 @@ def test_deterministic_parser_does_not_match_a_device_code_prefix():
 
     assert parsed.structured_query.device_code is None
     assert parsed.structured_query.clarification_required is True
+
+
+@pytest.mark.django_db
+def test_deterministic_parser_preserves_unicode_device_and_parses_turkish_date():
+    snapshot = create_snapshot("deterministic-unicode-date")
+    from apps.operations.tests.test_operations_models import create_maltepe_bng
+
+    create_maltepe_bng(snapshot, code="AGG-İZM-002")
+    device_query = DeterministicStructuredQueryParser().parse(
+        original_query="AGG-İZM-002 cihazındaki olayın etkisini açıkla.",
+        snapshot=snapshot,
+    )
+    date_query = DeterministicStructuredQueryParser().parse(
+        original_query="6 Haziran 2026 tarihinde Maltepe ilçesinde kaç kesinti oldu?",
+        snapshot=snapshot,
+    )
+
+    assert device_query.structured_query.device_code == "AGG-İZM-002"
+    assert date_query.structured_query.time_window is not None
+    assert date_query.structured_query.time_window.from_time.date().isoformat() == "2026-06-06"

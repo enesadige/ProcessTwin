@@ -119,8 +119,10 @@ def sanitize_json(value: Any) -> Any:
         for key, item in value.items():
             normalized_key = str(key).lower()
             key_parts = set(re.split(r"[^a-z0-9]+", normalized_key))
-            if normalized_key.startswith("raw_") or normalized_key in SENSITIVE_KEY_PARTS or any(
-                part in key_parts for part in SENSITIVE_KEY_PARTS
+            if (
+                normalized_key.startswith("raw_")
+                or normalized_key in SENSITIVE_KEY_PARTS
+                or any(part in key_parts for part in SENSITIVE_KEY_PARTS)
             ):
                 continue
             sanitized[str(key)] = sanitize_json(item)
@@ -185,11 +187,21 @@ class QueryRunService:
         current = QueryRunStatus(query_run.status)
         if target not in STATUS_TRANSITIONS[current]:
             raise QueryRunTransitionError(current=current.value, target=target.value)
-        query_run.status = target
+        now = timezone.now()
+        fields = {"status": target, "updated_at": now}
         if target == QueryRunStatus.EXECUTING:
-            query_run.started_at = timezone.now()
-        query_run.full_clean()
-        query_run.save()
+            fields["started_at"] = now
+        if target == QueryRunStatus.PLANNED:
+            fields.update(
+                structured_query=query_run.structured_query,
+                planned_tools=query_run.planned_tools,
+                model_version=query_run.model_version,
+                prompt_version=query_run.prompt_version,
+            )
+        updated = QueryRun.objects.filter(pk=query_run.pk, status=current).update(**fields)
+        if updated != 1:
+            raise QueryRunTransitionError(current=current.value, target=target.value)
+        query_run.refresh_from_db()
         return query_run
 
     def save_plan(
@@ -374,9 +386,17 @@ class QueryRunService:
             raise QueryRunError(
                 message="final_result must be an object.", code="invalid_query_run_result"
             )
-        query_run.final_result = sanitize_json(dict(final_result))
-        query_run.completed_at = timezone.now()
-        return self.transition(query_run, target_status=QueryRunStatus.COMPLETED)
+        completed_at = timezone.now()
+        updated = QueryRun.objects.filter(pk=query_run.pk, status=QueryRunStatus.EXECUTING).update(
+            status=QueryRunStatus.COMPLETED,
+            final_result=sanitize_json(dict(final_result)),
+            completed_at=completed_at,
+            updated_at=completed_at,
+        )
+        if updated != 1:
+            raise QueryRunTransitionError(current=query_run.status, target=QueryRunStatus.COMPLETED)
+        query_run.refresh_from_db()
+        return query_run
 
     def fail(self, query_run: QueryRun, *, error_code: str, error_summary: str) -> QueryRun:
         normalized_code = (error_code or "").strip().lower()
@@ -384,10 +404,25 @@ class QueryRunService:
             raise QueryRunError(
                 message="error_code is invalid.", code="invalid_query_run_error_code"
             )
-        query_run.error_code = normalized_code
-        query_run.error_summary = sanitize_text(error_summary)
-        query_run.completed_at = timezone.now()
-        return self.transition(query_run, target_status=QueryRunStatus.FAILED)
+        completed_at = timezone.now()
+        updated = QueryRun.objects.filter(
+            pk=query_run.pk,
+            status__in=(
+                QueryRunStatus.PENDING,
+                QueryRunStatus.PLANNED,
+                QueryRunStatus.EXECUTING,
+            ),
+        ).update(
+            status=QueryRunStatus.FAILED,
+            error_code=normalized_code,
+            error_summary=sanitize_text(error_summary),
+            completed_at=completed_at,
+            updated_at=completed_at,
+        )
+        if updated != 1:
+            raise QueryRunTransitionError(current=query_run.status, target=QueryRunStatus.FAILED)
+        query_run.refresh_from_db()
+        return query_run
 
     def create_retry(
         self,
