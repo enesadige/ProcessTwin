@@ -357,6 +357,22 @@ supersedes unrelated rule-tool candidates when rendering RuleVersion and
 DecisionEvidence. The exact 10 original and 8 unseen questions are recorded
 in the semantic artifact; HTTP 200 is not treated as a PRE-061 PASS.
 
+## Provider Resilience Audit
+
+Gemini retry behavior is now bounded: up to two attempts, provider retry timing
+when available, otherwise 250 ms initial exponential backoff capped at 2000 ms
+with 100 ms jitter. Non-transient configuration, authentication, malformed
+response and validation errors are not retried. Retry metadata is limited to
+attempt count and delay totals. The acceptance harness is sequential and uses
+configurable `ACCEPTANCE_CASE_DELAY_SECONDS`, default 0.5 seconds.
+
+The post-fix representative case passed with `llm_assisted`. A three-case
+sequential burst with 0.5-second pacing exercised two attempts per case, but
+all three were rate-limited and safely fell back. The prior 18-case run remains
+1/10 original and 0/8 unseen provider-selection passes. This classifies the
+code as **CODE_COMPLETE_PROVIDER_QUOTA_LIMITED**; PRE-061 is not promoted to
+complete and MAIN-061 remains blocked.
+
 ## Semantic Completeness Revalidation
 
 **Decision: PASS.** The earlier HTTP/provider pass was narrowed: it proved

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -112,7 +113,13 @@ class ValidatedResponseBuilder:
         response.model = active_provider.model_name
         contract = self._statement_contract(result)
         try:
-            narrative = self._safe_statement_selection(active_provider, contract)
+            narrative, retry = self._safe_statement_selection(active_provider, contract)
+            if retry.get("retry_count", 0):
+                response.warnings = [
+                    *response.warnings,
+                    f"llm_statement_selection_retry_count:{retry['retry_count']}",
+                    f"llm_statement_selection_retry_delay_ms:{retry['total_retry_delay_ms']}",
+                ]
         except Exception as exc:
             response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
             response.warnings = sorted(
@@ -126,6 +133,12 @@ class ValidatedResponseBuilder:
                     ]
                 )
             )
+            details = getattr(exc, "details", {})
+            if isinstance(details, Mapping):
+                for key in ("attempt_count", "retry_count", "total_retry_delay_ms"):
+                    if isinstance(details.get(key), int):
+                        response.warnings.append(f"llm_statement_selection_{key}:{details[key]}")
+                response.warnings = sorted(set(response.warnings))
             return response
 
         response.response_text = narrative
@@ -558,7 +571,7 @@ class ValidatedResponseBuilder:
     @classmethod
     def _safe_statement_selection(
         cls, provider: LLMProvider, contract: tuple[str, dict[str, object]]
-    ) -> str:
+    ) -> tuple[str, Mapping[str, Any]]:
         prompt, data = contract
         response = provider.generate(request={"contents": prompt, "format_schema": data["schema"]})
         if not isinstance(response, Mapping) or response.get("provider") != provider.provider_name:
@@ -566,6 +579,9 @@ class ValidatedResponseBuilder:
         if response.get("model") != provider.model_name or not isinstance(
             response.get("content"), str
         ):
+            raise ValueError("provider response is invalid")
+        retry = response.get("retry", {})
+        if not isinstance(retry, Mapping):
             raise ValueError("provider response is invalid")
         try:
             selection = json.loads(response["content"])
@@ -583,7 +599,7 @@ class ValidatedResponseBuilder:
         # the model deciding to include every canonical statement.
         ordered_ids = [*selected, *(item for item in statements if item not in selected)]
         lines.extend(statements[statement_id] for statement_id in ordered_ids)
-        return "\n".join(lines)
+        return "\n".join(lines), retry
 
     @staticmethod
     def _validate_statement_selection(selection: object, statements: Mapping[str, str]) -> None:

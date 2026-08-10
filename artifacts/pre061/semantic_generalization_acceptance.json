@@ -4856,6 +4856,48 @@
       "privacy": 0,
       "snapshot_leakage": 0,
       "citation_mismatch": 0
-    }
+    },
+    "retry_policy": {
+      "max_attempts": 2,
+      "initial_backoff_ms": 250,
+      "max_backoff_ms": 2000,
+      "jitter_ms": 100,
+      "provider_retry_after_supported": true,
+      "non_transient_errors_not_retried": true
+    },
+    "acceptance_pacing": {
+      "configured_delay_seconds": 0.5,
+      "sequential": true,
+      "concurrency_factor": false
+    },
+    "representative_after_fix": {
+      "http_status": 200,
+      "query_run_status": "completed",
+      "generation_mode": "llm_assisted",
+      "provider_selection": "GEMINI_SELECTION_PASS",
+      "unsupported_fact": 0,
+      "unsupported_reference": 0,
+      "unsupported_decision": 0
+    },
+    "short_burst": {
+      "case_count": 3,
+      "delay_seconds": 0.5,
+      "gemini_selection_pass": 0,
+      "safe_fallback": 3,
+      "provider_fail": 0,
+      "retry_count_total": 3,
+      "total_retry_delay_ms_range": [
+        280,
+        323
+      ],
+      "failure_code": "provider_call_failed_rate_limited"
+    },
+    "full_18": {
+      "executed_before_retry_backoff_change": true,
+      "original_provider_selection": "1/10",
+      "unseen_provider_selection": "0/8",
+      "safe_fallback": "17/18"
+    },
+    "status": "CODE_COMPLETE_PROVIDER_QUOTA_LIMITED"
   }
 }

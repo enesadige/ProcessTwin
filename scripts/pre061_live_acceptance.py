@@ -10,6 +10,7 @@ import secrets
 import subprocess
 import sys
 import time
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -1246,9 +1247,11 @@ def _run_original_query_baseline(
         "snapshot_identifier": SNAPSHOT,
         "cases": preserved,
     }
-    for case_code, prompt in prompts:
+    for index, (case_code, prompt) in enumerate(prompts):
         if only_cases and case_code not in only_cases:
             continue
+        if index:
+            time.sleep(_acceptance_case_delay_seconds(env))
         started = time.monotonic()
         response = httpx.post(
             "http://127.0.0.1:8000/api/internal/v1/orchestration/queries/execute/",
@@ -1323,8 +1326,12 @@ def _run_provider_matrix(headers: dict[str, str], env: dict[str, str]) -> dict[s
         ),
     ]
     report = {"gate": "PRE-061-provider-matrix", "snapshot_identifier": SNAPSHOT, "cases": []}
+    case_index = 0
     for llm_provider, embedding_provider in matrix:
         for kind, prompt in prompts:
+            if case_index:
+                time.sleep(_acceptance_case_delay_seconds(env))
+            case_index += 1
             started = time.monotonic()
             try:
                 response = httpx.post(
@@ -1386,6 +1393,15 @@ def _run_provider_matrix(headers: dict[str, str], env: dict[str, str]) -> dict[s
     report["decision"] = "PASS" if report["passed_count"] == len(report["cases"]) else "FAIL"
     _write_json_atomic(matrix_path, report)
     return report
+
+
+def _acceptance_case_delay_seconds(env: Mapping[str, str]) -> float:
+    """Apply modest configurable pacing between synthetic acceptance requests."""
+    try:
+        value = float(env.get("ACCEPTANCE_CASE_DELAY_SECONDS", "0.5"))
+    except (TypeError, ValueError):
+        value = 0.5
+    return min(max(value, 0.0), 10.0)
 
 
 def _snapshot_context(env: dict[str, str]) -> dict[str, str]:
@@ -1582,6 +1598,7 @@ def main() -> int:
         "LLM_PROVIDER": "ollama",
         "RAG_EMBEDDING_PROVIDER": "ollama",
         "OLLAMA_LLM_TIMEOUT_MS": "60000",
+        "ACCEPTANCE_CASE_DELAY_SECONDS": os.getenv("ACCEPTANCE_CASE_DELAY_SECONDS", "0.5"),
     }
     causal_lookup = (
         "from apps.datasets.models import DataSnapshot; "

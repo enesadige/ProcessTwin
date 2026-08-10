@@ -280,6 +280,15 @@ provider-selection passes; 17/18 use safe fallback because Gemini rate limits
 remain. Diagnostics are persisted as bounded warning categories, without raw
 provider payloads. PRE-061 remains **NOT COMPLETE**.
 
+## Latest Provider Resilience Status
+
+Gemini now uses bounded two-attempt retry with provider-supplied retry timing
+or capped exponential backoff plus jitter. Acceptance pacing is sequential and
+configurable at 0.5 seconds by default. One post-fix representative case
+passed `llm_assisted`; a three-case burst was 0/3 provider selection and 3/3
+safe fallback with `provider_call_failed_rate_limited`. The code path is
+complete, but acceptance is provider-quota-limited. MAIN-061 remains blocked.
+
 ## Latest Semantic Audit
 
 The old semantic-completeness PASS text is historical and is superseded by

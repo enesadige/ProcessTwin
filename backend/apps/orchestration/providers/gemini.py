@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import random
+import time
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -42,6 +44,8 @@ class GeminiLLMProvider(LLMProvider):
         contents, format_schema = self._validate_request(request)
         client = self._get_client()
         max_attempts = self._max_attempts()
+        retry_count = 0
+        total_retry_delay_ms = 0
         for attempt in range(max_attempts):
             try:
                 if self._api_family() == GEMINI_INTERACTIONS_API_FAMILY:
@@ -51,15 +55,36 @@ class GeminiLLMProvider(LLMProvider):
                         stream=False,
                         response_format=self._interaction_response_format(format_schema),
                     )
-                    return self._normalize_interaction_response(response)
-                response = client.models.generate_content(model=self.model_name, contents=contents)
-                return self._normalize_response(response)
+                    normalized = self._normalize_interaction_response(response)
+                else:
+                    response = client.models.generate_content(
+                        model=self.model_name, contents=contents
+                    )
+                    normalized = self._normalize_response(response)
+                return self._with_retry_metadata(
+                    normalized,
+                    attempt_count=attempt + 1,
+                    retry_count=retry_count,
+                    total_retry_delay_ms=total_retry_delay_ms,
+                )
             except GeminiLLMProviderError:
                 raise
             except Exception as exc:
                 error = self._map_exception(exc)
                 if error.code in TRANSIENT_ERROR_CODES and attempt + 1 < max_attempts:
+                    delay_ms = self._retry_delay_ms(exc, attempt)
+                    retry_count += 1
+                    total_retry_delay_ms += delay_ms
+                    time.sleep(delay_ms / 1000)
                     continue
+                if error.code in TRANSIENT_ERROR_CODES:
+                    error.details.update(
+                        {
+                            "attempt_count": attempt + 1,
+                            "retry_count": retry_count,
+                            "total_retry_delay_ms": total_retry_delay_ms,
+                        }
+                    )
                 raise error from exc
         raise GeminiLLMProviderError(
             message="Gemini provider is unavailable.", code="provider_unavailable"
@@ -137,6 +162,63 @@ class GeminiLLMProvider(LLMProvider):
                 message="Gemini retry configuration is invalid.", code="invalid_request"
             )
         return max_attempts
+
+    @staticmethod
+    def _retry_delay_ms(exc: Exception, attempt: int) -> int:
+        provider_delay = GeminiLLMProvider._provider_retry_delay_ms(exc)
+        if provider_delay is not None:
+            return provider_delay
+        initial = getattr(settings, "GEMINI_LLM_RETRY_INITIAL_BACKOFF_MS", 250)
+        maximum = getattr(settings, "GEMINI_LLM_RETRY_MAX_BACKOFF_MS", 2000)
+        jitter = getattr(settings, "GEMINI_LLM_RETRY_JITTER_MS", 100)
+        if not all(isinstance(value, int) and value >= 0 for value in (initial, maximum, jitter)):
+            raise GeminiLLMProviderError(
+                message="Gemini retry configuration is invalid.", code="invalid_request"
+            )
+        if maximum < initial:
+            raise GeminiLLMProviderError(
+                message="Gemini retry configuration is invalid.", code="invalid_request"
+            )
+        base = min(maximum, initial * (2**attempt))
+        return base + round(random.uniform(0, jitter))
+
+    @staticmethod
+    def _provider_retry_delay_ms(exc: Exception) -> int | None:
+        for name in ("retry_after_ms", "retry_delay_ms"):
+            value = getattr(exc, name, None)
+            if isinstance(value, (int, float)) and 0 <= value <= 120_000:
+                return round(value)
+        retry_after = getattr(exc, "retry_after", None)
+        if isinstance(retry_after, (int, float)) and 0 <= retry_after <= 120:
+            return round(retry_after * 1000)
+        response = getattr(exc, "response", None)
+        headers = getattr(response, "headers", None)
+        if headers is not None:
+            value = headers.get("retry-after")
+            try:
+                seconds = float(value)
+            except (TypeError, ValueError):
+                return None
+            if 0 <= seconds <= 120:
+                return round(seconds * 1000)
+        return None
+
+    @staticmethod
+    def _with_retry_metadata(
+        response: Mapping[str, Any],
+        *,
+        attempt_count: int,
+        retry_count: int,
+        total_retry_delay_ms: int,
+    ) -> Mapping[str, Any]:
+        return {
+            **response,
+            "retry": {
+                "attempt_count": attempt_count,
+                "retry_count": retry_count,
+                "total_retry_delay_ms": total_retry_delay_ms,
+            },
+        }
 
     @staticmethod
     def _api_family() -> str:

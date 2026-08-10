@@ -10,9 +10,10 @@ from apps.orchestration.providers import (
 
 
 class FakeProviderException(Exception):
-    def __init__(self, *, status_code=None, message="provider failure"):
+    def __init__(self, *, status_code=None, message="provider failure", retry_after=None):
         super().__init__(message)
         self.status_code = status_code
+        self.retry_after = retry_after
 
 
 class FakeModels:
@@ -118,6 +119,7 @@ def test_normalized_request_response_finish_reason_and_usage(settings):
             "total_tokens": 18,
             "available": True,
         },
+        "retry": {"attempt_count": 1, "retry_count": 0, "total_retry_delay_ms": 0},
     }
 
 
@@ -233,8 +235,13 @@ def test_provider_errors_are_mapped_without_secret_or_raw_exception_leaks(
     assert "private" not in str(exc_info.value)
 
 
-def test_only_transient_errors_retry_up_to_the_configured_limit(settings):
+def test_only_transient_errors_retry_up_to_the_configured_limit(settings, monkeypatch):
     settings.GEMINI_LLM_MAX_ATTEMPTS = 2
+    settings.GEMINI_LLM_RETRY_INITIAL_BACKOFF_MS = 10
+    settings.GEMINI_LLM_RETRY_MAX_BACKOFF_MS = 20
+    settings.GEMINI_LLM_RETRY_JITTER_MS = 0
+    slept: list[float] = []
+    monkeypatch.setattr("apps.orchestration.providers.gemini.time.sleep", slept.append)
     provider, client = provider_with_outcomes(
         settings,
         [FakeProviderException(status_code=500), success_response()],
@@ -244,6 +251,51 @@ def test_only_transient_errors_retry_up_to_the_configured_limit(settings):
 
     assert response["content"] == "Safe answer."
     assert len(client.models.calls) == 2
+    assert slept == [0.01]
+    assert response["retry"] == {
+        "attempt_count": 2,
+        "retry_count": 1,
+        "total_retry_delay_ms": 10,
+    }
+
+
+def test_provider_retry_after_wins_over_local_backoff(settings):
+    settings.GEMINI_LLM_RETRY_INITIAL_BACKOFF_MS = 10
+    settings.GEMINI_LLM_RETRY_MAX_BACKOFF_MS = 20
+    settings.GEMINI_LLM_RETRY_JITTER_MS = 0
+
+    delay = GeminiLLMProvider._retry_delay_ms(
+        FakeProviderException(status_code=429, retry_after=1.5), 0
+    )
+
+    assert delay == 1500
+
+
+def test_rate_limit_exhaustion_keeps_safe_retry_diagnostics(settings, monkeypatch):
+    settings.GEMINI_LLM_MAX_ATTEMPTS = 3
+    settings.GEMINI_LLM_RETRY_INITIAL_BACKOFF_MS = 0
+    settings.GEMINI_LLM_RETRY_MAX_BACKOFF_MS = 0
+    settings.GEMINI_LLM_RETRY_JITTER_MS = 0
+    monkeypatch.setattr("apps.orchestration.providers.gemini.time.sleep", lambda _: None)
+    provider, client = provider_with_outcomes(
+        settings,
+        [
+            FakeProviderException(status_code=429),
+            FakeProviderException(status_code=429),
+            FakeProviderException(status_code=429),
+        ],
+    )
+
+    with pytest.raises(GeminiLLMProviderError) as exc_info:
+        provider.generate(request={"contents": "safe"})
+
+    assert exc_info.value.code == "rate_limited"
+    assert exc_info.value.details == {
+        "attempt_count": 3,
+        "retry_count": 2,
+        "total_retry_delay_ms": 0,
+    }
+    assert len(client.models.calls) == 3
 
 
 def test_persistent_errors_do_not_retry(settings):
