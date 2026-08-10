@@ -272,6 +272,14 @@ Session identity mapping, masking ve retention; stop/restart/continue semantiği
 
 İşe `git status --short`, `git rev-parse HEAD` ve son commit ile başla. Tamamlanmış görevleri yeniden uygulama, kullanıcı değişikliklerini silme, görevin dışına refactor taşıma. Her görevde tüm repo kataloglanmaz; önce bu handoff ve ilgili REV-01/REV-00 dokümanları okunur. Uygulama görevinde yalnız ilgili testler, önemli entegrasyon kapısında veya finalde full suite çalıştırılır. Her tamamlanan görev ayrı commit alır. 24 saat kuralı doğrulanmadan kodlanmaz; canlı simülasyon veya yeni MCP kendiliğinden başlatılmaz. Görev seçerken `Görev Takip Durumu` bölümündeki MAIN/REV/ORCH ayrımını kullan.
 
+## Latest Provider Selection Audit
+
+One representative real Gemini case now passes non-fallback statement
+selection. The full 18-case run still has 1/10 original and 0/8 unseen
+provider-selection passes; 17/18 use safe fallback because Gemini rate limits
+remain. Diagnostics are persisted as bounded warning categories, without raw
+provider payloads. PRE-061 remains **NOT COMPLETE**.
+
 ## Latest Semantic Audit
 
 The old semantic-completeness PASS text is historical and is superseded by

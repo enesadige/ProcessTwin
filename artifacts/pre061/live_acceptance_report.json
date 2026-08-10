@@ -78,5 +78,26 @@
         "canonical compensation RuleVersion supersedes unrelated rule-tool candidates"
       ]
     }
+  },
+  "semantic_provider_selection_audit": {
+    "decision": "NOT_COMPLETE",
+    "original_semantic": "10/10",
+    "unseen_semantic": "8/8",
+    "original_provider_selection": "1/10",
+    "unseen_provider_selection": "0/8",
+    "fallback_before": "18/18",
+    "fallback_final": "17/18",
+    "representative_provider_selection": "PASS",
+    "representative_failure_before": "provider_call_failed_rate_limited",
+    "diagnostic": "llm_statement_selection_attempted + provider_call_failed_rate_limited",
+    "blocking_reason": "Gemini selection is not reliable across the full run because provider rate limits still cause fallback.",
+    "safe_counters": {
+      "unsupported_fact": 0,
+      "unsupported_reference": 0,
+      "unsupported_decision": 0,
+      "privacy": 0,
+      "snapshot_leakage": 0,
+      "citation_mismatch": 0
+    }
   }
 }

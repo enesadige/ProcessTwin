@@ -7,7 +7,7 @@
   },
   "original_10": [
     {
-      "elapsed_ms": 12220.724,
+      "elapsed_ms": 16783.727,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -17,7 +17,7 @@
             "attempt_count": 1,
             "call_id": "outage_details",
             "correlation_id": "mentor-demo-1:outage_details",
-            "duration_ms": 1036,
+            "duration_ms": 937,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -33,7 +33,7 @@
             "attempt_count": 1,
             "call_id": "customer_impact",
             "correlation_id": "mentor-demo-1:customer_impact",
-            "duration_ms": 4024,
+            "duration_ms": 3840,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -49,7 +49,7 @@
             "attempt_count": 1,
             "call_id": "root_cause",
             "correlation_id": "mentor-demo-1:root_cause",
-            "duration_ms": 940,
+            "duration_ms": 931,
             "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
             "safe_result_summary": {
               "deterministic": true,
@@ -172,7 +172,7 @@
             "tool_name": "rank_root_cause_candidates"
           }
         ],
-        "query_run_code": "QR-92F4B1298CE74CBC9D155D1ABE4DFB66",
+        "query_run_code": "QR-98C7DFC6FDC744508F7DB4D28CFF3739",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -199,7 +199,7 @@
       },
       "question": "AGG-ANK-002 cihazındaki kesintide kaç müşteri ve kaç abonelik gerçekten etkilendi? Kesintinin türünü, kök nedeni, potansiyel kapsamı ve doğrulanmış etkiyi açıkla.",
       "response": {
-        "query_run_code": "QR-92F4B1298CE74CBC9D155D1ABE4DFB66",
+        "query_run_code": "QR-98C7DFC6FDC744508F7DB4D28CFF3739",
         "replayed": false,
         "response": {
           "citations": [
@@ -214,6 +214,7 @@
           ],
           "generation_mode": "deterministic_fallback",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -241,20 +242,25 @@
               "tool_name": "rank_root_cause_candidates"
             }
           ],
+          "provider": "gemini",
           "response_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0001.\n\nKök neden\nKök kaynak: device AGG-ANK-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nTam hizmet kesintisi: Evet.\nGerekçe kodları: root_cause_unverified, same_resource, temporal_propagation.\nYayılım özeti: Candidate matches the causal event physical root resource.\n\nMüşteri etkisi\nPotansiyel kapsam: 572 abonelik.\nDoğrulanmış etki: 572 abonelik / 495 müşteri.\nFailover ile korunan: 0 bağlantı.",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ]
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 1
+      "test": 1,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
-      "elapsed_ms": 12369.015,
+      "elapsed_ms": 16432.649,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -264,7 +270,7 @@
             "attempt_count": 1,
             "call_id": "outage_details",
             "correlation_id": "mentor-demo-2:outage_details",
-            "duration_ms": 902,
+            "duration_ms": 995,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -280,7 +286,7 @@
             "attempt_count": 1,
             "call_id": "customer_impact",
             "correlation_id": "mentor-demo-2:customer_impact",
-            "duration_ms": 4076,
+            "duration_ms": 4321,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -296,7 +302,7 @@
             "attempt_count": 1,
             "call_id": "rule_evidence",
             "correlation_id": "mentor-demo-2:rule_evidence",
-            "duration_ms": 890,
+            "duration_ms": 921,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -312,7 +318,7 @@
             "attempt_count": 1,
             "call_id": "compensation_evidence",
             "correlation_id": "mentor-demo-2:compensation_evidence",
-            "duration_ms": 849,
+            "duration_ms": 901,
             "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
             "safe_result_summary": {
               "deterministic": true,
@@ -470,7 +476,7 @@
             "tool_name": "get_compensation_evidence"
           }
         ],
-        "query_run_code": "QR-43B8D67ECA0641E5BD75CCA7A909AC22",
+        "query_run_code": "QR-BF8C3F8026314B87B511744CC2475840",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -498,7 +504,7 @@
       },
       "question": "AGG-KOC-002 cihazındaki olay tam kesinti mi yoksa kısmi kesinti mi? Kaç müşteri ve abonelik etkilendi ve bu olay için hangi telafi kuralı uygulanıyor?",
       "response": {
-        "query_run_code": "QR-43B8D67ECA0641E5BD75CCA7A909AC22",
+        "query_run_code": "QR-BF8C3F8026314B87B511744CC2475840",
         "replayed": false,
         "response": {
           "citations": [
@@ -517,6 +523,7 @@
           ],
           "generation_mode": "deterministic_fallback",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -552,20 +559,25 @@
               "tool_name": "get_rule_evidence"
             }
           ],
+          "provider": "gemini",
           "response_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0005.\n\nKök neden\nKök kaynak: device AGG-KOC-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nTam hizmet kesintisi: Hayır.\nGerekçe kodları: root_cause_unverified.\n\nMüşteri etkisi\nPotansiyel kapsam: 1341 abonelik.\nDoğrulanmış etki: 1338 abonelik / 1101 müşteri.\nFailover ile korunan: 3 bağlantı tam hizmet kesintisi değildir.\n\nTelafi sonucu\nTelafi durumu: calculated.\nDeğerlendirilen doğrulanmış etki: 1.\nUygun kayıt: 1.\nUygun olmayan/bekleyen kayıt: 0.\nToplam telafi tutarı: 10.00 TRY.\nDoğrulanmış RuleVersion: BB-PARTIAL-OUTAGE-PRORATED:v1.\nDoğrulanmış DecisionEvidence: d43704013e92.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ]
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 2
+      "test": 2,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
-      "elapsed_ms": 13837.13,
+      "elapsed_ms": 16824.122,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -575,7 +587,7 @@
             "attempt_count": 1,
             "call_id": "outage_details",
             "correlation_id": "mentor-demo-3:outage_details",
-            "duration_ms": 919,
+            "duration_ms": 1000,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -591,7 +603,7 @@
             "attempt_count": 1,
             "call_id": "customer_impact",
             "correlation_id": "mentor-demo-3:customer_impact",
-            "duration_ms": 3983,
+            "duration_ms": 3873,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -607,7 +619,7 @@
             "attempt_count": 1,
             "call_id": "root_cause",
             "correlation_id": "mentor-demo-3:root_cause",
-            "duration_ms": 967,
+            "duration_ms": 995,
             "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
             "safe_result_summary": {
               "deterministic": true,
@@ -628,7 +640,7 @@
             "attempt_count": 1,
             "call_id": "rule_evidence",
             "correlation_id": "mentor-demo-3:rule_evidence",
-            "duration_ms": 858,
+            "duration_ms": 975,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -644,7 +656,7 @@
             "attempt_count": 1,
             "call_id": "compensation_evidence",
             "correlation_id": "mentor-demo-3:compensation_evidence",
-            "duration_ms": 850,
+            "duration_ms": 912,
             "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
             "safe_result_summary": {
               "deterministic": true,
@@ -829,7 +841,7 @@
             "tool_name": "get_compensation_evidence"
           }
         ],
-        "query_run_code": "QR-F1D55D8DDDD94F8EA72F0E9FD4E03595",
+        "query_run_code": "QR-6D2D59FE8C8B4E0E9BCB8977625D051F",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -859,7 +871,7 @@
       },
       "question": "AGG-İZM-002 olayında failover neden müşterileri koruyamadı? Kaç müşteri ve abonelik etkilendi, olayın sınıfı ne ve telafi sonucu nedir?",
       "response": {
-        "query_run_code": "QR-F1D55D8DDDD94F8EA72F0E9FD4E03595",
+        "query_run_code": "QR-6D2D59FE8C8B4E0E9BCB8977625D051F",
         "replayed": false,
         "response": {
           "citations": [
@@ -878,6 +890,7 @@
           ],
           "generation_mode": "deterministic_fallback",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -921,20 +934,25 @@
               "tool_name": "get_rule_evidence"
             }
           ],
+          "provider": "gemini",
           "response_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0013.\n\nKök neden\nKök kaynak: device AGG-İZM-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nTam hizmet kesintisi: Evet.\nGerekçe kodları: root_cause_unverified, same_resource, temporal_propagation.\nYayılım özeti: Candidate matches the causal event physical root resource.\n\nMüşteri etkisi\nPotansiyel kapsam: 1441 abonelik.\nDoğrulanmış etki: 1438 abonelik / 1267 müşteri.\nFailover ile korunan: 3 bağlantı.\nFailover bazı bağlantıları korusa da bu olayda tam hizmet kesintisini önleyemedi.\nAna ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı ve manuel inceleme gerekir.\n\nTelafi sonucu\nTelafi durumu: calculated.\nDeğerlendirilen doğrulanmış etki: 1.\nUygun kayıt: 1.\nUygun olmayan/bekleyen kayıt: 0.\nToplam telafi tutarı: 839.99 TRY.\nDoğrulanmış RuleVersion: ME-FAILED-FAILOVER:v1.\nDoğrulanmış DecisionEvidence: a8170593f3fb.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ]
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 3
+      "test": 3,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
-      "elapsed_ms": 12920.304,
+      "elapsed_ms": 15520.431,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -944,7 +962,7 @@
             "attempt_count": 1,
             "call_id": "outage_details",
             "correlation_id": "mentor-demo-4:outage_details",
-            "duration_ms": 926,
+            "duration_ms": 1045,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -960,7 +978,7 @@
             "attempt_count": 1,
             "call_id": "customer_impact",
             "correlation_id": "mentor-demo-4:customer_impact",
-            "duration_ms": 5086,
+            "duration_ms": 5375,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -976,7 +994,7 @@
             "attempt_count": 1,
             "call_id": "root_cause",
             "correlation_id": "mentor-demo-4:root_cause",
-            "duration_ms": 930,
+            "duration_ms": 1070,
             "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
             "safe_result_summary": {
               "deterministic": true,
@@ -1101,7 +1119,7 @@
             "tool_name": "rank_root_cause_candidates"
           }
         ],
-        "query_run_code": "QR-CE33E7A76B6648768CBAE074FDC607B7",
+        "query_run_code": "QR-98B57E5F00C84A8DB0B7AD994A62A054",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -1129,7 +1147,7 @@
       },
       "question": "AGG-İZM-004 cihazındaki olayda ana ve yedek yollar gerçekten bağımsız mı? Shared-risk problemi varsa müşteri etkisini ve neden manuel inceleme gerektiğini açıkla.",
       "response": {
-        "query_run_code": "QR-CE33E7A76B6648768CBAE074FDC607B7",
+        "query_run_code": "QR-98B57E5F00C84A8DB0B7AD994A62A054",
         "replayed": false,
         "response": {
           "citations": [
@@ -1142,8 +1160,9 @@
               "reference_kind": "outage"
             }
           ],
-          "generation_mode": "deterministic_fallback",
+          "generation_mode": "llm_assisted",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -1171,20 +1190,21 @@
               "tool_name": "rank_root_cause_candidates"
             }
           ],
-          "response_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0015.\n\nKök neden\nKök kaynak: device AGG-İZM-004.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nTam hizmet kesintisi: Evet.\nGerekçe kodları: root_cause_unverified, same_resource, temporal_propagation.\nYayılım özeti: Candidate matches the causal event physical root resource.\n\nMüşteri etkisi\nPotansiyel kapsam: 1145 abonelik.\nDoğrulanmış etki: 1112 abonelik / 989 müşteri.\nFailover ile korunan: 33 bağlantı.\nFailover bazı bağlantıları korusa da bu olayda tam hizmet kesintisini önleyemedi.\nAna ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı ve manuel inceleme gerekir.",
+          "provider": "gemini",
+          "response_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Evet.\nDoğrulanmış kök kaynak: device AGG-İZM-004.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nKök neden gerekçesi: root_cause_unverified, same_resource, temporal_propagation.\nPotansiyel kapsam: 1145 abonelik.\nDoğrulanmış etki: 1112 abonelik / 989 müşteri.\nFailover ile korunan: 33 bağlantı.\nFailover bazı bağlantıları korusa da bu olayda tam hizmet kesintisini önleyemedi.\nAna ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı ve manuel inceleme gerekir.",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
-          "warnings": [
-            "llm_narrative_fallback"
-          ]
+          "warnings": []
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 4
+      "test": 4,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "GEMINI_SELECTION_PASS"
     },
     {
-      "elapsed_ms": 11978.442,
+      "elapsed_ms": 20522.512,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -1194,7 +1214,7 @@
             "attempt_count": 1,
             "call_id": "outage_details",
             "correlation_id": "mentor-demo-5:outage_details",
-            "duration_ms": 902,
+            "duration_ms": 966,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -1210,7 +1230,7 @@
             "attempt_count": 1,
             "call_id": "customer_impact",
             "correlation_id": "mentor-demo-5:customer_impact",
-            "duration_ms": 3801,
+            "duration_ms": 3943,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -1226,7 +1246,7 @@
             "attempt_count": 1,
             "call_id": "root_cause",
             "correlation_id": "mentor-demo-5:root_cause",
-            "duration_ms": 921,
+            "duration_ms": 1230,
             "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
             "safe_result_summary": {
               "deterministic": true,
@@ -1247,7 +1267,7 @@
             "attempt_count": 1,
             "call_id": "rule_evidence",
             "correlation_id": "mentor-demo-5:rule_evidence",
-            "duration_ms": 864,
+            "duration_ms": 856,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -1263,7 +1283,7 @@
             "attempt_count": 1,
             "call_id": "compensation_evidence",
             "correlation_id": "mentor-demo-5:compensation_evidence",
-            "duration_ms": 856,
+            "duration_ms": 860,
             "result_fingerprint": "acc00418d1938d7d82690c64d21220837a2d58b80d14e4a269f1efa044a44e96",
             "safe_result_summary": {
               "deterministic": true,
@@ -1444,7 +1464,7 @@
             "tool_name": "get_compensation_evidence"
           }
         ],
-        "query_run_code": "QR-A2F4C50428E443538B0481B2DE75BD3D",
+        "query_run_code": "QR-BC7C0B9C88E44FB4AA4AB25E5E93EC02",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -1474,7 +1494,7 @@
       },
       "question": "AN-ESE-002 kaynaklı olayda kaç müşteri etkilendi? Kök neden kesin olarak doğrulanmış mı; doğrulanmadıysa hangi kanıt eksik ve sistem hangi kararı veriyor?",
       "response": {
-        "query_run_code": "QR-A2F4C50428E443538B0481B2DE75BD3D",
+        "query_run_code": "QR-BC7C0B9C88E44FB4AA4AB25E5E93EC02",
         "replayed": false,
         "response": {
           "citations": [
@@ -1493,6 +1513,7 @@
           ],
           "generation_mode": "deterministic_fallback",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -1536,20 +1557,25 @@
               "tool_name": "get_rule_evidence"
             }
           ],
+          "provider": "gemini",
           "response_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0022.\n\nKök neden\nKök kaynak: device AN-ESE-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nTam hizmet kesintisi: Evet.\nGerekçe kodları: root_cause_unverified, same_resource, temporal_propagation.\nYayılım özeti: Candidate matches the causal event physical root resource.\n\nMüşteri etkisi\nPotansiyel kapsam: 48 abonelik.\nDoğrulanmış etki: 48 abonelik / 24 müşteri.\nFailover ile korunan: 0 bağlantı.\n\nTelafi sonucu\nTelafi durumu: calculated.\nDeğerlendirilen doğrulanmış etki: 1.\nUygun kayıt: 0.\nUygun olmayan/bekleyen kayıt: 1.\nKarar: eksik doğrulama nedeniyle manuel inceleme bekleniyor.\nToplam telafi tutarı: 0.00 TRY.\nDoğrulanmış RuleVersion: MR-UNKNOWN-MISSING-EVIDENCE:v1.\nDoğrulanmış DecisionEvidence: b39d63177552.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ]
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 5
+      "test": 5,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
-      "elapsed_ms": 8421.397,
+      "elapsed_ms": 21796.381,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -1559,7 +1585,7 @@
             "attempt_count": 1,
             "call_id": "correlate",
             "correlation_id": "mentor-demo-6:correlate",
-            "duration_ms": 961,
+            "duration_ms": 980,
             "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "safe_result_summary": {
               "causal_event_code": "CE-MCR-0023",
@@ -1583,7 +1609,7 @@
             "attempt_count": 1,
             "call_id": "root_cause",
             "correlation_id": "mentor-demo-6:root_cause",
-            "duration_ms": 953,
+            "duration_ms": 956,
             "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
             "safe_result_summary": {
               "causal_event_code": "CE-MCR-0023",
@@ -1607,7 +1633,7 @@
             "attempt_count": 1,
             "call_id": "rule_evidence",
             "correlation_id": "mentor-demo-6:rule_evidence",
-            "duration_ms": 967,
+            "duration_ms": 983,
             "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
             "safe_result_summary": {
               "causal_event_code": "CE-MCR-0023",
@@ -1742,7 +1768,7 @@
             "tool_name": "get_rule_evidence"
           }
         ],
-        "query_run_code": "QR-3F03C01C10E246F2AFA39A56C6C9E9FB",
+        "query_run_code": "QR-31A3E37A03AA498783299BA756A7273E",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -1767,7 +1793,7 @@
       },
       "question": "CE-MCR-0023 olayının gerçek kök nedeni nedir? OLT_UNREACHABLE, Dying Gasp ve Device Not Active sinyallerinden hangileri kök neden, hangileri belirtidir ve neden?",
       "response": {
-        "query_run_code": "QR-3F03C01C10E246F2AFA39A56C6C9E9FB",
+        "query_run_code": "QR-31A3E37A03AA498783299BA756A7273E",
         "replayed": false,
         "response": {
           "citations": [
@@ -1778,6 +1804,7 @@
           ],
           "generation_mode": "deterministic_fallback",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -1805,20 +1832,25 @@
               "tool_name": "get_rule_evidence"
             }
           ],
+          "provider": "gemini",
           "response_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0023.\n\nKök neden\nKök kaynak: device OLT-YEN-002.\nKök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi ayrıca doğrulanmadı.\nKök neden alarmı: OLT_UNREACHABLE.\nDying Gasp alarmı kök neden değil, belirtidir.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\nGerekçe kodları: same_resource, temporal_propagation.\nYayılım özeti: Candidate matches the causal event physical root resource.\n\nMüşteri etkisi\nPotansiyel etki: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nEtkilenmediği doğrulanan: 0 bağlantı.\nKanıtı yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.\nFailover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok.",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ]
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 6
+      "test": 6,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
-      "elapsed_ms": 7083.557,
+      "elapsed_ms": 14018.332,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -1828,7 +1860,7 @@
             "attempt_count": 1,
             "call_id": "correlate",
             "correlation_id": "mentor-demo-7:correlate",
-            "duration_ms": 871,
+            "duration_ms": 1054,
             "result_fingerprint": "c828a13c611d7c873d7fc437815c667cc5727f9c4652200e8823bddc7b1a2f77",
             "safe_result_summary": {
               "causal_event_code": "CE-MCR-0010",
@@ -1849,7 +1881,7 @@
             "attempt_count": 1,
             "call_id": "root_cause",
             "correlation_id": "mentor-demo-7:root_cause",
-            "duration_ms": 871,
+            "duration_ms": 916,
             "result_fingerprint": "c828a13c611d7c873d7fc437815c667cc5727f9c4652200e8823bddc7b1a2f77",
             "safe_result_summary": {
               "causal_event_code": "CE-MCR-0010",
@@ -1870,7 +1902,7 @@
             "attempt_count": 1,
             "call_id": "customer_history",
             "correlation_id": "mentor-demo-7:customer_history",
-            "duration_ms": 860,
+            "duration_ms": 972,
             "result_fingerprint": "013f20b5ff4cfa7db4de8ff4ca833ee8336a4a1d7e83e81edcec872ae23ba446",
             "safe_result_summary": {
               "causal_event_code": "CE-MCR-0010",
@@ -2003,7 +2035,7 @@
             "tool_name": "get_customer_outage_history"
           }
         ],
-        "query_run_code": "QR-503E7FC10FB14180B0D6EB1733DC07EE",
+        "query_run_code": "QR-C44FEC1815F3492389DA7E1EDA45BE0E",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -2028,7 +2060,7 @@
       },
       "question": "CE-MCR-0010 olayında ana bağlantı down ve yedek bağlantı active. Bu tam hizmet kesintisi sayılır mı? Müşteri etkisini ve failover durumunu açıkla.",
       "response": {
-        "query_run_code": "QR-503E7FC10FB14180B0D6EB1733DC07EE",
+        "query_run_code": "QR-C44FEC1815F3492389DA7E1EDA45BE0E",
         "replayed": false,
         "response": {
           "citations": [
@@ -2039,6 +2071,7 @@
           ],
           "generation_mode": "deterministic_fallback",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -2066,20 +2099,25 @@
               "tool_name": "rank_root_cause_candidates"
             }
           ],
+          "provider": "gemini",
           "response_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0010.\n\nKök neden\nKök kaynak: subscription_connection SUB-MCR-00011.\nKök neden alarmı: PRIMARY_PATH_DOWN.\nDying Gasp için bu olayda doğrulanmış alarm kaydı yok.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\nTam hizmet kesintisi: Hayır.\nBağlantı durumu: ana bağlantı down, yedek bağlantı active.\n\nMüşteri etkisi\nPotansiyel etki: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nEtkilenmediği doğrulanan: 0 bağlantı.\nKanıtı yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı tam hizmet kesintisi değildir.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.\nFailover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok.",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ]
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 7
+      "test": 7,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
-      "elapsed_ms": 10893.457,
+      "elapsed_ms": 23745.542,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -2089,7 +2127,7 @@
             "attempt_count": 1,
             "call_id": "outage_details",
             "correlation_id": "mentor-demo-8:outage_details",
-            "duration_ms": 961,
+            "duration_ms": 1146,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -2105,7 +2143,7 @@
             "attempt_count": 1,
             "call_id": "customer_impact",
             "correlation_id": "mentor-demo-8:customer_impact",
-            "duration_ms": 3836,
+            "duration_ms": 3688,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -2121,7 +2159,7 @@
             "attempt_count": 1,
             "call_id": "rule_evidence",
             "correlation_id": "mentor-demo-8:rule_evidence",
-            "duration_ms": 864,
+            "duration_ms": 880,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -2137,7 +2175,7 @@
             "attempt_count": 1,
             "call_id": "compensation_evidence",
             "correlation_id": "mentor-demo-8:compensation_evidence",
-            "duration_ms": 862,
+            "duration_ms": 895,
             "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
             "safe_result_summary": {
               "deterministic": true,
@@ -2293,7 +2331,7 @@
             "tool_name": "get_compensation_evidence"
           }
         ],
-        "query_run_code": "QR-ACFADC1D14B44C08B4007D96EEADAF1A",
+        "query_run_code": "QR-3908A8C9EBA24C92B95A6A4671622BFD",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -2322,7 +2360,7 @@
       },
       "question": "CE-MCR-0001 olayında SUB-MCR-00002 aboneliği için tazminat sonucu nedir? Doğrulanmış etkiyi, RuleVersion'ı, DecisionEvidence kaydını ve hesaplanan sonucu belirt.",
       "response": {
-        "query_run_code": "QR-ACFADC1D14B44C08B4007D96EEADAF1A",
+        "query_run_code": "QR-3908A8C9EBA24C92B95A6A4671622BFD",
         "replayed": false,
         "response": {
           "citations": [
@@ -2341,6 +2379,7 @@
           ],
           "generation_mode": "deterministic_fallback",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -2376,20 +2415,25 @@
               "tool_name": "get_rule_evidence"
             }
           ],
+          "provider": "gemini",
           "response_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0001.\n\nKök neden\nKök kaynak: device AGG-ANK-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nTam hizmet kesintisi: Evet.\nGerekçe kodları: root_cause_unverified.\n\nMüşteri etkisi\nPotansiyel kapsam: 572 abonelik.\nDoğrulanmış etki: 572 abonelik / 495 müşteri.\nFailover ile korunan: 0 bağlantı.\n\nTelafi sonucu\nTelafi durumu: calculated.\nDeğerlendirilen doğrulanmış etki: 1.\nUygun kayıt: 1.\nUygun olmayan/bekleyen kayıt: 0.\nToplam telafi tutarı: 48.00 TRY.\nDoğrulanmış RuleVersion: BB-DEGRADATION-QUALITY:v1.\nDoğrulanmış DecisionEvidence: 0a388c1e82bf.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ]
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 8
+      "test": 8,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
-      "elapsed_ms": 8791.325,
+      "elapsed_ms": 13126.07,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -2399,7 +2443,7 @@
             "attempt_count": 1,
             "call_id": "compensation_evidence",
             "correlation_id": "mentor-demo-9:compensation_evidence",
-            "duration_ms": 938,
+            "duration_ms": 873,
             "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
             "safe_result_summary": {
               "deterministic": true,
@@ -2417,7 +2461,7 @@
             "attempt_count": 1,
             "call_id": "rule_documents",
             "correlation_id": "mentor-demo-9:rule_documents",
-            "duration_ms": 1751,
+            "duration_ms": 1785,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -2433,7 +2477,7 @@
             "attempt_count": 1,
             "call_id": "rule_evidence",
             "correlation_id": "mentor-demo-9:rule_evidence",
-            "duration_ms": 998,
+            "duration_ms": 948,
             "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
             "safe_result_summary": {
               "causal_event_code": "CE-MCR-0001",
@@ -2587,7 +2631,7 @@
             "tool_name": "get_rule_evidence"
           }
         ],
-        "query_run_code": "QR-1A3903F104A84B47BE37B8837B2FB3F9",
+        "query_run_code": "QR-E36B35FAF4474B97B3FA322E350A1F00",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -2615,7 +2659,7 @@
       },
       "question": "CE-MCR-0001 ve SUB-MCR-00002 için verilen tazminat kararı hangi kural ve kanıtlara dayanıyor? RuleVersion, DecisionEvidence ve RAG kaynaklarının source, version ve section bilgilerini göster.",
       "response": {
-        "query_run_code": "QR-1A3903F104A84B47BE37B8837B2FB3F9",
+        "query_run_code": "QR-E36B35FAF4474B97B3FA322E350A1F00",
         "replayed": false,
         "response": {
           "citations": [
@@ -2668,6 +2712,7 @@
           ],
           "generation_mode": "deterministic_fallback",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -2695,20 +2740,25 @@
               "tool_name": "get_rule_evidence"
             }
           ],
+          "provider": "gemini",
           "response_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0001.\n\nTelafi sonucu\nTelafi durumu: calculated.\nDeğerlendirilen doğrulanmış etki: 1.\nUygun kayıt: 1.\nUygun olmayan/bekleyen kayıt: 0.\nToplam telafi tutarı: 48.00 TRY.\nDoğrulanmış RuleVersion: BB-DEGRADATION-QUALITY:v1.\nDoğrulanmış DecisionEvidence: 0a388c1e82bf.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\n\nKaynaklar\nDoküman sonuçları karar değil, kaynak/citation niteliğindedir.\nSYN-COMP-2026-BROADBAND v1 / Kanıt ve Referanslar\nSYN-COMP-2026-ELIGIBILITY v1 / Duplicate ve Eksik Kanıt\nSYN-COMP-2026-ELIGIBILITY v1 / Kanıt ve Referanslar\nSYN-COMP-2026-OVERVIEW v1 / Değerlendirme Sırası\nSYN-COMP-2026-OVERVIEW v1 / Kanıt ve Açıklanabilirlik",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ]
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 9
+      "test": 9,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
-      "elapsed_ms": 5944.197,
+      "elapsed_ms": 11279.594,
       "http_status": 200,
       "query_run": {
         "error_code": "",
@@ -2718,7 +2768,7 @@
             "attempt_count": 1,
             "call_id": "aggregate_location_impact",
             "correlation_id": "mentor-demo-10:aggregate_location_impact",
-            "duration_ms": 901,
+            "duration_ms": 864,
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
             "safe_result_summary": {
               "deterministic": true,
@@ -2779,7 +2829,7 @@
             "tool_name": "aggregate_location_impact"
           }
         ],
-        "query_run_code": "QR-A2E52B23176A4DE68471C13568DF8FBB",
+        "query_run_code": "QR-2E22F1121B9A4DF7800149301735B3C3",
         "requested_embedding_provider": "gemini",
         "requested_llm_provider": "gemini",
         "resolved_embedding_model": "gemini-embedding-2",
@@ -2811,12 +2861,13 @@
       },
       "question": "6 Haziran 2026 tarihinde Konak ilçesinde kaç kesinti yaşandı? Potansiyel kapsamı, doğrulanmış müşteri etkisini, etkilenmediği doğrulananları, kanıtı yetersiz olanları ve failover ile korunanları ayrı ayrı açıkla.",
       "response": {
-        "query_run_code": "QR-A2E52B23176A4DE68471C13568DF8FBB",
+        "query_run_code": "QR-2E22F1121B9A4DF7800149301735B3C3",
         "replayed": false,
         "response": {
           "citations": [],
           "generation_mode": "deterministic_fallback",
           "language": "tr",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "provenance": [
             {
@@ -2828,17 +2879,22 @@
               "tool_name": "aggregate_location_impact"
             }
           ],
+          "provider": "gemini",
           "response_text": "Genel sonuç\n\nMüşteri etkisi\nKesinti sayısı: 1.\nPotansiyel etki: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nEtkilenmediği doğrulanan: 0 bağlantı.\nKanıtı yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı.",
           "schema_version": "validated-natural-language-response.v1",
           "validation_status": "valid",
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ]
         },
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "status": "completed"
       },
-      "test": 10
+      "test": 10,
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     }
   ],
   "unseen_8": [
@@ -2847,7 +2903,7 @@
       "question": "AGG-ANK-003 cihazındaki olayda kaç abonelik ve kaç müşteri etkilendi? Kesinti sınıfını ve doğrulanmış etkiyi açıkla.",
       "http_status": 200,
       "response": {
-        "query_run_code": "QR-AF039CED0A3244FF8C0945926B856DF7",
+        "query_run_code": "QR-07D9744F9738454181CF9A60E027F228",
         "status": "completed",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "replayed": false,
@@ -2885,8 +2941,12 @@
             }
           ],
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ],
+          "provider": "gemini",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "validation_status": "valid"
         }
@@ -2942,7 +3002,7 @@
             "status": "succeeded",
             "call_id": "outage_details",
             "tool_name": "get_outage_details",
-            "duration_ms": 948,
+            "duration_ms": 964,
             "attempt_count": 1,
             "correlation_id": "unseen-1:outage_details",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -2958,7 +3018,7 @@
             "status": "succeeded",
             "call_id": "customer_impact",
             "tool_name": "calculate_customer_impact",
-            "duration_ms": 5111,
+            "duration_ms": 5072,
             "attempt_count": 1,
             "correlation_id": "unseen-1:customer_impact",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -3027,14 +3087,16 @@
         },
         "error_code": "",
         "error_summary": ""
-      }
+      },
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
       "case_code": "UNSEEN-02",
       "question": "AN-KON-001 kaynaklı olayda müşteri etkisi nedir ve kök neden kanıtı ne kadar güçlüdür?",
       "http_status": 200,
       "response": {
-        "query_run_code": "QR-EE6CF3984BAF4915B4D16CF4ADC2C7CF",
+        "query_run_code": "QR-12D612DA50AA4E0C9BEF1BDFA65D16E2",
         "status": "completed",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "replayed": false,
@@ -3080,8 +3142,12 @@
             }
           ],
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ],
+          "provider": "gemini",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "validation_status": "valid"
         }
@@ -3153,7 +3219,7 @@
             "status": "succeeded",
             "call_id": "outage_details",
             "tool_name": "get_outage_details",
-            "duration_ms": 901,
+            "duration_ms": 919,
             "attempt_count": 1,
             "correlation_id": "unseen-2:outage_details",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -3169,7 +3235,7 @@
             "status": "succeeded",
             "call_id": "customer_impact",
             "tool_name": "calculate_customer_impact",
-            "duration_ms": 3809,
+            "duration_ms": 3805,
             "attempt_count": 1,
             "correlation_id": "unseen-2:customer_impact",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -3185,7 +3251,7 @@
             "status": "succeeded",
             "call_id": "root_cause",
             "tool_name": "rank_root_cause_candidates",
-            "duration_ms": 943,
+            "duration_ms": 946,
             "attempt_count": 1,
             "correlation_id": "unseen-2:root_cause",
             "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
@@ -3266,14 +3332,16 @@
         },
         "error_code": "",
         "error_summary": ""
-      }
+      },
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
       "case_code": "UNSEEN-03",
       "question": "CE-MCR-0011 olayında kısa süreli failover kesintisi nasıl sınıflandırılmıştır ve müşteri etkisi nedir?",
       "http_status": 200,
       "response": {
-        "query_run_code": "QR-542C7853171B47FF895663A029CFFCCA",
+        "query_run_code": "QR-C53E187B67EC4E5893D1F3666CFC1BEC",
         "status": "completed",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "replayed": false,
@@ -3311,8 +3379,12 @@
             }
           ],
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ],
+          "provider": "gemini",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "validation_status": "valid"
         }
@@ -3367,7 +3439,7 @@
             "status": "succeeded",
             "call_id": "outage_details",
             "tool_name": "get_outage_details",
-            "duration_ms": 886,
+            "duration_ms": 906,
             "attempt_count": 1,
             "correlation_id": "unseen-3:outage_details",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -3383,7 +3455,7 @@
             "status": "succeeded",
             "call_id": "customer_impact",
             "tool_name": "calculate_customer_impact",
-            "duration_ms": 3762,
+            "duration_ms": 3750,
             "attempt_count": 1,
             "correlation_id": "unseen-3:customer_impact",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -3447,14 +3519,16 @@
         },
         "error_code": "",
         "error_summary": ""
-      }
+      },
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
       "case_code": "UNSEEN-04",
       "question": "CE-MCR-0012 olayında yedek yolun durumu ve doğrulanmış müşteri etkisi nedir?",
       "http_status": 200,
       "response": {
-        "query_run_code": "QR-966A578FB18C4AD2A867025C73F4DF62",
+        "query_run_code": "QR-FEF2916EBA2546E2A5FCEC7A826E67AF",
         "status": "completed",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "replayed": false,
@@ -3496,8 +3570,12 @@
             }
           ],
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ],
+          "provider": "gemini",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "validation_status": "valid"
         }
@@ -3570,7 +3648,7 @@
             "status": "succeeded",
             "call_id": "correlate",
             "tool_name": "correlate_alarms",
-            "duration_ms": 888,
+            "duration_ms": 916,
             "attempt_count": 1,
             "correlation_id": "unseen-4:correlate",
             "result_fingerprint": "f05e7ad2eef857518a5626c8067db8a458964cd5a75f101755b448b589ab45ed",
@@ -3591,7 +3669,7 @@
             "status": "succeeded",
             "call_id": "root_cause",
             "tool_name": "rank_root_cause_candidates",
-            "duration_ms": 869,
+            "duration_ms": 890,
             "attempt_count": 1,
             "correlation_id": "unseen-4:root_cause",
             "result_fingerprint": "f05e7ad2eef857518a5626c8067db8a458964cd5a75f101755b448b589ab45ed",
@@ -3612,7 +3690,7 @@
             "status": "succeeded",
             "call_id": "customer_history",
             "tool_name": "get_customer_outage_history",
-            "duration_ms": 868,
+            "duration_ms": 856,
             "attempt_count": 1,
             "correlation_id": "unseen-4:customer_history",
             "result_fingerprint": "9189292a5315c8ea9f1c4e4544f8929e73aecb17f0cad804068839c6de206072",
@@ -3697,14 +3775,16 @@
         },
         "error_code": "",
         "error_summary": ""
-      }
+      },
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
       "case_code": "UNSEEN-05",
       "question": "CE-MCR-0022 olayında kök neden kesinleşmiş mi, eksik kanıt nedir ve hangi karar verilmiştir?",
       "http_status": 200,
       "response": {
-        "query_run_code": "QR-0AF2C54317AB4FF6866FF4215A587E17",
+        "query_run_code": "QR-F60EA94354E84AE5BC6F39C7EEE24C6F",
         "status": "completed",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "replayed": false,
@@ -3770,8 +3850,12 @@
             }
           ],
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ],
+          "provider": "gemini",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "validation_status": "valid"
         }
@@ -3874,7 +3958,7 @@
             "status": "succeeded",
             "call_id": "outage_details",
             "tool_name": "get_outage_details",
-            "duration_ms": 905,
+            "duration_ms": 904,
             "attempt_count": 1,
             "correlation_id": "unseen-5:outage_details",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -3890,7 +3974,7 @@
             "status": "succeeded",
             "call_id": "customer_impact",
             "tool_name": "calculate_customer_impact",
-            "duration_ms": 3796,
+            "duration_ms": 3738,
             "attempt_count": 1,
             "correlation_id": "unseen-5:customer_impact",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -3906,7 +3990,7 @@
             "status": "succeeded",
             "call_id": "root_cause",
             "tool_name": "rank_root_cause_candidates",
-            "duration_ms": 916,
+            "duration_ms": 942,
             "attempt_count": 1,
             "correlation_id": "unseen-5:root_cause",
             "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
@@ -3927,7 +4011,7 @@
             "status": "succeeded",
             "call_id": "rule_evidence",
             "tool_name": "get_rule_evidence",
-            "duration_ms": 853,
+            "duration_ms": 861,
             "attempt_count": 1,
             "correlation_id": "unseen-5:rule_evidence",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -3943,7 +4027,7 @@
             "status": "succeeded",
             "call_id": "compensation_evidence",
             "tool_name": "get_compensation_evidence",
-            "duration_ms": 869,
+            "duration_ms": 859,
             "attempt_count": 1,
             "correlation_id": "unseen-5:compensation_evidence",
             "result_fingerprint": "acc00418d1938d7d82690c64d21220837a2d58b80d14e4a269f1efa044a44e96",
@@ -4052,14 +4136,16 @@
         },
         "error_code": "",
         "error_summary": ""
-      }
+      },
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
       "case_code": "UNSEEN-06",
       "question": "CE-MCR-0026 olayındaki OLT alarmının kök neden mi belirti mi olduğunu ve etki kanıtını açıkla.",
       "http_status": 200,
       "response": {
-        "query_run_code": "QR-0A784F3DE5624AB9B9B7BA2DA373B695",
+        "query_run_code": "QR-A525FBE5713743C5B67BF2C16BE7466A",
         "status": "completed",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "replayed": false,
@@ -4101,8 +4187,12 @@
             }
           ],
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ],
+          "provider": "gemini",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "validation_status": "valid"
         }
@@ -4173,7 +4263,7 @@
             "status": "succeeded",
             "call_id": "correlate",
             "tool_name": "correlate_alarms",
-            "duration_ms": 955,
+            "duration_ms": 872,
             "attempt_count": 1,
             "correlation_id": "unseen-6:correlate",
             "result_fingerprint": "cb88f63492b92e899de4ad82562b944805b0bba39a4bcdbabaa8bc6acad49af1",
@@ -4194,7 +4284,7 @@
             "status": "succeeded",
             "call_id": "root_cause",
             "tool_name": "rank_root_cause_candidates",
-            "duration_ms": 871,
+            "duration_ms": 863,
             "attempt_count": 1,
             "correlation_id": "unseen-6:root_cause",
             "result_fingerprint": "cb88f63492b92e899de4ad82562b944805b0bba39a4bcdbabaa8bc6acad49af1",
@@ -4215,7 +4305,7 @@
             "status": "succeeded",
             "call_id": "rule_evidence",
             "tool_name": "get_rule_evidence",
-            "duration_ms": 863,
+            "duration_ms": 874,
             "attempt_count": 1,
             "correlation_id": "unseen-6:rule_evidence",
             "result_fingerprint": "276c6272cf49a697efca8c7f4d5b31964d035f3d7dfb9e5a81dd92975a0694fb",
@@ -4300,14 +4390,16 @@
         },
         "error_code": "",
         "error_summary": ""
-      }
+      },
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
       "case_code": "UNSEEN-07",
       "question": "6 Haziran 2026 tarihinde Konak ilçesinde kaç kesinti oldu ve doğrulanmış müşteri etkisi nedir?",
       "http_status": 200,
       "response": {
-        "query_run_code": "QR-F0A64F2D525F4299B3FC7CBFC36779CF",
+        "query_run_code": "QR-C4AB7FFC42B0456A99BC71B3C28B8978",
         "status": "completed",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "replayed": false,
@@ -4328,8 +4420,12 @@
             }
           ],
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ],
+          "provider": "gemini",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "validation_status": "valid"
         }
@@ -4380,7 +4476,7 @@
             "status": "succeeded",
             "call_id": "aggregate_location_impact",
             "tool_name": "aggregate_location_impact",
-            "duration_ms": 860,
+            "duration_ms": 869,
             "attempt_count": 1,
             "correlation_id": "unseen-7:aggregate_location_impact",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -4425,14 +4521,16 @@
         },
         "error_code": "",
         "error_summary": ""
-      }
+      },
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     },
     {
       "case_code": "UNSEEN-08",
       "question": "CE-MCR-0015 olayının RuleVersion, DecisionEvidence ve RAG kaynaklarını source, version ve section ile göster.",
       "http_status": 200,
       "response": {
-        "query_run_code": "QR-31FC11D2985F4FCBAE89FE4BDD5E63B8",
+        "query_run_code": "QR-BC4A6B96DF8C49EA996892835826D58B",
         "status": "completed",
         "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
         "replayed": false,
@@ -4512,8 +4610,12 @@
             }
           ],
           "warnings": [
-            "llm_narrative_fallback"
+            "llm_narrative_fallback",
+            "llm_statement_selection_attempted",
+            "llm_statement_selection_failure:provider_call_failed_rate_limited"
           ],
+          "provider": "gemini",
+          "model": "gemini-3.6-flash",
           "prompt_version": "closed-world-statement-selection-tr-v3",
           "validation_status": "valid"
         }
@@ -4588,7 +4690,7 @@
             "status": "succeeded",
             "call_id": "compensation_evidence",
             "tool_name": "get_compensation_evidence",
-            "duration_ms": 934,
+            "duration_ms": 947,
             "attempt_count": 1,
             "correlation_id": "unseen-8:compensation_evidence",
             "result_fingerprint": "1cfff0380a820badb70f58efef21c0b72a434c7a49b1624dc99c88af5dee9ac7",
@@ -4607,7 +4709,7 @@
             "status": "succeeded",
             "call_id": "rule_documents",
             "tool_name": "search_rule_documents",
-            "duration_ms": 3691,
+            "duration_ms": 2192,
             "attempt_count": 1,
             "correlation_id": "unseen-8:rule_documents",
             "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
@@ -4623,7 +4725,7 @@
             "status": "succeeded",
             "call_id": "rule_evidence",
             "tool_name": "get_rule_evidence",
-            "duration_ms": 930,
+            "duration_ms": 952,
             "attempt_count": 1,
             "correlation_id": "unseen-8:rule_evidence",
             "result_fingerprint": "ce2853ad0b878807b4742abd33f62db2df7bf71072835fd22a5df105f8494c69",
@@ -4730,25 +4832,30 @@
         },
         "error_code": "",
         "error_summary": ""
-      }
+      },
+      "semantic_verdict": "PASS",
+      "provider_verdict": "PROVIDER_FAIL"
     }
   ],
   "audit": {
-    "original_http_completed": "10/10",
-    "unseen_http_completed": "8/8",
-    "semantic_response_status": "deterministic_facts_rendered",
-    "provider_statement_selection": "fallback_observed_in_all_cases",
     "decision": "NOT_COMPLETE",
-    "blocking_reasons": [
-      "Gemini statement-selection response fell back to deterministic rendering in the recorded runs; provider success is not proven by these artifacts.",
-      "Semantic acceptance is recorded separately from HTTP completion and must not be advertised as PRE-061 PASS."
-    ],
-    "known_fixes": [
-      "compensation evidence is scoped to ground_truth_operational evaluations for the resolved outage",
-      "snapshot_identifier is accepted by causal analysis",
-      "outage planner returns its constructed calls",
-      "root-resource and root-cause rendering are distinct",
-      "canonical compensation RuleVersion supersedes unrelated rule-tool candidates"
-    ]
+    "original_semantic": "10/10",
+    "unseen_semantic": "8/8",
+    "original_provider_selection": "1/10",
+    "unseen_provider_selection": "0/8",
+    "fallback_before": "18/18",
+    "fallback_final": "17/18",
+    "representative_provider_selection": "PASS",
+    "representative_failure_before": "provider_call_failed_rate_limited",
+    "diagnostic": "llm_statement_selection_attempted + provider_call_failed_rate_limited",
+    "blocking_reason": "Gemini selection is not reliable across the full run because provider rate limits still cause fallback.",
+    "safe_counters": {
+      "unsupported_fact": 0,
+      "unsupported_reference": 0,
+      "unsupported_decision": 0,
+      "privacy": 0,
+      "snapshot_leakage": 0,
+      "citation_mismatch": 0
+    }
   }
 }

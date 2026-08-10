@@ -326,6 +326,18 @@ unsupported fact/reference/decision, privacy violations, snapshot leakage and
 critical citation mismatches were all zero. PRE-061 is therefore **PASS** and
 `MAIN-061` may start.
 
+## Provider Selection Audit
+
+The representative Gemini + Gemini Embedding HTTP case proved the provider
+path: HTTP 200, QueryRun completed, Gemini `gemini-3.6-flash` returned a valid
+canonical statement selection, and generation mode was `llm_assisted`.
+The first representative failure was classified safely as
+`provider_call_failed_rate_limited`; the harness had also forced
+`GEMINI_LLM_MAX_ATTEMPTS=1`. With two bounded attempts, the final 18-case run
+recorded 1/10 original and 0/8 unseen Gemini selections, with 17/18 safe
+fallbacks. Semantic verdicts remained 10/10 and 8/8; provider acceptance
+remains **NOT COMPLETE**.
+
 ## Semantic Audit Supersession
 
 The preceding PASS paragraphs are historical records and are superseded by

@@ -272,7 +272,11 @@ def test_unsupported_llm_facts_use_deterministic_fallback(content):
     )
 
     assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
-    assert response.warnings == ["llm_narrative_fallback"]
+    assert "llm_narrative_fallback" in response.warnings
+    assert "llm_statement_selection_attempted" in response.warnings
+    assert any(
+        warning.startswith("llm_statement_selection_failure:") for warning in response.warnings
+    )
     assert content not in response.response_text
     assert "Doğrulanmış etki: 2 bağlantı." in response.response_text
 

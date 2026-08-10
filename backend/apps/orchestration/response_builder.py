@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from apps.core.exceptions import ProcessTwinError
 from apps.orchestration.models import QueryRun, QueryRunStatus
 from apps.orchestration.providers.base import LLMProvider
+from apps.orchestration.providers.gemini import GeminiLLMProviderError
 from apps.orchestration.providers.registry import get_llm_descriptor
 from apps.orchestration.result_merge import (
     ProvenanceEntry,
@@ -107,20 +108,49 @@ class ValidatedResponseBuilder:
         if active_provider is None:
             descriptor = get_llm_descriptor(provider_name)
             active_provider = descriptor.create_provider()
+        response.provider = active_provider.provider_name
+        response.model = active_provider.model_name
+        contract = self._statement_contract(result)
         try:
-            narrative = self._safe_statement_selection(
-                active_provider, self._statement_contract(result)
-            )
-        except Exception:
+            narrative = self._safe_statement_selection(active_provider, contract)
+        except Exception as exc:
             response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
-            response.warnings = sorted(set([*response.warnings, "llm_narrative_fallback"]))
+            response.warnings = sorted(
+                set(
+                    [
+                        *response.warnings,
+                        "llm_narrative_fallback",
+                        "llm_statement_selection_attempted",
+                        "llm_statement_selection_failure:"
+                        + self._statement_selection_failure_code(exc),
+                    ]
+                )
+            )
             return response
 
         response.response_text = narrative
         response.generation_mode = ResponseGenerationMode.LLM_ASSISTED
-        response.provider = active_provider.provider_name
-        response.model = active_provider.model_name
         return response
+
+    @staticmethod
+    def _statement_selection_failure_code(exc: Exception) -> str:
+        """Return a bounded diagnostic category without exposing provider payloads."""
+        if isinstance(exc, GeminiLLMProviderError):
+            return f"provider_call_failed_{exc.code}"
+        message = str(exc)
+        if "not JSON" in message:
+            return "statement_selection_parse_failed"
+        if "unknown or duplicate" in message:
+            return "unknown_or_duplicate_statement_id"
+        if "critical statement missing" in message:
+            return "statement_selection_missing_id"
+        if "schema is invalid" in message:
+            return "statement_selection_schema_invalid"
+        if "provider response is invalid" in message:
+            return "provider_response_invalid"
+        if "selection" in message:
+            return "statement_selection_validation_failed"
+        return "statement_selection_failed"
 
     @staticmethod
     def _validated_result(query_run: QueryRun) -> ValidatedExecutionResult:
