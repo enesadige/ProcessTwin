@@ -773,6 +773,7 @@ def calculate_customer_impact(request, outage_code: str):
             "protected_failover": {
                 "subscription_count": payload["failover_protected_subscription_count"],
             },
+            "failover_path_diversity_counts": payload["failover_path_diversity_counts"],
         }
         warnings = [
             {

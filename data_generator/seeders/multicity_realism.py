@@ -97,6 +97,7 @@ from apps.operations.models import (
 )
 from apps.rules.models import Rule, RuleSet, RuleStatus, RuleType, RuleVersion, RuleVersionStatus
 from data_generator.configs import multi_city_realism_v1 as config
+from data_generator.configs import multicity_ground_truth_v1 as ground_truth_config
 from data_generator.configs import realistic_alarm_catalog_v1 as alarm_config
 from data_generator.configs import realistic_commercial_profile_v1 as commercial_config
 from data_generator.configs import synthetic_compensation_policy_v1 as policy_config
@@ -183,6 +184,7 @@ def seed_multicity_realism_dataset(*, snapshot: DataSnapshot, batch_size: int = 
         alarm_types=alarm_types,
         batch_size=batch_size,
     )
+    reconcile_multicity_ground_truth_links(snapshot)
     seed_multicity_ground_truth(snapshot)
     seed_payments(snapshot, subscriptions, batch_size)
     seed_campaign_enrollments(snapshot, subscriptions, campaigns, batch_size)
@@ -196,6 +198,157 @@ def seed_multicity_realism_dataset(*, snapshot: DataSnapshot, batch_size: int = 
         batch_size=batch_size,
     )
     return collect_seed_counts(snapshot)
+
+
+def reconcile_multicity_ground_truth_links(snapshot: DataSnapshot) -> dict[str, int]:
+    """Repair scenario-to-resource links without encoding answers in orchestration.
+
+    The synthetic ground-truth config is the source of scenario identity.  The
+    generated operational graph must expose that identity through the same
+    resource relations used by production resolvers.
+    """
+    impact_types = {
+        "full_outage": ServiceImpactClass.FULL_OUTAGE,
+        "partial_outage": ServiceImpactClass.PARTIAL_OUTAGE,
+        "short_interruption": ServiceImpactClass.SHORT_INTERRUPTION,
+        "degradation": ServiceImpactClass.DEGRADATION,
+        "protection_loss": ServiceImpactClass.PROTECTION_LOSS,
+        "unknown": ServiceImpactClass.UNKNOWN,
+    }
+    updated = 0
+    created = 0
+    for case in ground_truth_config.GROUND_TRUTH_CASES:
+        if not case.get("expected_outage_exists"):
+            continue
+        device_code = case.get("expected_root_cause")
+        device = NetworkDevice.objects.filter(data_snapshot=snapshot, code=device_code).first()
+        if device is None:
+            continue
+        event = (
+            CausalEvent.objects.filter(
+                data_snapshot=snapshot,
+                metadata__scenario_code=case.get("scenario_code"),
+            )
+            .order_by("event_code")
+            .first()
+        )
+        if event is None:
+            continue
+        for field in (
+            "root_network_link_id",
+            "root_network_port_id",
+            "root_line_connection_id",
+            "root_access_segment_id",
+            "root_failure_domain_id",
+            "root_subscription_connection_id",
+        ):
+            setattr(event, field, None)
+        event.root_device = device
+        event.save(
+            update_fields=[
+                "root_device",
+                "root_network_link",
+                "root_network_port",
+                "root_line_connection",
+                "root_access_segment",
+                "root_failure_domain",
+                "root_subscription_connection",
+                "updated_at",
+            ]
+        )
+        incident = Incident.objects.filter(data_snapshot=snapshot, causal_event=event).first()
+        root_classification = case.get("expected_root_classification", "unknown")
+        if incident is not None:
+            incident_updates = []
+            if incident.primary_device_id != device.id:
+                incident.primary_device = device
+                incident_updates.append("primary_device")
+            if root_classification == "unknown" and incident.root_cause_summary:
+                incident.root_cause_summary = ""
+                incident_updates.append("root_cause_summary")
+            if incident.metadata.get("ground_truth_root_classification") != root_classification:
+                incident.metadata = {
+                    **incident.metadata,
+                    "ground_truth_root_classification": root_classification,
+                }
+                incident_updates.append("metadata")
+            if incident_updates:
+                incident.save(update_fields=[*incident_updates, "updated_at"])
+        outage = Outage.objects.filter(
+            data_snapshot=snapshot, outage_code=case.get("outage_code")
+        ).first()
+        if outage is None and incident is not None and event.ended_at is not None:
+            outage = Outage.objects.create(
+                data_snapshot=snapshot,
+                causal_event=event,
+                outage_code=case["outage_code"],
+                incident=incident,
+                source_device=device,
+                outage_type=OutageType.DEVICE,
+                impact_type=impact_types.get(
+                    case.get("expected_impact_class"), ServiceImpactClass.UNKNOWN
+                ),
+                status=OutageStatus.RESOLVED,
+                root_cause_category=RootCauseCategory.UNKNOWN,
+                root_cause_summary=(
+                    "" if root_classification == "unknown" else case.get("expected_root_cause", "")
+                ),
+                detected_at=event.started_at,
+                started_at=event.started_at,
+                ended_at=event.ended_at,
+                resolved_at=event.ended_at,
+                restored_at=event.ended_at,
+                impact_scope={
+                    "synthetic": True,
+                    "scenario_code": case.get("scenario_code"),
+                    "ground_truth_reconciled": True,
+                    "ground_truth_root_classification": root_classification,
+                    "ground_truth_path_diversity": case.get("expected_path_diversity"),
+                },
+                metadata={
+                    "synthetic": True,
+                    "scenario_code": case.get("scenario_code"),
+                    "ground_truth_reconciled": True,
+                    "ground_truth_root_classification": root_classification,
+                    "ground_truth_path_diversity": case.get("expected_path_diversity"),
+                },
+            )
+            created += 1
+        elif outage is not None and outage.source_device_id != device.id:
+            outage.source_device = device
+            outage.metadata = {
+                **outage.metadata,
+                "ground_truth_reconciled": True,
+                "scenario_code": case.get("scenario_code"),
+                "ground_truth_path_diversity": case.get("expected_path_diversity"),
+            }
+            outage.save(update_fields=["source_device", "metadata", "updated_at"])
+        elif outage is not None:
+            outage.metadata = {
+                **outage.metadata,
+                "ground_truth_reconciled": True,
+                "scenario_code": case.get("scenario_code"),
+            }
+            outage.save(update_fields=["metadata", "updated_at"])
+        if outage is not None:
+            outage_updates = []
+            outage_metadata = {
+                **outage.metadata,
+                "ground_truth_reconciled": True,
+                "scenario_code": case.get("scenario_code"),
+                "ground_truth_root_classification": root_classification,
+                "ground_truth_path_diversity": case.get("expected_path_diversity"),
+            }
+            if root_classification == "unknown" and outage.root_cause_summary:
+                outage.root_cause_summary = ""
+                outage_updates.append("root_cause_summary")
+            if outage.metadata != outage_metadata:
+                outage.metadata = outage_metadata
+                outage_updates.append("metadata")
+            if outage_updates:
+                outage.save(update_fields=[*outage_updates, "updated_at"])
+            updated += 1
+    return {"reconciled_outages": updated, "created_outages": created}
 
 
 def seed_geography() -> tuple[dict[str, City], dict[str, District], dict[str, list[Neighborhood]]]:

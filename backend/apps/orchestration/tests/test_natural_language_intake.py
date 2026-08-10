@@ -280,3 +280,48 @@ def test_deterministic_parser_preserves_unicode_device_and_parses_turkish_date()
     assert device_query.structured_query.device_code == "AGG-İZM-002"
     assert date_query.structured_query.time_window is not None
     assert date_query.structured_query.time_window.from_time.date().isoformat() == "2026-06-06"
+
+
+@pytest.mark.django_db
+def test_device_resolution_prefers_reconciled_canonical_chain_over_history():
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.operations.models import (
+        Outage,
+        OutageStatus,
+        OutageType,
+        RootCauseCategory,
+        ServiceImpactClass,
+    )
+    from apps.operations.tests.test_operations_models import create_maltepe_bng
+
+    snapshot = create_snapshot("deterministic-device-ranking")
+    device = create_maltepe_bng(snapshot, code="AGG-ANK-002")
+    started_at = timezone.now() - timedelta(hours=2)
+    for code, metadata in (
+        ("OUT-HISTORY-001", {}),
+        ("OUT-CANONICAL-001", {"ground_truth_reconciled": True}),
+    ):
+        Outage.objects.create(
+            data_snapshot=snapshot,
+            outage_code=code,
+            source_device=device,
+            outage_type=OutageType.DEVICE,
+            impact_type=ServiceImpactClass.FULL_OUTAGE,
+            status=OutageStatus.RESOLVED,
+            root_cause_category=RootCauseCategory.UNKNOWN,
+            detected_at=started_at,
+            started_at=started_at,
+            ended_at=started_at + timedelta(minutes=10),
+            resolved_at=started_at + timedelta(minutes=10),
+            metadata=metadata,
+        )
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query="AGG-ANK-002 cihazındaki kesintiyi açıkla.", snapshot=snapshot
+    )
+
+    assert parsed.structured_query.outage_code == "OUT-CANONICAL-001"
+    assert parsed.missing_fields == ()

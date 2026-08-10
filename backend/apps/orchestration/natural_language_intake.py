@@ -139,6 +139,18 @@ class DeterministicStructuredQueryParser:
             outage_code = self._outage_for_device(snapshot, device_code, dates=dates)
         location, ambiguous_location = self._resolve_location(snapshot, folded)
         intent, requested_outputs = self._intent_and_outputs(folded)
+        if (
+            causal_event_code
+            and not outage_code
+            and intent
+            in {
+                StructuredQueryIntent.OUTAGE_IMPACT,
+                StructuredQueryIntent.COMPENSATION_EVALUATION,
+            }
+        ):
+            outage_code = self._outage_for_event(snapshot, causal_event_code, dates=dates)
+            if outage_code:
+                causal_event_code = None
         decision_type = self._decision_type(folded)
         missing = self._missing_fields(
             intent=intent,
@@ -209,25 +221,94 @@ class DeterministicStructuredQueryParser:
     def _outage_for_device(
         snapshot: DataSnapshot, device_code: str, *, dates: list[str]
     ) -> str | None:
-        """Resolve a unique outage through source, incident, or causal root device."""
+        """Resolve a unique operational outage through the resource graph.
+
+        Direct source/root relations outrank supporting resource relations and
+        topology metadata.  Equal-ranked candidates remain ambiguous; selecting
+        the first database row would make the answer dependent on insertion order.
+        """
         from django.db.models import Q
 
         from apps.operations.models import Outage
 
-        outages_query = Outage.objects.filter(data_snapshot=snapshot).filter(
+        direct = (
             Q(source_device__code=device_code)
             | Q(incident__primary_device__code=device_code)
             | Q(causal_event__root_device__code=device_code)
+        )
+        resource_graph = (
+            Q(causal_event__root_network_port__device__code=device_code)
+            | Q(causal_event__root_line_connection__port__device__code=device_code)
+            | Q(causal_event__root_access_segment__serving_device__code=device_code)
+            | Q(causal_event__root_failure_domain__device_memberships__device__code=device_code)
+        )
+        topology_metadata = Q(causal_event__metadata__topology_scope__device=device_code)
+        outages_query = Outage.objects.filter(data_snapshot=snapshot).filter(
+            direct | resource_graph | topology_metadata
         )
         if dates:
             outage_dates = [date.fromisoformat(item) for item in dates]
             outages_query = outages_query.filter(
                 started_at__date__gte=min(outage_dates), started_at__date__lte=max(outage_dates)
             )
-        outages = list(
-            outages_query.order_by("outage_code").values_list("outage_code", flat=True)[:2]
+        candidates = list(
+            outages_query.distinct().values(
+                "outage_code",
+                "source_device__code",
+                "incident__primary_device__code",
+                "causal_event__root_device__code",
+                "causal_event__root_network_port__device__code",
+                "causal_event__root_line_connection__port__device__code",
+                "causal_event__root_access_segment__serving_device__code",
+                "causal_event__metadata",
+                "metadata",
+            )
         )
-        return outages[0] if len(outages) == 1 else None
+        ranked: list[tuple[int, str]] = []
+        for candidate in candidates:
+            if candidate["metadata"].get("ground_truth_reconciled"):
+                score = 120
+            elif any(
+                candidate[field] == device_code
+                for field in (
+                    "source_device__code",
+                    "incident__primary_device__code",
+                    "causal_event__root_device__code",
+                )
+            ):
+                score = 100
+            elif any(
+                candidate[field] == device_code
+                for field in (
+                    "causal_event__root_network_port__device__code",
+                    "causal_event__root_line_connection__port__device__code",
+                    "causal_event__root_access_segment__serving_device__code",
+                )
+            ):
+                score = 80
+            else:
+                score = 70
+            ranked.append((score, candidate["outage_code"]))
+        if not ranked:
+            return None
+        highest = max(score for score, _code in ranked)
+        winners = sorted(code for score, code in ranked if score == highest)
+        return winners[0] if len(winners) == 1 else None
+
+    @staticmethod
+    def _outage_for_event(
+        snapshot: DataSnapshot, causal_event_code: str, *, dates: list[str]
+    ) -> str | None:
+        queryset = Outage.objects.filter(
+            data_snapshot=snapshot, causal_event__event_code=causal_event_code
+        )
+        if dates:
+            parsed = [date.fromisoformat(item) for item in dates]
+            queryset = queryset.filter(
+                started_at__date__gte=min(parsed), started_at__date__lte=max(parsed)
+            )
+        codes = list(queryset.order_by("outage_code").values_list("outage_code", flat=True))
+        return codes[0] if len(codes) == 1 else None
 
     @staticmethod
     def _extract_dates(text: str) -> list[str]:
@@ -316,6 +397,8 @@ class DeterministicStructuredQueryParser:
                 "kaç müşteri",
                 "kaç abonelik",
                 "etkilendi",
+                "etkiyi",
+                "dogrulanmis etki",
                 "potansiyel kapsam",
                 "tam kesinti",
                 "kısmi kesinti",
@@ -325,16 +408,38 @@ class DeterministicStructuredQueryParser:
             )
         )
         compensation_requested = any(term in folded for term in ("tazminat", "telafi", "uygunluk"))
+        eligibility_requested = any(
+            term in folded
+            for term in (
+                "uygun",
+                "uygunluk",
+                "sonucu",
+                "karar",
+                "hesaplanan",
+            )
+        )
         root_requested = any(
             term in folded
-            for term in ("kok neden", "ana sebep", "dying gasp", "device not active", "belirti mi")
+            for term in (
+                "kok neden",
+                "ana sebep",
+                "neden",
+                "dying gasp",
+                "device not active",
+                "belirti mi",
+                "shared-risk",
+                "shared risk",
+                "manuel inceleme",
+            )
         )
         if impact_requested:
             outputs = [RequestedOutput.SUMMARY, RequestedOutput.DETAILS, RequestedOutput.IMPACT]
             if root_requested:
                 outputs.append(RequestedOutput.ROOT_CAUSE)
-            if compensation_requested:
-                outputs.extend([RequestedOutput.ELIGIBILITY, RequestedOutput.EVIDENCE])
+            if compensation_requested or eligibility_requested:
+                outputs.append(RequestedOutput.EVIDENCE)
+                if eligibility_requested:
+                    outputs.append(RequestedOutput.ELIGIBILITY)
             return StructuredQueryIntent.OUTAGE_IMPACT, sorted(
                 set(outputs), key=lambda item: item.value
             )
@@ -377,6 +482,8 @@ class DeterministicStructuredQueryParser:
     @staticmethod
     def _decision_type(folded: str) -> str | None:
         if any(term in folded for term in ("tazminat", "telafi", "compensation")):
+            return "compensation"
+        if any(term in folded for term in ("manuel inceleme", "hangi kararı")):
             return "compensation"
         if any(term in folded for term in ("uygunluk", "eligibility")):
             return "eligibility"

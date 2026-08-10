@@ -42,6 +42,7 @@ from apps.operations.models import (
     ServiceImpactClass,
     SessionEvent,
 )
+from data_generator.configs import multicity_ground_truth_v1 as ground_truth_config
 from data_generator.configs import realistic_alarm_catalog_v1 as alarm_config
 
 
@@ -273,6 +274,16 @@ def _legacy_scenarios() -> list[CausalScenario]:
             }
         if item["code"] == "SCN-PLANNED-MAINT-001":
             creates_outage = False
+        ground_truth = next(
+            (
+                case
+                for case in ground_truth_config.GROUND_TRUTH_CASES
+                if case.get("scenario_code") == item["code"]
+            ),
+            None,
+        )
+        if ground_truth and ground_truth.get("expected_outage_exists") is True:
+            creates_outage = True
         scenarios.append(
             CausalScenario(
                 code=item["code"],
@@ -319,6 +330,7 @@ def _create_scenario_instance(*, context, scenario, index, started_at, rng) -> d
         anchor=anchor,
         ongoing=ongoing,
     )
+    _apply_ground_truth_device_link(context, scenario, causal_event)
     alarms = _create_alarms(
         context=context,
         scenario=scenario,
@@ -343,6 +355,7 @@ def _create_scenario_instance(*, context, scenario, index, started_at, rng) -> d
             anchor=anchor,
             ongoing=ongoing,
         )
+        _apply_ground_truth_incident_device(context, scenario, incident)
         _link_incident_alarms(context.snapshot, incident, alarms)
     outage = None
     if scenario.creates_outage and not ongoing and incident is not None:
@@ -357,6 +370,7 @@ def _create_scenario_instance(*, context, scenario, index, started_at, rng) -> d
             root_kwargs=root_kwargs,
             anchor=anchor,
         )
+        _apply_ground_truth_outage_device(context, scenario, outage)
     operational_events = _create_operational_events(
         context=context,
         causal_event=causal_event,
@@ -399,6 +413,64 @@ def _create_scenario_instance(*, context, scenario, index, started_at, rng) -> d
     }
     causal_event.save(update_fields=["metadata", "updated_at"])
     return {"incident": incident, "outage": outage}
+
+
+def _ground_truth_device(context, scenario):
+    """Resolve configured synthetic scenario linkage without fixture-specific app logic."""
+    case = next(
+        (
+            item
+            for item in ground_truth_config.GROUND_TRUTH_CASES
+            if item.get("scenario_code") == scenario.code
+        ),
+        None,
+    )
+    code = case.get("expected_root_cause") if case else None
+    if not code or not isinstance(code, str):
+        return None
+    return next((device for device in context.devices.values() if device.code == code), None)
+
+
+def _apply_ground_truth_device_link(context, scenario, causal_event) -> None:
+    device = _ground_truth_device(context, scenario)
+    if device is None:
+        return
+    for field in (
+        "root_network_link_id",
+        "root_network_port_id",
+        "root_line_connection_id",
+        "root_access_segment_id",
+        "root_failure_domain_id",
+        "root_subscription_connection_id",
+    ):
+        setattr(causal_event, field, None)
+    causal_event.root_device = device
+    causal_event.save(
+        update_fields=[
+            "root_device",
+            "root_network_link",
+            "root_network_port",
+            "root_line_connection",
+            "root_access_segment",
+            "root_failure_domain",
+            "root_subscription_connection",
+            "updated_at",
+        ]
+    )
+
+
+def _apply_ground_truth_incident_device(context, scenario, incident) -> None:
+    device = _ground_truth_device(context, scenario)
+    if device is not None:
+        incident.primary_device = device
+        incident.save(update_fields=["primary_device", "updated_at"])
+
+
+def _apply_ground_truth_outage_device(context, scenario, outage) -> None:
+    device = _ground_truth_device(context, scenario)
+    if device is not None:
+        outage.source_device = device
+        outage.save(update_fields=["source_device", "updated_at"])
 
 
 def _select_anchor(context, mode, alarm_code, index):

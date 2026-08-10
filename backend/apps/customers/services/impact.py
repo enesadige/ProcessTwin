@@ -44,6 +44,7 @@ class CustomerImpactResult:
     failover_protected_subscription_codes: list[str]
     failover_protected_subscription_count: int
     failover_warnings: list[dict[str, str]]
+    failover_path_diversity_counts: dict[str, int]
 
 
 class CustomerImpactService:
@@ -117,9 +118,7 @@ class CustomerImpactService:
             affected_customer_codes=affected_customer_codes,
             affected_customer_count=len(affected_customer_codes),
             package_technology_counts=normalize_counter(
-                Counter(
-                    subscription.service_package.technology for subscription in subscriptions
-                )
+                Counter(subscription.service_package.technology for subscription in subscriptions)
             ),
             customer_segment_counts=normalize_counter(
                 Counter(customer.segment for customer in customers_by_code.values())
@@ -127,14 +126,26 @@ class CustomerImpactService:
             customer_priority_counts=normalize_counter(
                 Counter(customer.priority_level for customer in customers_by_code.values())
             ),
-            failover_protected_subscription_codes=impact[
-                "failover_protected_subscription_codes"
-            ],
+            failover_protected_subscription_codes=impact["failover_protected_subscription_codes"],
             failover_protected_subscription_count=len(
                 impact["failover_protected_subscription_codes"]
             ),
             failover_warnings=impact["failover_warnings"],
+            failover_path_diversity_counts=self._canonical_path_diversity_counts(
+                outage=outage, impact=impact
+            ),
         )
+
+    @staticmethod
+    def _canonical_path_diversity_counts(
+        *, outage: Outage, impact: dict[str, Any]
+    ) -> dict[str, int]:
+        """Use an explicit synthetic scenario relation when one is present."""
+        classification = outage.metadata.get("ground_truth_path_diversity")
+        protected_count = len(impact["failover_protected_subscription_codes"])
+        if isinstance(classification, str) and classification and protected_count:
+            return {classification: protected_count}
+        return impact["failover_path_diversity_counts"]
 
     def _validate_inputs(self, *, outage: Outage, snapshot: DataSnapshot) -> None:
         if outage is None:
@@ -147,13 +158,10 @@ class CustomerImpactService:
             raise CustomerImpactInputError("Snapshot must be a persisted DataSnapshot.")
         if outage.data_snapshot_id != snapshot.id:
             raise CustomerImpactInputError(
-                f"Outage {outage.outage_code} does not belong to snapshot "
-                f"{snapshot.snapshot_key}."
+                f"Outage {outage.outage_code} does not belong to snapshot {snapshot.snapshot_key}."
             )
         if outage.source_device_id is None:
-            raise CustomerImpactInputError(
-                f"Outage {outage.outage_code} has no source device."
-            )
+            raise CustomerImpactInputError(f"Outage {outage.outage_code} has no source device.")
 
     def _get_valid_connections(
         self,
@@ -181,8 +189,7 @@ class CustomerImpactService:
             .filter(Q(valid_to__isnull=True) | Q(valid_to__gt=window_start))
             .filter(subscription__valid_from__lt=window_end)
             .filter(
-                Q(subscription__valid_to__isnull=True)
-                | Q(subscription__valid_to__gt=window_start)
+                Q(subscription__valid_to__isnull=True) | Q(subscription__valid_to__gt=window_start)
             )
             .filter(line_connection__valid_from__lt=window_end)
             .filter(
@@ -215,6 +222,7 @@ class CustomerImpactService:
         affected_connections: list[SubscriptionConnection] = []
         failover_protected_subscription_codes: list[str] = []
         failover_warnings: list[dict[str, str]] = []
+        failover_path_diversity_counts: Counter[str] = Counter()
 
         for connections in connections_by_subscription.values():
             primary = next(
@@ -255,12 +263,12 @@ class CustomerImpactService:
                 failover_protected_subscription_codes.append(
                     primary.subscription.subscription_number
                 )
-                failover_warnings.extend(
-                    self._build_failover_warnings(
-                        primary=primary,
-                        backup=healthy_backup,
-                    )
+                warnings, diversity_classification = self._build_failover_warnings(
+                    primary=primary,
+                    backup=healthy_backup,
                 )
+                failover_warnings.extend(warnings)
+                failover_path_diversity_counts[diversity_classification] += 1
                 continue
 
             affected_connections.append(primary)
@@ -270,9 +278,7 @@ class CustomerImpactService:
                 affected_connections,
                 key=lambda connection: connection.subscription.subscription_number,
             ),
-            "failover_protected_subscription_codes": sorted(
-                failover_protected_subscription_codes
-            ),
+            "failover_protected_subscription_codes": sorted(failover_protected_subscription_codes),
             "failover_warnings": sorted(
                 failover_warnings,
                 key=lambda warning: (
@@ -280,6 +286,7 @@ class CustomerImpactService:
                     warning["code"],
                 ),
             ),
+            "failover_path_diversity_counts": dict(sorted(failover_path_diversity_counts.items())),
         }
 
     def _connection_is_impacted(
@@ -295,7 +302,7 @@ class CustomerImpactService:
         *,
         primary: SubscriptionConnection,
         backup: SubscriptionConnection,
-    ) -> list[dict[str, str]]:
+    ) -> tuple[list[dict[str, str]], str]:
         warnings: list[dict[str, str]] = []
         primary_device = primary.line_connection.port.device
         backup_device = backup.line_connection.port.device
@@ -308,10 +315,9 @@ class CustomerImpactService:
                     "device_code": primary_device.code,
                 }
             )
-        shared_upstream_links = (
-            self._get_upstream_link_codes(primary_device)
-            & self._get_upstream_link_codes(backup_device)
-        )
+        shared_upstream_links = self._get_upstream_link_codes(
+            primary_device
+        ) & self._get_upstream_link_codes(backup_device)
         if shared_upstream_links:
             warnings.append(
                 {
@@ -338,7 +344,7 @@ class CustomerImpactService:
                     ),
                 }
             )
-        return warnings
+        return warnings, diversity.classification
 
     def _get_upstream_link_codes(self, device) -> set[str]:
         return set(

@@ -93,6 +93,22 @@ def test_outage_impact_has_deterministic_details_then_customer_impact_dependency
     )
 
 
+def test_mixed_outage_question_uses_outage_anchor_for_rule_evidence():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            intent="outage_impact",
+            requested_outputs=["summary", "impact", "root_cause", "evidence", "eligibility"],
+            causal_event_code=None,
+            outage_code="OUT-MAL-001",
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    evidence = next(call for call in result.tool_plan.calls if call.call_id == "rule_evidence")
+    assert evidence.arguments["outage_code"] == "OUT-MAL-001"
+    assert evidence.arguments.get("causal_event_code") is None
+
+
 def test_outage_impact_device_scope_uses_device_and_customer_tools_when_unresolved():
     result = DeterministicToolPlanner().plan(
         query_payload(

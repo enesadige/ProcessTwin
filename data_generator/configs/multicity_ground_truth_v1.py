@@ -206,6 +206,7 @@ NETWORK_CASES = [
         "expected_decision": "manual_review",
         "expected_exact_amount": "0.00",
         "expected_manual_review_reason": "shared_risk_diversity",
+        "expected_path_diversity": "shared_risk",
         "service_checks": ["impact", "root_cause", "path_diversity_distribution"],
     },
     {

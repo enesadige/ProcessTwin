@@ -61,7 +61,7 @@ def test_query_run_to_tool_plan_integration_is_idempotent_and_offline(monkeypatc
     assert {
         server: len(definitions) for server, definitions in MCP_TOOL_REGISTRIES.items()
     } == {
-        MCPServer.NETWORK: 9,
+            MCPServer.NETWORK: 10,
         MCPServer.CUSTOMER: 7,
         MCPServer.RULE: 8,
         MCPServer.COMPENSATION: 6,

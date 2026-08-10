@@ -150,7 +150,9 @@ def test_deterministic_response_renders_validated_sections_and_keeps_run_unchang
     assert "Doğrulanmış etki: 2 bağlantı." in response.response_text
     assert "Etkilenmediği doğrulanan: 1 bağlantı." in response.response_text
     assert "Kanıtı yetersiz: 1 bağlantı." in response.response_text
-    assert "Failover ile korunan: 1 bağlantı; tam kesinti sayılmaz." in response.response_text
+    assert (
+        "Failover ile korunan: 1 bağlantı tam hizmet kesintisi değildir." in response.response_text
+    )
     assert "Doğrulanmış ana kök neden: OLT_UNREACHABLE." in response.response_text
     assert "Dying Gasp alarmı kök neden değil, belirtidir." in response.response_text
     assert "Tam hizmet kesintisi: Hayır." in response.response_text

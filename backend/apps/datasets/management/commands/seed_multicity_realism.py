@@ -2,6 +2,7 @@ from data_generator.configs import multi_city_realism_v1 as seed_config
 from data_generator.seeders.multicity_realism import (
     delete_multicity_realism_dataset_tree,
     parse_reference_datetime,
+    reconcile_multicity_ground_truth_links,
     seed_multicity_realism_dataset,
 )
 from data_generator.validators.multicity_realism import validate_multicity_realism_snapshot
@@ -42,6 +43,11 @@ class Command(BaseCommand):
             "--dataset-slug",
             help="Create or validate this versioned dataset slug instead of the legacy default.",
         )
+        parser.add_argument(
+            "--reconcile-ground-truth",
+            action="store_true",
+            help="Repair scenario resource links in an existing snapshot without reseeding it.",
+        )
 
     def handle(self, *args, **options):
         reference_datetime = parse_reference_datetime(options["reference_datetime"])
@@ -54,6 +60,13 @@ class Command(BaseCommand):
             raise CommandError("--reset cannot be used with --dataset-slug.")
         with transaction.atomic():
             dataset = DatasetVersion.objects.filter(slug=dataset_slug).first()
+            if options["reconcile_ground_truth"]:
+                if dataset is None:
+                    raise CommandError("Multi-city realism dataset does not exist.")
+                snapshot = dataset.snapshots.order_by("-created_at").first()
+                result = reconcile_multicity_ground_truth_links(snapshot)
+                self.stdout.write(self.style.SUCCESS(str(result)))
+                return
             if options["validate_only"]:
                 if dataset is None:
                     raise CommandError("Multi-city realism dataset does not exist.")

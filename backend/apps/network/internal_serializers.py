@@ -215,6 +215,7 @@ def outage_summary(outage: Outage, *, duration: dict[str, Any] | None = None) ->
         "source_device": device_summary(outage.source_device),
         "root_cause_category": outage.root_cause_category,
         "root_cause_summary": outage.root_cause_summary,
+        "root_cause_classification": outage.metadata.get("ground_truth_root_classification"),
         "detected_at": iso_or_none(outage.detected_at),
         "started_at": iso_or_none(outage.started_at),
         "ended_at": iso_or_none(outage.ended_at),

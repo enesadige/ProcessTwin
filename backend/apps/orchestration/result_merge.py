@@ -76,6 +76,7 @@ class ImpactSummary(BaseModel):
     verified_no_impact: int | None = None
     insufficient_evidence: int | None = None
     failover_protected: int | None = None
+    failover_path_diversity_counts: dict[str, int] = Field(default_factory=dict)
     affected_subscription_count: int | None = None
     affected_customer_count: int | None = None
     reason_code_distribution: dict[str, int] = Field(default_factory=dict)
@@ -330,6 +331,9 @@ def _network_outage_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
                 data.get("affected_customer_count"), "affected_customer_count"
             ),
             "failover_protected": failover_protected,
+            "failover_path_diversity_counts": _count_mapping(
+                data.get("failover_path_diversity_counts"), "failover_path_diversity_counts"
+            ),
         },
     )
 
@@ -365,6 +369,16 @@ def _network_outage_details(data: Mapping[str, Any]) -> _ExtractedToolResult:
     incident = _mapping(outage.get("incident"))
     source = _mapping(outage.get("source_device"))
     impact_class = _string(outage.get("impact_class"), "impact_class")
+    root_cause_classification = _string(
+        outage.get("root_cause_classification"), "root_cause_classification"
+    )
+    root_cause_summary = _string(
+        outage.get("root_cause_summary") or (incident or {}).get("root_cause_summary") or None,
+        "root_cause_summary",
+    )
+    root_cause_reason_codes = []
+    if root_cause_classification == "unknown":
+        root_cause_reason_codes.append("root_cause_unverified")
     return _ExtractedToolResult(
         category=EvidenceCategory.NETWORK_CAUSAL,
         causal={
@@ -374,10 +388,8 @@ def _network_outage_details(data: Mapping[str, Any]) -> _ExtractedToolResult:
             "root_resource_reference": (
                 _string(source.get("code"), "source_device.code") if source else None
             ),
-            "root_cause_summary": _string(
-                outage.get("root_cause_summary") or (incident or {}).get("root_cause_summary"),
-                "root_cause_summary",
-            ),
+            "root_cause_summary": root_cause_summary,
+            "root_cause_reason_codes": root_cause_reason_codes,
             "full_outage": impact_class == "full_outage" if impact_class else None,
         },
     )
@@ -390,11 +402,7 @@ def _rule_evidence(data: Mapping[str, Any]) -> _ExtractedToolResult:
     )
     return _ExtractedToolResult(
         category=EvidenceCategory.RULE_EVIDENCE,
-        causal={
-            "causal_event_code": _string(
-                data.get("causal_event_code"), "causal_event_code", required=True
-            )
-        },
+        causal={"causal_event_code": _string(data.get("causal_event_code"), "causal_event_code")},
         rule={
             "rule_versions": _string_list(
                 [data["selected_rule_version"]]
@@ -634,7 +642,7 @@ class ResultMergerValidator:
         return service.fail(
             query_run,
             error_code=primary_code,
-            error_summary="Tool result validation failed.",
+            error_summary=("Tool result validation failed: " + ", ".join(sorted(codes)) + "."),
         )
 
     @staticmethod
@@ -738,6 +746,13 @@ class ResultMergerValidator:
                 ):
                     for key, value in incoming.items():
                         if value in (None, [], {}):
+                            continue
+                        if (
+                            key in target
+                            and isinstance(target[key], list)
+                            and isinstance(value, list)
+                        ):
+                            target[key] = sorted(set(target[key]) | set(value))
                             continue
                         if key in target and target[key] != value:
                             errors.append(ValidationErrorItem(code="conflicting_fact"))

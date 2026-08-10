@@ -267,6 +267,17 @@ class DeterministicToolPlanner:
                     depends_on=["outage_details"],
                 ),
             ]
+            if RequestedOutput.ROOT_CAUSE in query.requested_outputs:
+                calls.append(
+                    self._call(
+                        "root_cause",
+                        "network",
+                        "rank_root_cause_candidates",
+                        self._snapshot_args(query, outage_code=query.outage_code),
+                        3,
+                        depends_on=["customer_impact"],
+                    )
+                )
             self._append_rule_evidence_if_requested(query, calls)
             self._append_compensation_if_requested(query, calls)
             return calls
@@ -388,12 +399,28 @@ class DeterministicToolPlanner:
     ) -> None:
         if RequestedOutput.EVIDENCE not in query.requested_outputs:
             return
+        if query.outage_code and not query.causal_event_code:
+            calls.append(
+                self._call(
+                    "rule_evidence",
+                    "rule",
+                    "get_rule_evidence",
+                    self._snapshot_args(query, outage_code=query.outage_code),
+                    max((int(call["execution_order"]) for call in calls), default=0) + 1,
+                    depends_on=[str(calls[-1]["call_id"])] if calls else None,
+                )
+            )
+            return
         calls.append(
             self._call(
                 "rule_evidence",
                 "rule",
                 "get_rule_evidence",
-                self._snapshot_args(query, causal_event_code=query.causal_event_code),
+                (
+                    self._snapshot_args(query, causal_event_code=query.causal_event_code)
+                    if query.causal_event_code
+                    else self._snapshot_args(query, outage_code=query.outage_code)
+                ),
                 1,
                 parallel_group="causal_analysis",
             )
@@ -402,7 +429,14 @@ class DeterministicToolPlanner:
     def _append_compensation_if_requested(
         self, query: StructuredQuery, calls: list[dict[str, object]]
     ) -> None:
-        if RequestedOutput.ELIGIBILITY not in query.requested_outputs:
+        rule_only_compensation = (
+            RequestedOutput.EVIDENCE in query.requested_outputs
+            and query.decision_type == "compensation"
+        )
+        if (
+            RequestedOutput.ELIGIBILITY not in query.requested_outputs
+            and not rule_only_compensation
+        ):
             return
         arguments = self._snapshot_args(
             query,

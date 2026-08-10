@@ -174,6 +174,11 @@ class ValidatedResponseBuilder:
                 sections.append(f"Kök kaynak: {resource} {causal.root_resource_reference}.")
             if causal.root_cause_summary:
                 sections.append(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
+            if "root_cause_unverified" in causal.root_cause_reason_codes:
+                sections.append(
+                    "Kök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle "
+                    "manuel inceleme gerekir."
+                )
             if causal.dying_gasp_classification == "symptom":
                 sections.append("Dying Gasp alarmı kök neden değil, belirtidir.")
             if causal.device_not_active_classification == "not_observed":
@@ -219,9 +224,18 @@ class ValidatedResponseBuilder:
             if impact.insufficient_evidence is not None:
                 sections.append(f"Kanıtı yetersiz: {impact.insufficient_evidence} bağlantı.")
             if impact.failover_protected is not None:
+                suffix = (
+                    " tam hizmet kesintisi değildir."
+                    if causal and causal.full_outage is False
+                    else "."
+                )
                 sections.append(
-                    f"Failover ile korunan: {impact.failover_protected} bağlantı; "
-                    "tam kesinti sayılmaz."
+                    f"Failover ile korunan: {impact.failover_protected} bağlantı{suffix}"
+                )
+            if impact.failover_path_diversity_counts.get("shared_risk", 0) > 0:
+                sections.append(
+                    "Ana ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı "
+                    "ve manuel inceleme gerekir."
                 )
             if impact.assessment_record_count == 0 and "customer_impact_assessment" in (
                 impact.missing_evidence_categories
@@ -255,6 +269,8 @@ class ValidatedResponseBuilder:
                 sections.append(f"Uygun kayıt: {compensation.eligible}.")
             if compensation.ineligible_pending is not None:
                 sections.append(f"Uygun olmayan/bekleyen kayıt: {compensation.ineligible_pending}.")
+                if compensation.ineligible_pending > 0:
+                    sections.append("Karar: eksik doğrulama nedeniyle manuel inceleme bekleniyor.")
             if compensation.total_amount and compensation.currency:
                 sections.append(
                     f"Toplam telafi tutarı: {compensation.total_amount} {compensation.currency}."
@@ -341,6 +357,11 @@ class ValidatedResponseBuilder:
         if causal:
             if causal.root_cause_summary:
                 add(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
+            if "root_cause_unverified" in causal.root_cause_reason_codes:
+                add(
+                    "Kök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle "
+                    "manuel inceleme gerekir."
+                )
             if causal.root_resource_reference:
                 resource_type = causal.root_resource_type or "kaynak"
                 add(f"Doğrulanmış kök kaynak: {resource_type} {causal.root_resource_reference}.")
@@ -365,6 +386,11 @@ class ValidatedResponseBuilder:
                 )
             if causal.root_cause_reason_codes:
                 add("Kök neden gerekçesi: " + ", ".join(causal.root_cause_reason_codes) + ".")
+                if "shared_failure_domain" in causal.root_cause_reason_codes:
+                    add(
+                        "Ana ve yedek yollar aynı arıza alanını paylaştığı için "
+                        "bağımsızlık doğrulanamadı; manuel inceleme gerekir."
+                    )
         impact = result.impact_summary
         if impact:
             if impact.outage_count is not None:
@@ -386,9 +412,16 @@ class ValidatedResponseBuilder:
                     if value is not None:
                         add(f"{label}: {value} bağlantı.")
             if impact.failover_protected is not None:
+                suffix = (
+                    " tam hizmet kesintisi değildir."
+                    if causal and causal.full_outage is False
+                    else "."
+                )
+                add(f"Failover ile korunan: {impact.failover_protected} bağlantı{suffix}")
+            if impact.failover_path_diversity_counts.get("shared_risk", 0) > 0:
                 add(
-                    f"Failover ile korunan: {impact.failover_protected} bağlantı; "
-                    "tam kesinti sayılmaz."
+                    "Ana ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı "
+                    "ve manuel inceleme gerekir."
                 )
             if impact.assessment_record_count == 0 and "customer_impact_assessment" in (
                 impact.missing_evidence_categories
@@ -410,6 +443,8 @@ class ValidatedResponseBuilder:
             add(f"Tazminata uygun: {compensation.eligible} kayıt.")
         if compensation and compensation.ineligible_pending is not None:
             add(f"Uygun olmayan veya bekleyen: {compensation.ineligible_pending} kayıt.")
+            if compensation.ineligible_pending > 0:
+                add("Karar: eksik doğrulama nedeniyle manuel inceleme bekleniyor.")
         if compensation and compensation.rule_versions:
             add("Doğrulanmış RuleVersion: " + ", ".join(sorted(compensation.rule_versions)) + ".")
         if compensation and compensation.evidence_references:
