@@ -289,6 +289,22 @@ passed `llm_assisted`; a three-case burst was 0/3 provider selection and 3/3
 safe fallback with `provider_call_failed_rate_limited`. The code path is
 complete, but acceptance is provider-quota-limited. MAIN-061 remains blocked.
 
+## Latest Local Provider Baseline
+
+The same canonical semantic acceptance was run without Gemini: resolved LLM
+`ollama/gemma4:12b-it-qat`, resolved embedding `ollama/qwen3-embedding:4b`
+(Qwen profile), with native Ollama `think:false` and `stream:false`. The
+representative case, four-case burst, original 10 and existing unseen 8 all
+completed through real HTTP. Local Gemma statement selection was `llm_assisted`
+for 18/18 with no safe fallback or provider failure. Latency was 19.114 s min,
+30.368 s median, 52.036 s max and 33.848 s average. Qwen RAG citations were
+supported and security/evidence counters were zero. Full details are in
+`artifacts/pre061/local_ollama_qwen_acceptance.json`.
+
+This does not erase the Gemini quota-limited result. The local provider baseline
+is complete, while overall PRE-061 and MAIN-061 remain blocked until the Gemini
+acceptance criterion is satisfied.
+
 ## Latest Semantic Audit
 
 The old semantic-completeness PASS text is historical and is superseded by

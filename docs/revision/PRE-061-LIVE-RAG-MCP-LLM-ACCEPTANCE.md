@@ -393,3 +393,27 @@ unknown or duplicate IDs remain rejected. `final_black_box_acceptance.json`
 retains the pre-fix response where available and the new response plus field
 checks for every case. No unsupported fact/reference/decision, privacy
 violation, snapshot leakage, or citation mismatch was observed.
+
+## Local Ollama + Qwen Provider Baseline
+
+The independent local run used the same canonical snapshot and the same existing
+original 10 plus unseen 8 questions. The resolved providers were
+`ollama` / `gemma4:12b-it-qat` for statement selection and `ollama` /
+`qwen3-embedding:4b` for Qwen embeddings. The Ollama request used
+`think:false`, `stream:false`, `raw:false` and temperature zero. The local
+acceptance timeout was bounded at 120 seconds; no Gemini request was made.
+
+The representative case, sequential four-case burst and final 18 cases all
+completed through real HTTP. All 18 responses used `llm_assisted`; Gemma
+statement selection passed 18/18, with zero safe fallbacks and zero provider
+failures. Semantic baselines remained 10/10 original and 8/8 unseen. Latency
+was 19,113.981 ms minimum, 30,368 ms median, 52,036.163 ms maximum and
+33,848.444 ms average. Two cases used Qwen-backed RAG and retained supported
+citations. Unsupported fact/reference/decision, privacy, snapshot leakage and
+citation mismatch counters were zero.
+
+The sanitized run is recorded in
+`artifacts/pre061/local_ollama_qwen_acceptance.json`. Gemma was gracefully
+unloaded and `ollama ps` was empty. This proves the local provider path
+independently; the Gemini quota-limited result was not rerun. Overall PRE-061
+and `MAIN-061` remain blocked by the outstanding Gemini acceptance criterion.
