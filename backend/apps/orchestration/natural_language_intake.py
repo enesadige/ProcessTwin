@@ -396,6 +396,12 @@ class DeterministicStructuredQueryParser:
             for term in (
                 "kaç müşteri",
                 "kaç abonelik",
+                "kac musteri",
+                "kac abonelik",
+                "musteri etkisi",
+                "abonelik etkisi",
+                "müşteri etkisi",
+                "abonelik",
                 "etkilendi",
                 "etkiyi",
                 "dogrulanmis etki",
@@ -405,6 +411,7 @@ class DeterministicStructuredQueryParser:
                 "failover",
                 "yedek",
                 "ana bağlantı",
+                "karar",
             )
         )
         compensation_requested = any(term in folded for term in ("tazminat", "telafi", "uygunluk"))

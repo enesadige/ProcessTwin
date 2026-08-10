@@ -214,7 +214,9 @@ NETWORK_CASES = [
         "category": "manual_review",
         "scenario_code": "SCN-UNKNOWN-RCA-001",
         "outage_code": "OUT-MCR-0021",
-        "incident_number": "INC-MCR-0021",
+        # The generated unknown-RCA scenario is INC/CE-0022; 0021 is the
+        # public outage identifier and must not be used as the incident key.
+        "incident_number": "INC-MCR-0022",
         "expected_root_cause": "AN-ESE-002",
         "expected_root_classification": "unknown",
         "expected_incident_type": "network_outage",

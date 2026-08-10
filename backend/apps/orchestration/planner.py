@@ -242,6 +242,8 @@ class DeterministicToolPlanner:
                     depends_on=["outage_details"],
                 ),
             ]
+            self._append_rule_evidence_if_requested(query, calls)
+            return calls
         if query.incident_code:
             return self._incident_search_calls(query)
         return self._scoped_network_calls(query)

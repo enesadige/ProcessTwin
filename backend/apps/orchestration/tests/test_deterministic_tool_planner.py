@@ -73,6 +73,24 @@ def test_network_causal_plan_preserves_reference_and_uses_parallel_causal_tools(
     assert {call.parallel_group for call in result.tool_plan.calls} == {"causal_analysis"}
 
 
+def test_network_investigation_with_resolved_outage_keeps_the_outage_anchor():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            causal_event_code=None,
+            outage_code="OUT-MCR-0018",
+            requested_outputs=["summary", "root_cause", "evidence"],
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert [(call.tool_name, call.execution_order) for call in result.tool_plan.calls] == [
+        ("get_outage_details", 1),
+        ("rank_root_cause_candidates", 2),
+        ("get_rule_evidence", 3),
+    ]
+    assert all(call.arguments["outage_code"] == "OUT-MCR-0018" for call in result.tool_plan.calls)
+
+
 def test_outage_impact_has_deterministic_details_then_customer_impact_dependency():
     result = DeterministicToolPlanner().plan(
         query_payload(

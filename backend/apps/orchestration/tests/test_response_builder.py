@@ -221,6 +221,39 @@ def test_llm_assisted_mode_uses_only_safe_fact_sheet_and_preserves_deterministic
 
 
 @pytest.mark.django_db
+def test_compensation_rule_is_authoritative_over_unrelated_rule_tool_candidate():
+    snapshot = create_snapshot("response-compensation-authority")
+    result = valid_result(snapshot.snapshot_key).model_copy(
+        update={
+            "rule_summary": RuleSummary(
+                rule_codes=["UNRELATED-RULE"],
+                rule_versions=["UNRELATED-RULE:v9"],
+                evidence_references=["UNRELATED-EVIDENCE"],
+            ),
+            "compensation_summary": CompensationSummary(
+                status="available",
+                considered=1,
+                eligible=1,
+                ineligible_pending=0,
+                total_amount="48.00",
+                currency="TRY",
+                rule_versions={"APPLIED-RULE:v1": 1},
+                evidence_references=["APPLIED-EVIDENCE"],
+                scope="verified_impact",
+            ),
+        }
+    )
+    response = ValidatedResponseBuilder().build(
+        completed_run("response-compensation-authority-run", result=result, snapshot=snapshot)
+    )
+
+    assert "APPLIED-RULE:v1" in response.response_text
+    assert "APPLIED-EVIDENCE" in response.response_text
+    assert "UNRELATED-RULE:v9" not in response.response_text
+    assert "UNRELATED-EVIDENCE" not in response.response_text
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "content",
     [

@@ -197,6 +197,11 @@ def seed_multicity_realism_dataset(*, snapshot: DataSnapshot, batch_size: int = 
         rule_versions=rule_versions,
         batch_size=batch_size,
     )
+    seed_ground_truth_compensation_evidence(
+        snapshot=snapshot,
+        rule_set=rule_set,
+        rule_versions=rule_versions,
+    )
     return collect_seed_counts(snapshot)
 
 
@@ -2151,7 +2156,18 @@ def seed_compensation_history_and_evidence(
     settlement_iter = iter(settlement_values)
     history_rows = []
     evaluation_rows = []
-    outage_cycle = cycle(outages)
+    ground_truth_outage_codes = {
+        case["outage_code"]
+        for case in ground_truth_config.NETWORK_CASES
+        if case.get("expected_outage_exists") and case.get("outage_code")
+    }
+    # Historical records are deliberately kept separate from operational
+    # decisions for the canonical scenarios.  Otherwise an arbitrary history
+    # row can masquerade as the rule selected for the resolved outage.
+    historical_outages = [
+        outage for outage in outages if outage.outage_code not in ground_truth_outage_codes
+    ]
+    outage_cycle = cycle(historical_outages or [None])
     for index, decision_status in enumerate(decision_values, start=1):
         subscription = eligible_subscriptions[index % len(eligible_subscriptions)]
         incident = resolved_incidents[index % len(resolved_incidents)]
@@ -2275,6 +2291,119 @@ def seed_compensation_history_and_evidence(
             )
         )
     DecisionEvidence.objects.bulk_create(evidence_rows, batch_size=batch_size)
+
+
+def seed_ground_truth_compensation_evidence(*, snapshot, rule_set, rule_versions) -> None:
+    """Create one deterministic decision context per canonical outage scenario.
+
+    The broad compensation history is synthetic customer history, not the
+    decision for a particular operational event.  Canonical scenarios need an
+    explicit event-anchored record so runtime consumers never select a rule by
+    insertion order or by an unrelated subscription.
+    """
+    rule_by_code = {f"{version.rule.code}": version for version in rule_versions}
+    DecisionEvidence.objects.filter(
+        data_snapshot=snapshot,
+        compensation_evaluation__metadata__ground_truth_operational=True,
+    ).delete()
+    CompensationEvaluation.objects.filter(
+        data_snapshot=snapshot, metadata__ground_truth_operational=True
+    ).delete()
+    decision_map = {
+        "eligible": CompensationResultType.ELIGIBLE,
+        "ineligible": CompensationResultType.NOT_ELIGIBLE,
+        "manual_review": CompensationResultType.MANUAL_REVIEW,
+        "evidence_only": CompensationResultType.MANUAL_REVIEW,
+    }
+    for case in ground_truth_config.NETWORK_CASES:
+        outage_code = case.get("outage_code")
+        if not case.get("expected_outage_exists") or not outage_code:
+            continue
+        outage = Outage.objects.filter(data_snapshot=snapshot, outage_code=outage_code).first()
+        rule_version = rule_by_code.get(case.get("expected_selected_rule"))
+        if outage is None or rule_version is None:
+            continue
+        affected = _ground_truth_affected_subscriptions(snapshot=snapshot, outage=outage)
+        if not affected:
+            continue
+        subscription = affected[0]
+        evaluation_code = f"GT-EVAL-{case['case_code']}"
+        result_type = decision_map[case["expected_decision"]]
+        amount = Decimal(case["expected_exact_amount"])
+        evaluation, _ = CompensationEvaluation.objects.update_or_create(
+            data_snapshot=snapshot,
+            evaluation_code=evaluation_code,
+            defaults={
+                "outage": outage,
+                "customer": subscription.customer,
+                "subscription": subscription,
+                "rule_version": rule_version,
+                "result_type": result_type,
+                "status": CompensationEvaluationStatus.CALCULATED,
+                "proposed_amount": amount,
+                "currency": "TRY",
+                "explanation": "Canonical scenario decision anchored to its outage.",
+                "calculation_trace": {
+                    "ground_truth_case_code": case["case_code"],
+                    "causal_event_code": outage.causal_event.event_code
+                    if outage.causal_event_id
+                    else None,
+                },
+                "metadata": {
+                    "ground_truth_operational": True,
+                    "ground_truth_case_code": case["case_code"],
+                },
+            },
+        )
+        decision = {
+            CompensationResultType.ELIGIBLE: DecisionEvidenceDecision.ELIGIBLE,
+            CompensationResultType.NOT_ELIGIBLE: DecisionEvidenceDecision.INELIGIBLE,
+            CompensationResultType.MANUAL_REVIEW: DecisionEvidenceDecision.MANUAL_REVIEW,
+        }[result_type]
+        payload = {
+            "evaluation_code": evaluation.evaluation_code,
+            "outage_code": outage.outage_code,
+            "causal_event_code": outage.causal_event.event_code if outage.causal_event_id else None,
+            "rule": rule_version.rule.code,
+            "amount": str(amount),
+            "decision": decision,
+        }
+        evidence_hash = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        DecisionEvidence.objects.update_or_create(
+            data_snapshot=snapshot,
+            evidence_hash=evidence_hash,
+            defaults={
+                "compensation_evaluation": evaluation,
+                "rule_set": rule_set,
+                "selected_rule_version": rule_version,
+                "price_basis": rule_version.price_basis,
+                "selected_price": subscription.monthly_price,
+                "unrounded_amount": amount,
+                "final_amount": amount,
+                "currency": "TRY",
+                "decision": decision,
+                "evidence_schema_version": 1,
+                "matched_conditions": [
+                    {"code": "canonical_outage_context", "outage": outage.outage_code}
+                ],
+                "candidate_base_rules": [rule_version.rule.code],
+                "manual_review_reasons": (
+                    [case["expected_manual_review_reason"]]
+                    if case.get("expected_manual_review_reason")
+                    else []
+                ),
+                "context_snapshot": payload,
+                "finalized": True,
+            },
+        )
+
+
+def _ground_truth_affected_subscriptions(*, snapshot, outage):
+    from data_generator.seeders.multicity_ground_truth import (
+        collect_oracle_affected_subscriptions,
+    )
+
+    return collect_oracle_affected_subscriptions(snapshot=snapshot, outage=outage)
 
 
 def collect_seed_counts(snapshot: DataSnapshot) -> dict[str, int]:

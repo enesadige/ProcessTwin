@@ -272,6 +272,15 @@ Session identity mapping, masking ve retention; stop/restart/continue semantiği
 
 İşe `git status --short`, `git rev-parse HEAD` ve son commit ile başla. Tamamlanmış görevleri yeniden uygulama, kullanıcı değişikliklerini silme, görevin dışına refactor taşıma. Her görevde tüm repo kataloglanmaz; önce bu handoff ve ilgili REV-01/REV-00 dokümanları okunur. Uygulama görevinde yalnız ilgili testler, önemli entegrasyon kapısında veya finalde full suite çalıştırılır. Her tamamlanan görev ayrı commit alır. 24 saat kuralı doğrulanmadan kodlanmaz; canlı simülasyon veya yeni MCP kendiliğinden başlatılmaz. Görev seçerken `Görev Takip Durumu` bölümündeki MAIN/REV/ORCH ayrımını kullan.
 
+## Latest Semantic Audit
+
+The old semantic-completeness PASS text is historical and is superseded by
+`artifacts/pre061/semantic_generalization_acceptance.json`. The latest run
+completed 10 original and 8 unseen real HTTP cases, but Gemini statement
+selection fell back to deterministic rendering in all recorded cases.
+Provider-success evidence is therefore incomplete. PRE-061 is **NOT COMPLETE**;
+do not start MAIN-061.
+
 ## 14. Yeni Oturuma Yapıştırılacak Başlangıç Promptu
 
 ```text

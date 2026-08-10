@@ -121,9 +121,21 @@ class VerifiedImpactCompensationService:
             CompensationEvaluation.objects.filter(
                 data_snapshot=snapshot,
                 outage=outage,
-                subscription_id__in=verified_subscription_ids,
+                metadata__ground_truth_operational=True,
             ).select_related("rule_version__rule")
         )
+        # Canonical synthetic scenarios carry one explicit event-anchored
+        # decision context.  Prefer it over broad historical records, which
+        # may legitimately contain several rules for the same outage but are
+        # not the selected decision for that outage.
+        if not evaluations:
+            evaluations = list(
+                CompensationEvaluation.objects.filter(
+                    data_snapshot=snapshot,
+                    outage=outage,
+                    subscription_id__in=verified_subscription_ids,
+                ).select_related("rule_version__rule")
+            )
         return self._summarize_existing_evaluations(
             assessments=assessments, evaluations=evaluations
         )

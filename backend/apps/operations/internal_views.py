@@ -13,7 +13,10 @@ from apps.operations.services.root_cause import RootCauseService
 @require_GET
 @internal_service_required
 def causal_analysis(request, event_code):
-    snapshot_key = request.GET.get("snapshot")
+    # MCP clients use the canonical request field name; keep the short query
+    # parameter for existing internal callers and always preserve snapshot
+    # isolation when the full name is supplied.
+    snapshot_key = request.GET.get("snapshot") or request.GET.get("snapshot_identifier")
     events = CausalEvent.objects.select_related("data_snapshot__dataset_version").filter(
         event_code=event_code
     )

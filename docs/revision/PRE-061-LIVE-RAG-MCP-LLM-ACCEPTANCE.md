@@ -326,6 +326,25 @@ unsupported fact/reference/decision, privacy violations, snapshot leakage and
 critical citation mismatches were all zero. PRE-061 is therefore **PASS** and
 `MAIN-061` may start.
 
+## Semantic Audit Supersession
+
+The preceding PASS paragraphs are historical records and are superseded by
+`artifacts/pre061/semantic_generalization_acceptance.json`. The latest Gemini
++ Gemini Embedding run completed 10/10 original and 8/8 unseen HTTP QueryRuns,
+but every recorded response used deterministic fallback
+(`llm_narrative_fallback`); this does not prove successful Gemini statement
+selection. PRE-061 therefore remains **NOT COMPLETE** and `MAIN-061` remains
+blocked.
+
+General fixes in this audit scope compensation evaluations to the resolved
+outage, accept the MCP `snapshot_identifier` in causal analysis, return the
+outage planner's constructed calls, and keep root resource, physical
+root-cause reason, alarms, failover state and missing impact evidence as
+distinct canonical statements. An exact compensation evaluation now
+supersedes unrelated rule-tool candidates when rendering RuleVersion and
+DecisionEvidence. The exact 10 original and 8 unseen questions are recorded
+in the semantic artifact; HTTP 200 is not treated as a PRE-061 PASS.
+
 ## Semantic Completeness Revalidation
 
 **Decision: PASS.** The earlier HTTP/provider pass was narrowed: it proved

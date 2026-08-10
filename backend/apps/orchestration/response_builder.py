@@ -172,15 +172,29 @@ class ValidatedResponseBuilder:
             if causal.root_resource_reference:
                 resource = causal.root_resource_type or "kaynak"
                 sections.append(f"Kök kaynak: {resource} {causal.root_resource_reference}.")
-            if causal.root_cause_summary:
+            if (
+                causal.root_cause_summary
+                and causal.root_cause_summary != causal.root_resource_reference
+            ):
                 sections.append(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
+            elif causal.root_cause_summary == causal.root_resource_reference:
+                sections.append(
+                    "Kök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi "
+                    "ayrıca doğrulanmadı."
+                )
             if "root_cause_unverified" in causal.root_cause_reason_codes:
                 sections.append(
                     "Kök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle "
                     "manuel inceleme gerekir."
                 )
+            if causal.root_alarm_types:
+                sections.append("Kök neden alarmı: " + ", ".join(causal.root_alarm_types) + ".")
             if causal.dying_gasp_classification == "symptom":
                 sections.append("Dying Gasp alarmı kök neden değil, belirtidir.")
+            elif causal.dying_gasp_classification == "not_observed":
+                sections.append("Dying Gasp için bu olayda doğrulanmış alarm kaydı yok.")
+            if causal.device_not_active_classification == "symptom":
+                sections.append("Device Not Active alarmı kök neden değil, belirtidir.")
             if causal.device_not_active_classification == "not_observed":
                 sections.append("Device Not Active için bu olayda doğrulanmış alarm kaydı yok.")
             if causal.full_outage is not None:
@@ -232,6 +246,11 @@ class ValidatedResponseBuilder:
                 sections.append(
                     f"Failover ile korunan: {impact.failover_protected} bağlantı{suffix}"
                 )
+                if causal and causal.full_outage is True and impact.failover_protected > 0:
+                    sections.append(
+                        "Failover bazı bağlantıları korusa da bu olayda tam hizmet kesintisini "
+                        "önleyemedi."
+                    )
             if impact.failover_path_diversity_counts.get("shared_risk", 0) > 0:
                 sections.append(
                     "Ana ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı "
@@ -243,8 +262,16 @@ class ValidatedResponseBuilder:
                 sections.append(
                     "Gerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok."
                 )
+                if impact.failover_protected == 0:
+                    sections.append(
+                        "Failover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok."
+                    )
 
-        rule = result.rule_summary
+        compensation = result.compensation_summary
+        # A compensation evaluation is the authoritative rule/evidence source
+        # for that decision. Retrieval/rule-tool candidates must not be rendered
+        # as if they were the applied rule for the same answer.
+        rule = None if compensation and compensation.rule_versions else result.rule_summary
         if rule and any(
             (rule.rule_codes, rule.rule_versions, rule.eligibility_status, rule.evidence_references)
         ):
@@ -258,7 +285,6 @@ class ValidatedResponseBuilder:
             if rule.evidence_references:
                 sections.append("Kanıt referansı: " + ", ".join(rule.evidence_references) + ".")
 
-        compensation = result.compensation_summary
         if compensation:
             sections.extend(["", "Telafi sonucu"])
             if compensation.status:
@@ -355,8 +381,16 @@ class ValidatedResponseBuilder:
 
         causal = result.causal_summary
         if causal:
-            if causal.root_cause_summary:
+            if (
+                causal.root_cause_summary
+                and causal.root_cause_summary != causal.root_resource_reference
+            ):
                 add(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
+            elif causal.root_cause_summary == causal.root_resource_reference:
+                add(
+                    "Kök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi "
+                    "ayrıca doğrulanmadı."
+                )
             if "root_cause_unverified" in causal.root_cause_reason_codes:
                 add(
                     "Kök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle "
@@ -418,6 +452,11 @@ class ValidatedResponseBuilder:
                     else "."
                 )
                 add(f"Failover ile korunan: {impact.failover_protected} bağlantı{suffix}")
+                if causal and causal.full_outage is True and impact.failover_protected > 0:
+                    add(
+                        "Failover bazı bağlantıları korusa da bu olayda tam hizmet kesintisini "
+                        "önleyemedi."
+                    )
             if impact.failover_path_diversity_counts.get("shared_risk", 0) > 0:
                 add(
                     "Ana ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı "
@@ -429,12 +468,14 @@ class ValidatedResponseBuilder:
                 add(
                     "Gerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok."
                 )
-        rule = result.rule_summary
+                if impact.failover_protected == 0:
+                    add("Failover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok.")
+        compensation = result.compensation_summary
+        rule = None if compensation and compensation.rule_versions else result.rule_summary
         if rule and rule.rule_versions:
             add("Doğrulanmış kural sürümü: " + ", ".join(rule.rule_versions) + ".")
         if rule and rule.evidence_references:
             add("Doğrulanmış karar kanıtı: " + ", ".join(rule.evidence_references) + ".")
-        compensation = result.compensation_summary
         if compensation and compensation.status:
             add(f"Telafi durumu: {compensation.status}.")
         if compensation and compensation.considered is not None:

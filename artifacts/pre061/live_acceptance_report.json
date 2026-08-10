@@ -48,5 +48,35 @@
     "privacy_violation_count": 0,
     "snapshot_leakage_count": 0,
     "citation_mismatch_count": 0
+  },
+  "semantic_generalization_audit": {
+    "decision": "NOT_COMPLETE",
+    "artifact": "artifacts/pre061/semantic_generalization_acceptance.json",
+    "original_cases": 10,
+    "unseen_cases": 8,
+    "original_http_completed": "10/10",
+    "unseen_http_completed": "8/8",
+    "provider_statement_selection": "fallback_observed_in_all_cases",
+    "canonical_compensation_rule_precedence": true,
+    "snapshot_identifier_alias_fixed": true,
+    "root_resource_vs_root_cause_distinguished": true,
+    "notes": {
+      "original_http_completed": "10/10",
+      "unseen_http_completed": "8/8",
+      "semantic_response_status": "deterministic_facts_rendered",
+      "provider_statement_selection": "fallback_observed_in_all_cases",
+      "decision": "NOT_COMPLETE",
+      "blocking_reasons": [
+        "Gemini statement-selection response fell back to deterministic rendering in the recorded runs; provider success is not proven by these artifacts.",
+        "Semantic acceptance is recorded separately from HTTP completion and must not be advertised as PRE-061 PASS."
+      ],
+      "known_fixes": [
+        "compensation evidence is scoped to ground_truth_operational evaluations for the resolved outage",
+        "snapshot_identifier is accepted by causal analysis",
+        "outage planner returns its constructed calls",
+        "root-resource and root-cause rendering are distinct",
+        "canonical compensation RuleVersion supersedes unrelated rule-tool candidates"
+      ]
+    }
   }
 }
