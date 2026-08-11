@@ -16,7 +16,12 @@ from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.gemini import GeminiLLMProviderError
 from apps.orchestration.providers.registry import get_llm_descriptor
 from apps.orchestration.result_merge import (
+    CausalSummary,
+    CompensationSummary,
+    ImpactSummary,
     ProvenanceEntry,
+    RetrievalSource,
+    RuleSummary,
     ValidatedExecutionResult,
     ValidationStatus,
 )
@@ -78,6 +83,19 @@ class ResponseCitation(BaseModel):
     section: str | None = None
 
 
+class StructuredVerifiedResult(BaseModel):
+    """Safe, already-validated facts exposed to the application client."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: str = "structured-verified-result.v1"
+    causal_summary: CausalSummary | None = None
+    impact_summary: ImpactSummary | None = None
+    rule_summary: RuleSummary | None = None
+    compensation_summary: CompensationSummary | None = None
+    retrieval_sources: list[RetrievalSource] = Field(default_factory=list)
+
+
 class ValidatedNaturalLanguageResponse(BaseModel):
     """In-memory user response with deterministic facts and safe metadata."""
 
@@ -96,6 +114,7 @@ class ValidatedNaturalLanguageResponse(BaseModel):
     validation_status: ValidationStatus
     semantic_concepts: list[str] = Field(default_factory=list)
     grounded_relationships: list[dict[str, str]] = Field(default_factory=list)
+    structured_result: StructuredVerifiedResult | None = None
 
 
 class ValidatedResponseBuilder:
@@ -121,6 +140,7 @@ class ValidatedResponseBuilder:
             provenance=sorted(result.provenance, key=lambda item: item.call_id),
             warnings=sorted(set(warnings)),
             validation_status=result.validation_status,
+            structured_result=self._public_structured_result(result),
         )
         if requested_mode == ResponseGenerationMode.DETERMINISTIC:
             return response
@@ -170,6 +190,19 @@ class ValidatedResponseBuilder:
         response.response_text = narrative
         response.generation_mode = ResponseGenerationMode.LLM_ASSISTED
         return response
+
+    @staticmethod
+    def _public_structured_result(
+        result: ValidatedExecutionResult,
+    ) -> StructuredVerifiedResult:
+        """Expose validated summaries without raw calls, prompts, or internal IDs."""
+        return StructuredVerifiedResult(
+            causal_summary=result.causal_summary,
+            impact_summary=result.impact_summary,
+            rule_summary=result.rule_summary,
+            compensation_summary=result.compensation_summary,
+            retrieval_sources=result.retrieval_sources,
+        )
 
     @staticmethod
     def _statement_selection_failure_code(exc: Exception) -> str:

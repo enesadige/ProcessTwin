@@ -207,6 +207,13 @@ def test_deterministic_response_renders_validated_sections_and_keeps_run_unchang
 
     assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC
     assert response.provider is None
+    assert response.structured_result is not None
+    assert response.structured_result.impact_summary is not None
+    assert response.structured_result.impact_summary.verified_impacted == 2
+    assert response.structured_result.impact_summary.verified_no_impact == 1
+    assert response.structured_result.impact_summary.potential == 5
+    assert response.structured_result.compensation_summary is not None
+    assert response.structured_result.compensation_summary.total_amount == "10.00"
     assert "Potansiyel etki: 5 bağlantı." in response.response_text
     assert "Doğrulanmış etki: 2 bağlantı." in response.response_text
     assert "Etkilenmediği doğrulanan: 1 bağlantı." in response.response_text
@@ -485,3 +492,8 @@ def test_partial_result_warning_and_empty_summaries_do_not_invent_values():
     assert "Doğrulanmış etki: 0 bağlantı." in response.response_text
     assert "Potansiyel etki:" not in response.response_text
     assert "Telafi sonucu" not in response.response_text
+    assert response.structured_result is not None
+    assert response.structured_result.impact_summary is not None
+    assert response.structured_result.impact_summary.verified_impacted == 0
+    assert response.structured_result.impact_summary.potential is None
+    assert response.structured_result.compensation_summary is None

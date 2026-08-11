@@ -1,5 +1,22 @@
 # ProcessTwin Codex Handoff
 
+## Latest MAIN-065 Checkpoint
+
+- Public orchestration response now includes only backend-validated
+  `structured_result` summaries for causal, impact, rule, compensation and
+  compact retrieval references. Raw MCP/provider payloads, prompts and
+  provenance call records are not exposed.
+- AI Analysis renders dynamic Impact, Outage/Network, Root cause,
+  Compensation/decision and technical evidence-reference groups. Missing
+  values stay absent; verified zero values remain visible.
+- Management and Technical views use the same verified facts; Technical adds
+  available root-cause and retrieval-reference detail without changing
+  calculations. MAIN-066 was not started.
+- Focused response-builder tests: 13 passed. Frontend lint/build, Django
+  check, migration check and diff check are clean. One local HTTP smoke
+  reached the real orchestration tools but did not complete within the bounded
+  smoke window; no result card was accepted from incomplete data.
+
 ## Latest MAIN-062 Checkpoint
 
 - `aa8b74f` üzerindeki MAIN-061 shell korunarak session tabanlı login, logout

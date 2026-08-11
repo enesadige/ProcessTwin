@@ -28,9 +28,82 @@ export type AnalysisResponse = {
     model?: string
     warnings?: string[]
     citations?: Array<{ reference_code: string; reference_kind: string }>
+    structured_result?: StructuredVerifiedResult
   }
   clarification?: { code: string; reasons: string[]; message: string }
   error?: { code: string; message: string }
+}
+
+export type CausalSummary = {
+  causal_event_code?: string
+  outage_code?: string
+  root_resource_type?: string
+  root_resource_reference?: string
+  root_cause_reason_codes?: string[]
+  role_counts?: Record<string, number>
+  propagation_summary?: string
+  event_type?: string
+  root_cause_summary?: string
+  root_alarm_types?: string[]
+  symptom_alarm_types?: string[]
+  dying_gasp_classification?: string
+  device_not_active_classification?: string
+  primary_status?: string
+  backup_status?: string
+  full_outage?: boolean
+}
+
+export type ImpactSummary = {
+  outage_count?: number
+  potential?: number
+  verified_impacted?: number
+  verified_no_impact?: number
+  insufficient_evidence?: number
+  failover_protected?: number
+  failover_path_diversity_counts?: Record<string, number>
+  affected_subscription_count?: number
+  affected_customer_count?: number
+  reason_code_distribution?: Record<string, number>
+  assessment_record_count?: number
+  missing_evidence_categories?: string[]
+}
+
+export type RuleSummary = {
+  rule_codes?: string[]
+  rule_versions?: string[]
+  eligibility_status?: string
+  evidence_references?: string[]
+  baseline?: string
+  candidate?: string
+  difference_summary?: string
+}
+
+export type CompensationSummary = {
+  status?: string
+  considered?: number
+  eligible?: number
+  ineligible_pending?: number
+  total_amount?: string
+  currency?: string
+  rule_versions?: Record<string, number>
+  evidence_references?: string[]
+  scope?: string
+}
+
+export type RetrievalSource = {
+  source_code: string
+  version?: number
+  section?: string
+  source_kind?: string
+}
+
+export type StructuredVerifiedResult = {
+  schema_version: string
+  causal_summary?: CausalSummary
+  impact_summary?: ImpactSummary
+  rule_summary?: RuleSummary
+  compensation_summary?: CompensationSummary
+  retrieval_sources?: RetrievalSource[]
 }
 
 export type AnalysisStatus = {

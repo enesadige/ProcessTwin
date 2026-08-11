@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 
 import { useAuth } from '../auth/AuthContext'
-import { AnalysisRequestError, getAnalysisStatus, submitAnalysis, type AnalysisStatus, type ProviderName, type ViewMode } from '../auth/api'
+import { AnalysisRequestError, getAnalysisStatus, submitAnalysis, type AnalysisStatus, type CausalSummary, type CompensationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type ViewMode } from '../auth/api'
 import './AIAnalysisPage.css'
 
 const SNAPSHOT_IDENTIFIER =
@@ -14,6 +14,69 @@ const EXAMPLES = [
 ]
 
 type Lifecycle = 'idle' | 'submitting' | 'success' | 'clarification' | 'failed'
+
+function FactCard({ label, value, tone = '' }: { label: string; value: string | number; tone?: string }) {
+  return <div className={`analysis-fact ${tone ? `analysis-fact--${tone}` : ''}`}><span>{label}</span><strong>{value}</strong></div>
+}
+
+function FactGroup({ title, children }: { title: string; children: ReactNode }) {
+  return <section className="analysis-fact-group"><h3>{title}</h3><div className="analysis-fact-grid">{children}</div></section>
+}
+
+function VerifiedResultCards({ result, technical }: { result: StructuredVerifiedResult; technical: boolean }) {
+  const causal: CausalSummary | undefined = result.causal_summary
+  const impact: ImpactSummary | undefined = result.impact_summary
+  const compensation: CompensationSummary | undefined = result.compensation_summary
+  const rule: RuleSummary | undefined = result.rule_summary
+  const impactCards: ReactNode[] = []
+  if (impact) {
+    if (impact.outage_count !== undefined) impactCards.push(<FactCard key="outage-count" label="Kesinti sayısı" value={impact.outage_count} />)
+    if (impact.potential !== undefined) impactCards.push(<FactCard key="potential" label="Potansiyel kapsam" value={impact.potential} />)
+    if (impact.affected_subscription_count !== undefined) impactCards.push(<FactCard key="subscriptions" label="Etkilenen abonelik" value={impact.affected_subscription_count} />)
+    if (impact.affected_customer_count !== undefined) impactCards.push(<FactCard key="customers" label="Etkilenen müşteri" value={impact.affected_customer_count} />)
+    if (impact.verified_impacted !== undefined && impact.affected_subscription_count === undefined) impactCards.push(<FactCard key="verified" label="Doğrulanmış etki" value={impact.verified_impacted} />)
+    if (impact.verified_no_impact !== undefined) impactCards.push(<FactCard key="no-impact" label="Doğrulanmış etkisiz" value={impact.verified_no_impact} />)
+    if (impact.insufficient_evidence !== undefined) impactCards.push(<FactCard key="insufficient" label="Kanıtı yetersiz" value={impact.insufficient_evidence} tone={impact.insufficient_evidence > 0 ? 'warning' : ''} />)
+    if (impact.failover_protected !== undefined) impactCards.push(<FactCard key="protected" label="Failover ile korunan" value={impact.failover_protected} />)
+  }
+  const outageCards: ReactNode[] = []
+  if (causal) {
+    if (causal.event_type) outageCards.push(<FactCard key="event-type" label="Olay sınıfı" value={causal.event_type} />)
+    if (causal.full_outage !== undefined) outageCards.push(<FactCard key="full-outage" label="Tam hizmet kesintisi" value={causal.full_outage ? 'Evet' : 'Hayır'} />)
+    if (causal.primary_status) outageCards.push(<FactCard key="primary" label="Ana bağlantı" value={causal.primary_status} />)
+    if (causal.backup_status) outageCards.push(<FactCard key="backup" label="Yedek bağlantı" value={causal.backup_status} />)
+    const resource = [causal.root_resource_type, causal.root_resource_reference].filter(Boolean).join(' ')
+    if (resource) outageCards.push(<FactCard key="resource" label="Doğrulanmış kök kaynak" value={resource} />)
+  }
+  const rootCards: ReactNode[] = []
+  if (causal) {
+    if (causal.root_cause_summary) rootCards.push(<FactCard key="cause" label="Fiziksel kök neden" value={causal.root_cause_summary} />)
+    if (causal.root_alarm_types?.length) rootCards.push(<FactCard key="root-alarm" label="Kök neden alarmı" value={causal.root_alarm_types.join(', ')} />)
+    if (causal.symptom_alarm_types?.length) rootCards.push(<FactCard key="symptoms" label="Belirti alarmları" value={causal.symptom_alarm_types.join(', ')} />)
+    if (causal.root_cause_reason_codes?.includes('root_cause_unverified')) rootCards.push(<FactCard key="unknown" label="RCA durumu" value="Doğrulanmadı; manuel inceleme" tone="warning" />)
+  }
+  const decisionCards: ReactNode[] = []
+  if (compensation) {
+    if (compensation.status) decisionCards.push(<FactCard key="status" label="Telafi sonucu" value={compensation.status} />)
+    if (compensation.total_amount && compensation.currency) decisionCards.push(<FactCard key="amount" label="Toplam tutar" value={`${compensation.total_amount} ${compensation.currency}`} />)
+    if (compensation.rule_versions && Object.keys(compensation.rule_versions).length) decisionCards.push(<FactCard key="comp-rules" label="Uygulanan RuleVersion" value={Object.keys(compensation.rule_versions).join(', ')} />)
+    if (compensation.evidence_references?.length) decisionCards.push(<FactCard key="comp-evidence" label="DecisionEvidence" value={compensation.evidence_references.join(', ')} />)
+  }
+  if (rule) {
+    if (rule.rule_versions?.length) decisionCards.push(<FactCard key="rules" label="Kural sürümü" value={rule.rule_versions.join(', ')} />)
+    if (rule.evidence_references?.length) decisionCards.push(<FactCard key="evidence" label="Karar kanıtı" value={rule.evidence_references.join(', ')} />)
+    if (!compensation?.status && rule.eligibility_status) decisionCards.push(<FactCard key="eligibility" label="Uygunluk" value={rule.eligibility_status} />)
+  }
+  return <div className="analysis-facts" aria-label="Doğrulanmış sonuç kartları">
+    <div className="analysis-facts__heading"><div><p className="analysis-page__eyebrow">Doğrulanmış veri</p><h2>Operasyon özeti</h2></div><span>Kaynak: backend</span></div>
+    {impactCards.length ? <FactGroup title="Müşteri etkisi">{impactCards}</FactGroup> : null}
+    {outageCards.length ? <FactGroup title="Kesinti ve ağ">{outageCards}</FactGroup> : null}
+    {technical && rootCards.length ? <FactGroup title="Kök neden">{rootCards}</FactGroup> : null}
+    {decisionCards.length ? <FactGroup title="Telafi ve karar">{decisionCards}</FactGroup> : null}
+    {technical && result.retrieval_sources?.length ? <FactGroup title="Kanıt referansları">{result.retrieval_sources.map((source) => <FactCard key={`${source.source_code}-${source.version ?? ''}-${source.section ?? ''}`} label={source.section ?? 'Kaynak'} value={`${source.source_code}${source.version !== undefined ? ` v${source.version}` : ''}`} />)}</FactGroup> : null}
+    {!impactCards.length && !outageCards.length && !rootCards.length && !decisionCards.length ? <p className="analysis-message">Bu sorgu için yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}
+  </div>
+}
 
 export function AIAnalysisPage() {
   const { user } = useAuth()
@@ -140,7 +203,7 @@ export function AIAnalysisPage() {
         {runStatus?.failed_tool_count ? <p className="analysis-message analysis-message--error">İşlem güvenli şekilde başarısız oldu: {runStatus.error_code ?? 'tool_error'}</p> : null}
       </section>}
 
-      {result?.response && <section className="analysis-result" aria-live="polite"><div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>{viewMode === 'technical' ? 'Teknik görünüm' : 'Yönetim görünümü'}</span></div><h2>Yanıt</h2><p>{result.response.response_text}</p>{result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}</section>}
+      {result?.response && <section className="analysis-result" aria-live="polite"><div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>{viewMode === 'technical' ? 'Teknik görünüm' : 'Yönetim görünümü'}</span></div><div className="analysis-result__answer"><p className="analysis-page__eyebrow">Analiz yanıtı</p><h2>Yanıt</h2><p>{result.response.response_text}</p></div>{result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} technical={viewMode === 'technical'} /> : null}{result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}</section>}
       {result?.clarification && <section className="analysis-result analysis-result--clarification" aria-live="polite"><h2>Ek bilgi gerekiyor</h2><p>{result.clarification.message}</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
     </section>
   )
