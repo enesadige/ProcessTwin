@@ -4,7 +4,6 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from apps.orchestration.providers import get_llm_descriptor
-from apps.orchestration.providers.gemini import GeminiLLMProvider
 from apps.orchestration.providers.ollama import OllamaLLMProvider
 from apps.orchestration.providers.registry import GEMMA4_MODEL, LLM_PROVIDER_REGISTRY
 from apps.rag.providers.registry import get_embedding_descriptor
@@ -21,15 +20,57 @@ def test_known_ollama_descriptor_is_fixed_and_disables_thinking():
     assert descriptor.adapter_factory is OllamaLLMProvider
 
 
-def test_gemini_descriptor_uses_the_fixed_allowlisted_model_and_factory():
+@pytest.mark.parametrize("model", ["gemini-2.5-flash", "gemini-3.6-flash"])
+def test_gemini_descriptor_resolves_configured_allowlisted_model(settings, model):
+    settings.LLM_MODEL = model
     descriptor = get_llm_descriptor("gemini")
 
-    assert descriptor.model == "gemini-3.6-flash"
+    assert descriptor.model == model
     assert descriptor.is_local is False
     assert descriptor.thinking_enabled is False
     assert descriptor.production_allowed is True
-    assert descriptor.model_version == "gemini-3.6-flash-interactions-v1"
-    assert descriptor.adapter_factory is GeminiLLMProvider
+    assert descriptor.model_version == f"{model}-interactions-v1"
+    assert descriptor.create_provider().metadata()["model"] == model
+
+
+def test_gemini_descriptor_keeps_default_when_no_model_override(settings):
+    settings.LLM_MODEL = "gemini-3.6-flash"
+
+    descriptor = get_llm_descriptor("gemini")
+
+    assert descriptor.model == "gemini-3.6-flash"
+
+
+def test_resolved_model_is_written_to_query_run_provider_provenance(settings, db):
+    from apps.operations.tests.test_operations_models import create_snapshot
+    from apps.orchestration.models import QueryRun
+    from apps.orchestration.services import QueryRunService
+
+    settings.LLM_MODEL = "gemini-2.5-flash"
+    descriptor = get_llm_descriptor("gemini")
+    snapshot = create_snapshot("gemini-model-provenance")
+    run, _ = QueryRunService().create_or_get(
+        data_snapshot=snapshot,
+        idempotency_key="gemini-model-provenance-key",
+        original_query="test",
+    )
+
+    QueryRunService().save_provider_provenance(
+        run,
+        requested_llm_provider="gemini",
+        resolved_llm_provider=descriptor.provider,
+        resolved_llm_model=descriptor.model,
+        requested_embedding_provider="ollama",
+        resolved_embedding_provider="ollama",
+        resolved_embedding_model="qwen3-embedding:4b",
+        embedding_prompt_version="qwen3-telecom-query-v1",
+        structured_query_parser="deterministic",
+        structured_query_parser_version="structured-query.v1",
+    )
+
+    persisted = QueryRun.objects.get(pk=run.pk)
+    assert persisted.resolved_llm_provider == "gemini"
+    assert persisted.resolved_llm_model == "gemini-2.5-flash"
 
 
 @pytest.mark.parametrize("provider_name", ["", "unknown", "ollama-custom-model"])

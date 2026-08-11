@@ -121,6 +121,7 @@ GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 GEMINI_LLM_MODEL = "gemini-3.6-flash"
 GEMINI_LLM_API_FAMILY = "interactions"
 LLM_PROVIDER = env("LLM_PROVIDER", default="gemini")
+LLM_MODEL = env("LLM_MODEL", default=GEMINI_LLM_MODEL)
 LLM_ALLOW_MOCK_PROVIDER = env.bool("LLM_ALLOW_MOCK_PROVIDER", default=False)
 GEMINI_LLM_TIMEOUT_MS = env.int("GEMINI_LLM_TIMEOUT_MS", default=15000)
 GEMINI_LLM_MAX_ATTEMPTS = env.int("GEMINI_LLM_MAX_ATTEMPTS", default=2)

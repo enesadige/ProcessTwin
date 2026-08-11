@@ -73,6 +73,7 @@ def provider_with_outcomes(settings, outcomes):
 
 def test_gemini_provider_matches_registry_metadata_and_factory_without_network(settings):
     settings.GEMINI_API_KEY = "test-secret-key"
+    settings.LLM_MODEL = "gemini-3.6-flash"
 
     provider = get_llm_descriptor("gemini").create_provider()
 

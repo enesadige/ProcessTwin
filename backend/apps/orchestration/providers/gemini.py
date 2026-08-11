@@ -36,9 +36,11 @@ class GeminiLLMProvider(LLMProvider):
         self,
         *,
         client_factory: Callable[[str, int], Any] | None = None,
+        model_name: str | None = None,
     ) -> None:
         self._client_factory = client_factory or self._build_sdk_client
         self._client: Any | None = None
+        self.model_name = model_name or GEMINI_LLM_MODEL
 
     def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
         contents, format_schema = self._validate_request(request)

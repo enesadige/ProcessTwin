@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from types import MappingProxyType
 
 from django.conf import settings
@@ -18,6 +18,9 @@ OLLAMA_PROVIDER = "ollama"
 GEMINI_PROVIDER = "gemini"
 MOCK_PROVIDER = "mock"
 GEMMA4_MODEL = "gemma4:12b-it-qat"
+GEMINI_ALLOWED_MODELS = frozenset(
+    {"gemini-2.5-flash", "gemini-3.5-flash", "gemini-3.6-flash"}
+)
 
 
 @dataclass(frozen=True)
@@ -114,4 +117,16 @@ def get_llm_descriptor(provider_name: str | None = None) -> LLMProviderDescripto
         settings, "LLM_ALLOW_MOCK_PROVIDER", False
     ):
         raise ImproperlyConfigured("Mock LLM provider is disabled outside tests.")
+    if selected == GEMINI_PROVIDER:
+        configured_model = (getattr(settings, "LLM_MODEL", "") or "").strip()
+        model = configured_model or descriptor.model
+        if model not in GEMINI_ALLOWED_MODELS:
+            raise ImproperlyConfigured("Unsupported Gemini LLM model configuration.")
+        if model != descriptor.model:
+            descriptor = replace(
+                descriptor,
+                model=model,
+                model_version=f"{model}-interactions-v1",
+                adapter_factory=lambda model=model: GeminiLLMProvider(model_name=model),
+            )
     return descriptor
