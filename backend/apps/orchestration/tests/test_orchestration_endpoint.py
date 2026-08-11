@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.utils import timezone
 
 from apps.operations.tests.test_operations_models import create_snapshot
 from apps.orchestration.executor import (
@@ -25,6 +26,7 @@ from apps.orchestration.tool_plan import MCP_TOOL_REGISTRIES, ToolPlan
 
 ENDPOINT = "/api/internal/v1/orchestration/queries/execute/"
 PUBLIC_ENDPOINT = "/api/orchestration/queries/execute/"
+STATUS_ENDPOINT = "/api/orchestration/queries/status/"
 
 
 class FakeExecutor:
@@ -178,6 +180,49 @@ def test_authenticated_analysis_endpoint_requires_analyst_role_and_uses_session(
     )
     assert response.status_code == 200
     assert response.json()["status"] == "completed"
+
+
+@pytest.mark.django_db
+def test_analysis_status_is_owned_role_limited_and_safe():
+    snapshot = create_snapshot("public-analysis-status")
+    analyst = get_user_model().objects.create_user(
+        username="status-analyst", password="correct-pass-123", role="analyst"
+    )
+    viewer = get_user_model().objects.create_user(
+        username="status-viewer", password="correct-pass-123", role="viewer"
+    )
+    run = QueryRun.objects.create(
+        data_snapshot=snapshot,
+        owner=analyst,
+        idempotency_key="public-status-001",
+        original_query="sensitive original query",
+    )
+    client = Client()
+    assert (
+        client.get(STATUS_ENDPOINT, {"idempotency_key": run.idempotency_key}).status_code == 401
+    )
+    client.force_login(viewer)
+    assert client.get(STATUS_ENDPOINT, {"idempotency_key": run.idempotency_key}).status_code == 403
+    client.force_login(analyst)
+    pending = client.get(STATUS_ENDPOINT, {"idempotency_key": run.idempotency_key})
+    assert pending.status_code == 200
+    assert pending.json()["phase"] == "request_received"
+    assert "sensitive original query" not in pending.content.decode()
+
+    run.status = QueryRunStatus.EXECUTING
+    run.started_at = timezone.now()
+    run.planned_tools = [{"tool_name": "get_outage_details"}]
+    run.executed_tools = [{"tool_name": "get_outage_details", "status": "succeeded"}]
+    run.save(update_fields=["status", "started_at", "planned_tools", "executed_tools"])
+    executing = client.get(STATUS_ENDPOINT, {"query_run_code": run.query_run_code})
+    assert executing.json()["phase"] == "tools_executing"
+    assert executing.json()["succeeded_tool_count"] == 1
+
+    other = get_user_model().objects.create_user(
+        username="other-analyst", password="correct-pass-123", role="analyst"
+    )
+    client.force_login(other)
+    assert client.get(STATUS_ENDPOINT, {"query_run_code": run.query_run_code}).status_code == 404
 
 
 def patch_facade(monkeypatch, facade: OrchestrationFacade) -> None:

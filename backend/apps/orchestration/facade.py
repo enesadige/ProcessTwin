@@ -123,6 +123,7 @@ class OrchestrationFacade:
         request: OrchestrationRequest | Mapping[str, Any],
         *,
         request_id: str,
+        owner=None,
     ) -> OrchestrationOutcome:
         try:
             normalized_request = (
@@ -142,6 +143,7 @@ class OrchestrationFacade:
                 idempotency_key=normalized_request.idempotency_key,
                 original_query=normalized_request.original_query,
                 request_id=request_id,
+                owner=owner,
             )
         except QueryRunIdempotencyConflictError:
             return self._error(

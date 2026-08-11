@@ -26,6 +26,18 @@
   deterministic fallback döndürdü; sahte sonuç veya backend semantiği
   değişikliği yoktur. MAIN-064 başlatılmadı.
 
+## Latest MAIN-064 Checkpoint
+
+- Session-auth public orchestration runs now persist an optional QueryRun owner
+  and expose a read-only `/api/orchestration/queries/status/` endpoint scoped
+  to that owner and analyst/admin roles.
+- Status payload yalnız persisted QueryRun status, safe tool counts/names,
+  error code ve elapsed timestamps içerir. Frontend, synchronous POST ile
+  birlikte idempotency key üzerinden bu endpoint'i poll eder; timer yalnız
+  elapsed süreyi gösterir, backend fazlarını taklit etmez.
+- Truthful states `request_received`, `plan_prepared`, `tools_executing`,
+  `completed` ve `failed` ile sınırlıdır. MAIN-065 başlatılmadı.
+
 ## Latest MAIN-061 Checkpoint
 
 - `feature/llm-role-expansion` üzerinde `acece2a` tabanından frontend uygulama

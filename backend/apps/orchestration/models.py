@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -45,6 +46,13 @@ class QueryRun(TimeStampedModel):
         null=True,
         blank=True,
         related_name="retries",
+    )
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="orchestration_runs",
     )
     original_query = models.TextField()
     structured_query = models.JSONField(default=dict, blank=True)
@@ -139,6 +147,7 @@ class QueryRun(TimeStampedModel):
                     "data_snapshot_id",
                     "idempotency_key",
                     "retry_of_id",
+                    "owner_id",
                     "original_query",
                     "structured_query",
                     "planned_tools",
@@ -170,6 +179,7 @@ class QueryRun(TimeStampedModel):
                     "data_snapshot_id": self.data_snapshot_id,
                     "idempotency_key": self.idempotency_key,
                     "retry_of_id": self.retry_of_id,
+                    "owner_id": self.owner_id,
                     "original_query": self.original_query,
                     "structured_query": self.structured_query,
                     "planned_tools": self.planned_tools,

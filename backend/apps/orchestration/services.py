@@ -161,6 +161,7 @@ class QueryRunService:
         idempotency_key: str,
         original_query: str,
         request_id: str | None = None,
+        owner=None,
     ) -> tuple[QueryRun, bool]:
         if not idempotency_key.strip():
             raise QueryRunError(
@@ -173,12 +174,14 @@ class QueryRunService:
             with transaction.atomic():
                 query_run, created = QueryRun.objects.get_or_create(
                     idempotency_key=idempotency_key,
-                    defaults={"data_snapshot": data_snapshot, **defaults},
+                    defaults={"data_snapshot": data_snapshot, "owner": owner, **defaults},
                 )
         except IntegrityError:
             query_run = QueryRun.objects.get(idempotency_key=idempotency_key)
             created = False
         if query_run.data_snapshot_id != data_snapshot.id:
+            raise QueryRunIdempotencyConflictError()
+        if owner is not None and query_run.owner_id not in {None, owner.pk}:
             raise QueryRunIdempotencyConflictError()
         return query_run, created
 

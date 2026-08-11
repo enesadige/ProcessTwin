@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { useAuth } from '../auth/AuthContext'
-import { AnalysisRequestError, submitAnalysis, type ProviderName, type ViewMode } from '../auth/api'
+import { AnalysisRequestError, getAnalysisStatus, submitAnalysis, type AnalysisStatus, type ProviderName, type ViewMode } from '../auth/api'
 import './AIAnalysisPage.css'
 
 const SNAPSHOT_IDENTIFIER =
@@ -24,6 +24,36 @@ export function AIAnalysisPage() {
   const [lifecycle, setLifecycle] = useState<Lifecycle>('idle')
   const [result, setResult] = useState<Awaited<ReturnType<typeof submitAnalysis>> | null>(null)
   const [error, setError] = useState('')
+  const [runKey, setRunKey] = useState<string | null>(null)
+  const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [runStatus, setRunStatus] = useState<AnalysisStatus | null>(null)
+
+  useEffect(() => {
+    if (!runKey) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const poll = async () => {
+      try {
+        const status = await getAnalysisStatus(runKey)
+        if (!cancelled && status) setRunStatus(status)
+      } catch {
+        // The POST response remains authoritative if a transient poll fails.
+      }
+      if (!cancelled) timer = setTimeout(poll, 700)
+    }
+    void poll()
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+    }
+  }, [runKey])
+
+  useEffect(() => {
+    if (!runStartedAt) return
+    const timer = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - runStartedAt) / 1000)), 250)
+    return () => clearInterval(timer)
+  }, [runStartedAt])
 
   async function submit() {
     const trimmed = query.trim()
@@ -31,10 +61,15 @@ export function AIAnalysisPage() {
     setLifecycle('submitting')
     setError('')
     setResult(null)
+    const idempotencyKey = crypto.randomUUID()
+    setRunKey(idempotencyKey)
+    setRunStartedAt(Date.now())
+    setElapsedSeconds(0)
+    setRunStatus(null)
     try {
       const response = await submitAnalysis({
         snapshot_identifier: SNAPSHOT_IDENTIFIER,
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: idempotencyKey,
         original_query: trimmed,
         llm_provider: llmProvider,
         embedding_provider: embeddingProvider,
@@ -45,6 +80,17 @@ export function AIAnalysisPage() {
       setLifecycle('failed')
       setError(reason instanceof AnalysisRequestError ? reason.message : 'Sunucuya ulaşılamadı.')
     }
+    setRunKey(null)
+    setRunStartedAt(null)
+  }
+
+  const currentPhase = runStatus?.phase === 'failed' ? 'tools_executing' : (runStatus?.phase ?? 'request_received')
+  const phaseOrder = ['request_received', 'plan_prepared', 'tools_executing', 'completed']
+  const phaseLabels: Record<string, string> = {
+    request_received: 'Sorgu alındı',
+    plan_prepared: 'Plan hazırlandı',
+    tools_executing: 'Operasyon verileri işleniyor',
+    completed: 'Tamamlandı',
   }
 
   return (
@@ -86,6 +132,13 @@ export function AIAnalysisPage() {
           {EXAMPLES.map((example) => <button type="button" key={example} onClick={() => setQuery(example)}>{example}</button>)}
         </aside>
       </div>
+
+      {(lifecycle === 'submitting' || runStatus) && <section className="analysis-progress" aria-live="polite" aria-label="Analiz işlem durumu">
+        <div className="analysis-progress__header"><div><p className="analysis-page__eyebrow">Gerçek işlem durumu</p><h2>{lifecycle === 'submitting' ? (phaseLabels[currentPhase] ?? 'Sorgu çalışıyor') : lifecycle === 'success' ? 'Tamamlandı' : lifecycle === 'failed' ? 'İşlem başarısız' : 'İşlem sonucu'}</h2></div><span>{runStatus?.elapsed_ms ? Math.round(runStatus.elapsed_ms / 1000) : elapsedSeconds}s</span></div>
+        <ol className="analysis-progress__steps">{phaseOrder.map((phase, index) => { const currentIndex = phaseOrder.indexOf(currentPhase); const state = lifecycle !== 'submitting' && phase === 'completed' ? 'complete' : index < currentIndex ? 'complete' : phase === currentPhase ? 'current' : 'pending'; return <li className={`analysis-progress__step analysis-progress__step--${state}`} key={phase}><span aria-hidden="true">{state === 'complete' ? '✓' : index + 1}</span>{phaseLabels[phase]}</li> })}</ol>
+        {runStatus && runStatus.planned_tool_count > 0 && <p className="analysis-progress__tools">Servis durumu: {runStatus.succeeded_tool_count}/{runStatus.planned_tool_count} başarılı</p>}
+        {runStatus?.failed_tool_count ? <p className="analysis-message analysis-message--error">İşlem güvenli şekilde başarısız oldu: {runStatus.error_code ?? 'tool_error'}</p> : null}
+      </section>}
 
       {result?.response && <section className="analysis-result" aria-live="polite"><div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>{viewMode === 'technical' ? 'Teknik görünüm' : 'Yönetim görünümü'}</span></div><h2>Yanıt</h2><p>{result.response.response_text}</p>{result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}</section>}
       {result?.clarification && <section className="analysis-result analysis-result--clarification" aria-live="polite"><h2>Ek bilgi gerekiyor</h2><p>{result.clarification.message}</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}

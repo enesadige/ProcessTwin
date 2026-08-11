@@ -33,6 +33,22 @@ export type AnalysisResponse = {
   error?: { code: string; message: string }
 }
 
+export type AnalysisStatus = {
+  query_run_code: string
+  status: 'pending' | 'planned' | 'executing' | 'completed' | 'failed'
+  phase: 'request_received' | 'plan_prepared' | 'tools_executing' | 'completed' | 'failed'
+  planned_tool_count: number
+  executed_tool_count: number
+  succeeded_tool_count: number
+  failed_tool_count: number
+  planned_tools: string[]
+  executed_tools: string[]
+  error_code: string | null
+  started_at: string | null
+  completed_at: string | null
+  elapsed_ms: number
+}
+
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
 function csrfCookie() {
@@ -110,4 +126,15 @@ export async function submitAnalysis(payload: AnalysisRequest) {
   const body = (await response.json().catch(() => ({}))) as AnalysisResponse
   if (!response.ok) throw new AnalysisRequestError(response.status, body)
   return body
+}
+
+export async function getAnalysisStatus(idempotencyKey: string) {
+  const response = await fetch(
+    `${apiBase}/api/orchestration/queries/status/?idempotency_key=${encodeURIComponent(idempotencyKey)}`,
+    { credentials: 'include', headers: { Accept: 'application/json' } },
+  )
+  const body = (await response.json().catch(() => ({}))) as AnalysisStatus | AnalysisResponse
+  if (response.status === 404) return null
+  if (!response.ok) throw new AnalysisRequestError(response.status, body as AnalysisResponse)
+  return body as AnalysisStatus
 }

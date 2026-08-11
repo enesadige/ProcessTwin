@@ -24,6 +24,18 @@
 .analysis-examples button { display: block; width: 100%; margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); background: var(--color-surface-muted); text-align: left; cursor: pointer; }
 .analysis-examples button:hover { border-color: var(--color-primary); background: rgba(31,111,235,.06); }
 .analysis-result { display: grid; gap: var(--space-3); }
+.analysis-progress { display: grid; gap: var(--space-4); padding: var(--space-5); border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); box-shadow: var(--shadow-panel); }
+.analysis-progress__header { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--space-4); }
+.analysis-progress__header h2 { margin: 0; font-size: 18px; }
+.analysis-progress__header > span { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.analysis-progress__steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-2); padding: 0; margin: 0; list-style: none; }
+.analysis-progress__step { display: flex; align-items: center; gap: var(--space-2); min-height: 38px; color: var(--color-text-subtle); font-size: 12px; font-weight: 700; }
+.analysis-progress__step span { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; border: 1px solid var(--color-border); border-radius: 50%; font-size: 11px; }
+.analysis-progress__step--current { color: var(--color-primary-strong); }
+.analysis-progress__step--current span { border-color: var(--color-primary); background: rgba(31,111,235,.1); }
+.analysis-progress__step--complete { color: var(--color-success); }
+.analysis-progress__step--complete span { border-color: var(--color-success); }
+.analysis-progress__tools { margin: 0; color: var(--color-text-muted); font-size: 12px; }
 .analysis-result > p { margin: 0; white-space: pre-wrap; line-height: 1.7; }
 .analysis-result__meta { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--color-text-muted); font-size: 11px; font-weight: 700; }
 .analysis-result__meta span { padding: 5px 8px; border-radius: 5px; background: var(--color-surface-muted); }
@@ -31,5 +43,5 @@
 .analysis-result--clarification button { justify-self: start; }
 .analysis-message { margin: 0; color: var(--color-warning); font-size: 12px; }
 .analysis-message--error { color: var(--color-danger); }
-@media (max-width: 800px) { .analysis-grid { grid-template-columns: 1fr; } .analysis-page__header { flex-direction: column; } }
+@media (max-width: 800px) { .analysis-grid { grid-template-columns: 1fr; } .analysis-page__header { flex-direction: column; } .analysis-progress__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { .analysis-options { grid-template-columns: 1fr; } .analysis-options fieldset { grid-column: auto; } }
