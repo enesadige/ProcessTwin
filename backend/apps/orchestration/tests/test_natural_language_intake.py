@@ -16,6 +16,7 @@ from apps.orchestration.natural_language_intake import (
     NaturalLanguageStructuredQueryParser,
 )
 from apps.orchestration.providers.base import LLMProvider
+from apps.orchestration.providers.gemini import GeminiLLMProviderError
 from apps.orchestration.structured_query import RequestedOutput, SemanticDimension, StructuredQuery
 
 
@@ -205,6 +206,29 @@ def test_semantic_decomposition_provider_failure_preserves_deterministic_query()
     assert result.structured_query.requested_outputs == query.requested_outputs
     assert result.structured_query.semantic_dimensions == []
     assert result.failure_code == "provider_unavailable"
+
+
+@pytest.mark.django_db
+def test_semantic_decomposition_preserves_safe_gemini_provider_error_category():
+    snapshot = create_snapshot("intake-semantic-gemini-error")
+    query = deterministic_query(snapshot.snapshot_key)
+
+    class GeminiFailureProvider(SemanticProvider):
+        def generate(self, *, request: Mapping[str, object]) -> Mapping[str, object]:
+            raise GeminiLLMProviderError(
+                message="Gemini request is invalid.", code="invalid_request"
+            )
+
+    result = LLMSemanticDecomposer(GeminiFailureProvider([])).merge(
+        original_query="CE-INTAKE-001 etkisi nedir?",
+        deterministic_query=query,
+    )
+
+    assert result.accepted is False
+    assert result.failure_code == "provider_call_failed_invalid_request"
+    assert result.structured_query.semantic_decomposition_failure == (
+        "provider_call_failed_invalid_request"
+    )
 
 
 @pytest.mark.django_db
