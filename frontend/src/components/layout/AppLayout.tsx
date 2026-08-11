@@ -1,33 +1,40 @@
 import { isRouteErrorResponse, NavLink, Outlet, useRouteError } from 'react-router-dom'
 
+import { useAuth } from '../../auth/AuthContext'
+import type { UserRole } from '../../auth/api'
 import './AppLayout.css'
 
-const navGroups = [
+type NavItem = { label: string; to: string; marker: string; roles?: UserRole[] }
+const navGroups: { label: string; items: NavItem[] }[] = [
   {
     label: 'Workspace',
     items: [
-      { label: 'AI Analysis', to: '/ai-analysis', marker: 'AI' },
+      { label: 'AI Analysis', to: '/ai-analysis', marker: 'AI', roles: ['analyst', 'admin'] },
       { label: 'Operations', to: '/', marker: 'OP' },
-      { label: 'ProcessTwin', to: '/processtwin', marker: 'PT' },
+      { label: 'ProcessTwin', to: '/processtwin', marker: 'PT', roles: ['analyst', 'admin'] },
     ],
   },
   {
     label: 'Operations',
     items: [
-      { label: 'Network', to: '/network', marker: 'NW' },
+      { label: 'Network', to: '/network', marker: 'NW', roles: ['engineer', 'admin'] },
       { label: 'Customers', to: '/customers', marker: 'CU' },
     ],
   },
   {
     label: 'Governance',
     items: [
-      { label: 'Rules', to: '/rules', marker: 'RL' },
+      { label: 'Rules', to: '/rules', marker: 'RL', roles: ['admin'] },
       { label: 'Decision Evidence', to: '/evidence', marker: 'EV' },
     ],
   },
 ]
 
 export function AppLayout() {
+  const { user, signOut } = useAuth()
+  const canSee = (roles?: UserRole[]) => !roles || roles.includes(user?.role ?? 'viewer')
+  const initials = user?.username.slice(0, 2).toUpperCase() ?? 'PT'
+
   return (
     <div className="app-shell">
       <aside className="app-sidebar">
@@ -42,7 +49,7 @@ export function AppLayout() {
           {navGroups.map((group) => (
             <div className="app-nav__group" key={group.label}>
               <p className="app-nav__group-label">{group.label}</p>
-              {group.items.map((item) => (
+              {group.items.filter((item) => canSee(item.roles)).map((item) => (
                 <NavLink
                   className={({ isActive }) =>
                     isActive ? 'app-nav__link app-nav__link--active' : 'app-nav__link'
@@ -59,17 +66,16 @@ export function AppLayout() {
           ))}
         </nav>
         <div className="app-sidebar__footer">
-          <NavLink className="app-nav__link" to="/settings">
-            <span className="app-nav__marker" aria-hidden="true">ST</span>
-            <span>Settings</span>
-          </NavLink>
+          {canSee(['admin']) && <NavLink className="app-nav__link" to="/settings">
+            <span className="app-nav__marker" aria-hidden="true">ST</span><span>Settings</span>
+          </NavLink>}
           <div className="auth-shell" aria-label="Signed-in workspace">
-            <span className="auth-shell__avatar" aria-hidden="true">ED</span>
+            <span className="auth-shell__avatar" aria-hidden="true">{initials}</span>
             <span className="auth-shell__details">
-              <strong>Operations user</strong>
-              <small>Workspace access</small>
+              <strong>{user?.username}</strong>
+              <small>{user?.role} access</small>
             </span>
-            <span className="auth-shell__status" title="Auth boundary ready" />
+            <button className="auth-shell__logout" type="button" onClick={() => void signOut()} aria-label="Log out">Exit</button>
           </div>
         </div>
       </aside>

@@ -172,6 +172,19 @@
   background: var(--color-success);
 }
 
+.auth-shell__logout {
+  margin-left: auto;
+  padding: 3px 0;
+  border: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.auth-shell__logout:hover { color: var(--color-danger); }
+
 .app-content {
   min-width: 0;
   flex: 1;

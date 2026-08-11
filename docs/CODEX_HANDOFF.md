@@ -1,5 +1,17 @@
 # ProcessTwin Codex Handoff
 
+## Latest MAIN-062 Checkpoint
+
+- `aa8b74f` üzerindeki MAIN-061 shell korunarak session tabanlı login, logout
+  ve current-user endpoint'leri eklendi (`/api/auth/csrf/`, `/login/`,
+  `/logout/`, `/me/`). Django'nun mevcut `User` modeli ve CSRF/session
+  middleware'i kullanılıyor.
+- Frontend auth provider oturumu geri yüklüyor; protected routes, güvenli
+  login yönlendirmesi, logout ve viewer/analyst/engineer/admin route görünürlüğü
+  uygulanıyor. Yetkisiz rol için 403 görünümü var.
+- Yerel geliştirme kullanıcıları için kaynakta parola tutmayan
+  `seed_demo_users --password ...` komutu eklendi. MAIN-063 başlatılmadı.
+
 ## Latest MAIN-061 Checkpoint
 
 - `feature/llm-role-expansion` üzerinde `acece2a` tabanından frontend uygulama
