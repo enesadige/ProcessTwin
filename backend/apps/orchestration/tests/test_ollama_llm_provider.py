@@ -78,7 +78,7 @@ def test_request_body_has_fixed_model_thinking_stream_and_native_schema_contract
     response = provider.generate(request=request)
 
     assert request == {"contents": "Kisa ve guvenli yanit.", "format_schema": schema}
-    assert base_urls == [("http://127.0.0.1:11434", 30.0)]
+    assert base_urls == [("http://127.0.0.1:11434", 120.0)]
     assert client.calls == [
         {
             "path": "/api/chat",
