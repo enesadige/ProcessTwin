@@ -417,3 +417,22 @@ The sanitized run is recorded in
 unloaded and `ollama ps` was empty. This proves the local provider path
 independently; the Gemini quota-limited result was not rerun. Overall PRE-061
 and `MAIN-061` remain blocked by the outstanding Gemini acceptance criterion.
+## Gemini Final 18-Case Baseline
+
+The existing original 10 and unseen 8 questions were run once, sequentially,
+with a 10-second delay using real HTTP, `gemini-3.6-flash` and
+`gemini-embedding-2`. All 18 requests returned HTTP 200 and completed. The
+semantic baseline remained 10/10 original and 8/8 unseen. Gemini statement
+selection passed 15/18: original 10/10 and unseen 5/8. Three unseen cases
+(`unseen-04`, `unseen-07`, `unseen-08`) used safe deterministic fallback after
+bounded retries ended with `provider_call_failed_rate_limited`; provider-fail
+count was zero.
+
+Latency was 5,195.230 ms minimum, 10,683.153 ms median, 10,982.661 ms average
+and 17,335.238 ms maximum. Unsupported fact/reference/decision, privacy,
+snapshot leakage and citation mismatch counters remained zero. The complete
+sanitized result is stored in `artifacts/pre061/gemini_acceptance_baseline.json`.
+
+This closes the semantic Gemini baseline but not the full provider gate:
+status is **PARTIAL_PROVIDER_LIMIT**, not PRE-061 COMPLETE. No production code
+was changed and `MAIN-061` remains blocked.

@@ -323,3 +323,16 @@ Belgeyle kod çelişirse güncel kod/git durumunu kaynak kabul et. Henüz
 implementasyon yapmadan checkpoint'i en fazla 10 maddede özetle. Sonraki
 görev promptunu kullanıcıdan bekle.
 ```
+## Latest Gemini Final Baseline
+
+The existing original 10 and unseen 8 questions were run once with real HTTP,
+Gemini `gemini-3.6-flash`, Gemini Embedding `gemini-embedding-2` and 10-second
+sequential pacing. All 18 QueryRuns completed with HTTP 200. Semantic results
+remained 10/10 and 8/8. Gemini selection passed 15/18: original 10/10 and
+unseen 5/8. `unseen-04`, `unseen-07` and `unseen-08` hit bounded retry
+exhaustion with `provider_call_failed_rate_limited` and safely fell back.
+Provider failures were 0; security and citation counters were zero. Details:
+`artifacts/pre061/gemini_acceptance_baseline.json`.
+
+Overall status is **PARTIAL_PROVIDER_LIMIT**. No production code changed;
+PRE-061 is not promoted to complete and MAIN-061 remains blocked.

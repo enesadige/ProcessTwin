@@ -1,0 +1,4187 @@
+{
+  "generated_at": "2026-08-11T14:51:47Z",
+  "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+  "delay_seconds": 10,
+  "requested_llm_provider": "gemini",
+  "resolved_llm_provider": "gemini",
+  "resolved_llm_model": "gemini-3.6-flash",
+  "requested_embedding_provider": "gemini",
+  "resolved_embedding_provider": "gemini",
+  "resolved_embedding_model": "gemini-embedding-2",
+  "summary": {
+    "original_10_semantic_pass": 10,
+    "original_10_gemini_selection_pass": 10,
+    "unseen_8_semantic_pass": 8,
+    "unseen_8_gemini_selection_pass": 5,
+    "fallback_count": 3,
+    "provider_fail_count": 0,
+    "rate_limited_cases": [
+      "unseen-04",
+      "unseen-07",
+      "unseen-08"
+    ],
+    "semantic_mismatch_count": 0,
+    "latency_ms": {
+      "min": 5195.23,
+      "median": 10683.153,
+      "average": 10982.661166666669,
+      "max": 17335.238
+    }
+  },
+  "security_counters": {
+    "unsupported_fact": 0,
+    "unsupported_reference": 0,
+    "unsupported_decision": 0,
+    "privacy_violation": 0,
+    "snapshot_leakage": 0,
+    "citation_mismatch": 0
+  },
+  "decision": "PARTIAL_PROVIDER_LIMIT",
+  "cases": [
+    {
+      "case": "original-01",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0001",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "OUT-MCR-0001",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-1:outage_details",
+          "duration_ms": 624,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-1:customer_impact",
+          "duration_ms": 2525,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-1:root_cause",
+          "duration_ms": 632,
+          "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+          "safe_result_summary": {
+            "deterministic": true,
+            "reason_codes": [
+              "same_resource",
+              "temporal_propagation"
+            ],
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0001",
+          "full_outage": true,
+          "outage_code": "OUT-MCR-0001",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [
+            "root_cause_unverified",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AGG-ANK-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 495,
+          "affected_subscription_count": 572,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "missing_evidence_categories": [],
+          "potential": 572,
+          "reason_code_distribution": {},
+          "verified_impacted": 572
+        },
+        "provenance": [
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-1:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-1:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-1:root_cause",
+            "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          }
+        ],
+        "result_fingerprint": "cc20c2fd47d829c0b51557fe388d9f09feb6e6ad3ad0526f4b594d9497e7f9a6",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Evet.\nDoğrulanmış kök kaynak: device AGG-ANK-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nKök neden gerekçesi: root_cause_unverified, same_resource, temporal_propagation.\nDoğrulanmış etki: 572 abonelik / 495 müşteri.\nPotansiyel kapsam: 572 abonelik.\nFailover ile korunan: 0 bağlantı.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 10610.997,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0001",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0001",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0001",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "customer_impact"
+          ],
+          "execution_order": 3,
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "AGG-ANK-002 cihazındaki kesintide kaç müşteri ve kaç abonelik gerçekten etkilendi? Kesintinin türünü, kök nedeni, potansiyel kapsamı ve doğrulanmış etkiyi açıkla.",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "device_code": "AGG-ANK-002",
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0001",
+        "requested_outputs": [
+          "details",
+          "impact",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "original-02",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0005",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "d43704013e92",
+          "reference_kind": "decision_evidence"
+        },
+        {
+          "reference_code": "OUT-MCR-0005",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-2:outage_details",
+          "duration_ms": 614,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-2:customer_impact",
+          "duration_ms": 2580,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_evidence",
+          "correlation_id": "pre061-gemini-final-2:rule_evidence",
+          "duration_ms": 579,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "compensation_evidence",
+          "correlation_id": "pre061-gemini-final-2:compensation_evidence",
+          "duration_ms": 562,
+          "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+          "safe_result_summary": {
+            "deterministic": true,
+            "eligible": 1,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "status": "calculated",
+            "tool_version": "0.1.0"
+          },
+          "server": "compensation",
+          "status": "succeeded",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0005",
+          "full_outage": false,
+          "outage_code": "OUT-MCR-0005",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [
+            "root_cause_unverified"
+          ],
+          "root_resource_reference": "AGG-KOC-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "d43704013e92"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-PARTIAL-OUTAGE-PRORATED:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "10.00"
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 1101,
+          "affected_subscription_count": 1338,
+          "failover_path_diversity_counts": {
+            "fully_diverse": 1,
+            "partially_diverse": 2
+          },
+          "failover_protected": 3,
+          "missing_evidence_categories": [],
+          "potential": 1341,
+          "reason_code_distribution": {},
+          "verified_impacted": 1338
+        },
+        "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-gemini-final-2:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-2:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-2:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-gemini-final-2:rule_evidence",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "dc5bec6624ad7f60bf3c623bc5a2e36b48fa8ef93fc6cd682d2e9ae7bd2107f2",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Hayır.\nFailover ile korunan: 3 bağlantı tam hizmet kesintisi değildir.\nDoğrulanmış kök kaynak: device AGG-KOC-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nKök neden gerekçesi: root_cause_unverified.\nPotansiyel kapsam: 1341 abonelik.\nDoğrulanmış etki: 1338 abonelik / 1101 müşteri.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nTelafi durumu: calculated.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 1 kayıt.\nUygun olmayan veya bekleyen: 0 kayıt.\nDoğrulanmış RuleVersion: BB-PARTIAL-OUTAGE-PRORATED:v1.\nDoğrulanmış DecisionEvidence: d43704013e92.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 10766.634,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0005",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0005",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0005",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "customer_impact"
+          ],
+          "execution_order": 3,
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0005",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "rule_evidence"
+          ],
+          "execution_order": 4,
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "AGG-KOC-002 cihazındaki olay tam kesinti mi yoksa kısmi kesinti mi? Kaç müşteri ve abonelik etkilendi ve bu olay için hangi telafi kuralı uygulanıyor?",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "compensation",
+        "device_code": "AGG-KOC-002",
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0005",
+        "requested_outputs": [
+          "details",
+          "evidence",
+          "impact",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "original-03",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0013",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "a8170593f3fb",
+          "reference_kind": "decision_evidence"
+        },
+        {
+          "reference_code": "OUT-MCR-0013",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-1:outage_details",
+          "duration_ms": 643,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-1:customer_impact",
+          "duration_ms": 2645,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-1:root_cause",
+          "duration_ms": 626,
+          "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+          "safe_result_summary": {
+            "deterministic": true,
+            "reason_codes": [
+              "same_resource",
+              "temporal_propagation"
+            ],
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_evidence",
+          "correlation_id": "pre061-gemini-final-1:rule_evidence",
+          "duration_ms": 561,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "compensation_evidence",
+          "correlation_id": "pre061-gemini-final-1:compensation_evidence",
+          "duration_ms": 551,
+          "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+          "safe_result_summary": {
+            "deterministic": true,
+            "eligible": 1,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "status": "calculated",
+            "tool_version": "0.1.0"
+          },
+          "server": "compensation",
+          "status": "succeeded",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0013",
+          "full_outage": true,
+          "outage_code": "OUT-MCR-0013",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [
+            "root_cause_unverified",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AGG-İZM-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "a8170593f3fb"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "ME-FAILED-FAILOVER:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "839.99"
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 1267,
+          "affected_subscription_count": 1438,
+          "failover_path_diversity_counts": {
+            "fully_diverse": 1,
+            "shared_risk": 1,
+            "unknown": 1
+          },
+          "failover_protected": 3,
+          "missing_evidence_categories": [],
+          "potential": 1441,
+          "reason_code_distribution": {},
+          "verified_impacted": 1438
+        },
+        "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-gemini-final-1:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-1:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-1:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-1:root_cause",
+            "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-gemini-final-1:rule_evidence",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "c9904cdcaed825f214f0fc3d4f9b20919fa8cf243a1a6679cbb87def3d85908b",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Evet.\nDoğrulanmış kök kaynak: device AGG-İZM-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nKök neden gerekçesi: root_cause_unverified, same_resource, temporal_propagation.\nAna ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı ve manuel inceleme gerekir.\nPotansiyel kapsam: 1441 abonelik.\nDoğrulanmış etki: 1438 abonelik / 1267 müşteri.\nFailover ile korunan: 3 bağlantı.\nFailover bazı bağlantıları korusa da bu olayda tam hizmet kesintisini önleyemedi.\nTelafi durumu: calculated.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 1 kayıt.\nUygun olmayan veya bekleyen: 0 kayıt.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nDoğrulanmış RuleVersion: ME-FAILED-FAILOVER:v1.\nDoğrulanmış DecisionEvidence: a8170593f3fb.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 11745.835,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0013",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0013",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0013",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "customer_impact"
+          ],
+          "execution_order": 3,
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0013",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "root_cause"
+          ],
+          "execution_order": 4,
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0013",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "rule_evidence"
+          ],
+          "execution_order": 5,
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "AGG-İZM-002 olayında failover neden müşterileri koruyamadı? Kaç müşteri ve abonelik etkilendi, olayın sınıfı ne ve telafi sonucu nedir?",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "compensation",
+        "device_code": "AGG-İZM-002",
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0013",
+        "requested_outputs": [
+          "details",
+          "eligibility",
+          "evidence",
+          "impact",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "original-04",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0015",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "OUT-MCR-0015",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-2:outage_details",
+          "duration_ms": 635,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-2:customer_impact",
+          "duration_ms": 3916,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-2:root_cause",
+          "duration_ms": 600,
+          "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+          "safe_result_summary": {
+            "deterministic": true,
+            "reason_codes": [
+              "same_resource",
+              "temporal_propagation"
+            ],
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0015",
+          "full_outage": true,
+          "outage_code": "OUT-MCR-0015",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [
+            "root_cause_unverified",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AGG-İZM-004",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 989,
+          "affected_subscription_count": 1112,
+          "failover_path_diversity_counts": {
+            "shared_risk": 33
+          },
+          "failover_protected": 33,
+          "missing_evidence_categories": [],
+          "potential": 1145,
+          "reason_code_distribution": {},
+          "verified_impacted": 1112
+        },
+        "provenance": [
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-2:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-2:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-2:root_cause",
+            "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          }
+        ],
+        "result_fingerprint": "4f74082b102ee470c855597fbc911c2200a7f3f21aa51383f6ce761f051253f6",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Evet.\nDoğrulanmış etki: 1112 abonelik / 989 müşteri.\nPotansiyel kapsam: 1145 abonelik.\nFailover ile korunan: 33 bağlantı.\nFailover bazı bağlantıları korusa da bu olayda tam hizmet kesintisini önleyemedi.\nDoğrulanmış kök kaynak: device AGG-İZM-004.\nKök neden gerekçesi: root_cause_unverified, same_resource, temporal_propagation.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nAna ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı ve manuel inceleme gerekir.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 12417.249,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0015",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0015",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0015",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "customer_impact"
+          ],
+          "execution_order": 3,
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "AGG-İZM-004 cihazındaki olayda ana ve yedek yollar gerçekten bağımsız mı? Shared-risk problemi varsa müşteri etkisini ve neden manuel inceleme gerektiğini açıkla.",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "compensation",
+        "device_code": "AGG-İZM-004",
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0015",
+        "requested_outputs": [
+          "details",
+          "impact",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "original-05",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0022",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "b39d63177552",
+          "reference_kind": "decision_evidence"
+        },
+        {
+          "reference_code": "OUT-MCR-0021",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-3:outage_details",
+          "duration_ms": 599,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-3:customer_impact",
+          "duration_ms": 2379,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-3:root_cause",
+          "duration_ms": 618,
+          "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+          "safe_result_summary": {
+            "deterministic": true,
+            "reason_codes": [
+              "same_resource",
+              "temporal_propagation"
+            ],
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_evidence",
+          "correlation_id": "pre061-gemini-final-3:rule_evidence",
+          "duration_ms": 561,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "compensation_evidence",
+          "correlation_id": "pre061-gemini-final-3:compensation_evidence",
+          "duration_ms": 549,
+          "result_fingerprint": "acc00418d1938d7d82690c64d21220837a2d58b80d14e4a269f1efa044a44e96",
+          "safe_result_summary": {
+            "deterministic": true,
+            "eligible": 0,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "status": "calculated",
+            "tool_version": "0.1.0"
+          },
+          "server": "compensation",
+          "status": "succeeded",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0022",
+          "full_outage": true,
+          "outage_code": "OUT-MCR-0021",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [
+            "root_cause_unverified",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-ESE-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 0,
+          "evidence_references": [
+            "b39d63177552"
+          ],
+          "ineligible_pending": 1,
+          "rule_versions": {
+            "MR-UNKNOWN-MISSING-EVIDENCE:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "0.00"
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 24,
+          "affected_subscription_count": 48,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "missing_evidence_categories": [],
+          "potential": 48,
+          "reason_code_distribution": {},
+          "verified_impacted": 48
+        },
+        "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-gemini-final-3:compensation_evidence",
+            "result_fingerprint": "acc00418d1938d7d82690c64d21220837a2d58b80d14e4a269f1efa044a44e96",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-3:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-3:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-3:root_cause",
+            "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-gemini-final-3:rule_evidence",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "f30d3d399482ba0787e28eab88b95a84ba246fc48d0396a22a7c531ac4ff2013",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Evet.\nDoğrulanmış kök kaynak: device AN-ESE-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nKök neden gerekçesi: root_cause_unverified, same_resource, temporal_propagation.\nPotansiyel kapsam: 48 abonelik.\nDoğrulanmış etki: 48 abonelik / 24 müşteri.\nFailover ile korunan: 0 bağlantı.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nTelafi durumu: calculated.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 0 kayıt.\nUygun olmayan veya bekleyen: 1 kayıt.\nKarar: eksik doğrulama nedeniyle manuel inceleme bekleniyor.\nDoğrulanmış RuleVersion: MR-UNKNOWN-MISSING-EVIDENCE:v1.\nDoğrulanmış DecisionEvidence: b39d63177552.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 13054.654,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "customer_impact"
+          ],
+          "execution_order": 3,
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "root_cause"
+          ],
+          "execution_order": 4,
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "rule_evidence"
+          ],
+          "execution_order": 5,
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "AN-ESE-002 kaynaklı olayda kaç müşteri etkilendi? Kök neden kesin olarak doğrulanmış mı; doğrulanmadıysa hangi kanıt eksik ve sistem hangi kararı veriyor?",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "compensation",
+        "device_code": "AN-ESE-002",
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0021",
+        "requested_outputs": [
+          "details",
+          "eligibility",
+          "evidence",
+          "impact",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "original-06",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0023",
+          "reference_kind": "causal_event"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "correlate",
+          "correlation_id": "pre061-gemini-final-4:correlate",
+          "duration_ms": 670,
+          "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0023",
+            "deterministic": true,
+            "reason_codes": [
+              "same_resource",
+              "temporal_propagation"
+            ],
+            "root_cause_confidence": 100,
+            "root_cause_score": 100,
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-4:root_cause",
+          "duration_ms": 649,
+          "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0023",
+            "deterministic": true,
+            "reason_codes": [
+              "same_resource",
+              "temporal_propagation"
+            ],
+            "root_cause_confidence": 100,
+            "root_cause_score": 100,
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_evidence",
+          "correlation_id": "pre061-gemini-final-4:rule_evidence",
+          "duration_ms": 650,
+          "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0023",
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0023",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "symptom",
+          "event_type": "device_failure",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {
+            "child": 0,
+            "noise": 0,
+            "root": 1,
+            "supporting": 0,
+            "symptom": 7,
+            "unrelated": 0
+          },
+          "root_alarm_types": [
+            "OLT_UNREACHABLE"
+          ],
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_cause_summary": "OLT-YEN-002",
+          "root_resource_reference": "OLT-YEN-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": [
+            "ONT_DISCONNECT_SURGE"
+          ]
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-4:correlate",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-4:root_cause",
+            "result_fingerprint": "e53c87b9f38944a7fde9e060fd569dd66f088cb0d5b583caf55bd0e4bbbfda87",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-gemini-final-4:rule_evidence",
+            "result_fingerprint": "f1fe7d9f71dd06a329548e37e7370cf4f73fec8eb166aa0015d2ef0406ed5bfb",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "f616f583917056d74aca92cb00b9f054f717576cf8d3969050888797ad9c7827",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nDoğrulanmış kök kaynak: device OLT-YEN-002.\nKök neden alarmı: OLT_UNREACHABLE.\nKök neden gerekçesi: same_resource, temporal_propagation.\nKök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi ayrıca doğrulanmadı.\nDying Gasp alarmı kök neden değil, belirtidir.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\nPotansiyel kapsam: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nDoğrulanmış etkisizlik: 0 bağlantı.\nKanıt yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.\nFailover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 10249.158,
+      "planned_tools": [
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0023",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "correlate",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0023",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0023",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "CE-MCR-0023 olayının gerçek kök nedeni nedir? OLT_UNREACHABLE, Dying Gasp ve Device Not Active sinyallerinden hangileri kök neden, hangileri belirtidir ve neden?",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "causal_event_code": "CE-MCR-0023",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "network_investigation",
+        "requested_outputs": [
+          "evidence",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "original-07",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0010",
+          "reference_kind": "causal_event"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "correlate",
+          "correlation_id": "pre061-gemini-final-5:correlate",
+          "duration_ms": 587,
+          "result_fingerprint": "c828a13c611d7c873d7fc437815c667cc5727f9c4652200e8823bddc7b1a2f77",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0010",
+            "deterministic": true,
+            "reason_codes": [],
+            "root_cause_confidence": null,
+            "root_cause_score": null,
+            "root_resource_type": "subscription_connection",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-5:root_cause",
+          "duration_ms": 554,
+          "result_fingerprint": "c828a13c611d7c873d7fc437815c667cc5727f9c4652200e8823bddc7b1a2f77",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0010",
+            "deterministic": true,
+            "reason_codes": [],
+            "root_cause_confidence": null,
+            "root_cause_score": null,
+            "root_resource_type": "subscription_connection",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_history",
+          "correlation_id": "pre061-gemini-final-5:customer_history",
+          "duration_ms": 549,
+          "result_fingerprint": "013f20b5ff4cfa7db4de8ff4ca833ee8336a4a1d7e83e81edcec872ae23ba446",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0010",
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "customer",
+          "status": "succeeded",
+          "tool_name": "get_customer_outage_history"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "backup_status": "active",
+          "causal_event_code": "CE-MCR-0010",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "not_observed",
+          "event_type": "link_failure",
+          "full_outage": false,
+          "primary_status": "down",
+          "role_counts": {
+            "child": 1,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_alarm_types": [
+            "PRIMARY_PATH_DOWN"
+          ],
+          "root_cause_reason_codes": [],
+          "root_resource_reference": "SUB-MCR-00011",
+          "root_resource_type": "subscription_connection",
+          "symptom_alarm_types": []
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-5:correlate",
+            "result_fingerprint": "c828a13c611d7c873d7fc437815c667cc5727f9c4652200e8823bddc7b1a2f77",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "customer_history",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-5:customer_history",
+            "result_fingerprint": "013f20b5ff4cfa7db4de8ff4ca833ee8336a4a1d7e83e81edcec872ae23ba446",
+            "server": "customer",
+            "tool_name": "get_customer_outage_history"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-5:root_cause",
+            "result_fingerprint": "c828a13c611d7c873d7fc437815c667cc5727f9c4652200e8823bddc7b1a2f77",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          }
+        ],
+        "result_fingerprint": "55bb87e7465948a394405db6a3836967a60f56fab909cf1a455785fe92906841",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nDoğrulanmış kök kaynak: subscription_connection SUB-MCR-00011.\nKök neden alarmı: PRIMARY_PATH_DOWN.\nDying Gasp için bu olayda doğrulanmış alarm kaydı yok.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\nBağlantı durumu: ana bağlantı down, yedek bağlantı active.\nTam hizmet kesintisi: Hayır.\nFailover ile korunan: 0 bağlantı tam hizmet kesintisi değildir.\nPotansiyel kapsam: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nDoğrulanmış etkisizlik: 0 bağlantı.\nKanıt yetersiz: 0 bağlantı.\nFailover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 8440.915,
+      "planned_tools": [
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0010",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "correlate",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0010",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0010",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_history",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "correlate",
+            "root_cause"
+          ],
+          "execution_order": 2,
+          "server": "customer",
+          "tool_name": "get_customer_outage_history"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "CE-MCR-0010 olayında ana bağlantı down ve yedek bağlantı active. Bu tam hizmet kesintisi sayılır mı? Müşteri etkisini ve failover durumunu açıkla.",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "causal_event_code": "CE-MCR-0010",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "requested_outputs": [
+          "details",
+          "impact",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "original-08",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0001",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "0a388c1e82bf",
+          "reference_kind": "decision_evidence"
+        },
+        {
+          "reference_code": "OUT-MCR-0001",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-6:outage_details",
+          "duration_ms": 746,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-6:customer_impact",
+          "duration_ms": 2430,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_evidence",
+          "correlation_id": "pre061-gemini-final-6:rule_evidence",
+          "duration_ms": 565,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "compensation_evidence",
+          "correlation_id": "pre061-gemini-final-6:compensation_evidence",
+          "duration_ms": 568,
+          "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+          "safe_result_summary": {
+            "deterministic": true,
+            "eligible": 1,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "status": "calculated",
+            "tool_version": "0.1.0"
+          },
+          "server": "compensation",
+          "status": "succeeded",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0001",
+          "full_outage": true,
+          "outage_code": "OUT-MCR-0001",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [
+            "root_cause_unverified"
+          ],
+          "root_resource_reference": "AGG-ANK-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 495,
+          "affected_subscription_count": 572,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "missing_evidence_categories": [],
+          "potential": 572,
+          "reason_code_distribution": {},
+          "verified_impacted": 572
+        },
+        "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-gemini-final-6:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-6:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-6:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-gemini-final-6:rule_evidence",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "0a2f03608d4d3b044c231bfec05b3bba0a6018286140f244e8629f366a8ac812",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Evet.\nDoğrulanmış kök kaynak: device AGG-ANK-002.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nKök neden gerekçesi: root_cause_unverified.\nPotansiyel kapsam: 572 abonelik.\nDoğrulanmış etki: 572 abonelik / 495 müşteri.\nFailover ile korunan: 0 bağlantı.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nTelafi durumu: calculated.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 1 kayıt.\nUygun olmayan veya bekleyen: 0 kayıt.\nDoğrulanmış RuleVersion: BB-DEGRADATION-QUALITY:v1.\nDoğrulanmış DecisionEvidence: 0a388c1e82bf.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 12717.096,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0001",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0001",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0001",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "customer_impact"
+          ],
+          "execution_order": 3,
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0001",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "subscription_number": "SUB-MCR-00002"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "rule_evidence"
+          ],
+          "execution_order": 4,
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "CE-MCR-0001 olayında SUB-MCR-00002 aboneliği için tazminat sonucu nedir? Doğrulanmış etkiyi, RuleVersion'ı, DecisionEvidence kaydını ve hesaplanan sonucu belirt.",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "compensation",
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0001",
+        "requested_outputs": [
+          "details",
+          "eligibility",
+          "evidence",
+          "impact",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "subscription_reference": "SUB-MCR-00002"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "original-09",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0001",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "0a388c1e82bf",
+          "reference_kind": "decision_evidence"
+        },
+        {
+          "reference_code": "fd38063a1e7f",
+          "reference_kind": "decision_evidence"
+        },
+        {
+          "reference_code": "SYN-COMP-2026-BROADBAND",
+          "reference_kind": "retrieval_source",
+          "section": "Kanıt ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Duplicate ve Eksik Kanıt",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Kanıt ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "Değerlendirme Sırası",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "Kanıt ve Açıklanabilirlik",
+          "version": 1
+        },
+        {
+          "reference_code": "BB-FULL-OUTAGE-TIERED:v1",
+          "reference_kind": "rule_version"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "compensation_evidence",
+          "correlation_id": "pre061-gemini-final-7:compensation_evidence",
+          "duration_ms": 574,
+          "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+          "safe_result_summary": {
+            "deterministic": true,
+            "eligible": 1,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "status": "calculated",
+            "tool_version": "0.1.0"
+          },
+          "server": "compensation",
+          "status": "succeeded",
+          "tool_name": "get_compensation_evidence"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_documents",
+          "correlation_id": "pre061-gemini-final-7:rule_documents",
+          "duration_ms": 1240,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "search_rule_documents"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_evidence",
+          "correlation_id": "pre061-gemini-final-7:rule_evidence",
+          "duration_ms": 645,
+          "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0001",
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0001",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 1,
+          "evidence_references": [
+            "0a388c1e82bf"
+          ],
+          "ineligible_pending": 0,
+          "rule_versions": {
+            "BB-DEGRADATION-QUALITY:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "48.00"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-gemini-final-7:compensation_evidence",
+            "result_fingerprint": "2ea082533d0b5acd4d8f4d386cfb77bffbc42ad6746591cf2c6c3af1985e637d",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-gemini-final-7:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-gemini-final-7:rule_evidence",
+            "result_fingerprint": "9de93bd71c0591240138eddf0af5b33154a5435e62667fca98317b76600cc09c",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "eb5d2222476b7ebd0276aca191397e07579e7f4d03f6016be728e152adf05d51",
+        "retrieval_sources": [
+          {
+            "section": "Kanıt ve Referanslar",
+            "source_code": "SYN-COMP-2026-BROADBAND",
+            "version": 1
+          },
+          {
+            "section": "Duplicate ve Eksik Kanıt",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Kanıt ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Değerlendirme Sırası",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kanıt ve Açıklanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          }
+        ],
+        "rule_summary": {
+          "evidence_references": [
+            "fd38063a1e7f"
+          ],
+          "rule_codes": [],
+          "rule_versions": [
+            "BB-FULL-OUTAGE-TIERED:v1"
+          ]
+        },
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nDoğrulanmış kaynaklar: SYN-COMP-2026-BROADBAND v1 / Kanıt ve Referanslar; SYN-COMP-2026-ELIGIBILITY v1 / Duplicate ve Eksik Kanıt; SYN-COMP-2026-ELIGIBILITY v1 / Kanıt ve Referanslar; SYN-COMP-2026-OVERVIEW v1 / Değerlendirme Sırası; SYN-COMP-2026-OVERVIEW v1 / Kanıt ve Açıklanabilirlik.\nDoğrulanmış RuleVersion: BB-DEGRADATION-QUALITY:v1.\nDoğrulanmış DecisionEvidence: 0a388c1e82bf.\nKök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi ayrıca doğrulanmadı.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nTelafi durumu: calculated.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 1 kayıt.\nUygun olmayan veya bekleyen: 0 kayıt.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 13195.856,
+      "planned_tools": [
+        {
+          "arguments": {
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "subscription_number": "SUB-MCR-00002"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        },
+        {
+          "arguments": {
+            "embedding_provider": "gemini",
+            "include_scores": true,
+            "query": "CE-MCR-0001 ve SUB-MCR-00002 için verilen tazminat kararı hangi kural ve kanıtlara dayanıyor? RuleVersion, DecisionEvidence ve RAG kaynaklarının source, version ve section bilgilerini göster.",
+            "search_mode": "hybrid",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "top_k": 5
+          },
+          "call_id": "rule_documents",
+          "call_kind": "document_retrieval",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "search_rule_documents"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0001",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "CE-MCR-0001 ve SUB-MCR-00002 için verilen tazminat kararı hangi kural ve kanıtlara dayanıyor? RuleVersion, DecisionEvidence ve RAG kaynaklarının source, version ve section bilgilerini göster.",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "causal_event_code": "CE-MCR-0001",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "decision_type": "compensation",
+        "embedding_provider": "gemini",
+        "intent": "rule_document_retrieval",
+        "requested_outputs": [
+          "details",
+          "evidence",
+          "summary"
+        ],
+        "retrieval_query": "CE-MCR-0001 ve SUB-MCR-00002 için verilen tazminat kararı hangi kural ve kanıtlara dayanıyor? RuleVersion, DecisionEvidence ve RAG kaynaklarının source, version ve section bilgilerini göster.",
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "subscription_reference": "SUB-MCR-00002"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "original-10",
+      "citation_mismatch_count": 0,
+      "citations": [],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "aggregate_location_impact",
+          "correlation_id": "pre061-gemini-final-8:aggregate_location_impact",
+          "duration_ms": 578,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "aggregate_location_impact"
+        }
+      ],
+      "final_result": {
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [],
+          "outage_count": 1,
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
+        "provenance": [
+          {
+            "call_id": "aggregate_location_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-8:aggregate_location_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "aggregate_location_impact"
+          }
+        ],
+        "result_fingerprint": "431e5e10a34fdb65580cb90e5f53a882a28095293c7715d89b07645c7cd74c8c",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nKesinti sayısı: 1.\nPotansiyel kapsam: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nDoğrulanmış etkisizlik: 0 bağlantı.\nKanıt yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 5195.23,
+      "planned_tools": [
+        {
+          "arguments": {
+            "city": "İzmir",
+            "district": "Konak",
+            "from_time": "2026-06-06T00:00:00Z",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "to_time": "2026-06-06T23:59:59Z"
+          },
+          "call_id": "aggregate_location_impact",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "aggregate_location_impact"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "6 Haziran 2026 tarihinde Konak ilçesinde kaç kesinti yaşandı? Potansiyel kapsamı, doğrulanmış müşteri etkisini, etkilenmediği doğrulananları, kanıtı yetersiz olanları ve failover ile korunanları ayrı ayrı açıkla.",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "location": {
+          "city": "İzmir",
+          "district": "Konak"
+        },
+        "requested_outputs": [
+          "details",
+          "impact",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "time_window": {
+          "from_time": "2026-06-06T00:00:00Z",
+          "to_time": "2026-06-06T23:59:59Z"
+        }
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "unseen-01",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0002",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "OUT-MCR-0002",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-9:outage_details",
+          "duration_ms": 604,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-9:customer_impact",
+          "duration_ms": 3737,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0002",
+          "full_outage": false,
+          "outage_code": "OUT-MCR-0002",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [
+            "root_cause_unverified"
+          ],
+          "root_resource_reference": "AGG-ANK-003",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 437,
+          "affected_subscription_count": 474,
+          "failover_path_diversity_counts": {
+            "fully_diverse": 16,
+            "partially_diverse": 7,
+            "shared_risk": 9
+          },
+          "failover_protected": 32,
+          "missing_evidence_categories": [],
+          "potential": 506,
+          "reason_code_distribution": {},
+          "verified_impacted": 474
+        },
+        "provenance": [
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-9:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-9:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          }
+        ],
+        "result_fingerprint": "fb3e0944975ffc7cc76fc2f325194a5a16bc2e632c4a6167aa007075ae943906",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Hayır.\nDoğrulanmış etki: 474 abonelik / 437 müşteri.\nPotansiyel kapsam: 506 abonelik.\nFailover ile korunan: 32 bağlantı tam hizmet kesintisi değildir.\nDoğrulanmış kök kaynak: device AGG-ANK-003.\nKök neden gerekçesi: root_cause_unverified.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nAna ve yedek yollar ortak arıza alanı taşıyor; bağımsızlık doğrulanamadı ve manuel inceleme gerekir.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 17335.238,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0002",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0002",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "AGG-ANK-003 cihazındaki olayda kaç abonelik ve kaç müşteri etkilendi? Kesinti sınıfını ve doğrulanmış etkiyi açıkla.",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "device_code": "AGG-ANK-003",
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0002",
+        "requested_outputs": [
+          "details",
+          "impact",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "unseen-02",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0018",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "OUT-MCR-0018",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-10:outage_details",
+          "duration_ms": 609,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-10:customer_impact",
+          "duration_ms": 2384,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-10:root_cause",
+          "duration_ms": 629,
+          "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+          "safe_result_summary": {
+            "deterministic": true,
+            "reason_codes": [
+              "same_resource",
+              "temporal_propagation"
+            ],
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0018",
+          "full_outage": false,
+          "outage_code": "OUT-MCR-0018",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_cause_summary": "SCN-ACCESS-NODE-001",
+          "root_resource_reference": "AN-KON-001",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 25,
+          "affected_subscription_count": 48,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "missing_evidence_categories": [],
+          "potential": 48,
+          "reason_code_distribution": {},
+          "verified_impacted": 48
+        },
+        "provenance": [
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-10:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-10:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-10:root_cause",
+            "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          }
+        ],
+        "result_fingerprint": "e8c2b2b1f1c419b3980959911c4c1c03f9b298f673ae60848b3b793337bbc934",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nDoğrulanmış ana kök neden: SCN-ACCESS-NODE-001.\nDoğrulanmış kök kaynak: device AN-KON-001.\nKök neden gerekçesi: same_resource, temporal_propagation.\nPotansiyel kapsam: 48 abonelik.\nDoğrulanmış etki: 48 abonelik / 25 müşteri.\nTam hizmet kesintisi: Hayır.\nFailover ile korunan: 0 bağlantı tam hizmet kesintisi değildir.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 8146.285,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0018",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0018",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0018",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "customer_impact"
+          ],
+          "execution_order": 3,
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "AN-KON-001 kaynaklı olayda müşteri etkisi nedir ve kök neden kanıtı ne kadar güçlüdür?",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "device_code": "AN-KON-001",
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0018",
+        "requested_outputs": [
+          "details",
+          "impact",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "unseen-03",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0011",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "OUT-MCR-0011",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-11:outage_details",
+          "duration_ms": 608,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-11:customer_impact",
+          "duration_ms": 2371,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0011",
+          "full_outage": false,
+          "outage_code": "OUT-MCR-0011",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "root_cause_summary": "SCN-FAILOVER-SHORT-001",
+          "root_resource_reference": "OLT-BOR-001",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 313,
+          "affected_subscription_count": 384,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "missing_evidence_categories": [],
+          "potential": 384,
+          "reason_code_distribution": {},
+          "verified_impacted": 384
+        },
+        "provenance": [
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-11:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-11:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          }
+        ],
+        "result_fingerprint": "d58309815c1f2857799e5e6e17a805a8d9374dc3d92d3cfcf5939987f3a3df47",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Hayır.\nDoğrulanmış etki: 384 abonelik / 313 müşteri.\nPotansiyel kapsam: 384 abonelik.\nDoğrulanmış ana kök neden: SCN-FAILOVER-SHORT-001.\nDoğrulanmış kök kaynak: device OLT-BOR-001.\nFailover ile korunan: 0 bağlantı tam hizmet kesintisi değildir.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 10636.396,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0011",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0011",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "CE-MCR-0011 olayında kısa süreli failover kesintisi nasıl sınıflandırılmıştır ve müşteri etkisi nedir?",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0011",
+        "requested_outputs": [
+          "details",
+          "impact",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "unseen-04",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0012",
+          "reference_kind": "causal_event"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "correlate",
+          "correlation_id": "pre061-gemini-final-12:correlate",
+          "duration_ms": 593,
+          "result_fingerprint": "f05e7ad2eef857518a5626c8067db8a458964cd5a75f101755b448b589ab45ed",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0012",
+            "deterministic": true,
+            "reason_codes": [],
+            "root_cause_confidence": null,
+            "root_cause_score": null,
+            "root_resource_type": "subscription_connection",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-12:root_cause",
+          "duration_ms": 574,
+          "result_fingerprint": "f05e7ad2eef857518a5626c8067db8a458964cd5a75f101755b448b589ab45ed",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0012",
+            "deterministic": true,
+            "reason_codes": [],
+            "root_cause_confidence": null,
+            "root_cause_score": null,
+            "root_resource_type": "subscription_connection",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_history",
+          "correlation_id": "pre061-gemini-final-12:customer_history",
+          "duration_ms": 560,
+          "result_fingerprint": "9189292a5315c8ea9f1c4e4544f8929e73aecb17f0cad804068839c6de206072",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0012",
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "customer",
+          "status": "succeeded",
+          "tool_name": "get_customer_outage_history"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0012",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "not_observed",
+          "event_type": "link_failure",
+          "role_counts": {
+            "child": 6,
+            "noise": 0,
+            "root": 0,
+            "supporting": 0,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_alarm_types": [
+            "PRIMARY_PATH_DOWN"
+          ],
+          "root_cause_reason_codes": [],
+          "root_resource_reference": "SUB-MCR-00013",
+          "root_resource_type": "subscription_connection",
+          "symptom_alarm_types": []
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-12:correlate",
+            "result_fingerprint": "f05e7ad2eef857518a5626c8067db8a458964cd5a75f101755b448b589ab45ed",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "customer_history",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-12:customer_history",
+            "result_fingerprint": "9189292a5315c8ea9f1c4e4544f8929e73aecb17f0cad804068839c6de206072",
+            "server": "customer",
+            "tool_name": "get_customer_outage_history"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-12:root_cause",
+            "result_fingerprint": "f05e7ad2eef857518a5626c8067db8a458964cd5a75f101755b448b589ab45ed",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          }
+        ],
+        "result_fingerprint": "a6549be38500f4ac81bc424c98c02f95577570343976e3f454ece227817310a2",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0012.\n\nKök neden\nKök kaynak: subscription_connection SUB-MCR-00013.\nKök neden alarmı: PRIMARY_PATH_DOWN.\nDying Gasp için bu olayda doğrulanmış alarm kaydı yok.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\n\nMüşteri etkisi\nPotansiyel etki: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nEtkilenmediği doğrulanan: 0 bağlantı.\nKanıtı yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.\nFailover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok.",
+      "generation_mode": "deterministic_fallback",
+      "http_status": 200,
+      "latency_ms": 10683.153,
+      "planned_tools": [
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0012",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "correlate",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0012",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0012",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_history",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "correlate",
+            "root_cause"
+          ],
+          "execution_order": 2,
+          "server": "customer",
+          "tool_name": "get_customer_outage_history"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "SAFE_FALLBACK",
+      "query_run_status": "completed",
+      "question": "CE-MCR-0012 olayında yedek yolun durumu ve doğrulanmış müşteri etkisi nedir?",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "causal_event_code": "CE-MCR-0012",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "requested_outputs": [
+          "details",
+          "impact",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": [
+        "llm_narrative_fallback",
+        "llm_statement_selection_attempt_count:2",
+        "llm_statement_selection_attempted",
+        "llm_statement_selection_failure:provider_call_failed_rate_limited",
+        "llm_statement_selection_retry_count:1",
+        "llm_statement_selection_total_retry_delay_ms:323"
+      ]
+    },
+    {
+      "case": "unseen-05",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0022",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "b39d63177552",
+          "reference_kind": "decision_evidence"
+        },
+        {
+          "reference_code": "OUT-MCR-0021",
+          "reference_kind": "outage"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "outage_details",
+          "correlation_id": "pre061-gemini-final-13:outage_details",
+          "duration_ms": 594,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "customer_impact",
+          "correlation_id": "pre061-gemini-final-13:customer_impact",
+          "duration_ms": 2378,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-13:root_cause",
+          "duration_ms": 605,
+          "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+          "safe_result_summary": {
+            "deterministic": true,
+            "reason_codes": [
+              "same_resource",
+              "temporal_propagation"
+            ],
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_evidence",
+          "correlation_id": "pre061-gemini-final-13:rule_evidence",
+          "duration_ms": 566,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "compensation_evidence",
+          "correlation_id": "pre061-gemini-final-13:compensation_evidence",
+          "duration_ms": 557,
+          "result_fingerprint": "acc00418d1938d7d82690c64d21220837a2d58b80d14e4a269f1efa044a44e96",
+          "safe_result_summary": {
+            "deterministic": true,
+            "eligible": 0,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "status": "calculated",
+            "tool_version": "0.1.0"
+          },
+          "server": "compensation",
+          "status": "succeeded",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0022",
+          "full_outage": true,
+          "outage_code": "OUT-MCR-0021",
+          "propagation_summary": "Candidate matches the causal event physical root resource.",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [
+            "root_cause_unverified",
+            "same_resource",
+            "temporal_propagation"
+          ],
+          "root_resource_reference": "AN-ESE-002",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "currency": "TRY",
+          "eligible": 0,
+          "evidence_references": [
+            "b39d63177552"
+          ],
+          "ineligible_pending": 1,
+          "rule_versions": {
+            "MR-UNKNOWN-MISSING-EVIDENCE:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "calculated",
+          "total_amount": "0.00"
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "affected_customer_count": 24,
+          "affected_subscription_count": 48,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "missing_evidence_categories": [],
+          "potential": 48,
+          "reason_code_distribution": {},
+          "verified_impacted": 48
+        },
+        "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-gemini-final-13:compensation_evidence",
+            "result_fingerprint": "acc00418d1938d7d82690c64d21220837a2d58b80d14e4a269f1efa044a44e96",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
+          {
+            "call_id": "customer_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-13:customer_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "calculate_customer_impact"
+          },
+          {
+            "call_id": "outage_details",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-13:outage_details",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "get_outage_details"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-13:root_cause",
+            "result_fingerprint": "bac510ccf2c2e272765f3e77b82a10da592fccb04f6a4c3c754b217568ca7284",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-gemini-final-13:rule_evidence",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "2fe9ed116e6e6e183969f790ff5d1a4f531ae65dd127e04d8826631166fdf488",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nTam hizmet kesintisi: Evet.\nDoğrulanmış kök kaynak: device AN-ESE-002.\nKök neden gerekçesi: root_cause_unverified, same_resource, temporal_propagation.\nKök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle manuel inceleme gerekir.\nPotansiyel kapsam: 48 abonelik.\nDoğrulanmış etki: 48 abonelik / 24 müşteri.\nFailover ile korunan: 0 bağlantı.\nTelafi durumu: calculated.\nTelafi değerlendirmesi yapılan: 1 kayıt.\nTazminata uygun: 0 kayıt.\nUygun olmayan veya bekleyen: 1 kayıt.\nKarar: eksik doğrulama nedeniyle manuel inceleme bekleniyor.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\nDoğrulanmış RuleVersion: MR-UNKNOWN-MISSING-EVIDENCE:v1.\nDoğrulanmış DecisionEvidence: b39d63177552.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 13427.839,
+      "planned_tools": [
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "outage_details",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "get_outage_details"
+        },
+        {
+          "arguments": {
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "customer_impact",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "outage_details"
+          ],
+          "execution_order": 2,
+          "server": "network",
+          "tool_name": "calculate_customer_impact"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "customer_impact"
+          ],
+          "execution_order": 3,
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "root_cause"
+          ],
+          "execution_order": 4,
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        },
+        {
+          "arguments": {
+            "limit": 50,
+            "outage_code": "OUT-MCR-0021",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [
+            "rule_evidence"
+          ],
+          "execution_order": 5,
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "CE-MCR-0022 olayında kök neden kesinleşmiş mi, eksik kanıt nedir ve hangi karar verilmiştir?",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "outage_code": "OUT-MCR-0021",
+        "requested_outputs": [
+          "details",
+          "eligibility",
+          "evidence",
+          "impact",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "unseen-06",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0026",
+          "reference_kind": "causal_event"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "correlate",
+          "correlation_id": "pre061-gemini-final-14:correlate",
+          "duration_ms": 585,
+          "result_fingerprint": "cb88f63492b92e899de4ad82562b944805b0bba39a4bcdbabaa8bc6acad49af1",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0026",
+            "deterministic": true,
+            "reason_codes": [],
+            "root_cause_confidence": null,
+            "root_cause_score": null,
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "root_cause",
+          "correlation_id": "pre061-gemini-final-14:root_cause",
+          "duration_ms": 566,
+          "result_fingerprint": "cb88f63492b92e899de4ad82562b944805b0bba39a4bcdbabaa8bc6acad49af1",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0026",
+            "deterministic": true,
+            "reason_codes": [],
+            "root_cause_confidence": null,
+            "root_cause_score": null,
+            "root_resource_type": "device",
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_evidence",
+          "correlation_id": "pre061-gemini-final-14:rule_evidence",
+          "duration_ms": 563,
+          "result_fingerprint": "276c6272cf49a697efca8c7f4d5b31964d035f3d7dfb9e5a81dd92975a0694fb",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0026",
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0026",
+          "device_not_active_classification": "not_observed",
+          "dying_gasp_classification": "not_observed",
+          "event_type": "environmental_anomaly",
+          "role_counts": {
+            "child": 2,
+            "noise": 0,
+            "root": 1,
+            "supporting": 1,
+            "symptom": 0,
+            "unrelated": 0
+          },
+          "root_alarm_types": [
+            "HIGH_TEMPERATURE"
+          ],
+          "root_cause_reason_codes": [],
+          "root_resource_reference": "OLT-ÇAN-003",
+          "root_resource_type": "device",
+          "symptom_alarm_types": []
+        },
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "assessment_record_count": 0,
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [
+            "customer_impact_assessment"
+          ],
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
+        "provenance": [
+          {
+            "call_id": "correlate",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-14:correlate",
+            "result_fingerprint": "cb88f63492b92e899de4ad82562b944805b0bba39a4bcdbabaa8bc6acad49af1",
+            "server": "network",
+            "tool_name": "correlate_alarms"
+          },
+          {
+            "call_id": "root_cause",
+            "category": "network_causal",
+            "correlation_id": "pre061-gemini-final-14:root_cause",
+            "result_fingerprint": "cb88f63492b92e899de4ad82562b944805b0bba39a4bcdbabaa8bc6acad49af1",
+            "server": "network",
+            "tool_name": "rank_root_cause_candidates"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-gemini-final-14:rule_evidence",
+            "result_fingerprint": "276c6272cf49a697efca8c7f4d5b31964d035f3d7dfb9e5a81dd92975a0694fb",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "9ab74c4781fca330b913c58ba11b409b50879f17c0a97f15c2cd5770f1521985",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Kesinti değerlendirmesi\nDoğrulanmış kök kaynak: device OLT-ÇAN-003.\nKök neden alarmı: HIGH_TEMPERATURE.\nDying Gasp için bu olayda doğrulanmış alarm kaydı yok.\nDevice Not Active için bu olayda doğrulanmış alarm kaydı yok.\nPotansiyel kapsam: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nDoğrulanmış etkisizlik: 0 bağlantı.\nKanıt yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı.\nGerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok.\nFailover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok.",
+      "generation_mode": "llm_assisted",
+      "http_status": 200,
+      "latency_ms": 7330.814,
+      "planned_tools": [
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0026",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "correlate",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "correlate_alarms"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0026",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "root_cause",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "network",
+          "tool_name": "rank_root_cause_candidates"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0026",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "causal_analysis",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "GEMINI_SELECTION_PASS",
+      "query_run_status": "completed",
+      "question": "CE-MCR-0026 olayındaki OLT alarmının kök neden mi belirti mi olduğunu ve etki kanıtını açıkla.",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "causal_event_code": "CE-MCR-0026",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "network_investigation",
+        "requested_outputs": [
+          "evidence",
+          "root_cause",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": []
+    },
+    {
+      "case": "unseen-07",
+      "citation_mismatch_count": 0,
+      "citations": [],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "aggregate_location_impact",
+          "correlation_id": "pre061-gemini-final-15:aggregate_location_impact",
+          "duration_ms": 572,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "network",
+          "status": "succeeded",
+          "tool_name": "aggregate_location_impact"
+        }
+      ],
+      "final_result": {
+        "execution_status": "succeeded",
+        "impact_summary": {
+          "failover_path_diversity_counts": {},
+          "failover_protected": 0,
+          "insufficient_evidence": 0,
+          "missing_evidence_categories": [],
+          "outage_count": 1,
+          "potential": 0,
+          "reason_code_distribution": {},
+          "verified_impacted": 0,
+          "verified_no_impact": 0
+        },
+        "provenance": [
+          {
+            "call_id": "aggregate_location_impact",
+            "category": "customer_impact",
+            "correlation_id": "pre061-gemini-final-15:aggregate_location_impact",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "network",
+            "tool_name": "aggregate_location_impact"
+          }
+        ],
+        "result_fingerprint": "1ef46ac42095ccdf46b74966edb89a9a478908ec0c2a902570613dba3c296483",
+        "retrieval_sources": [],
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Genel sonuç\n\nMüşteri etkisi\nKesinti sayısı: 1.\nPotansiyel etki: 0 bağlantı.\nDoğrulanmış etki: 0 bağlantı.\nEtkilenmediği doğrulanan: 0 bağlantı.\nKanıtı yetersiz: 0 bağlantı.\nFailover ile korunan: 0 bağlantı.",
+      "generation_mode": "deterministic_fallback",
+      "http_status": 200,
+      "latency_ms": 10198.767,
+      "planned_tools": [
+        {
+          "arguments": {
+            "city": "İzmir",
+            "district": "Konak",
+            "from_time": "2026-06-06T00:00:00Z",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "to_time": "2026-06-06T23:59:59Z"
+          },
+          "call_id": "aggregate_location_impact",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "server": "network",
+          "tool_name": "aggregate_location_impact"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "SAFE_FALLBACK",
+      "query_run_status": "completed",
+      "question": "6 Haziran 2026 tarihinde Konak ilçesinde kaç kesinti oldu ve doğrulanmış müşteri etkisi nedir?",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "outage_impact",
+        "location": {
+          "city": "İzmir",
+          "district": "Konak"
+        },
+        "requested_outputs": [
+          "details",
+          "impact",
+          "summary"
+        ],
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "time_window": {
+          "from_time": "2026-06-06T00:00:00Z",
+          "to_time": "2026-06-06T23:59:59Z"
+        }
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": [
+        "llm_narrative_fallback",
+        "llm_statement_selection_attempt_count:2",
+        "llm_statement_selection_attempted",
+        "llm_statement_selection_failure:provider_call_failed_rate_limited",
+        "llm_statement_selection_retry_count:1",
+        "llm_statement_selection_total_retry_delay_ms:269"
+      ]
+    },
+    {
+      "case": "unseen-08",
+      "citation_mismatch_count": 0,
+      "citations": [
+        {
+          "reference_code": "CE-MCR-0015",
+          "reference_kind": "causal_event"
+        },
+        {
+          "reference_code": "45592dc1a723",
+          "reference_kind": "decision_evidence"
+        },
+        {
+          "reference_code": "SYN-COMP-2026-BROADBAND",
+          "reference_kind": "retrieval_source",
+          "section": "Kanıt ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Kanıt ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-COMP-2026-ELIGIBILITY",
+          "reference_kind": "retrieval_source",
+          "section": "Immutable DecisionEvidence",
+          "version": 2
+        },
+        {
+          "reference_code": "SYN-COMP-2026-OVERVIEW",
+          "reference_kind": "retrieval_source",
+          "section": "Kanıt ve Açıklanabilirlik",
+          "version": 1
+        },
+        {
+          "reference_code": "SYN-OPERATIONS-LIFECYCLE-2026",
+          "reference_kind": "retrieval_source",
+          "section": "Kanıt ve Referanslar",
+          "version": 1
+        },
+        {
+          "reference_code": "SLA-PATH-DIVERSITY-BREACH:v1",
+          "reference_kind": "rule_version"
+        }
+      ],
+      "error_code": "",
+      "executed_tools": [
+        {
+          "attempt_count": 1,
+          "call_id": "compensation_evidence",
+          "correlation_id": "pre061-gemini-final-16:compensation_evidence",
+          "duration_ms": 657,
+          "result_fingerprint": "1cfff0380a820badb70f58efef21c0b72a434c7a49b1624dc99c88af5dee9ac7",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0015",
+            "deterministic": true,
+            "eligible": 0,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "status": "available",
+            "tool_version": "0.1.0"
+          },
+          "server": "compensation",
+          "status": "succeeded",
+          "tool_name": "get_compensation_evidence"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_documents",
+          "correlation_id": "pre061-gemini-final-16:rule_documents",
+          "duration_ms": 1414,
+          "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+          "safe_result_summary": {
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "search_rule_documents"
+        },
+        {
+          "attempt_count": 1,
+          "call_id": "rule_evidence",
+          "correlation_id": "pre061-gemini-final-16:rule_evidence",
+          "duration_ms": 637,
+          "result_fingerprint": "ce2853ad0b878807b4742abd33f62db2df7bf71072835fd22a5df105f8494c69",
+          "safe_result_summary": {
+            "causal_event_code": "CE-MCR-0015",
+            "deterministic": true,
+            "schema_version": "mcp.tool_response.v1",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "tool_version": "0.1.0"
+          },
+          "server": "rule",
+          "status": "succeeded",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "final_result": {
+        "causal_summary": {
+          "causal_event_code": "CE-MCR-0015",
+          "role_counts": {},
+          "root_alarm_types": [],
+          "root_cause_reason_codes": [],
+          "symptom_alarm_types": []
+        },
+        "compensation_summary": {
+          "considered": 1,
+          "eligible": 0,
+          "evidence_references": [
+            "45592dc1a723"
+          ],
+          "ineligible_pending": 1,
+          "rule_versions": {
+            "SLA-PATH-DIVERSITY-BREACH:v1": 1
+          },
+          "scope": "verified_impact",
+          "status": "available",
+          "total_amount": "0.00"
+        },
+        "execution_status": "succeeded",
+        "provenance": [
+          {
+            "call_id": "compensation_evidence",
+            "category": "compensation",
+            "correlation_id": "pre061-gemini-final-16:compensation_evidence",
+            "result_fingerprint": "1cfff0380a820badb70f58efef21c0b72a434c7a49b1624dc99c88af5dee9ac7",
+            "server": "compensation",
+            "tool_name": "get_compensation_evidence"
+          },
+          {
+            "call_id": "rule_documents",
+            "category": "document_retrieval",
+            "correlation_id": "pre061-gemini-final-16:rule_documents",
+            "result_fingerprint": "a8cb7bb12a019c132deec11a7917c57ecd5299b3107a427b3fe38fc6af339018",
+            "server": "rule",
+            "tool_name": "search_rule_documents"
+          },
+          {
+            "call_id": "rule_evidence",
+            "category": "rule_evidence",
+            "correlation_id": "pre061-gemini-final-16:rule_evidence",
+            "result_fingerprint": "ce2853ad0b878807b4742abd33f62db2df7bf71072835fd22a5df105f8494c69",
+            "server": "rule",
+            "tool_name": "get_rule_evidence"
+          }
+        ],
+        "result_fingerprint": "77bbc98be2fdef7b55e9e73ef1d4c779936d5ed936e0deccb5738e8eb87152a8",
+        "retrieval_sources": [
+          {
+            "section": "Kanıt ve Referanslar",
+            "source_code": "SYN-COMP-2026-BROADBAND",
+            "version": 1
+          },
+          {
+            "section": "Kanıt ve Referanslar",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 1
+          },
+          {
+            "section": "Immutable DecisionEvidence",
+            "source_code": "SYN-COMP-2026-ELIGIBILITY",
+            "version": 2
+          },
+          {
+            "section": "Kanıt ve Açıklanabilirlik",
+            "source_code": "SYN-COMP-2026-OVERVIEW",
+            "version": 1
+          },
+          {
+            "section": "Kanıt ve Referanslar",
+            "source_code": "SYN-OPERATIONS-LIFECYCLE-2026",
+            "version": 1
+          }
+        ],
+        "rule_summary": {
+          "evidence_references": [
+            "45592dc1a723"
+          ],
+          "rule_codes": [],
+          "rule_versions": [
+            "SLA-PATH-DIVERSITY-BREACH:v1"
+          ]
+        },
+        "schema_version": "validated-execution-result.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+        "validation_errors": [],
+        "validation_status": "valid",
+        "warnings": []
+      },
+      "final_user_text": "Genel sonuç\nDoğrulanan operasyon referansı: CE-MCR-0015.\n\nTelafi sonucu\nTelafi durumu: available.\nDeğerlendirilen doğrulanmış etki: 1.\nUygun kayıt: 0.\nUygun olmayan/bekleyen kayıt: 1.\nKarar: eksik doğrulama nedeniyle manuel inceleme bekleniyor.\nDoğrulanmış RuleVersion: SLA-PATH-DIVERSITY-BREACH:v1.\nDoğrulanmış DecisionEvidence: 45592dc1a723.\nTazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.\n\nKaynaklar\nDoküman sonuçları karar değil, kaynak/citation niteliğindedir.\nSYN-COMP-2026-BROADBAND v1 / Kanıt ve Referanslar\nSYN-COMP-2026-ELIGIBILITY v1 / Kanıt ve Referanslar\nSYN-COMP-2026-ELIGIBILITY v2 / Immutable DecisionEvidence\nSYN-COMP-2026-OVERVIEW v1 / Kanıt ve Açıklanabilirlik\nSYN-OPERATIONS-LIFECYCLE-2026 v1 / Kanıt ve Referanslar",
+      "generation_mode": "deterministic_fallback",
+      "http_status": 200,
+      "latency_ms": 11535.785,
+      "planned_tools": [
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0015",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "compensation_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "compensation",
+          "tool_name": "get_compensation_evidence"
+        },
+        {
+          "arguments": {
+            "embedding_provider": "gemini",
+            "include_scores": true,
+            "query": "CE-MCR-0015 olayının RuleVersion, DecisionEvidence ve RAG kaynaklarını source, version ve section ile göster.",
+            "search_mode": "hybrid",
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1",
+            "top_k": 5
+          },
+          "call_id": "rule_documents",
+          "call_kind": "document_retrieval",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "search_rule_documents"
+        },
+        {
+          "arguments": {
+            "causal_event_code": "CE-MCR-0015",
+            "limit": 50,
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+          },
+          "call_id": "rule_evidence",
+          "call_kind": "deterministic",
+          "depends_on": [],
+          "execution_order": 1,
+          "parallel_group": "rule_document_context",
+          "server": "rule",
+          "tool_name": "get_rule_evidence"
+        }
+      ],
+      "privacy_violation_count": 0,
+      "provider_verdict": "SAFE_FALLBACK",
+      "query_run_status": "completed",
+      "question": "CE-MCR-0015 olayının RuleVersion, DecisionEvidence ve RAG kaynaklarını source, version ve section ile göster.",
+      "requested_embedding_provider": "gemini",
+      "requested_llm_provider": "gemini",
+      "resolved_embedding_model": "gemini-embedding-2",
+      "resolved_embedding_provider": "gemini",
+      "resolved_llm_model": "gemini-3.6-flash",
+      "resolved_llm_provider": "gemini",
+      "semantic_verdict": "PASS",
+      "snapshot_leakage_count": 0,
+      "structured_query": {
+        "causal_event_code": "CE-MCR-0015",
+        "clarification_reasons": [],
+        "clarification_required": false,
+        "embedding_provider": "gemini",
+        "intent": "rule_document_retrieval",
+        "requested_outputs": [
+          "details",
+          "evidence",
+          "summary"
+        ],
+        "retrieval_query": "CE-MCR-0015 olayının RuleVersion, DecisionEvidence ve RAG kaynaklarını source, version ve section ile göster.",
+        "schema_version": "structured-query.v1",
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1"
+      },
+      "unsupported_decision_count": 0,
+      "unsupported_fact_count": 0,
+      "unsupported_reference_count": 0,
+      "warnings": [
+        "llm_narrative_fallback",
+        "llm_statement_selection_attempt_count:2",
+        "llm_statement_selection_attempted",
+        "llm_statement_selection_failure:provider_call_failed_rate_limited",
+        "llm_statement_selection_retry_count:1",
+        "llm_statement_selection_total_retry_delay_ms:284"
+      ]
+    }
+  ]
+}

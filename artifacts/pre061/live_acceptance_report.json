@@ -161,6 +161,51 @@
       "unseen_provider_selection": "0/8",
       "safe_fallback": "17/18"
     },
-    "status": "CODE_COMPLETE_PROVIDER_QUOTA_LIMITED"
+    "status": "CODE_COMPLETE_PROVIDER_QUOTA_LIMITED",
+    "latest_final_18": {
+      "decision": "PARTIAL_PROVIDER_LIMIT",
+      "delay_seconds": 10,
+      "original_semantic": "10/10",
+      "original_provider_selection": "10/10",
+      "unseen_semantic": "8/8",
+      "unseen_provider_selection": "5/8",
+      "fallback": "3/18",
+      "provider_fail": "0/18",
+      "rate_limited_cases": [
+        "unseen-04",
+        "unseen-07",
+        "unseen-08"
+      ],
+      "latency_ms": {
+        "min": 5195.23,
+        "median": 10683.153,
+        "average": 10982.661166666669,
+        "max": 17335.238
+      }
+    }
+  },
+  "gemini_final_acceptance_10s": {
+    "summary": {
+      "original_10_semantic_pass": 10,
+      "original_10_gemini_selection_pass": 10,
+      "unseen_8_semantic_pass": 8,
+      "unseen_8_gemini_selection_pass": 5,
+      "fallback_count": 3,
+      "provider_fail_count": 0,
+      "rate_limited_cases": [
+        "unseen-04",
+        "unseen-07",
+        "unseen-08"
+      ],
+      "semantic_mismatch_count": 0,
+      "latency_ms": {
+        "min": 5195.23,
+        "median": 10683.153,
+        "average": 10982.661166666669,
+        "max": 17335.238
+      }
+    },
+    "decision": "PARTIAL_PROVIDER_LIMIT",
+    "artifact": "artifacts/pre061/gemini_acceptance_baseline.json"
   }
 }
