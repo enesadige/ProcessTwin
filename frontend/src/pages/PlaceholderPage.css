@@ -1,0 +1,77 @@
+.placeholder-page {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.placeholder-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.placeholder-page__eyebrow {
+  margin: 0 0 var(--space-2);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.placeholder-page h1 {
+  margin: 0;
+  font-size: clamp(24px, 4vw, 34px);
+  line-height: 1.15;
+}
+
+.placeholder-page__status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.placeholder-page__body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  min-height: 180px;
+  padding: var(--space-6);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+}
+
+.placeholder-page__indicator {
+  width: 10px;
+  height: 10px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  box-shadow: 0 0 0 5px rgba(31, 111, 235, 0.1);
+}
+
+.placeholder-page__body h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.placeholder-page__body p {
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 640px) {
+  .placeholder-page__header {
+    flex-direction: column;
+  }
+}

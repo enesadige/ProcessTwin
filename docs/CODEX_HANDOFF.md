@@ -1,5 +1,16 @@
 # ProcessTwin Codex Handoff
 
+## Latest MAIN-061 Checkpoint
+
+- `feature/llm-role-expansion` üzerinde `acece2a` tabanından frontend uygulama
+  kabuğu tamamlandı.
+- Persistent sidebar navigation, auth-shell sınırı, operations/process views,
+  prepared routes (`AI Analysis`, `Network`, `Customers`, `Rules`, `Decision
+  Evidence`, `Settings`), loading fallback ve route error state eklendi.
+- Frontend backend/orchestration semantiğine dokunmadı; MAIN-062 başlatılmadı.
+- `frontend` lint/typecheck, production build, route HTTP kontrolü ve diff
+  kontrolü temizdir. MAIN-061 commit'i bu değişikliklerle oluşturulmuştur.
+
 ## 1. Mevcut Checkpoint
 
 - Aktif branch: `main`.
