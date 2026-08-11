@@ -34,6 +34,28 @@ class RequestedOutput(StrEnum):
     EVIDENCE = "evidence"
 
 
+class SemanticDimension(StrEnum):
+    """Allowlisted concepts the LLM may add to a deterministic query scope."""
+
+    OUTAGE_CLASSIFICATION = "outage_classification"
+    VERIFIED_CUSTOMER_IMPACT = "verified_customer_impact"
+    VERIFIED_SUBSCRIPTION_IMPACT = "verified_subscription_impact"
+    POTENTIAL_SCOPE = "potential_scope"
+    FAILOVER_STATUS = "failover_status"
+    FAILOVER_PROTECTION = "failover_protection"
+    ROOT_RESOURCE = "root_resource"
+    PHYSICAL_ROOT_CAUSE = "physical_root_cause"
+    EVIDENCE_GAP = "evidence_gap"
+    COMPENSATION_RESULT = "compensation_result"
+    COMPENSATION_REASON = "compensation_reason"
+    RULE_VERSION = "rule_version"
+    DECISION_EVIDENCE = "decision_evidence"
+    RAG_EVIDENCE = "rag_evidence"
+    SOURCE_VERSION_SECTION = "source_version_section"
+    MANUAL_REVIEW_REASON = "manual_review_reason"
+    SUMMARY = "summary"
+
+
 class Technology(StrEnum):
     GPON = "GPON"
     XDSL = "xDSL"
@@ -111,6 +133,11 @@ class StructuredQuery(BaseModel):
     schema_version: str = "structured-query.v1"
     intent: StructuredQueryIntent
     requested_outputs: list[RequestedOutput] = Field(default_factory=list)
+    semantic_dimensions: list[SemanticDimension] = Field(default_factory=list)
+    semantic_decomposition_status: Literal["not_attempted", "accepted", "fallback"] = (
+        "not_attempted"
+    )
+    semantic_decomposition_failure: str | None = Field(default=None, max_length=80)
     snapshot_identifier: str = Field(min_length=3, max_length=160)
     causal_event_code: str | None = Field(default=None, max_length=80)
     incident_code: str | None = Field(default=None, max_length=80)
@@ -178,6 +205,9 @@ class StructuredQuery(BaseModel):
     @model_validator(mode="after")
     def normalize_and_validate_scope(self):
         self.requested_outputs = sorted(set(self.requested_outputs), key=lambda value: value.value)
+        self.semantic_dimensions = sorted(
+            set(self.semantic_dimensions), key=lambda value: value.value
+        )
         self.clarification_reasons = sorted(
             set(self.clarification_reasons), key=lambda value: value.value
         )

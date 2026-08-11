@@ -12,7 +12,9 @@ from apps.datasets.models import DataSnapshot
 from apps.orchestration.executor import ExecutorResult, ToolExecutor
 from apps.orchestration.models import QueryRun, QueryRunStatus
 from apps.orchestration.natural_language_intake import (
+    SEMANTIC_DECOMPOSITION_PROMPT_VERSION,
     DeterministicStructuredQueryParser,
+    LLMSemanticDecomposer,
     NaturalLanguageQueryParseError,
 )
 from apps.orchestration.planner import (
@@ -153,6 +155,7 @@ class OrchestrationFacade:
             return self._error(400, "validation_error", "Requested provider is invalid.")
 
         structured_query = normalized_request.structured_query
+        active_provider = self._response_provider
         if structured_query is None:
             try:
                 parsed = self._intake_parser.parse(
@@ -170,6 +173,19 @@ class OrchestrationFacade:
             parser_name = "deterministic"
             parser_version = parsed.prompt_version
             response_mode = ResponseGenerationMode.LLM_ASSISTED
+            if active_provider is None:
+                try:
+                    active_provider = llm_descriptor.create_provider()
+                except Exception:
+                    active_provider = None
+            if active_provider is not None:
+                decomposition = LLMSemanticDecomposer(active_provider).merge(
+                    original_query=normalized_request.original_query,
+                    deterministic_query=structured_query,
+                )
+                structured_query = decomposition.structured_query
+                if decomposition.accepted:
+                    parser_version = f"{parser_version}+{SEMANTIC_DECOMPOSITION_PROMPT_VERSION}"
         else:
             parser_name = "replay"
             parser_version = "structured-query.v1"
@@ -184,9 +200,22 @@ class OrchestrationFacade:
             }
         )
         if not created and query_run.structured_query != structured_query.to_audit_dict():
-            return self._error(
-                409, "idempotency_conflict", "Idempotency key conflicts with another request."
-            )
+            persisted = StructuredQuery.model_validate(query_run.structured_query)
+            incoming_audit = structured_query.to_audit_dict()
+            persisted_audit = persisted.to_audit_dict()
+            semantic_keys = {
+                "semantic_dimensions",
+                "semantic_decomposition_status",
+                "semantic_decomposition_failure",
+            }
+            if {
+                key: value for key, value in incoming_audit.items() if key not in semantic_keys
+            } == {key: value for key, value in persisted_audit.items() if key not in semantic_keys}:
+                structured_query = persisted
+            else:
+                return self._error(
+                    409, "idempotency_conflict", "Idempotency key conflicts with another request."
+                )
 
         if not created:
             replay = self._replay(query_run, structured_query, response_mode)
@@ -227,7 +256,7 @@ class OrchestrationFacade:
                 finalized_run,
                 mode=response_mode,
                 provider_name=llm_descriptor.provider,
-                provider=self._response_provider,
+                provider=active_provider,
             )
             return OrchestrationOutcome(
                 http_status=200,
@@ -317,6 +346,17 @@ class OrchestrationFacade:
         replayed: bool = False,
     ) -> OrchestrationOutcome:
         if status == PlannerResultStatus.CLARIFICATION_REQUIRED:
+            candidates = DeterministicStructuredQueryParser.clarification_candidates(
+                original_query=query_run.original_query,
+                snapshot=query_run.data_snapshot,
+            )
+            message = "Additional safe query scope is required."
+            if len(candidates) > 1:
+                message = (
+                    "Birden fazla uygun olay bulundu. "
+                    + ", ".join(candidates)
+                    + " arasından hangisini kastediyorsunuz?"
+                )
             return OrchestrationOutcome(
                 http_status=422,
                 envelope=OrchestrationEnvelope(
@@ -327,7 +367,7 @@ class OrchestrationFacade:
                     clarification=OrchestrationClarification(
                         code="clarification_required",
                         reasons=sorted(reasons),
-                        message="Additional safe query scope is required.",
+                        message=message,
                     ),
                 ),
             )

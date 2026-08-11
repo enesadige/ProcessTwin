@@ -11,10 +11,12 @@ from apps.orchestration.natural_language_intake import (
     DETERMINISTIC_STRUCTURED_QUERY_PARSER_VERSION,
     STRUCTURED_QUERY_PARSER_PROMPT_VERSION,
     DeterministicStructuredQueryParser,
+    LLMSemanticDecomposer,
     NaturalLanguageQueryParseError,
     NaturalLanguageStructuredQueryParser,
 )
 from apps.orchestration.providers.base import LLMProvider
+from apps.orchestration.structured_query import RequestedOutput, SemanticDimension, StructuredQuery
 
 
 class RecordingProvider(LLMProvider):
@@ -36,6 +38,22 @@ class RecordingProvider(LLMProvider):
             "provider": self.provider_name,
             "model": self.model_name,
             "content": json.dumps(self.payload),
+        }
+
+
+class SemanticProvider(RecordingProvider):
+    def __init__(self, dimensions: object, *, fail: bool = False) -> None:
+        super().__init__(fail=fail)
+        self.dimensions = dimensions
+
+    def generate(self, *, request: Mapping[str, object]) -> Mapping[str, object]:
+        self.requests.append(request)
+        if self.fail:
+            raise RuntimeError("unavailable")
+        return {
+            "provider": self.provider_name,
+            "model": self.model_name,
+            "content": json.dumps({"dimensions": self.dimensions}),
         }
 
 
@@ -116,6 +134,77 @@ def test_parser_returns_explicit_clarification_query_for_missing_scope():
         "missing_operational_anchor",
         "missing_requested_output",
     }
+
+
+def deterministic_query(snapshot_key: str) -> StructuredQuery:
+    return StructuredQuery.model_validate(
+        {
+            "intent": "outage_impact",
+            "requested_outputs": ["summary", "impact"],
+            "snapshot_identifier": snapshot_key,
+            "causal_event_code": "CE-INTAKE-001",
+        }
+    )
+
+
+@pytest.mark.django_db
+def test_semantic_decomposition_changes_real_requested_dimensions_without_overriding_anchor():
+    snapshot = create_snapshot("intake-semantic-merge")
+    create_causal_event(snapshot, code="CE-INTAKE-001")
+    query = deterministic_query(snapshot.snapshot_key)
+    result = LLMSemanticDecomposer(
+        SemanticProvider(["outage_classification", "compensation_reason"])
+    ).merge(
+        original_query="CE-INTAKE-001 olayının sınıfı ve telafi nedeni nedir?",
+        deterministic_query=query,
+    )
+
+    assert result.accepted is True
+    assert result.structured_query.causal_event_code == "CE-INTAKE-001"
+    assert result.structured_query.semantic_decomposition_status == "accepted"
+    assert set(result.structured_query.semantic_dimensions) == {
+        SemanticDimension.OUTAGE_CLASSIFICATION,
+        SemanticDimension.COMPENSATION_REASON,
+    }
+    assert set(result.structured_query.requested_outputs) >= {
+        RequestedOutput.DETAILS,
+        RequestedOutput.EVIDENCE,
+    }
+
+
+@pytest.mark.django_db
+def test_semantic_decomposition_normalizes_duplicates_and_rejects_unknown_dimensions():
+    snapshot = create_snapshot("intake-semantic-validation")
+    query = deterministic_query(snapshot.snapshot_key)
+    duplicate = LLMSemanticDecomposer(
+        SemanticProvider(["verified_customer_impact", "verified_customer_impact"])
+    ).merge(original_query="CE-INTAKE-001 etkisi nedir?", deterministic_query=query)
+    assert duplicate.accepted is True
+    assert duplicate.structured_query.semantic_dimensions == [
+        SemanticDimension.VERIFIED_CUSTOMER_IMPACT
+    ]
+
+    invalid = LLMSemanticDecomposer(SemanticProvider(["not_a_dimension"])).merge(
+        original_query="CE-INTAKE-001 etkisi nedir?", deterministic_query=query
+    )
+    assert invalid.accepted is False
+    assert invalid.structured_query.requested_outputs == query.requested_outputs
+    assert invalid.structured_query.semantic_decomposition_status == "fallback"
+    assert invalid.structured_query.semantic_decomposition_failure == "invalid_dimension"
+
+
+@pytest.mark.django_db
+def test_semantic_decomposition_provider_failure_preserves_deterministic_query():
+    snapshot = create_snapshot("intake-semantic-fallback")
+    query = deterministic_query(snapshot.snapshot_key)
+    result = LLMSemanticDecomposer(SemanticProvider([], fail=True)).merge(
+        original_query="CE-INTAKE-001 etkisi nedir?", deterministic_query=query
+    )
+
+    assert result.accepted is False
+    assert result.structured_query.requested_outputs == query.requested_outputs
+    assert result.structured_query.semantic_dimensions == []
+    assert result.failure_code == "provider_unavailable"
 
 
 @pytest.mark.django_db

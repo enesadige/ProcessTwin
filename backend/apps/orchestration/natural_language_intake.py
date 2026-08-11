@@ -21,12 +21,14 @@ from apps.orchestration.providers.ollama import OllamaLLMProvider, OllamaLLMProv
 from apps.orchestration.structured_query import (
     ClarificationReason,
     RequestedOutput,
+    SemanticDimension,
     StructuredQuery,
     StructuredQueryIntent,
 )
 
 STRUCTURED_QUERY_PARSER_PROMPT_VERSION = "structured-query-parser-tr-v1"
 DETERMINISTIC_STRUCTURED_QUERY_PARSER_VERSION = "deterministic-structured-query-tr-v1"
+SEMANTIC_DECOMPOSITION_PROMPT_VERSION = "semantic-decomposition-tr-v1"
 _DATE_RE = re.compile(r"\b\d{4}-\d{2}-\d{2}\b")
 _TURKISH_DATE_RE = re.compile(
     r"\b(\d{1,2})\s+(ocak|şubat|subat|mart|nisan|mayıs|mayis|haziran|temmuz|ağustos|agustos|eylül|eylul|ekim|kasım|kasim|aralık|aralik)\s+(\d{4})\b",
@@ -105,6 +107,132 @@ class ParsedStructuredQuery:
     structured_query: StructuredQuery
     missing_fields: tuple[MissingField, ...]
     prompt_version: str = STRUCTURED_QUERY_PARSER_PROMPT_VERSION
+
+
+@dataclass(frozen=True)
+class SemanticDecompositionResult:
+    structured_query: StructuredQuery
+    accepted: bool
+    failure_code: str | None = None
+
+
+class LLMSemanticDecomposer:
+    """Select allowlisted answer dimensions without extracting trusted anchors."""
+
+    _DIMENSION_OUTPUTS: dict[SemanticDimension, tuple[RequestedOutput, ...]] = {
+        SemanticDimension.SUMMARY: (RequestedOutput.SUMMARY,),
+        SemanticDimension.OUTAGE_CLASSIFICATION: (RequestedOutput.DETAILS,),
+        SemanticDimension.VERIFIED_CUSTOMER_IMPACT: (RequestedOutput.IMPACT,),
+        SemanticDimension.VERIFIED_SUBSCRIPTION_IMPACT: (RequestedOutput.IMPACT,),
+        SemanticDimension.POTENTIAL_SCOPE: (RequestedOutput.IMPACT,),
+        SemanticDimension.FAILOVER_STATUS: (RequestedOutput.DETAILS, RequestedOutput.IMPACT),
+        SemanticDimension.FAILOVER_PROTECTION: (RequestedOutput.IMPACT,),
+        SemanticDimension.ROOT_RESOURCE: (RequestedOutput.ROOT_CAUSE,),
+        SemanticDimension.PHYSICAL_ROOT_CAUSE: (RequestedOutput.ROOT_CAUSE,),
+        SemanticDimension.EVIDENCE_GAP: (RequestedOutput.EVIDENCE,),
+        SemanticDimension.COMPENSATION_RESULT: (RequestedOutput.ELIGIBILITY,),
+        SemanticDimension.COMPENSATION_REASON: (RequestedOutput.EVIDENCE,),
+        SemanticDimension.RULE_VERSION: (RequestedOutput.EVIDENCE,),
+        SemanticDimension.DECISION_EVIDENCE: (RequestedOutput.EVIDENCE,),
+        SemanticDimension.RAG_EVIDENCE: (RequestedOutput.EVIDENCE,),
+        SemanticDimension.SOURCE_VERSION_SECTION: (RequestedOutput.EVIDENCE,),
+        SemanticDimension.MANUAL_REVIEW_REASON: (RequestedOutput.EVIDENCE,),
+    }
+
+    def __init__(self, provider: LLMProvider):
+        self._provider = provider
+
+    def merge(
+        self, *, original_query: str, deterministic_query: StructuredQuery
+    ) -> SemanticDecompositionResult:
+        try:
+            response = self._provider.generate(
+                request={
+                    "contents": self._prompt(original_query, deterministic_query),
+                    "format_schema": self._schema(),
+                }
+            )
+            if (
+                not isinstance(response, Mapping)
+                or response.get("provider") != self._provider.provider_name
+                or response.get("model") != self._provider.model_name
+                or not isinstance(response.get("content"), str)
+            ):
+                raise ValueError("provider_response_invalid")
+            candidate = _SemanticDecomposition.model_validate(json.loads(response["content"]))
+            dimensions = sorted(set(candidate.dimensions), key=lambda value: value.value)
+            requested = set(deterministic_query.requested_outputs)
+            for dimension in dimensions:
+                requested.update(self._DIMENSION_OUTPUTS[dimension])
+            merged = deterministic_query.model_copy(
+                update={
+                    "requested_outputs": sorted(requested, key=lambda value: value.value),
+                    "semantic_dimensions": dimensions,
+                    "semantic_decomposition_status": "accepted",
+                    "semantic_decomposition_failure": None,
+                }
+            )
+            return SemanticDecompositionResult(merged, accepted=True)
+        except Exception as exc:
+            code = self._failure_code(exc)
+            fallback = deterministic_query.model_copy(
+                update={
+                    "semantic_decomposition_status": "fallback",
+                    "semantic_decomposition_failure": code,
+                }
+            )
+            return SemanticDecompositionResult(fallback, accepted=False, failure_code=code)
+
+    @staticmethod
+    def _failure_code(exc: Exception) -> str:
+        if isinstance(exc, json.JSONDecodeError):
+            return "malformed_schema"
+        if isinstance(exc, ValidationError):
+            return "invalid_dimension"
+        return str(exc) if str(exc) in {"provider_response_invalid"} else "provider_unavailable"
+
+    @staticmethod
+    def _schema() -> dict[str, object]:
+        return {
+            "type": "object",
+            "properties": {
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": [item.value for item in SemanticDimension],
+                    },
+                    "uniqueItems": True,
+                    "minItems": 1,
+                }
+            },
+            "required": ["dimensions"],
+            "additionalProperties": False,
+        }
+
+    @staticmethod
+    def _prompt(original_query: str, deterministic_query: StructuredQuery) -> str:
+        return (
+            "Yalnız kullanıcının istediği allowlist answer dimension değerlerini seç. "
+            "Tool, MCP, SQL, ID, tarih, konum, RuleVersion veya DecisionEvidence üretme. "
+            "Deterministik requested_outputs zaten güvenilirdir; yalnız açıkça veya "
+            "anlamca istenen ek boyutları ekle. Native schema dışında metin üretme.\n"
+            f"PROMPT_VERSION={SEMANTIC_DECOMPOSITION_PROMPT_VERSION}\n"
+            "DETERMINISTIC_OUTPUTS="
+            f"{json.dumps([item.value for item in deterministic_query.requested_outputs])}\n"
+            f"USER_QUERY={original_query}"
+        )
+
+
+class _SemanticDecomposition(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    dimensions: list[SemanticDimension] = Field(min_length=1, max_length=17)
+
+    @field_validator("dimensions")
+    @classmethod
+    def normalize_dimensions(cls, value: list[SemanticDimension]) -> list[SemanticDimension]:
+        return sorted(set(value), key=lambda item: item.value)
 
 
 def _fold(value: str) -> str:
@@ -193,6 +321,27 @@ class DeterministicStructuredQueryParser:
             missing_fields=tuple(missing),
             prompt_version=DETERMINISTIC_STRUCTURED_QUERY_PARSER_VERSION,
         )
+
+    @classmethod
+    def clarification_candidates(
+        cls, *, original_query: str, snapshot: DataSnapshot
+    ) -> tuple[str, ...]:
+        """Return public device candidates for a genuinely broad location query."""
+        folded = _fold(original_query)
+        city_names = {
+            device.city.name
+            for device in NetworkDevice.objects.filter(data_snapshot=snapshot).select_related(
+                "city"
+            )
+            if _fold(device.city.name) in folded
+        }
+        candidates: set[str] = set()
+        for device in NetworkDevice.objects.filter(
+            data_snapshot=snapshot, city__name__in=city_names
+        ).order_by("code"):
+            if cls._outage_for_device(snapshot, device.code, dates=[]):
+                candidates.add(device.code)
+        return tuple(sorted(candidates))
 
     @staticmethod
     def _extract_code(pattern: re.Pattern[str], text: str) -> str | None:
