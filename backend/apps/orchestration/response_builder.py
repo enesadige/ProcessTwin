@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping
 from enum import StrEnum
 from typing import Any
@@ -20,7 +21,7 @@ from apps.orchestration.result_merge import (
     ValidationStatus,
 )
 
-RESPONSE_PROMPT_VERSION = "closed-world-statement-selection-tr-v3"
+RESPONSE_PROMPT_VERSION = "grounded-semantic-statement-selection-tr-v4"
 _NARRATIVE_KEYS = frozenset(
     {
         "summary",
@@ -39,6 +40,23 @@ _IMPACT_STATUSES = frozenset(
 )
 _FAILOVER_PRIMARY_DOWN_BACKUP_HEALTHY = "primary_down_backup_healthy"
 _UNCERTAINTY_STATEMENT = "Yeterli doğrulanmış bilgi yok."
+_SEMANTIC_CONCEPTS = frozenset(
+    {
+        "outage_classification",
+        "potential_scope",
+        "verified_customer_impact",
+        "verified_no_impact",
+        "insufficient_evidence",
+        "primary_backup_state",
+        "failover_explanation",
+        "compensation_status",
+        "compensation_reason",
+        "root_cause",
+        "evidence",
+        "explanation_requested",
+    }
+)
+_RELATION_TYPES = frozenset({"cause", "contrast", "consequence", "uncertainty", "evidence_gap"})
 
 
 class ResponseBuilderError(ProcessTwinError):
@@ -76,6 +94,8 @@ class ValidatedNaturalLanguageResponse(BaseModel):
     model: str | None = None
     prompt_version: str = RESPONSE_PROMPT_VERSION
     validation_status: ValidationStatus
+    semantic_concepts: list[str] = Field(default_factory=list)
+    grounded_relationships: list[dict[str, str]] = Field(default_factory=list)
 
 
 class ValidatedResponseBuilder:
@@ -111,9 +131,15 @@ class ValidatedResponseBuilder:
             active_provider = descriptor.create_provider()
         response.provider = active_provider.provider_name
         response.model = active_provider.model_name
-        contract = self._statement_contract(result)
+        contract = self._statement_contract(
+            result,
+            original_query=query_run.original_query,
+            structured_query=query_run.structured_query,
+        )
         try:
-            narrative, retry = self._safe_statement_selection(active_provider, contract)
+            narrative, retry, selection = self._safe_statement_selection(active_provider, contract)
+            response.semantic_concepts = selection["concepts"]
+            response.grounded_relationships = selection["relationships"]
             if retry.get("retry_count", 0):
                 response.warnings = [
                     *response.warnings,
@@ -415,8 +441,13 @@ class ValidatedResponseBuilder:
         )
 
     @staticmethod
-    def _statement_contract(result: ValidatedExecutionResult) -> tuple[str, dict[str, str]]:
-        """Build immutable, privacy-safe sentences; the model may select IDs only."""
+    def _statement_contract(
+        result: ValidatedExecutionResult,
+        *,
+        original_query: str = "",
+        structured_query: Mapping[str, Any] | None = None,
+    ) -> tuple[str, dict[str, object]]:
+        """Build a closed-world contract for decomposition, relations and ordering."""
         statements: dict[str, str] = {}
 
         def add(text: str) -> None:
@@ -546,32 +577,105 @@ class ValidatedResponseBuilder:
             add("Doğrulanmış kaynaklar: " + "; ".join(source_labels) + ".")
         if not statements:
             add(_UNCERTAINTY_STATEMENT)
+        statement_concepts = {
+            statement_id: ValidatedResponseBuilder._statement_concepts(text)
+            for statement_id, text in statements.items()
+        }
         schema = {
             "type": "object",
             "properties": {
                 "headline_id": {"type": ["string", "null"], "enum": ["H1", None]},
+                "concepts": {
+                    "type": "array",
+                    "items": {"type": "string", "enum": sorted(_SEMANTIC_CONCEPTS)},
+                    "uniqueItems": True,
+                    "minItems": 1,
+                },
                 "selected_statement_ids": {
                     "type": "array",
                     "items": {"type": "string", "enum": list(statements)},
                     "uniqueItems": True,
                     "maxItems": len(statements),
                 },
+                "relationships": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": {"type": "string", "enum": sorted(_RELATION_TYPES)},
+                            "from_statement_id": {"type": "string", "enum": list(statements)},
+                            "to_statement_id": {"type": "string", "enum": list(statements)},
+                        },
+                        "required": ["type", "from_statement_id", "to_statement_id"],
+                        "additionalProperties": False,
+                    },
+                    "maxItems": 8,
+                },
             },
-            "required": ["headline_id", "selected_statement_ids"],
+            "required": ["headline_id", "concepts", "selected_statement_ids", "relationships"],
             "additionalProperties": False,
         }
+        safe_query = original_query
+        for value in (structured_query or {}).values():
+            if isinstance(value, str) and value.strip():
+                safe_query = safe_query.replace(value, "[doğrulanmış-ankor]")
+        if isinstance(structured_query, Mapping):
+            location = structured_query.get("location")
+            if isinstance(location, Mapping):
+                for value in location.values():
+                    if isinstance(value, str) and value.strip():
+                        safe_query = safe_query.replace(value, "[doğrulanmış-konum]")
+        safe_query = re.sub(r"\b(?:\d{1,3}\.){3}\d{1,3}\b", "[redakte-adres]", safe_query)
+        safe_query = re.sub(
+            r"\b(?:CUST|SUB|AGG|OLT|BNG|DSLAM|AN|CE|INC|OUT)-[A-Z0-9İÇŞĞÜÖ_-]+\b",
+            "[redakte-referans]",
+            safe_query,
+            flags=re.IGNORECASE,
+        )
         prompt = (
             "Yalnız native schema nesnesini üret. Cümle yazma, cümleleri değiştirme, "
-            "yeni ID üretme. Kritik tüm statement ID'lerini birer kez seç ve güvenli sırada diz.\n"
-            "HEADLINES={'H1': 'Kesinti değerlendirmesi'}\nSTATEMENTS="
+            "yeni ID veya gerçek üretme. concepts yalnız allowlist'ten seçilir; "
+            "relationships yalnız verilen statement ID'leri arasında kurulabilir. "
+            "Kullanıcı sorusundaki doğrulanmış ankorlar redakte edilmiştir.\n"
+            "USER_SEMANTIC_QUERY="
+            + safe_query
+            + "\nHEADLINES={'H1': 'Kesinti değerlendirmesi'}\nSTATEMENTS="
             + json.dumps(statements, ensure_ascii=False)
+            + "\nSTATEMENT_CONCEPTS="
+            + json.dumps(statement_concepts, ensure_ascii=False)
         )
-        return prompt, {"schema": schema, "statements": statements}
+        return prompt, {
+            "schema": schema,
+            "statements": statements,
+            "statement_concepts": statement_concepts,
+        }
+
+    @staticmethod
+    def _statement_concepts(text: str) -> list[str]:
+        concepts: list[str] = []
+        checks = (
+            ("outage_classification", ("kesinti", "Tam hizmet")),
+            ("potential_scope", ("Potansiyel kapsam",)),
+            ("verified_customer_impact", ("Doğrulanmış etki", "müşteri etkisi")),
+            ("verified_no_impact", ("etkilenmediği",)),
+            ("insufficient_evidence", ("kanıt", "doğrulanmadı", "manuel inceleme")),
+            ("primary_backup_state", ("ana bağlantı", "yedek bağlantı")),
+            ("failover_explanation", ("Failover", "yedek yollar")),
+            ("compensation_status", ("Telafi", "Tazminat")),
+            ("compensation_reason", ("kararı", "doğrulanmış etki üzerinden")),
+            ("root_cause", ("kök neden", "Kök kaynak")),
+            ("evidence", ("Kaynaklar", "DecisionEvidence", "RuleVersion")),
+        )
+        lowered = text.casefold()
+        for concept, needles in checks:
+            if any(needle.casefold() in lowered for needle in needles):
+                concepts.append(concept)
+        return concepts or ["explanation_requested"]
 
     @classmethod
     def _safe_statement_selection(
         cls, provider: LLMProvider, contract: tuple[str, dict[str, object]]
-    ) -> tuple[str, Mapping[str, Any]]:
+    ) -> tuple[str, Mapping[str, Any], Mapping[str, Any]]:
         prompt, data = contract
         response = provider.generate(request={"contents": prompt, "format_schema": data["schema"]})
         if not isinstance(response, Mapping) or response.get("provider") != provider.provider_name:
@@ -590,31 +694,91 @@ class ValidatedResponseBuilder:
         statements = data["statements"]
         if not isinstance(statements, Mapping):
             raise ValueError("statement contract is invalid")
-        cls._validate_statement_selection(selection, statements)
+        statement_concepts = data.get("statement_concepts", {})
+        cls._validate_statement_selection(selection, statements, statement_concepts)
         headline = "Kesinti değerlendirmesi" if selection["headline_id"] == "H1" else None
         lines = [headline] if headline else []
         selected = selection["selected_statement_ids"]
-        # The model chooses a safe ordering only. Any omitted critical ID is
-        # deterministically appended so semantic completeness never depends on
-        # the model deciding to include every canonical statement.
-        ordered_ids = [*selected, *(item for item in statements if item not in selected)]
+        concepts = selection["concepts"]
+        concept_rank = {concept: index for index, concept in enumerate(concepts)}
+        selected_position = {statement_id: index for index, statement_id in enumerate(selected)}
+        ordered_selected = sorted(
+            selected,
+            key=lambda statement_id: (
+                min(
+                    (
+                        concept_rank.get(concept, len(concepts))
+                        for concept in statement_concepts.get(statement_id, [])
+                    ),
+                    default=len(concepts),
+                ),
+                selected_position[statement_id],
+            ),
+        )
+        # Omitted critical IDs are appended deterministically.
+        ordered_ids = [
+            *ordered_selected,
+            *(item for item in statements if item not in selected),
+        ]
         lines.extend(statements[statement_id] for statement_id in ordered_ids)
-        return "\n".join(lines), retry
+        relation_labels = {
+            "cause": "Nedensel ilişki",
+            "contrast": "Karşıtlık ilişkisi",
+            "consequence": "Sonuç ilişkisi",
+            "uncertainty": "Belirsizlik ilişkisi",
+            "evidence_gap": "Kanıt boşluğu ilişkisi",
+        }
+        for relation in selection["relationships"]:
+            lines.append(
+                f"{relation_labels[relation['type']]}: "
+                f"{statements[relation['from_statement_id']]} -> "
+                f"{statements[relation['to_statement_id']]}"
+            )
+        return "\n".join(lines), retry, selection
 
     @staticmethod
-    def _validate_statement_selection(selection: object, statements: Mapping[str, str]) -> None:
+    def _validate_statement_selection(
+        selection: object,
+        statements: Mapping[str, str],
+        statement_concepts: Mapping[str, object] | None = None,
+    ) -> None:
         if not isinstance(selection, Mapping) or set(selection) != {
             "headline_id",
+            "concepts",
             "selected_statement_ids",
+            "relationships",
         }:
             raise ValueError("statement selection schema is invalid")
         if selection["headline_id"] not in {"H1", None}:
             raise ValueError("unknown headline ID")
+        concepts = selection["concepts"]
+        if (
+            not isinstance(concepts, list)
+            or not concepts
+            or len(concepts) != len(set(concepts))
+            or any(concept not in _SEMANTIC_CONCEPTS for concept in concepts)
+        ):
+            raise ValueError("semantic decomposition is invalid")
         selected = selection["selected_statement_ids"]
         if not isinstance(selected, list) or not all(isinstance(item, str) for item in selected):
             raise ValueError("statement selection IDs are invalid")
         if len(selected) != len(set(selected)) or any(item not in statements for item in selected):
             raise ValueError("unknown or duplicate statement ID")
+        relationships = selection["relationships"]
+        if not isinstance(relationships, list) or len(relationships) > 8:
+            raise ValueError("statement relationships are invalid")
+        for relation in relationships:
+            if not isinstance(relation, Mapping) or set(relation) != {
+                "type", "from_statement_id", "to_statement_id"
+            }:
+                raise ValueError("statement relationships are invalid")
+            if (
+                relation["type"] not in _RELATION_TYPES
+                or relation["from_statement_id"] not in statements
+                or relation["to_statement_id"] not in statements
+                or relation["from_statement_id"] == relation["to_statement_id"]
+            ):
+                raise ValueError("statement relationships are invalid")
 
     @staticmethod
     def _narrative_contract(result: ValidatedExecutionResult) -> str:

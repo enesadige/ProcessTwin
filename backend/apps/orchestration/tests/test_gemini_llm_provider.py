@@ -182,7 +182,7 @@ def test_interactions_uses_native_response_format_for_statement_schema(settings)
     settings.GEMINI_API_KEY = "test-secret-key"
     settings.GEMINI_LLM_API_FAMILY = "interactions"
     interaction = SimpleNamespace(
-        output_text='{"headline_id":null,"selected_statement_ids":[]}',
+        output_text='{"headline_id":null,"concepts":["evidence"],"selected_statement_ids":[],"relationships":[]}',
         status="completed",
         usage_metadata=None,
     )

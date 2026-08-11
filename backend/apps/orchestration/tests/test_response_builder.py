@@ -47,13 +47,54 @@ class RecordingProvider(LLMProvider):
             statement_ids = request["format_schema"]["properties"]["selected_statement_ids"][
                 "items"
             ]["enum"]
-            content = json.dumps({"headline_id": "H1", "selected_statement_ids": statement_ids})
+            concepts = request["format_schema"]["properties"]["concepts"]["items"]["enum"]
+            content = json.dumps(
+                {
+                    "headline_id": "H1",
+                    "concepts": concepts[:2],
+                    "selected_statement_ids": statement_ids,
+                    "relationships": [],
+                }
+            )
         return {
             "content": content,
             "finish_reason": "stop",
             "provider": self.provider_name,
             "model": self.model_name,
             "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+        }
+
+
+class RelationshipProvider(RecordingProvider):
+    def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
+        self.requests.append(dict(request))
+        schema = request["format_schema"]
+        statement_ids = schema["properties"]["selected_statement_ids"]["items"]["enum"]
+        concepts = schema["properties"]["concepts"]["items"]["enum"]
+        content = json.dumps(
+            {
+                "headline_id": "H1",
+                "concepts": ["primary_backup_state", "failover_explanation"],
+                "selected_statement_ids": statement_ids,
+                "relationships": (
+                    []
+                    if len(statement_ids) < 2
+                    else [
+                        {
+                            "type": "contrast",
+                            "from_statement_id": statement_ids[0],
+                            "to_statement_id": statement_ids[1],
+                        }
+                    ]
+                ),
+            }
+        )
+        assert "primary_backup_state" in concepts
+        return {
+            "content": content,
+            "provider": self.provider_name,
+            "model": self.model_name,
+            "retry": {},
         }
 
 
@@ -123,6 +164,7 @@ def completed_run(
     *,
     result: ValidatedExecutionResult | None = None,
     snapshot=None,
+    original_query: str = "Müşteri CUST-001 için 198.51.100.10 etkisini açıkla.",
 ):
     snapshot = snapshot or create_snapshot(seed)
     result = result or valid_result(snapshot.snapshot_key)
@@ -130,7 +172,7 @@ def completed_run(
     run, _ = service.create_or_get(
         data_snapshot=snapshot,
         idempotency_key=f"response-{snapshot.snapshot_key}",
-        original_query="Müşteri CUST-001 için 198.51.100.10 etkisini açıkla.",
+        original_query=original_query,
     )
     service.transition(run, target_status=QueryRunStatus.PLANNED)
     service.transition(run, target_status=QueryRunStatus.EXECUTING)
@@ -258,8 +300,8 @@ def test_compensation_rule_is_authoritative_over_unrelated_rule_tool_candidate()
     "content",
     [
         "999 bağlantı etkilendi.",
-        '{"headline_id":"H2","selected_statement_ids":["S1"]}',
-        '{"headline_id":"H1","selected_statement_ids":["S1","S1"]}',
+        '{"headline_id":"H2","concepts":["root_cause"],"selected_statement_ids":["S1"],"relationships":[]}',
+        '{"headline_id":"H1","concepts":["root_cause"],"selected_statement_ids":["S1","S1"],"relationships":[]}',
     ],
 )
 def test_unsupported_llm_facts_use_deterministic_fallback(content):
@@ -307,12 +349,15 @@ def test_statement_selection_rejects_unknown_or_duplicate_canonical_ids():
     partial = json.dumps(
         {
             "headline_id": "H1",
+            "concepts": ["root_cause"],
             "selected_statement_ids": ["S1"],
+            "relationships": [],
         }
     )
     full_outage = json.dumps(
         {
             "headline_id": "H1",
+            "concepts": ["root_cause"],
             "selected_statement_ids": [
                 "S1",
                 "S2",
@@ -325,6 +370,7 @@ def test_statement_selection_rejects_unknown_or_duplicate_canonical_ids():
                 "S9",
                 "S999",
             ],
+            "relationships": [],
         }
     )
     response = ValidatedResponseBuilder().build(
@@ -336,7 +382,54 @@ def test_statement_selection_rejects_unknown_or_duplicate_canonical_ids():
         response = ValidatedResponseBuilder().build(
             run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=RecordingProvider(content)
         )
-        assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
+    assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
+
+
+@pytest.mark.django_db
+def test_semantic_decomposition_and_grounded_relationships_change_safe_answer_order():
+    run = completed_run(
+        "response-semantic-decomposition",
+        original_query=(
+            "Ana bağlantı down ve yedek bağlantı active; bu neden tam kesinti değil, "
+            "failover ne yaptı ve telafi değerlendirmesi nasıl etkileniyor?"
+        ),
+    )
+    provider = RelationshipProvider()
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
+    assert "Karşıtlık ilişkisi: " in response.response_text
+    assert "Tam hizmet kesintisi: Hayır." in response.response_text
+    assert "CUST-001" not in provider.requests[0]["contents"]
+    assert "198.51.100.10" not in provider.requests[0]["contents"]
+    assert "concepts" in provider.requests[0]["format_schema"]["properties"]
+    assert "relationships" in provider.requests[0]["format_schema"]["properties"]
+
+
+@pytest.mark.django_db
+def test_invalid_semantic_decomposition_keeps_deterministic_fallback_safe():
+    run = completed_run("response-invalid-semantic-decomposition")
+    invalid = json.dumps(
+        {
+            "headline_id": "H1",
+            "concepts": ["invented_concept"],
+            "selected_statement_ids": [],
+            "relationships": [],
+        }
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=RecordingProvider(invalid),
+    )
+
+    assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
+    assert "invented_concept" not in response.response_text
+    assert "Doğrulanmış etki: 2 bağlantı." in response.response_text
 
 
 @pytest.mark.django_db
