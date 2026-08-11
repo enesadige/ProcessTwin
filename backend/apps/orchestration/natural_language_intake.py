@@ -129,7 +129,9 @@ class LLMSemanticDecomposer:
         SemanticDimension.FAILOVER_PROTECTION: (RequestedOutput.IMPACT,),
         SemanticDimension.ROOT_RESOURCE: (RequestedOutput.ROOT_CAUSE,),
         SemanticDimension.PHYSICAL_ROOT_CAUSE: (RequestedOutput.ROOT_CAUSE,),
-        SemanticDimension.EVIDENCE_GAP: (RequestedOutput.EVIDENCE,),
+        # Impact evidence gaps are answered by the customer-impact contract;
+        # they must not make a location aggregate require rule-document evidence.
+        SemanticDimension.EVIDENCE_GAP: (RequestedOutput.IMPACT,),
         SemanticDimension.COMPENSATION_RESULT: (RequestedOutput.ELIGIBILITY,),
         SemanticDimension.COMPENSATION_REASON: (RequestedOutput.EVIDENCE,),
         SemanticDimension.RULE_VERSION: (RequestedOutput.EVIDENCE,),

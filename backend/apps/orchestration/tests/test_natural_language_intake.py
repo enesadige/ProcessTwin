@@ -208,6 +208,31 @@ def test_semantic_decomposition_provider_failure_preserves_deterministic_query()
 
 
 @pytest.mark.django_db
+def test_impact_evidence_gap_does_not_add_unavailable_rule_evidence_output():
+    snapshot = create_snapshot("intake-impact-evidence-gap")
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "outage_impact",
+            "requested_outputs": ["summary", "details", "impact"],
+            "snapshot_identifier": snapshot.snapshot_key,
+            "location": {"city": "İzmir", "district": "Konak"},
+            "time_window": {
+                "from_time": "2026-06-06T00:00:00Z",
+                "to_time": "2026-06-06T23:59:59Z",
+            },
+        }
+    )
+    result = LLMSemanticDecomposer(SemanticProvider(["evidence_gap"])).merge(
+        original_query="6 Haziran 2026 Konak etkisi ve kanıtı yetersiz kayıtlar",
+        deterministic_query=query,
+    )
+
+    assert result.accepted is True
+    assert RequestedOutput.EVIDENCE not in result.structured_query.requested_outputs
+    assert RequestedOutput.IMPACT in result.structured_query.requested_outputs
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "provider",
     [RecordingProvider(fail=True), RecordingProvider({"intent": "network_investigation"})],
