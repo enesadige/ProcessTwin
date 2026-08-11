@@ -98,6 +98,25 @@ class RelationshipProvider(RecordingProvider):
         }
 
 
+class DuplicateConceptProvider(RecordingProvider):
+    def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
+        schema = request["format_schema"]
+        statement_ids = schema["properties"]["selected_statement_ids"]["items"]["enum"]
+        return {
+            "content": json.dumps(
+                {
+                    "headline_id": "H1",
+                    "concepts": ["verified_customer_impact", "verified_customer_impact"],
+                    "selected_statement_ids": statement_ids,
+                    "relationships": [],
+                }
+            ),
+            "provider": self.provider_name,
+            "model": self.model_name,
+            "retry": {},
+        }
+
+
 def valid_result(snapshot_identifier: str, *, warnings: list[str] | None = None):
     return ValidatedExecutionResult(
         snapshot_identifier=snapshot_identifier,
@@ -407,6 +426,26 @@ def test_semantic_decomposition_and_grounded_relationships_change_safe_answer_or
     assert "198.51.100.10" not in provider.requests[0]["contents"]
     assert "concepts" in provider.requests[0]["format_schema"]["properties"]
     assert "relationships" in provider.requests[0]["format_schema"]["properties"]
+
+
+@pytest.mark.django_db
+def test_simple_date_location_selection_normalizes_repeated_allowlisted_concept():
+    run = completed_run(
+        "response-simple-location",
+        original_query=(
+            "6 Haziran 2026 tarihinde Konak ilçesinde kaç kesinti oldu ve "
+            "doğrulanmış müşteri etkisi nedir?"
+        ),
+    )
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=DuplicateConceptProvider(),
+    )
+
+    assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
+    assert response.semantic_concepts == ["verified_customer_impact"]
+    assert "Doğrulanmış etki: 2 bağlantı." in response.response_text
 
 
 @pytest.mark.django_db

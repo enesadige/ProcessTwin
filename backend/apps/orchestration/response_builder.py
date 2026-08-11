@@ -691,6 +691,16 @@ class ValidatedResponseBuilder:
             selection = json.loads(response["content"])
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
             raise ValueError("native schema response is not JSON") from exc
+        if isinstance(selection, Mapping) and isinstance(selection.get("concepts"), list):
+            # Some local models repeat an allowlisted concept despite uniqueItems;
+            # deduplication is harmless and does not relax fact or ID validation.
+            normalized_selection = dict(selection)
+            concepts: list[object] = []
+            for concept in selection["concepts"]:
+                if concept not in concepts:
+                    concepts.append(concept)
+            normalized_selection["concepts"] = concepts
+            selection = normalized_selection
         statements = data["statements"]
         if not isinstance(statements, Mapping):
             raise ValueError("statement contract is invalid")
