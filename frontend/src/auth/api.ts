@@ -7,6 +7,32 @@ export type AuthUser = {
   role: UserRole
 }
 
+export type ProviderName = 'ollama' | 'gemini'
+export type ViewMode = 'management' | 'technical'
+
+export type AnalysisRequest = {
+  snapshot_identifier: string
+  idempotency_key: string
+  original_query: string
+  llm_provider: ProviderName
+  embedding_provider: ProviderName
+}
+
+export type AnalysisResponse = {
+  query_run_code?: string
+  status: string
+  response?: {
+    response_text: string
+    generation_mode: string
+    provider?: string
+    model?: string
+    warnings?: string[]
+    citations?: Array<{ reference_code: string; reference_kind: string }>
+  }
+  clarification?: { code: string; reasons: string[]; message: string }
+  error?: { code: string; message: string }
+}
+
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
 function csrfCookie() {
@@ -56,4 +82,32 @@ export async function logout() {
     method: 'POST',
     headers: { 'X-CSRFToken': csrfCookie() ?? '' },
   })
+}
+
+export class AnalysisRequestError extends Error {
+  readonly status: number
+  readonly payload: AnalysisResponse
+
+  constructor(status: number, payload: AnalysisResponse) {
+    super(payload.error?.message || 'Analiz isteği tamamlanamadı.')
+    this.status = status
+    this.payload = payload
+  }
+}
+
+export async function submitAnalysis(payload: AnalysisRequest) {
+  await ensureCsrf()
+  const response = await fetch(`${apiBase}/api/orchestration/queries/execute/`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfCookie() ?? '',
+    },
+    body: JSON.stringify(payload),
+  })
+  const body = (await response.json().catch(() => ({}))) as AnalysisResponse
+  if (!response.ok) throw new AnalysisRequestError(response.status, body)
+  return body
 }

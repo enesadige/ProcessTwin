@@ -1,0 +1,35 @@
+.analysis-page { display: grid; gap: var(--space-5); }
+.analysis-page__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.analysis-page__eyebrow { margin: 0 0 var(--space-2); color: var(--color-primary); font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.analysis-page__header h1 { margin: 0; font-size: 30px; }
+.analysis-page__header p:not(.analysis-page__eyebrow), .analysis-examples > p:not(.analysis-page__eyebrow) { margin: var(--space-2) 0 0; color: var(--color-text-muted); }
+.analysis-page__role { padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text-muted); background: var(--color-surface); font-size: 12px; font-weight: 800; }
+.analysis-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, .75fr); gap: var(--space-5); }
+.analysis-composer, .analysis-examples, .analysis-result { padding: var(--space-5); border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); box-shadow: var(--shadow-panel); }
+.analysis-composer { display: grid; gap: var(--space-3); }
+.analysis-composer__topline { display: flex; justify-content: space-between; align-items: center; }
+.analysis-composer h2, .analysis-examples h2, .analysis-result h2 { margin: 0; font-size: 18px; }
+.analysis-composer__topline span { color: var(--color-text-subtle); font-size: 12px; }
+.analysis-composer > label { color: var(--color-text-muted); font-size: 12px; font-weight: 800; }
+.analysis-composer textarea { width: 100%; resize: vertical; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); background: var(--color-surface); line-height: 1.55; }
+.analysis-composer textarea:focus, .analysis-options select:focus { outline: 3px solid rgba(31,111,235,.16); border-color: var(--color-primary); }
+.analysis-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3); }
+.analysis-options label, .analysis-options legend { color: var(--color-text-muted); font-size: 11px; font-weight: 800; }
+.analysis-options select { display: block; width: 100%; min-height: 38px; margin-top: 5px; padding: 0 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); }
+.analysis-options fieldset { display: flex; grid-column: 1 / -1; gap: var(--space-4); margin: 0; padding: 0; border: 0; }
+.analysis-options fieldset label { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+.analysis-submit, .analysis-result button { min-height: 42px; padding: 0 var(--space-4); border: 0; border-radius: 6px; color: #fff; background: var(--color-primary-strong); font-weight: 800; cursor: pointer; }
+.analysis-submit:disabled { cursor: wait; opacity: .55; }
+.analysis-examples { align-self: start; }
+.analysis-examples button { display: block; width: 100%; margin-top: var(--space-3); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); background: var(--color-surface-muted); text-align: left; cursor: pointer; }
+.analysis-examples button:hover { border-color: var(--color-primary); background: rgba(31,111,235,.06); }
+.analysis-result { display: grid; gap: var(--space-3); }
+.analysis-result > p { margin: 0; white-space: pre-wrap; line-height: 1.7; }
+.analysis-result__meta { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--color-text-muted); font-size: 11px; font-weight: 700; }
+.analysis-result__meta span { padding: 5px 8px; border-radius: 5px; background: var(--color-surface-muted); }
+.analysis-result--clarification { border-color: rgba(154,91,0,.3); }
+.analysis-result--clarification button { justify-self: start; }
+.analysis-message { margin: 0; color: var(--color-warning); font-size: 12px; }
+.analysis-message--error { color: var(--color-danger); }
+@media (max-width: 800px) { .analysis-grid { grid-template-columns: 1fr; } .analysis-page__header { flex-direction: column; } }
+@media (max-width: 520px) { .analysis-options { grid-template-columns: 1fr; } .analysis-options fieldset { grid-column: auto; } }

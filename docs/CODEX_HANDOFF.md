@@ -12,6 +12,20 @@
 - Yerel geliştirme kullanıcıları için kaynakta parola tutmayan
   `seed_demo_users --password ...` komutu eklendi. MAIN-063 başlatılmadı.
 
+## Latest MAIN-063 Checkpoint
+
+- AI Analysis workspace doğal dil textarea'sı, gerçek provider seçimleri,
+  Yönetim/Teknik görünüm tercihi, idempotent submit ve success/clarification/
+  failure durumlarıyla bağlandı.
+- Session + CSRF + analyst/admin rol kontrollü
+  `/api/orchestration/queries/execute/` endpoint'i mevcut
+  `OrchestrationFacade`'ı kullanıyor; internal service-token endpoint'i
+  değiştirilmedi.
+- Tek gerçek local smoke HTTP 200, completed QueryRun ve
+  `ollama/gemma4:12b-it-qat` provenance'ı ile tamamlandı. Gemma güvenli
+  deterministic fallback döndürdü; sahte sonuç veya backend semantiği
+  değişikliği yoktur. MAIN-064 başlatılmadı.
+
 ## Latest MAIN-061 Checkpoint
 
 - `feature/llm-role-expansion` üzerinde `acece2a` tabanından frontend uygulama

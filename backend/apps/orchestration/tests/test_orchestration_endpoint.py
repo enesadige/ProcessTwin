@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from typing import Any
 
 import pytest
+from django.contrib.auth import get_user_model
 from django.test import Client
 
 from apps.operations.tests.test_operations_models import create_snapshot
@@ -23,6 +24,7 @@ from apps.orchestration.services import QueryRunService
 from apps.orchestration.tool_plan import MCP_TOOL_REGISTRIES, ToolPlan
 
 ENDPOINT = "/api/internal/v1/orchestration/queries/execute/"
+PUBLIC_ENDPOINT = "/api/orchestration/queries/execute/"
 
 
 class FakeExecutor:
@@ -139,6 +141,43 @@ def request_payload(snapshot_identifier: str, *, idempotency_key: str = "endpoin
 def client_headers(settings) -> dict[str, str]:
     settings.INTERNAL_API_SERVICE_TOKEN = "test-service-token"
     return {"HTTP_AUTHORIZATION": "Bearer test-service-token", "HTTP_X_CORRELATION_ID": "e2e-060"}
+
+
+@pytest.mark.django_db
+def test_authenticated_analysis_endpoint_requires_analyst_role_and_uses_session(
+    settings, monkeypatch
+):
+    snapshot = create_snapshot("public-analysis-endpoint")
+    facade = OrchestrationFacade(executor=FakeExecutor(), response_provider=MockLLMProvider())
+    monkeypatch.setattr("apps.orchestration.public_views.get_orchestration_facade", lambda: facade)
+    user = get_user_model().objects.create_user(
+        username="analysis-analyst", password="correct-pass-123", role="analyst"
+    )
+    viewer = get_user_model().objects.create_user(
+        username="analysis-viewer", password="correct-pass-123", role="viewer"
+    )
+    payload = request_payload(snapshot.snapshot_key, idempotency_key="public-analysis-001")
+    client = Client()
+
+    assert (
+        client.post(
+            PUBLIC_ENDPOINT, data=json.dumps(payload), content_type="application/json"
+        ).status_code
+        == 401
+    )
+    client.force_login(viewer)
+    assert (
+        client.post(
+            PUBLIC_ENDPOINT, data=json.dumps(payload), content_type="application/json"
+        ).status_code
+        == 403
+    )
+    client.force_login(user)
+    response = client.post(
+        PUBLIC_ENDPOINT, data=json.dumps(payload), content_type="application/json"
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
 
 
 def patch_facade(monkeypatch, facade: OrchestrationFacade) -> None:

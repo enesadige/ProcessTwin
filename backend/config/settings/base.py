@@ -17,6 +17,10 @@ if env_file.exists():
 SECRET_KEY = env("DJANGO_SECRET_KEY", default="unsafe-dev-key-change-before-production")
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env.list("DJANGO_ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+CSRF_TRUSTED_ORIGINS = env.list(
+    "DJANGO_CSRF_TRUSTED_ORIGINS",
+    default=["http://localhost:5173", "http://127.0.0.1:5173"],
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
