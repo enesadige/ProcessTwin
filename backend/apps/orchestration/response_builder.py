@@ -61,6 +61,21 @@ _SEMANTIC_CONCEPTS = frozenset(
         "explanation_requested",
     }
 )
+_SEMANTIC_CONCEPT_ALIASES = {
+    "outage_type": "outage_classification",
+    "impact": "verified_customer_impact",
+    "customer_impact": "verified_customer_impact",
+    "failover_status": "primary_backup_state",
+    "failover": "failover_explanation",
+    "failover_protection": "failover_explanation",
+    "evidence_gap": "insufficient_evidence",
+    "compensation_result": "compensation_status",
+    "compensation_evaluation": "compensation_status",
+    "verified_subscription_impact": "verified_customer_impact",
+    "root_resource": "root_cause",
+    "physical_root_cause": "root_cause",
+    "summary": "explanation_requested",
+}
 _RELATION_TYPES = frozenset({"cause", "contrast", "consequence", "uncertainty", "evidence_gap"})
 
 
@@ -220,6 +235,10 @@ class ValidatedResponseBuilder:
             return "statement_selection_schema_invalid"
         if "provider response is invalid" in message:
             return "provider_response_invalid"
+        if isinstance(exc, KeyError):
+            return "statement_selection_missing_contract_key"
+        if isinstance(exc, (TypeError, IndexError)):
+            return "statement_selection_normalization_failed"
         if "selection" in message:
             return "statement_selection_validation_failed"
         return "statement_selection_failed"
@@ -731,11 +750,11 @@ class ValidatedResponseBuilder:
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
             raise ValueError("native schema response is not JSON") from exc
         if isinstance(selection, Mapping) and isinstance(selection.get("concepts"), list):
-            # Some local models repeat an allowlisted concept despite uniqueItems;
-            # deduplication is harmless and does not relax fact or ID validation.
+            # Normalize only known Phase-2 aliases; IDs and relationships remain strict.
             normalized_selection = dict(selection)
             concepts: list[object] = []
             for concept in selection["concepts"]:
+                concept = _SEMANTIC_CONCEPT_ALIASES.get(concept, concept)
                 if concept not in concepts:
                     concepts.append(concept)
             normalized_selection["concepts"] = concepts

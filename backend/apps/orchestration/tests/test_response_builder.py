@@ -412,6 +412,58 @@ def test_statement_selection_rejects_unknown_or_duplicate_canonical_ids():
 
 
 @pytest.mark.django_db
+def test_statement_selection_normalizes_phase_two_semantic_aliases():
+    run = completed_run("response-phase2-aliases")
+    content = json.dumps(
+        {
+            "headline_id": "H1",
+            "concepts": ["failover_status", "evidence_gap", "compensation_result"],
+            "selected_statement_ids": ["S1"],
+            "relationships": [],
+        }
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=RecordingProvider(content),
+    )
+
+    assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
+    assert response.semantic_concepts == [
+        "primary_backup_state",
+        "insufficient_evidence",
+        "compensation_status",
+    ]
+
+
+@pytest.mark.django_db
+def test_statement_selection_normalizes_common_allowlisted_concept_variants():
+    run = completed_run("response-concept-variants")
+    content = json.dumps(
+        {
+            "headline_id": "H1",
+            "concepts": ["impact", "failover", "compensation_evaluation"],
+            "selected_statement_ids": ["S1"],
+            "relationships": [],
+        }
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=RecordingProvider(content),
+    )
+
+    assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
+    assert response.semantic_concepts == [
+        "verified_customer_impact",
+        "failover_explanation",
+        "compensation_status",
+    ]
+
+
+@pytest.mark.django_db
 def test_semantic_decomposition_and_grounded_relationships_change_safe_answer_order():
     run = completed_run(
         "response-semantic-decomposition",
