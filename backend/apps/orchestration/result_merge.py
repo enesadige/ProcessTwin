@@ -21,6 +21,7 @@ from apps.orchestration.structured_query import (
     RequestedOutput,
     StructuredQuery,
     StructuredQueryIntent,
+    requires_documentary_evidence,
 )
 from apps.orchestration.tool_plan import MCPServer, ToolPlan
 
@@ -647,10 +648,14 @@ class ResultMergerValidator:
             StructuredQueryIntent.RULE_EVIDENCE,
         }:
             categories.add(EvidenceCategory.RULE_EVIDENCE)
-        if RequestedOutput.EVIDENCE in outputs and query.intent not in {
-            StructuredQueryIntent.COMPENSATION_EVALUATION,
-            StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL,
-        }:
+        if (
+            RequestedOutput.EVIDENCE in outputs
+            and query.intent not in {
+                StructuredQueryIntent.COMPENSATION_EVALUATION,
+                StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL,
+            }
+            and requires_documentary_evidence(query)
+        ):
             categories.add(EvidenceCategory.RULE_EVIDENCE)
         if (
             query.intent == StructuredQueryIntent.COMPENSATION_EVALUATION

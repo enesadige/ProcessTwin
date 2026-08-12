@@ -49,6 +49,20 @@ def test_causal_compensation_evidence_maps_read_only_aggregate():
     assert response.data["evidence"]["finalized"] is True
 
 
+def test_empty_compensation_evidence_preserves_unknown_counts():
+    client = FakeBackendClient(data={"evaluations": [], "decision_evidence": []})
+    response = CompensationMCPTools(client).run(
+        "get_compensation_evidence",
+        {"snapshot_identifier": "snapshot-1", "rule_code": "REFUND-001"},
+    )
+
+    assert response.success is True
+    assert response.data["status"] == "pending"
+    assert response.data["consideration_count"] is None
+    assert response.data["eligible"] is None
+    assert response.data["ineligible_pending"] is None
+
+
 @pytest.mark.parametrize(
     ("tool_name", "arguments", "method", "expected_path"),
     [

@@ -15,6 +15,7 @@ from apps.orchestration.structured_query import (
     RequestedOutput,
     StructuredQuery,
     StructuredQueryIntent,
+    requires_documentary_evidence,
 )
 from apps.orchestration.tool_plan import ToolPlan
 
@@ -399,7 +400,10 @@ class DeterministicToolPlanner:
     def _append_rule_evidence_if_requested(
         self, query: StructuredQuery, calls: list[dict[str, object]]
     ) -> None:
-        if RequestedOutput.EVIDENCE not in query.requested_outputs:
+        if (
+            RequestedOutput.EVIDENCE not in query.requested_outputs
+            or not requires_documentary_evidence(query)
+        ):
             return
         if query.outage_code and not query.causal_event_code:
             calls.append(

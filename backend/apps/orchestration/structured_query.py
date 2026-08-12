@@ -56,6 +56,31 @@ class SemanticDimension(StrEnum):
     SUMMARY = "summary"
 
 
+_DOCUMENTARY_EVIDENCE_DIMENSIONS = frozenset(
+    {
+        SemanticDimension.RULE_VERSION,
+        SemanticDimension.DECISION_EVIDENCE,
+        SemanticDimension.RAG_EVIDENCE,
+        SemanticDimension.SOURCE_VERSION_SECTION,
+    }
+)
+
+
+def requires_documentary_evidence(query: StructuredQuery) -> bool:
+    """Return whether the query explicitly needs a rule/evidence document lookup."""
+    if query.intent in {
+        StructuredQueryIntent.RULE_EVIDENCE,
+        StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL,
+        StructuredQueryIntent.COMPENSATION_EVALUATION,
+    }:
+        return True
+    if query.decision_type != "compensation":
+        return RequestedOutput.EVIDENCE in query.requested_outputs
+    if not query.semantic_dimensions:
+        return RequestedOutput.EVIDENCE in query.requested_outputs
+    return bool(_DOCUMENTARY_EVIDENCE_DIMENSIONS.intersection(query.semantic_dimensions))
+
+
 class Technology(StrEnum):
     GPON = "GPON"
     XDSL = "xDSL"

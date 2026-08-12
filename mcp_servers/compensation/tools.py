@@ -203,7 +203,7 @@ class CompensationMCPTools:
         if tool_name == "get_compensation_evidence" and "causal_event" in data:
             compensation = data.get("compensation")
             if compensation is None:
-                data = {"status": "pending", "consideration_count": 0}
+                data = {"status": "pending", "consideration_count": None}
             else:
                 data = {
                     "causal_event_code": data["causal_event"].get("code"),
@@ -217,9 +217,11 @@ class CompensationMCPTools:
             evidence = evidence_rows[0] if isinstance(evidence_rows, list) and evidence_rows else {}
             data = {
                 "status": evaluation.get("status", "pending"),
-                "consideration_count": 1 if evaluation else 0,
-                "eligible": 1 if evaluation.get("result_type") == "eligible" else 0,
-                "ineligible_pending": 0 if evaluation.get("result_type") == "eligible" else 1,
+                "consideration_count": 1 if evaluation else None,
+                "eligible": 1 if evaluation.get("result_type") == "eligible" else None,
+                "ineligible_pending": (
+                    0 if evaluation.get("result_type") == "eligible" else None
+                ),
                 "total_amount": evaluation.get("proposed_amount"),
                 "currency": evaluation.get("currency"),
                 "rule_versions": (

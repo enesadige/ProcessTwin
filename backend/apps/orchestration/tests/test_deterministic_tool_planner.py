@@ -127,6 +127,35 @@ def test_mixed_outage_question_uses_outage_anchor_for_rule_evidence():
     assert evidence.arguments.get("causal_event_code") is None
 
 
+def test_compensation_reason_without_documentary_dimension_skips_rule_evidence():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            intent="outage_impact",
+            decision_type="compensation",
+            semantic_dimensions=["compensation_reason", "evidence_gap", "failover_status"],
+            requested_outputs=["summary", "details", "impact", "root_cause", "evidence"],
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert all(call.tool_name != "get_rule_evidence" for call in result.tool_plan.calls)
+    assert any(call.tool_name == "get_compensation_evidence" for call in result.tool_plan.calls)
+
+
+def test_explicit_rule_version_dimension_keeps_rule_evidence_call():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            intent="outage_impact",
+            decision_type="compensation",
+            semantic_dimensions=["compensation_reason", "rule_version"],
+            requested_outputs=["summary", "impact", "evidence"],
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert any(call.tool_name == "get_rule_evidence" for call in result.tool_plan.calls)
+
+
 def test_outage_impact_device_scope_uses_device_and_customer_tools_when_unresolved():
     result = DeterministicToolPlanner().plan(
         query_payload(

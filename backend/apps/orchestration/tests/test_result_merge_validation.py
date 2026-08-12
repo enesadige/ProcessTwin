@@ -11,6 +11,7 @@ from apps.orchestration.executor import (
 )
 from apps.orchestration.models import QueryRunStatus
 from apps.orchestration.result_merge import (
+    EvidenceCategory,
     ResultMergerValidator,
     ValidationStatus,
     _customer_causal_impact,
@@ -225,6 +226,21 @@ def test_customer_history_without_aggregate_counters_is_safe_unknown_impact():
     assert extracted.causal["causal_event_code"] is None
     assert extracted.impact["verified_impacted"] is None
     assert extracted.impact["failover_protected"] is None
+
+
+def test_compensation_reason_without_documentary_dimension_does_not_require_rule_evidence():
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "outage_impact",
+            "decision_type": "compensation",
+            "requested_outputs": ["summary", "impact", "evidence"],
+            "semantic_dimensions": ["compensation_reason", "evidence_gap"],
+            "snapshot_identifier": "merge-evidence-optional-001",
+            "causal_event_code": "CE-MCR-0010",
+        }
+    )
+
+    assert EvidenceCategory.RULE_EVIDENCE not in ResultMergerValidator.required_categories(query)
 
 
 @pytest.mark.django_db
