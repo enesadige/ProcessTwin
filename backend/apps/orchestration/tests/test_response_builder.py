@@ -531,6 +531,78 @@ def test_invalid_semantic_decomposition_keeps_deterministic_fallback_safe():
 
 
 @pytest.mark.django_db
+def test_statement_selection_failure_persists_safe_structured_diagnostics():
+    run = completed_run("response-selection-diagnostics")
+    invalid = json.dumps(
+        {
+            "headline_id": "H1",
+            "concepts": ["invented_concept"],
+            "selected_statement_ids": ["S999"],
+            "relationships": [
+                {
+                    "type": "cause",
+                    "from_statement_id": "S999",
+                    "to_statement_id": "S1",
+                }
+            ],
+        }
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=RecordingProvider(invalid),
+    )
+
+    assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
+    assert "llm_statement_selection_failure:semantic_concept_validation_failed" in response.warnings
+    assert any(
+        warning.startswith("llm_statement_selection_allowed_statement_ids:")
+        for warning in response.warnings
+    )
+    assert any(
+        warning.startswith("llm_statement_selection_returned_statement_ids:")
+        for warning in response.warnings
+    )
+    assert any(
+        warning.startswith("llm_statement_selection_returned_concepts:")
+        for warning in response.warnings
+    )
+
+
+@pytest.mark.django_db
+def test_statement_selection_rejects_relationship_reference_outside_current_allowlist():
+    run = completed_run("response-relationship-diagnostics")
+    invalid = json.dumps(
+        {
+            "headline_id": "H1",
+            "concepts": ["root_cause"],
+            "selected_statement_ids": ["S1"],
+            "relationships": [
+                {
+                    "type": "cause",
+                    "from_statement_id": "S1",
+                    "to_statement_id": "S999",
+                }
+            ],
+        }
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=RecordingProvider(invalid),
+    )
+
+    assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
+    assert "llm_statement_selection_failure:relationship_validation_failed" in response.warnings
+    assert any(
+        warning.startswith("llm_statement_selection_relationship_references:")
+        for warning in response.warnings
+    )
+
+
+@pytest.mark.django_db
 def test_partial_result_warning_and_empty_summaries_do_not_invent_values():
     snapshot = create_snapshot("response-partial")
     result = valid_result(snapshot.snapshot_key, warnings=["optional_tool_failed:documents"])

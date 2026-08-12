@@ -83,6 +83,15 @@ class ResponseBuilderError(ProcessTwinError):
     """Stable response-builder precondition failure."""
 
 
+class StatementSelectionError(ValueError):
+    """Safe structured diagnostics for a rejected closed-world selection."""
+
+    def __init__(self, code: str, message: str, *, details: Mapping[str, Any] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.details = dict(details or {})
+
+
 class ResponseGenerationMode(StrEnum):
     DETERMINISTIC = "deterministic"
     LLM_ASSISTED = "llm_assisted"
@@ -196,6 +205,22 @@ class ValidatedResponseBuilder:
             )
             details = getattr(exc, "details", {})
             if isinstance(details, Mapping):
+                for key in (
+                    "allowed_statement_ids",
+                    "allowed_statement_concepts",
+                    "allowed_relationship_endpoints",
+                    "returned_keys",
+                    "returned_statement_ids",
+                    "returned_concepts",
+                    "normalized_concepts",
+                    "relationship_references",
+                ):
+                    value = details.get(key)
+                    if isinstance(value, (list, dict)):
+                        response.warnings.append(
+                            "llm_statement_selection_"
+                            f"{key}:{json.dumps(value, ensure_ascii=True, sort_keys=True)}"
+                        )
                 for key in ("attempt_count", "retry_count", "total_retry_delay_ms"):
                     if isinstance(details.get(key), int):
                         response.warnings.append(f"llm_statement_selection_{key}:{details[key]}")
@@ -222,6 +247,8 @@ class ValidatedResponseBuilder:
     @staticmethod
     def _statement_selection_failure_code(exc: Exception) -> str:
         """Return a bounded diagnostic category without exposing provider payloads."""
+        if isinstance(exc, StatementSelectionError):
+            return exc.code
         if isinstance(exc, GeminiLLMProviderError):
             return f"provider_call_failed_{exc.code}"
         message = str(exc)
@@ -229,6 +256,12 @@ class ValidatedResponseBuilder:
             return "statement_selection_parse_failed"
         if "unknown or duplicate" in message:
             return "unknown_or_duplicate_statement_id"
+        if "semantic decomposition is invalid" in message:
+            return "semantic_concept_validation_failed"
+        if "statement relationships are invalid" in message:
+            return "relationship_validation_failed"
+        if "statement selection IDs are invalid" in message:
+            return "statement_selection_ids_invalid"
         if "critical statement missing" in message:
             return "statement_selection_missing_id"
         if "schema is invalid" in message:
@@ -763,7 +796,76 @@ class ValidatedResponseBuilder:
         if not isinstance(statements, Mapping):
             raise ValueError("statement contract is invalid")
         statement_concepts = data.get("statement_concepts", {})
-        cls._validate_statement_selection(selection, statements, statement_concepts)
+        if not isinstance(statement_concepts, Mapping) or any(
+            statement_id not in statements for statement_id in statement_concepts
+        ):
+            raise StatementSelectionError(
+                "statement_contract_inconsistent",
+                "statement contract references an unavailable statement",
+                details={
+                    "allowed_statement_ids": sorted(str(key) for key in statements),
+                    "allowed_statement_concepts": sorted(
+                        str(concept)
+                        for concepts in statement_concepts.values()
+                        if isinstance(concepts, list)
+                        for concept in concepts
+                    )
+                    if isinstance(statement_concepts, Mapping)
+                    else [],
+                },
+            )
+        try:
+            cls._validate_statement_selection(selection, statements, statement_concepts)
+        except ValueError as exc:
+            returned_ids = (
+                selection.get("selected_statement_ids") if isinstance(selection, Mapping) else None
+            )
+            relationships = (
+                selection.get("relationships") if isinstance(selection, Mapping) else None
+            )
+            details = {
+                "allowed_statement_ids": sorted(str(key) for key in statements),
+                "allowed_relationship_endpoints": sorted(str(key) for key in statements),
+                "allowed_statement_concepts": sorted(
+                    str(concept)
+                    for concepts in statement_concepts.values()
+                    if isinstance(concepts, list)
+                    for concept in concepts
+                ),
+                "returned_keys": (
+                    sorted(str(key) for key in selection)
+                    if isinstance(selection, Mapping)
+                    else []
+                ),
+                "returned_statement_ids": (
+                    [str(value) for value in returned_ids]
+                    if isinstance(returned_ids, list) else []
+                ),
+                "returned_concepts": (
+                    [str(value) for value in selection.get("concepts", [])]
+                    if isinstance(selection.get("concepts"), list)
+                    else []
+                ),
+                "normalized_concepts": (
+                    [str(value) for value in selection.get("concepts", [])]
+                    if isinstance(selection.get("concepts"), list)
+                    else []
+                ),
+                "relationship_references": (
+                    [
+                        {
+                            "from": str(item.get("from_statement_id")),
+                            "to": str(item.get("to_statement_id")),
+                            "type": str(item.get("type")),
+                        }
+                        for item in relationships
+                        if isinstance(item, Mapping)
+                    ]
+                    if isinstance(relationships, list) else []
+                ),
+            }
+            code = cls._statement_selection_failure_code(exc)
+            raise StatementSelectionError(code, str(exc), details=details) from exc
         headline = "Kesinti değerlendirmesi" if selection["headline_id"] == "H1" else None
         lines = [headline] if headline else []
         selected = selection["selected_statement_ids"]
