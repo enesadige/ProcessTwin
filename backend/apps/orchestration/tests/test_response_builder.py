@@ -1065,6 +1065,33 @@ def test_free_text_narrative_accepts_natural_paraphrase_without_sentence_repair(
     assert removed == []
 
 
+def test_free_text_narrative_strips_only_known_internal_role_prefixes():
+    statements = {"S1": "Ana bağlantı down, yedek bağlantı active."}
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "details: Ana bağlantı down, yedek bağlantı active. evidence: Bilgi doğrulandı.",
+        statements,
+        {},
+    )
+
+    assert removed == []
+    assert [sentence["text"] for sentence in narrative["sentences"]] == [
+        "Ana bağlantı down, yedek bağlantı active.",
+        "Bilgi doğrulandı.",
+    ]
+
+
+def test_free_text_narrative_preserves_colon_identifiers_and_natural_text():
+    statements = {"S1": "RuleVersion BB-DEGRADATION-QUALITY:v1 uygulandı."}
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "RuleVersion BB-DEGRADATION-QUALITY:v1 uygulandı.",
+        statements,
+        {},
+    )
+
+    assert removed == []
+    assert narrative["sentences"][0]["text"] == "RuleVersion BB-DEGRADATION-QUALITY:v1 uygulandı."
+
+
 def test_free_text_narrative_accepts_eight_short_grounded_sentences():
     statements = {f"S{index}": f"Doğrulanmış bilgi {index}." for index in range(1, 9)}
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(

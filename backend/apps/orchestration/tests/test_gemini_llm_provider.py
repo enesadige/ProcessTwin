@@ -101,6 +101,21 @@ def test_missing_key_fails_before_client_factory_is_used(settings):
     assert invoked is False
 
 
+def test_gemini_uses_provider_specific_narrative_timeout(settings):
+    settings.GEMINI_API_KEY = "test-secret-key"
+    settings.GEMINI_LLM_API_FAMILY = "generate_content"
+    settings.GEMINI_LLM_TIMEOUT_MS = 120000
+    captured = []
+
+    def client_factory(api_key, timeout_ms):
+        captured.append(timeout_ms)
+        return FakeClient([success_response()])
+
+    GeminiLLMProvider(client_factory=client_factory).generate(request={"contents": "safe"})
+
+    assert captured == [120000]
+
+
 def test_normalized_request_response_finish_reason_and_usage(settings):
     provider, client = provider_with_outcomes(settings, [success_response()])
 

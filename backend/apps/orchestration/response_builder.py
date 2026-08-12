@@ -50,6 +50,10 @@ _RELATION_TYPES = frozenset({"cause", "contrast", "consequence", "uncertainty", 
 _NARRATIVE_SYNTHESIS_KEYS = frozenset({"sentences"})
 _NARRATIVE_SENTENCE_KEYS = frozenset({"text", "statement_ids", "relationship_ids"})
 _NARRATIVE_DEBUG_MARKERS = ("->", "Nedensel ilişki:", "Sonuç ilişkisi:", "Belirsizlik ilişkisi:")
+_NARRATIVE_ROLE_PREFIX_RE = re.compile(
+    r"^\s*(?:details|evidence|summary|root_cause|impact|eligibility)\s*:\s*",
+    re.IGNORECASE,
+)
 _NARRATIVE_NUMBER_RE = re.compile(
     r"(?<![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])\d+(?:[.,]\d+)?(?![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])"
 )
@@ -1324,10 +1328,12 @@ class ValidatedResponseBuilder:
             )
         }
         prompt = (
-            "Doğrulanmış telecom gerçeklerini kullanarak doğal ve kısa Türkçe yanıt yaz. "
+            "Doğrulanmış telecom gerçeklerini kullanarak doğal Türkçe paragraflar yaz. "
             "Yalnız aşağıdaki gerçeklerde bulunan sayı, kimlik, durum ve nedenleri kullan. "
             "Bilinmeyenleri sıfıra çevirme; bağımsız kanıt boşluklarını nedensel bağlama. "
-            "JSON, etiket, ID, madde imi veya debug ilişkisi üretme.\n"
+            "4-8 kısa cümleyle tüm istenen noktaları kapsa. details:, evidence:, summary:, "
+            "root_cause:, impact: veya eligibility: gibi iç rol etiketleriyle başlama. "
+            "JSON, ID, madde imi veya debug ilişkisi üretme.\n"
             "Sorgunun aşağıdaki istenen çıktılarını ayrı ayrı yanıtla; mevcut bir "
             "doğrulanmış değer varsa atlama: REQUESTED_OUTPUTS="
             + json.dumps(requested_outputs or [], ensure_ascii=False)
@@ -1445,6 +1451,9 @@ class ValidatedResponseBuilder:
         result: list[dict[str, Any]] = []
         removed: list[dict[str, str]] = []
         for text in (part.strip() for part in sentences):
+            if not text:
+                continue
+            text = _NARRATIVE_ROLE_PREFIX_RE.sub("", text, count=1).strip()
             if not text:
                 continue
             # The AnswerPlan is the closed-world support universe. A sentence
