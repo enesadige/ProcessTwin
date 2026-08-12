@@ -15,6 +15,7 @@ _SNAPSHOT_IDENTIFIER_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,159}$")
 
 
 class StructuredQueryIntent(StrEnum):
+    ALARM_CORRELATION = "alarm_correlation"
     NETWORK_INVESTIGATION = "network_investigation"
     OUTAGE_IMPACT = "outage_impact"
     CUSTOMER_HISTORY = "customer_history"
@@ -25,6 +26,7 @@ class StructuredQueryIntent(StrEnum):
 
 
 class RequestedOutput(StrEnum):
+    CORRELATION = "correlation"
     SUMMARY = "summary"
     DETAILS = "details"
     ROOT_CAUSE = "root_cause"
@@ -53,6 +55,7 @@ class SemanticDimension(StrEnum):
     RAG_EVIDENCE = "rag_evidence"
     SOURCE_VERSION_SECTION = "source_version_section"
     MANUAL_REVIEW_REASON = "manual_review_reason"
+    ALARM_CORRELATION = "alarm_correlation"
     SUMMARY = "summary"
 
 
@@ -90,6 +93,8 @@ def requires_customer_impact_evidence(query: StructuredQuery) -> bool:
 
 def requires_documentary_evidence(query: StructuredQuery) -> bool:
     """Return whether the query explicitly needs a rule/evidence document lookup."""
+    if query.intent == StructuredQueryIntent.ALARM_CORRELATION:
+        return False
     if query.intent in {
         StructuredQueryIntent.RULE_EVIDENCE,
         StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL,
@@ -190,6 +195,10 @@ class StructuredQuery(BaseModel):
     semantic_decomposition_failure: str | None = Field(default=None, max_length=80)
     snapshot_identifier: str = Field(min_length=3, max_length=160)
     causal_event_code: str | None = Field(default=None, max_length=80)
+    comparison_causal_event_code: str | None = Field(default=None, max_length=80)
+    correlation_window_minutes: int | None = Field(default=None, ge=1, le=24 * 60)
+    correlation_direction: Literal["before", "after", "both"] = "both"
+    correlation_other_region_only: bool = False
     incident_code: str | None = Field(default=None, max_length=80)
     outage_code: str | None = Field(default=None, max_length=80)
     device_code: str | None = Field(default=None, max_length=80)
@@ -211,7 +220,13 @@ class StructuredQuery(BaseModel):
             raise ValueError("snapshot_identifier is invalid")
         return normalized
 
-    @field_validator("causal_event_code", "incident_code", "outage_code", "subscription_reference")
+    @field_validator(
+        "causal_event_code",
+        "comparison_causal_event_code",
+        "incident_code",
+        "outage_code",
+        "subscription_reference",
+    )
     @classmethod
     def validate_public_code(cls, value: str | None, info) -> str | None:
         if value is None:
@@ -268,6 +283,13 @@ class StructuredQuery(BaseModel):
         ]
         if len(anchors) > 1:
             raise ValueError("Only one operational reference may be supplied")
+        if self.comparison_causal_event_code:
+            if self.intent != StructuredQueryIntent.ALARM_CORRELATION:
+                raise ValueError("comparison event requires alarm correlation intent")
+            if self.comparison_causal_event_code == self.causal_event_code:
+                raise ValueError("correlation events must be different")
+        if self.intent == StructuredQueryIntent.ALARM_CORRELATION and not self.causal_event_code:
+            raise ValueError("alarm correlation requires a causal event anchor")
         if self.clarification_required:
             if not self.clarification_reasons:
                 raise ValueError("clarification_required needs at least one reason")
@@ -281,6 +303,7 @@ class StructuredQuery(BaseModel):
         if (
             self.intent
             in {
+                StructuredQueryIntent.ALARM_CORRELATION,
                 StructuredQueryIntent.NETWORK_INVESTIGATION,
                 StructuredQueryIntent.OUTAGE_IMPACT,
                 StructuredQueryIntent.CUSTOMER_HISTORY,

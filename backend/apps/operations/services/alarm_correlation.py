@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 from datetime import timedelta
+from enum import StrEnum
 from typing import Any
 
 from apps.datasets.models import DataSnapshot
 from apps.network.models import NetworkDevice, NetworkDeviceType
 from apps.network.services.topology import NetworkTopologyService
 from apps.operations.contracts import CorrelationReason, CorrelationRole
-from apps.operations.models import Alarm, AlarmSourceKind
+from apps.operations.models import Alarm, AlarmSourceKind, CausalEvent
 
 TIME_WINDOW_SECONDS = 30 * 60
 CAUSAL_PROPAGATION_WINDOW_SECONDS = 2 * 60 * 60
@@ -27,6 +28,12 @@ class AlarmCorrelationInputError(AlarmCorrelationServiceError):
     """Raised when alarm or snapshot inputs are invalid."""
 
 
+class CrossIncidentCorrelationStatus(StrEnum):
+    VERIFIED_RELATION = "verified_relation"
+    INSUFFICIENT_EVIDENCE = "insufficient_evidence"
+    NO_RELATION = "no_relation"
+
+
 @dataclass(frozen=True)
 class AlarmCorrelationResult:
     anchor_alarm_code: str
@@ -41,6 +48,24 @@ class AlarmCorrelationResult:
     correlation_role: str = CorrelationRole.UNRELATED.value
     reason_codes: list[str] | None = None
     description: str = "No causal correlation was established."
+
+
+@dataclass(frozen=True)
+class CrossIncidentCorrelationResult:
+    """Backend-owned evidence for a bounded comparison between two causal events."""
+
+    anchor_event_code: str
+    candidate_event_code: str
+    correlation_status: CrossIncidentCorrelationStatus
+    time_difference_seconds: int
+    within_window: bool
+    requested_window_seconds: int
+    topology_relation: str
+    resource_relation: str
+    event_relation: str | None
+    root_symptom_status: str
+    evidence: list[dict[str, Any]]
+    snapshot: dict[str, Any]
 
 
 class AlarmCorrelationService:
@@ -69,7 +94,8 @@ class AlarmCorrelationService:
             )
             .exclude(pk=anchor_alarm.pk)
             .select_related(
-                "alarm_type", "causal_event",
+                "alarm_type",
+                "causal_event",
                 "device",
                 "device__district",
                 "network_link",
@@ -100,6 +126,241 @@ class AlarmCorrelationService:
             results,
             key=lambda result: (-result.evidence_score, result.candidate_alarm_code),
         )
+
+    def find_cross_incident_correlations(
+        self,
+        *,
+        anchor_event: CausalEvent,
+        snapshot: DataSnapshot,
+        window_seconds: int,
+        direction: str = "both",
+        other_region_only: bool = False,
+    ) -> list[CrossIncidentCorrelationResult]:
+        """Discover only event candidates inside an explicit bounded time window."""
+        self._validate_event(anchor_event=anchor_event, snapshot=snapshot)
+        if window_seconds <= 0:
+            raise AlarmCorrelationInputError("Correlation window must be positive.")
+        if direction not in {"before", "after", "both"}:
+            raise AlarmCorrelationInputError("Correlation direction is invalid.")
+        lower = anchor_event.started_at - timedelta(seconds=window_seconds)
+        upper = anchor_event.started_at + timedelta(seconds=window_seconds)
+        candidates = (
+            CausalEvent.objects.filter(
+                data_snapshot=snapshot,
+                started_at__gte=lower,
+                started_at__lte=upper,
+            )
+            .exclude(pk=anchor_event.pk)
+            .select_related("root_device", "root_device__city")
+        )
+        if direction == "before":
+            candidates = candidates.filter(started_at__lt=anchor_event.started_at)
+        elif direction == "after":
+            candidates = candidates.filter(started_at__gt=anchor_event.started_at)
+        anchor_city_id = getattr(anchor_event.root_device, "city_id", None)
+        if other_region_only and anchor_city_id is not None:
+            candidates = candidates.exclude(root_device__city_id=anchor_city_id)
+        results = [
+            self.correlate_events(
+                anchor_event=anchor_event,
+                candidate_event=candidate,
+                snapshot=snapshot,
+                window_seconds=window_seconds,
+            )
+            for candidate in candidates.order_by("started_at", "event_code")
+        ]
+        return sorted(
+            results,
+            key=lambda result: (
+                result.correlation_status != CrossIncidentCorrelationStatus.VERIFIED_RELATION,
+                result.time_difference_seconds,
+                result.candidate_event_code,
+            ),
+        )
+
+    def correlate_events(
+        self,
+        *,
+        anchor_event: CausalEvent,
+        candidate_event: CausalEvent,
+        snapshot: DataSnapshot,
+        window_seconds: int,
+    ) -> CrossIncidentCorrelationResult:
+        """Correlate distinct events from deterministic timestamp and topology evidence.
+
+        A shared graph relation is operational correlation evidence, not proof of a
+        shared physical root cause.  Timestamp proximity alone intentionally cannot
+        produce ``verified_relation``.
+        """
+        self._validate_event(anchor_event=anchor_event, snapshot=snapshot)
+        self._validate_event(anchor_event=candidate_event, snapshot=snapshot)
+        if anchor_event.pk == candidate_event.pk:
+            raise AlarmCorrelationInputError("Cross-incident comparison requires two events.")
+        if window_seconds <= 0:
+            raise AlarmCorrelationInputError("Correlation window must be positive.")
+
+        seconds = abs(int((candidate_event.started_at - anchor_event.started_at).total_seconds()))
+        within_window = seconds <= window_seconds
+        topology_relation, resource_relation = self._event_topology_relation(
+            anchor_event=anchor_event,
+            candidate_event=candidate_event,
+            snapshot=snapshot,
+        )
+        event_relation, root_symptom_status = self._explicit_event_relation(
+            anchor_event=anchor_event,
+            candidate_event=candidate_event,
+        )
+        has_topology_evidence = topology_relation != "unrelated"
+        if event_relation is not None or (within_window and has_topology_evidence):
+            status = CrossIncidentCorrelationStatus.VERIFIED_RELATION
+        elif within_window or has_topology_evidence:
+            status = CrossIncidentCorrelationStatus.INSUFFICIENT_EVIDENCE
+        else:
+            status = CrossIncidentCorrelationStatus.NO_RELATION
+        evidence = [
+            {
+                "dimension": "temporal",
+                "time_difference_seconds": seconds,
+                "within_window": within_window,
+                "window_seconds": window_seconds,
+            },
+            {
+                "dimension": "topology",
+                "relation": topology_relation,
+                "verified": has_topology_evidence,
+            },
+        ]
+        if resource_relation != "unrelated":
+            evidence.append({"dimension": "resource", "relation": resource_relation})
+        if event_relation is not None:
+            evidence.append({"dimension": "event_relation", "relation": event_relation})
+        return CrossIncidentCorrelationResult(
+            anchor_event_code=anchor_event.event_code,
+            candidate_event_code=candidate_event.event_code,
+            correlation_status=status,
+            time_difference_seconds=seconds,
+            within_window=within_window,
+            requested_window_seconds=window_seconds,
+            topology_relation=topology_relation,
+            resource_relation=resource_relation,
+            event_relation=event_relation,
+            root_symptom_status=root_symptom_status,
+            evidence=evidence,
+            snapshot={
+                "id": snapshot.id,
+                "snapshot_key": snapshot.snapshot_key,
+                "dataset_slug": snapshot.dataset_version.slug,
+            },
+        )
+
+    def _event_topology_relation(
+        self,
+        *,
+        anchor_event: CausalEvent,
+        candidate_event: CausalEvent,
+        snapshot: DataSnapshot,
+    ) -> tuple[str, str]:
+        """Return the strongest existing resource/topology relation across event alarms."""
+        anchor_alarms = list(
+            Alarm.objects.filter(data_snapshot=snapshot, causal_event=anchor_event)
+            .select_related(
+                "alarm_type",
+                "causal_event",
+                "device",
+                "device__district",
+                "network_link",
+                "network_link__source_device",
+                "network_link__target_device",
+                "network_port",
+                "network_port__device",
+                "line_connection",
+                "line_connection__port",
+                "line_connection__port__device",
+                "failure_domain",
+                "subscription_connection",
+                "subscription_connection__line_connection__port__device",
+            )
+            .order_by("alarm_id")
+        )
+        candidate_alarms = list(
+            Alarm.objects.filter(data_snapshot=snapshot, causal_event=candidate_event)
+            .select_related(
+                "alarm_type",
+                "causal_event",
+                "device",
+                "device__district",
+                "network_link",
+                "network_link__source_device",
+                "network_link__target_device",
+                "network_port",
+                "network_port__device",
+                "line_connection",
+                "line_connection__port",
+                "line_connection__port__device",
+                "failure_domain",
+                "subscription_connection",
+                "subscription_connection__line_connection__port__device",
+            )
+            .order_by("alarm_id")
+        )
+        relations = [
+            self._get_topology_relation(anchor_alarm, candidate_alarm, snapshot)
+            for anchor_alarm in anchor_alarms
+            for candidate_alarm in candidate_alarms
+        ]
+        topology_relation = max(relations, key=score_topology_relation, default="unrelated")
+        anchor_resource = anchor_event.get_root_resource()
+        candidate_resource = candidate_event.get_root_resource()
+        same_resource = (
+            anchor_resource is not None
+            and candidate_resource is not None
+            and anchor_resource.__class__ == candidate_resource.__class__
+            and anchor_resource.pk == candidate_resource.pk
+        )
+        return topology_relation, "same_resource" if same_resource else topology_relation
+
+    @staticmethod
+    def _explicit_event_relation(
+        *,
+        anchor_event: CausalEvent,
+        candidate_event: CausalEvent,
+    ) -> tuple[str | None, str]:
+        """Read an optional deterministic relation already stored with the event.
+
+        No relation is inferred from timestamps.  Dataset producers can provide an
+        explicit cross-event relation without creating a second truth source.
+        """
+        for event, counterpart in (
+            (anchor_event, candidate_event),
+            (candidate_event, anchor_event),
+        ):
+            relations = (event.metadata or {}).get("cross_incident_relations", [])
+            if not isinstance(relations, list):
+                continue
+            for relation in relations:
+                if (
+                    not isinstance(relation, dict)
+                    or relation.get("event_code") != counterpart.event_code
+                ):
+                    continue
+                relation_type = relation.get("relation_type")
+                if relation_type not in {"operational_correlation", "root_symptom"}:
+                    continue
+                direction = relation.get("root_symptom_direction")
+                if relation_type == "root_symptom" and direction in {
+                    "anchor_root",
+                    "candidate_root",
+                }:
+                    return relation_type, direction
+                return relation_type, "not_verified"
+        return None, "not_verified"
+
+    @staticmethod
+    def _validate_event(*, anchor_event: CausalEvent, snapshot: DataSnapshot) -> None:
+        if anchor_event is None or not anchor_event.pk:
+            raise AlarmCorrelationInputError("A persisted causal event must be provided.")
+        if anchor_event.data_snapshot_id != snapshot.id:
+            raise AlarmCorrelationInputError("Causal event does not belong to the snapshot.")
 
     def score_pair(
         self,
@@ -215,16 +476,30 @@ class AlarmCorrelationService:
         same_causal_event = anchor_alarm.causal_event_id == candidate_alarm.causal_event_id
         if not same_causal_event:
             return self._causal_result(
-                anchor_alarm, candidate_alarm, snapshot, time_difference_seconds,
-                topology_relation, type_compatibility, 0, CorrelationRole.UNRELATED,
-                [], "Alarms belong to different causal events.",
+                anchor_alarm,
+                candidate_alarm,
+                snapshot,
+                time_difference_seconds,
+                topology_relation,
+                type_compatibility,
+                0,
+                CorrelationRole.UNRELATED,
+                [],
+                "Alarms belong to different causal events.",
                 [{"criterion": "causal_event_boundary", "matched": False, "score": 0}],
             )
         if not technologies_compatible(anchor_alarm, candidate_alarm):
             return self._causal_result(
-                anchor_alarm, candidate_alarm, snapshot, time_difference_seconds,
-                topology_relation, type_compatibility, 0, CorrelationRole.UNRELATED,
-                [], "Alarm technologies are incompatible for one causal chain.",
+                anchor_alarm,
+                candidate_alarm,
+                snapshot,
+                time_difference_seconds,
+                topology_relation,
+                type_compatibility,
+                0,
+                CorrelationRole.UNRELATED,
+                [],
+                "Alarm technologies are incompatible for one causal chain.",
                 [{"criterion": "technology_compatibility", "matched": False, "score": 0}],
             )
 
@@ -251,36 +526,70 @@ class AlarmCorrelationService:
         if role in {CorrelationRole.UNRELATED, CorrelationRole.NOISE}:
             evidence_score = min(evidence_score, CORRELATION_THRESHOLD - 1)
         return self._causal_result(
-            anchor_alarm, candidate_alarm, snapshot, time_difference_seconds,
-            topology_relation, type_compatibility, evidence_score, role, reasons,
+            anchor_alarm,
+            candidate_alarm,
+            snapshot,
+            time_difference_seconds,
+            topology_relation,
+            type_compatibility,
+            evidence_score,
+            role,
+            reasons,
             causal_description(role),
             [
                 {"criterion": "causal_event_boundary", "matched": True, "score": 25},
-                {"criterion": "temporal_propagation", "score": temporal_score,
-                 "time_difference_seconds": time_difference_seconds},
-                {"criterion": "topology_relation", "score": topology_score,
-                 "relation": topology_relation},
-                {"criterion": "alarm_type_compatibility", "score": type_score,
-                 "compatibility": type_compatibility},
-                {"criterion": "clear_recovery_sequence", "score": clear_score,
-                 "consistent": clear_consistent},
+                {
+                    "criterion": "temporal_propagation",
+                    "score": temporal_score,
+                    "time_difference_seconds": time_difference_seconds,
+                },
+                {
+                    "criterion": "topology_relation",
+                    "score": topology_score,
+                    "relation": topology_relation,
+                },
+                {
+                    "criterion": "alarm_type_compatibility",
+                    "score": type_score,
+                    "compatibility": type_compatibility,
+                },
+                {
+                    "criterion": "clear_recovery_sequence",
+                    "score": clear_score,
+                    "consistent": clear_consistent,
+                },
             ],
         )
 
-    def _causal_result(self, anchor, candidate, snapshot, seconds, topology_relation,
-                       type_compatibility, score, role, reasons, description, evidence):
+    def _causal_result(
+        self,
+        anchor,
+        candidate,
+        snapshot,
+        seconds,
+        topology_relation,
+        type_compatibility,
+        score,
+        role,
+        reasons,
+        description,
+        evidence,
+    ):
         return AlarmCorrelationResult(
             anchor_alarm_code=anchor.alarm_id,
             candidate_alarm_code=candidate.alarm_id,
             evidence_score=score,
-            correlated=score >= CORRELATION_THRESHOLD and role not in {
-                CorrelationRole.UNRELATED, CorrelationRole.NOISE},
+            correlated=score >= CORRELATION_THRESHOLD
+            and role not in {CorrelationRole.UNRELATED, CorrelationRole.NOISE},
             time_difference_seconds=seconds,
             topology_relation=topology_relation,
             type_compatibility=type_compatibility,
             evidence=evidence,
-            snapshot={"id": snapshot.id, "snapshot_key": snapshot.snapshot_key,
-                      "dataset_slug": snapshot.dataset_version.slug},
+            snapshot={
+                "id": snapshot.id,
+                "snapshot_key": snapshot.snapshot_key,
+                "dataset_slug": snapshot.dataset_version.slug,
+            },
             correlation_role=role.value,
             reason_codes=[reason.value for reason in reasons],
             description=description,

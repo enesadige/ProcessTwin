@@ -35,6 +35,7 @@ RETRYABLE_TOOL_KEYS = frozenset(
     {
         (MCPServer.NETWORK, "aggregate_location_impact"),
         (MCPServer.NETWORK, "correlate_alarms"),
+        (MCPServer.NETWORK, "correlate_causal_events"),
         (MCPServer.NETWORK, "rank_root_cause_candidates"),
         (MCPServer.NETWORK, "get_outage_details"),
         (MCPServer.NETWORK, "calculate_customer_impact"),

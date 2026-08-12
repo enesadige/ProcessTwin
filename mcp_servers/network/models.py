@@ -106,6 +106,16 @@ class CorrelateAlarmsInput(SnapshotRequiredInput):
         return self
 
 
+class CorrelateCausalEventsInput(SnapshotRequiredInput):
+    """Bounded deterministic comparison/discovery for separate causal events."""
+
+    causal_event_code: str = Field(min_length=1)
+    candidate_causal_event_code: str | None = Field(default=None, min_length=1)
+    window_minutes: int = Field(default=60, ge=1, le=24 * 60)
+    direction: str = Field(default="both", pattern="^(before|after|both)$")
+    other_region_only: bool = False
+
+
 class RankRootCauseCandidatesInput(TemporalSnapshotInput):
     outage_code: str | None = Field(default=None, min_length=1)
     causal_event_code: str | None = Field(default=None, min_length=1)

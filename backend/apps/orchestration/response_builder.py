@@ -19,6 +19,7 @@ from apps.orchestration.providers.registry import get_llm_descriptor
 from apps.orchestration.result_merge import (
     CausalSummary,
     CompensationSummary,
+    CrossIncidentCorrelationSummary,
     ImpactSummary,
     ProvenanceEntry,
     RetrievalSource,
@@ -51,7 +52,7 @@ _NARRATIVE_SYNTHESIS_KEYS = frozenset({"sentences"})
 _NARRATIVE_SENTENCE_KEYS = frozenset({"text", "statement_ids", "relationship_ids"})
 _NARRATIVE_DEBUG_MARKERS = ("->", "Nedensel ilişki:", "Sonuç ilişkisi:", "Belirsizlik ilişkisi:")
 _NARRATIVE_ROLE_PREFIX_RE = re.compile(
-    r"^\s*(?:details|evidence|summary|root_cause|impact|eligibility)\s*:\s*",
+    r"^\s*(?:details|evidence|summary|root_cause|impact|eligibility|correlation)\s*:\s*",
     re.IGNORECASE,
 )
 _NARRATIVE_INTERNAL_REASON_RE = re.compile(
@@ -75,6 +76,20 @@ _NARRATIVE_FACT_TOKEN_RE = re.compile(
 _NARRATIVE_NUMBER_RE = re.compile(
     r"(?<![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])\d+(?:[.,]\d+)?(?![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])"
 )
+
+_TOPOLOGY_RELATION_NARRATIVE = {
+    "same_resource": "Kaynaklar aynı doğrulanmış kaynak üzerinde yer alıyor.",
+    "direct_parent_child": (
+        "Kaynaklar arasında doğrulanmış doğrudan üst/alt topoloji bağlantısı bulunuyor."
+    ),
+    "same_bng_branch": "Kaynaklar aynı doğrulanmış upstream BNG dalında yer alıyor.",
+    "shared_failure_domain": "Kaynaklar aynı doğrulanmış arıza alanında yer alıyor.",
+}
+
+
+def _topology_relation_narrative(relation: str | None) -> str | None:
+    """Translate backend topology enums before they enter user-facing facts."""
+    return _TOPOLOGY_RELATION_NARRATIVE.get(relation or "")
 
 
 class ResponseBuilderError(ProcessTwinError):
@@ -151,6 +166,7 @@ class StructuredVerifiedResult(BaseModel):
 
     schema_version: str = "structured-verified-result.v1"
     causal_summary: CausalSummary | None = None
+    cross_incident_correlation_summary: CrossIncidentCorrelationSummary | None = None
     impact_summary: ImpactSummary | None = None
     rule_summary: RuleSummary | None = None
     compensation_summary: CompensationSummary | None = None
@@ -443,6 +459,7 @@ class ValidatedResponseBuilder:
             intent = str(structured_query.get("intent", ""))
 
         all_roles = {
+            "alarm_correlation",
             "outage_classification",
             "root_cause",
             "primary_backup_state",
@@ -464,6 +481,12 @@ class ValidatedResponseBuilder:
         relevant_roles = set()
         if not requested and not dimensions:
             relevant_roles = all_roles
+        if (
+            requested & {"correlation"}
+            or dimensions & {"alarm_correlation"}
+            or intent == "alarm_correlation"
+        ):
+            relevant_roles |= {"alarm_correlation"}
         if requested & {"impact", "summary", "details"} or dimensions & {
             "verified_customer_impact",
             "verified_subscription_impact",
@@ -568,6 +591,7 @@ class ValidatedResponseBuilder:
         """Expose validated summaries without raw calls, prompts, or internal IDs."""
         return StructuredVerifiedResult(
             causal_summary=result.causal_summary,
+            cross_incident_correlation_summary=result.cross_incident_correlation_summary,
             impact_summary=result.impact_summary,
             rule_summary=result.rule_summary,
             compensation_summary=result.compensation_summary,
@@ -698,6 +722,28 @@ class ValidatedResponseBuilder:
             if causal.propagation_summary:
                 sections.append(f"Yayılım özeti: {causal.propagation_summary}")
 
+        correlation = result.cross_incident_correlation_summary
+        if correlation:
+            if correlation.candidate_event_code:
+                sections.append(
+                    "Karşılaştırılan olaylar: "
+                    f"{correlation.anchor_event_code} ve {correlation.candidate_event_code}."
+                )
+            if correlation.correlation_status == "verified_relation":
+                sections.append("Olaylar arasında doğrulanmış operasyonel ilişki bulunuyor.")
+            elif correlation.correlation_status == "insufficient_evidence":
+                sections.append("Olaylar arasında ilişkiyi doğrulamak için mevcut kanıt yetersiz.")
+            else:
+                sections.append("Olaylar arasında doğrulanmış operasyonel ilişki bulunmuyor.")
+            if correlation.time_difference_seconds is not None:
+                sections.append(
+                    f"Olaylar arasındaki zaman farkı: {correlation.time_difference_seconds} saniye."
+                )
+            topology_narrative = _topology_relation_narrative(correlation.topology_relation)
+            if topology_narrative:
+                sections.append(topology_narrative)
+            if correlation.root_symptom_status == "not_verified":
+                sections.append("Olaylar arasında kök/belirti yönü kesin olarak doğrulanmadı.")
         impact = result.impact_summary
         if impact:
             sections.extend(["", "Müşteri etkisi"])
@@ -837,6 +883,9 @@ class ValidatedResponseBuilder:
         if result.causal_summary:
             add(result.causal_summary.causal_event_code, "causal_event")
             add(result.causal_summary.outage_code, "outage")
+        if result.cross_incident_correlation_summary:
+            add(result.cross_incident_correlation_summary.anchor_event_code, "causal_event")
+            add(result.cross_incident_correlation_summary.candidate_event_code, "causal_event")
         if result.rule_summary:
             for code in result.rule_summary.rule_codes:
                 add(code, "rule")
@@ -917,6 +966,28 @@ class ValidatedResponseBuilder:
                         "Ana ve yedek yollar aynı arıza alanını paylaştığı için "
                         "bağımsızlık doğrulanamadı; manuel inceleme gerekir."
                     )
+        correlation = result.cross_incident_correlation_summary
+        if correlation:
+            if correlation.candidate_event_code:
+                add(
+                    "Karşılaştırılan olaylar: "
+                    f"{correlation.anchor_event_code} ve {correlation.candidate_event_code}."
+                )
+            if correlation.correlation_status == "verified_relation":
+                add("Olaylar arasında doğrulanmış operasyonel ilişki bulunuyor.")
+            elif correlation.correlation_status == "insufficient_evidence":
+                add("Olaylar arasında ilişkiyi doğrulamak için mevcut kanıt yetersiz.")
+            else:
+                add("Olaylar arasında doğrulanmış operasyonel ilişki bulunmuyor.")
+            if correlation.time_difference_seconds is not None:
+                add(
+                    f"Olaylar arasındaki zaman farkı: {correlation.time_difference_seconds} saniye."
+                )
+            topology_narrative = _topology_relation_narrative(correlation.topology_relation)
+            if topology_narrative:
+                add(topology_narrative)
+            if correlation.root_symptom_status == "not_verified":
+                add("Olaylar arasında kök/belirti yönü kesin olarak doğrulanmadı.")
         impact = result.impact_summary
         if impact:
             if impact.outage_count is not None:
@@ -1092,6 +1163,7 @@ class ValidatedResponseBuilder:
         if isinstance(structured_query, Mapping):
             for field in (
                 "causal_event_code",
+                "comparison_causal_event_code",
                 "incident_code",
                 "outage_code",
                 "device_code",
@@ -1202,6 +1274,10 @@ class ValidatedResponseBuilder:
             ("compensation_amount", ("tazminat tutarı", "telafi tutarı")),
             ("compensation_reason", ("kararı", "doğrulanmış etki üzerinden")),
             ("root_cause", ("kök neden", "Kök kaynak")),
+            (
+                "alarm_correlation",
+                ("Karşılaştırılan olaylar", "operasyonel ilişki", "topoloji ilişkisi"),
+            ),
             ("evidence", ("Kaynaklar", "DecisionEvidence", "RuleVersion")),
         )
         lowered = text.casefold()

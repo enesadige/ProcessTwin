@@ -270,6 +270,32 @@ def test_impact_evidence_gap_does_not_add_unavailable_rule_evidence_output():
 
 
 @pytest.mark.django_db
+def test_correlation_intent_ignores_broad_impact_dimension_from_semantic_decomposition():
+    snapshot = create_snapshot("intake-correlation-dimension-noise")
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "alarm_correlation",
+            "requested_outputs": ["summary", "correlation", "evidence"],
+            "snapshot_identifier": snapshot.snapshot_key,
+            "causal_event_code": "CE-INTAKE-001",
+        }
+    )
+
+    result = LLMSemanticDecomposer(SemanticProvider(["evidence_gap"])).merge(
+        original_query="CE-INTAKE-001 ile başka alarm arasında ilişki var mı?",
+        deterministic_query=query,
+    )
+
+    assert result.accepted is True
+    assert RequestedOutput.IMPACT not in result.structured_query.requested_outputs
+    assert set(result.structured_query.requested_outputs) == {
+        RequestedOutput.SUMMARY,
+        RequestedOutput.CORRELATION,
+        RequestedOutput.EVIDENCE,
+    }
+
+
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     "provider",
     [RecordingProvider(fail=True), RecordingProvider({"intent": "network_investigation"})],
@@ -328,6 +354,97 @@ def test_deterministic_parser_extracts_supported_intents_without_provider(prompt
     assert parsed.prompt_version == DETERMINISTIC_STRUCTURED_QUERY_PARSER_VERSION
     assert parsed.structured_query.intent.value == expected_intent
     assert Subscription.objects.filter(pk=subscription.pk).exists()
+
+
+@pytest.mark.django_db
+def test_deterministic_parser_extracts_two_verified_events_and_a_bounded_correlation_window():
+    snapshot = create_snapshot("cross-incident-intake")
+    create_causal_event(snapshot, code="CE-CORR-001")
+    create_causal_event(snapshot, code="CE-CORR-002")
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "CE-CORR-001 ile CE-CORR-002 arasındaki alarm ilişkisi var mı? "
+            "Bir saat önce başlayan olayları karşılaştır."
+        ),
+        snapshot=snapshot,
+    )
+
+    query = parsed.structured_query
+    assert query.intent.value == "alarm_correlation"
+    assert query.causal_event_code == "CE-CORR-001"
+    assert query.comparison_causal_event_code == "CE-CORR-002"
+    assert query.correlation_window_minutes == 60
+    assert query.correlation_direction == "before"
+    assert query.requested_outputs == [
+        RequestedOutput.CORRELATION,
+        RequestedOutput.EVIDENCE,
+        RequestedOutput.SUMMARY,
+    ]
+
+
+@pytest.mark.django_db
+def test_deterministic_parser_recognizes_folded_turkish_relation_question():
+    snapshot = create_snapshot("cross-incident-folded-intake")
+    create_causal_event(snapshot, code="CE-CORR-011")
+    create_causal_event(snapshot, code="CE-CORR-012")
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query="CE-CORR-011 ile CE-CORR-012 olayları arasında ilişki var mı?",
+        snapshot=snapshot,
+    )
+
+    assert parsed.structured_query.intent.value == "alarm_correlation"
+    assert parsed.structured_query.comparison_causal_event_code == "CE-CORR-012"
+
+
+@pytest.mark.django_db
+def test_deterministic_parser_recognizes_relation_question_with_modal_wording():
+    snapshot = create_snapshot("cross-incident-modal-intake")
+    create_causal_event(snapshot, code="CE-CORR-021")
+    create_causal_event(snapshot, code="CE-CORR-022")
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "CE-CORR-021 ile CE-CORR-022 yalnız zaman yakınlığı nedeniyle "
+            "ilişkili sayılabilir mi?"
+        ),
+        snapshot=snapshot,
+    )
+
+    assert parsed.structured_query.intent.value == "alarm_correlation"
+
+
+@pytest.mark.django_db
+def test_deterministic_parser_resolves_explicit_alarm_pair_to_persisted_events():
+    snapshot = create_snapshot("cross-incident-alarm-intake")
+    first = create_causal_event(snapshot, code="CE-CORR-031")
+    second = create_causal_event(snapshot, code="CE-CORR-032")
+    from apps.operations.models import Alarm, AlarmStatus, Severity
+    from apps.operations.tests.test_operations_models import create_alarm_type, create_maltepe_bng
+
+    device = create_maltepe_bng(snapshot)
+    alarm_type = create_alarm_type(snapshot, "ALARM_INTAKE")
+    for alarm_id, event in (("ALM-CORR-031", first), ("ALM-CORR-032", second)):
+        Alarm.objects.create(
+            data_snapshot=snapshot,
+            causal_event=event,
+            alarm_id=alarm_id,
+            alarm_type=alarm_type,
+            device=device,
+            severity=Severity.MAJOR,
+            status=AlarmStatus.OPEN,
+            detected_at=event.started_at,
+        )
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query="ALM-CORR-031 ile ALM-CORR-032 ilişkili mi?",
+        snapshot=snapshot,
+    )
+
+    assert parsed.structured_query.intent.value == "alarm_correlation"
+    assert parsed.structured_query.causal_event_code == "CE-CORR-031"
+    assert parsed.structured_query.comparison_causal_event_code == "CE-CORR-032"
 
 
 @pytest.mark.django_db

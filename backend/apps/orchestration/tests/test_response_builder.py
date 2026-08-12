@@ -1077,7 +1077,8 @@ def test_free_text_narrative_accepts_natural_paraphrase_without_sentence_repair(
 def test_free_text_narrative_strips_only_known_internal_role_prefixes():
     statements = {"S1": "Ana bağlantı down, yedek bağlantı active."}
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
-        "details: Ana bağlantı down, yedek bağlantı active. evidence: Bilgi doğrulandı.",
+        "details: Ana bağlantı down, yedek bağlantı active. "
+        "evidence: Bilgi doğrulandı. correlation: İlişki doğrulandı.",
         statements,
         {},
     )
@@ -1086,6 +1087,7 @@ def test_free_text_narrative_strips_only_known_internal_role_prefixes():
     assert [sentence["text"] for sentence in narrative["sentences"]] == [
         "Ana bağlantı down, yedek bağlantı active.",
         "Bilgi doğrulandı.",
+        "İlişki doğrulandı.",
     ]
 
 

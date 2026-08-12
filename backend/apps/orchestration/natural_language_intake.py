@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from apps.customers.models import Subscription
 from apps.datasets.models import DataSnapshot
 from apps.network.models import NetworkDevice
-from apps.operations.models import CausalEvent, Outage
+from apps.operations.models import Alarm, CausalEvent, Outage
 from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.gemini import GeminiLLMProviderError
 from apps.orchestration.providers.ollama import OllamaLLMProvider, OllamaLLMProviderError
@@ -56,6 +56,7 @@ _TURKISH_MONTHS = {
     "aralik": 12,
 }
 _CAUSAL_CODE_RE = re.compile(r"\bCE-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
+_ALARM_CODE_RE = re.compile(r"\bALM-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
 _OUTAGE_CODE_RE = re.compile(r"\bOUT-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
 _SUBSCRIPTION_RE = re.compile(r"\bSUB-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
 _CUSTOMER_IMPACT_REQUEST_TERMS = (
@@ -138,6 +139,7 @@ class LLMSemanticDecomposer:
     """Select allowlisted answer dimensions without extracting trusted anchors."""
 
     _DIMENSION_OUTPUTS: dict[SemanticDimension, tuple[RequestedOutput, ...]] = {
+        SemanticDimension.ALARM_CORRELATION: (RequestedOutput.CORRELATION,),
         SemanticDimension.SUMMARY: (RequestedOutput.SUMMARY,),
         SemanticDimension.OUTAGE_CLASSIFICATION: (RequestedOutput.DETAILS,),
         SemanticDimension.VERIFIED_CUSTOMER_IMPACT: (RequestedOutput.IMPACT,),
@@ -182,8 +184,13 @@ class LLMSemanticDecomposer:
             candidate = _SemanticDecomposition.model_validate(json.loads(response["content"]))
             dimensions = sorted(set(candidate.dimensions), key=lambda value: value.value)
             requested = set(deterministic_query.requested_outputs)
+            allowed_outputs = self._allowed_outputs(deterministic_query)
             for dimension in dimensions:
-                requested.update(self._DIMENSION_OUTPUTS[dimension])
+                requested.update(
+                    output
+                    for output in self._DIMENSION_OUTPUTS[dimension]
+                    if output in allowed_outputs
+                )
             merged = deterministic_query.model_copy(
                 update={
                     "requested_outputs": sorted(requested, key=lambda value: value.value),
@@ -202,6 +209,19 @@ class LLMSemanticDecomposer:
                 }
             )
             return SemanticDecompositionResult(fallback, accepted=False, failure_code=code)
+
+    @staticmethod
+    def _allowed_outputs(query: StructuredQuery) -> frozenset[RequestedOutput]:
+        """Keep probabilistic dimensions inside the deterministic intent contract."""
+        if query.intent == StructuredQueryIntent.ALARM_CORRELATION:
+            return frozenset(
+                {
+                    RequestedOutput.SUMMARY,
+                    RequestedOutput.CORRELATION,
+                    RequestedOutput.EVIDENCE,
+                }
+            )
+        return frozenset(RequestedOutput)
 
     @staticmethod
     def _failure_code(exc: Exception) -> str:
@@ -278,13 +298,23 @@ class DeterministicStructuredQueryParser:
             raise NaturalLanguageQueryParseError("invalid_structured_query")
         text = original_query.strip()
         folded = _fold(text)
-        causal_event_code = self._extract_code(_CAUSAL_CODE_RE, text)
+        causal_event_codes = self._extract_codes(_CAUSAL_CODE_RE, text)
+        if not causal_event_codes:
+            causal_event_codes = self._causal_events_for_alarm_codes(
+                snapshot=snapshot,
+                alarm_codes=self._extract_codes(_ALARM_CODE_RE, text),
+            )
+        causal_event_code = causal_event_codes[0] if causal_event_codes else None
+        comparison_causal_event_code = (
+            causal_event_codes[1] if len(causal_event_codes) > 1 else None
+        )
         outage_code = self._extract_code(_OUTAGE_CODE_RE, text)
         subscription_reference = self._extract_code(_SUBSCRIPTION_RE, text)
         device_code = self._extract_device_code(snapshot, text)
         self._validate_references(
             snapshot,
             causal_event_code,
+            comparison_causal_event_code,
             outage_code,
             subscription_reference,
             device_code,
@@ -294,6 +324,16 @@ class DeterministicStructuredQueryParser:
             outage_code = self._outage_for_device(snapshot, device_code, dates=dates)
         location, ambiguous_location = self._resolve_location(snapshot, folded)
         intent, requested_outputs = self._intent_and_outputs(folded)
+        correlation_window_minutes, correlation_direction = self._correlation_window(folded)
+        correlation_other_region_only = any(
+            term in folded
+            for term in ("başka bölge", "baska bolge", "farklı bölge", "farkli bolge")
+        )
+        if intent != StructuredQueryIntent.ALARM_CORRELATION:
+            comparison_causal_event_code = None
+            correlation_window_minutes = None
+            correlation_direction = "both"
+            correlation_other_region_only = False
         if (
             causal_event_code
             and not outage_code
@@ -331,6 +371,10 @@ class DeterministicStructuredQueryParser:
                 "customer_impact_requested": query_requests_customer_impact(folded),
                 "snapshot_identifier": snapshot.snapshot_key,
                 "causal_event_code": causal_event_code,
+                "comparison_causal_event_code": comparison_causal_event_code,
+                "correlation_window_minutes": correlation_window_minutes,
+                "correlation_direction": correlation_direction,
+                "correlation_other_region_only": correlation_other_region_only,
                 "outage_code": outage_code,
                 "device_code": device_code,
                 "subscription_reference": subscription_reference,
@@ -375,6 +419,10 @@ class DeterministicStructuredQueryParser:
     def _extract_code(pattern: re.Pattern[str], text: str) -> str | None:
         match = pattern.search(text)
         return match.group(0).upper() if match else None
+
+    @staticmethod
+    def _extract_codes(pattern: re.Pattern[str], text: str) -> list[str]:
+        return list(dict.fromkeys(match.group(0).upper() for match in pattern.finditer(text)))
 
     @staticmethod
     def _extract_device_code(snapshot: DataSnapshot, text: str) -> str | None:
@@ -500,20 +548,38 @@ class DeterministicStructuredQueryParser:
         return sorted(set(dates))
 
     @staticmethod
+    def _causal_events_for_alarm_codes(
+        *, snapshot: DataSnapshot, alarm_codes: list[str]
+    ) -> list[str]:
+        """Resolve explicit alarm references through their persisted causal events."""
+        if not alarm_codes:
+            return []
+        alarms = {
+            alarm.alarm_id.upper(): alarm
+            for alarm in Alarm.objects.filter(
+                data_snapshot=snapshot,
+                alarm_id__in=alarm_codes,
+                causal_event__isnull=False,
+            ).select_related("causal_event")
+        }
+        if len(alarms) != len(alarm_codes):
+            raise NaturalLanguageQueryParseError("reference_not_found")
+        return [alarms[alarm_code].causal_event.event_code for alarm_code in alarm_codes]
+
+    @staticmethod
     def _validate_references(
         snapshot: DataSnapshot,
         causal_event_code: str | None,
+        comparison_causal_event_code: str | None,
         outage_code: str | None,
         subscription_reference: str | None,
         device_code: str | None,
     ) -> None:
-        if (
-            causal_event_code
-            and not CausalEvent.objects.filter(
-                data_snapshot=snapshot, event_code=causal_event_code
-            ).exists()
-        ):
-            raise NaturalLanguageQueryParseError("reference_not_found")
+        for event_code in (causal_event_code, comparison_causal_event_code):
+            if event_code and not CausalEvent.objects.filter(
+                data_snapshot=snapshot, event_code=event_code
+            ).exists():
+                raise NaturalLanguageQueryParseError("reference_not_found")
         if (
             device_code
             and not NetworkDevice.objects.filter(data_snapshot=snapshot, code=device_code).exists()
@@ -559,6 +625,30 @@ class DeterministicStructuredQueryParser:
 
     @staticmethod
     def _intent_and_outputs(folded: str) -> tuple[StructuredQueryIntent, list[RequestedOutput]]:
+        if any(
+            term in folded
+            for term in (
+                "korelasyon",
+                "ilişkili mi",
+                "iliskili mi",
+                "ilişkili",
+                "iliskili",
+                "ilişki var mı",
+                "iliski var mi",
+                "iliski var mı",
+                "alarm ilişkisi",
+                "alarm iliskisi",
+                "karşılaştır",
+                "karsilastir",
+                "başka bölgede başlayan alarm",
+                "baska bolgede baslayan alarm",
+            )
+        ):
+            return StructuredQueryIntent.ALARM_CORRELATION, [
+                RequestedOutput.SUMMARY,
+                RequestedOutput.CORRELATION,
+                RequestedOutput.EVIDENCE,
+            ]
         if any(
             term in folded
             for term in ("hangi kural", "hangi kaynak", "source", "section", "citation")
@@ -677,6 +767,8 @@ class DeterministicStructuredQueryParser:
     def _missing_fields(**values: object) -> list[MissingField]:
         intent = values["intent"]
         anchors = bool(values["causal_event_code"] or values["outage_code"])
+        if intent == StructuredQueryIntent.ALARM_CORRELATION:
+            return [] if values["causal_event_code"] else [MissingField.OPERATIONAL_REFERENCE]
         if (
             intent == StructuredQueryIntent.OUTAGE_IMPACT
             and values["location"] is not None
@@ -705,6 +797,21 @@ class DeterministicStructuredQueryParser:
         if not dates:
             return None
         return {"from_time": f"{dates[0]}T00:00:00+00:00", "to_time": f"{dates[-1]}T23:59:59+00:00"}
+
+    @staticmethod
+    def _correlation_window(folded: str) -> tuple[int, str]:
+        match = re.search(r"\b(\d{1,2})\s*saat\b", folded)
+        if "bir saat" in folded:
+            minutes = 60
+        elif match:
+            minutes = min(int(match.group(1)) * 60, 24 * 60)
+        else:
+            minutes = 60
+        if "önce" in folded or "once" in folded:
+            return minutes, "before"
+        if "sonra" in folded:
+            return minutes, "after"
+        return minutes, "both"
 
 
 class NaturalLanguageStructuredQueryParser:

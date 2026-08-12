@@ -11,6 +11,7 @@ from mcp_servers.network.models import (
     AggregateLocationImpactInput,
     CalculateCustomerImpactInput,
     CorrelateAlarmsInput,
+    CorrelateCausalEventsInput,
     GetDeviceDetailsInput,
     GetDeviceTopologyInput,
     GetLongestOutageInput,
@@ -162,6 +163,20 @@ NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
         path_builder=_causal_or_path(
             "/api/internal/v1/network/alarms/{value}/correlations/",
             "anchor_alarm_id",
+        ),
+        params_builder=_params,
+    ),
+    "correlate_causal_events": NetworkToolDefinition(
+        name="correlate_causal_events",
+        description=(
+            "Compare one causal event with another event or discover bounded cross-event "
+            "correlation candidates using deterministic temporal and topology evidence."
+        ),
+        input_model=CorrelateCausalEventsInput,
+        method="GET",
+        path_builder=_path(
+            "/api/internal/v1/operations/causal-events/{value}/cross-correlations/",
+            "causal_event_code",
         ),
         params_builder=_params,
     ),

@@ -37,6 +37,9 @@ class PlannerReasonCode(StrEnum):
 
 
 _SUPPORTED_OUTPUTS = {
+    StructuredQueryIntent.ALARM_CORRELATION: frozenset(
+        {RequestedOutput.SUMMARY, RequestedOutput.CORRELATION, RequestedOutput.EVIDENCE}
+    ),
     StructuredQueryIntent.NETWORK_INVESTIGATION: frozenset(
         {
             RequestedOutput.SUMMARY,
@@ -151,6 +154,8 @@ class DeterministicToolPlanner:
         }
 
     def _calls_for_intent(self, query: StructuredQuery) -> list[dict[str, object]] | PlannerResult:
+        if query.intent == StructuredQueryIntent.ALARM_CORRELATION:
+            return self._cross_incident_correlation_calls(query)
         if query.intent == StructuredQueryIntent.NETWORK_INVESTIGATION:
             return self._network_calls(query)
         if query.intent == StructuredQueryIntent.OUTAGE_IMPACT:
@@ -221,6 +226,30 @@ class DeterministicToolPlanner:
                 )
             return calls
         return PlannerResult.unplannable(PlannerReasonCode.NO_SAFE_TOOL_MAPPING.value)
+
+    def _cross_incident_correlation_calls(
+        self, query: StructuredQuery
+    ) -> list[dict[str, object]] | PlannerResult:
+        if not query.causal_event_code:
+            return PlannerResult.clarification(
+                PlannerReasonCode.MISSING_SAFE_OPERATIONAL_REFERENCE.value
+            )
+        return [
+            self._call(
+                "cross_incident_correlation",
+                "network",
+                "correlate_causal_events",
+                self._snapshot_args(
+                    query,
+                    causal_event_code=query.causal_event_code,
+                    candidate_causal_event_code=query.comparison_causal_event_code,
+                    window_minutes=query.correlation_window_minutes or 60,
+                    direction=query.correlation_direction,
+                    other_region_only=query.correlation_other_region_only,
+                ),
+                1,
+            )
+        ]
 
     def _network_calls(self, query: StructuredQuery) -> list[dict[str, object]] | PlannerResult:
         if query.causal_event_code:

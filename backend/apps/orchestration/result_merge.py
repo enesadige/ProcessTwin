@@ -33,6 +33,7 @@ class ValidationStatus(StrEnum):
 
 
 class EvidenceCategory(StrEnum):
+    CROSS_INCIDENT_CORRELATION = "cross_incident_correlation"
     NETWORK_CAUSAL = "network_causal"
     CUSTOMER_IMPACT = "customer_impact"
     RULE_EVIDENCE = "rule_evidence"
@@ -67,6 +68,22 @@ class CausalSummary(BaseModel):
     primary_status: str | None = None
     backup_status: str | None = None
     full_outage: bool | None = None
+
+
+class CrossIncidentCorrelationSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    anchor_event_code: str
+    candidate_event_code: str | None = None
+    correlation_status: str
+    time_difference_seconds: int | None = None
+    within_window: bool | None = None
+    requested_window_seconds: int | None = None
+    topology_relation: str | None = None
+    resource_relation: str | None = None
+    event_relation: str | None = None
+    root_symptom_status: str | None = None
+    evidence_dimensions: list[str] = Field(default_factory=list)
 
 
 class ImpactSummary(BaseModel):
@@ -140,6 +157,7 @@ class ValidatedExecutionResult(BaseModel):
     execution_status: ExecutorStatus
     validation_status: ValidationStatus
     causal_summary: CausalSummary | None = None
+    cross_incident_correlation_summary: CrossIncidentCorrelationSummary | None = None
     impact_summary: ImpactSummary | None = None
     rule_summary: RuleSummary | None = None
     compensation_summary: CompensationSummary | None = None
@@ -158,6 +176,7 @@ class _ExtractedToolResult(BaseModel):
 
     category: EvidenceCategory
     causal: dict[str, Any] = Field(default_factory=dict)
+    cross_incident_correlation: dict[str, Any] = Field(default_factory=dict)
     impact: dict[str, Any] = Field(default_factory=dict)
     rule: dict[str, Any] = Field(default_factory=dict)
     compensation: dict[str, Any] = Field(default_factory=dict)
@@ -261,6 +280,59 @@ def _network_causal(data: Mapping[str, Any]) -> _ExtractedToolResult:
     )
 
 
+def _cross_incident_correlation(data: Mapping[str, Any]) -> _ExtractedToolResult:
+    anchor = _string(data.get("anchor_event_code"), "anchor_event_code", required=True)
+    rows = data.get("correlations")
+    if not isinstance(rows, list):
+        raise ValueError("correlations must be a list")
+    if not rows:
+        return _ExtractedToolResult(
+            category=EvidenceCategory.CROSS_INCIDENT_CORRELATION,
+            cross_incident_correlation={
+                "anchor_event_code": anchor,
+                "correlation_status": "no_relation",
+            },
+        )
+    # Discovery is already bounded by the backend time window and sorted by
+    # deterministic status/time.  The answer plan uses the strongest candidate;
+    # execution audit retains the tool result count separately.
+    row = _mapping(rows[0])
+    if row is None:
+        raise ValueError("correlation row is invalid")
+    status = _string(row.get("correlation_status"), "correlation_status", required=True)
+    if status not in {"verified_relation", "insufficient_evidence", "no_relation"}:
+        raise ValueError("correlation_status is invalid")
+    evidence = row.get("evidence")
+    if not isinstance(evidence, list) or not all(isinstance(item, Mapping) for item in evidence):
+        raise ValueError("correlation evidence is invalid")
+    dimensions = sorted(
+        {
+            _string(item.get("dimension"), "correlation evidence dimension", required=True)
+            for item in evidence
+        }
+    )
+    return _ExtractedToolResult(
+        category=EvidenceCategory.CROSS_INCIDENT_CORRELATION,
+        cross_incident_correlation={
+            "anchor_event_code": anchor,
+            "candidate_event_code": _string(
+                row.get("candidate_event_code"), "candidate_event_code", required=True
+            ),
+            "correlation_status": status,
+            "time_difference_seconds": _optional_non_negative(row, "time_difference_seconds"),
+            "within_window": row.get("within_window")
+            if isinstance(row.get("within_window"), bool)
+            else None,
+            "requested_window_seconds": _optional_non_negative(row, "requested_window_seconds"),
+            "topology_relation": _string(row.get("topology_relation"), "topology_relation"),
+            "resource_relation": _string(row.get("resource_relation"), "resource_relation"),
+            "event_relation": _string(row.get("event_relation"), "event_relation"),
+            "root_symptom_status": _string(row.get("root_symptom_status"), "root_symptom_status"),
+            "evidence_dimensions": dimensions,
+        },
+    )
+
+
 def _network_root_cause(data: Mapping[str, Any]) -> _ExtractedToolResult:
     if data.get("causal_event_code") is not None:
         return _network_causal(data)
@@ -282,16 +354,12 @@ def _network_root_cause(data: Mapping[str, Any]) -> _ExtractedToolResult:
 def _customer_causal_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
     return _ExtractedToolResult(
         category=EvidenceCategory.CUSTOMER_IMPACT,
-        causal={
-            "causal_event_code": _string(data.get("causal_event_code"), "causal_event_code")
-        },
+        causal={"causal_event_code": _string(data.get("causal_event_code"), "causal_event_code")},
         impact={
             "potential": _optional_non_negative(data, "potential_connection_count"),
             "verified_impacted": _optional_non_negative(data, "verified_impacted_count"),
             "verified_no_impact": _optional_non_negative(data, "verified_no_impact_count"),
-            "insufficient_evidence": _optional_non_negative(
-                data, "insufficient_evidence_count"
-            ),
+            "insufficient_evidence": _optional_non_negative(data, "insufficient_evidence_count"),
             "failover_protected": _optional_non_negative(data, "failover_protected_count"),
             "reason_code_distribution": _count_mapping(
                 data.get("reason_code_distribution"), "reason_code_distribution"
@@ -316,9 +384,7 @@ def _network_outage_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
     )
     impact = {
         "potential": (
-            affected_subscriptions + failover_protected
-            if failover_protected is not None
-            else None
+            affected_subscriptions + failover_protected if failover_protected is not None else None
         ),
         "verified_impacted": affected_subscriptions,
         "affected_subscription_count": affected_subscriptions,
@@ -478,6 +544,7 @@ def _document_retrieval(data: Mapping[str, Any]) -> _ExtractedToolResult:
 
 
 NORMALIZERS: dict[tuple[MCPServer, str], Normalizer] = {
+    (MCPServer.NETWORK, "correlate_causal_events"): _cross_incident_correlation,
     (MCPServer.NETWORK, "aggregate_location_impact"): _network_location_impact,
     (MCPServer.NETWORK, "correlate_alarms"): _network_causal,
     (MCPServer.NETWORK, "rank_root_cause_candidates"): _network_root_cause,
@@ -580,16 +647,21 @@ class ResultMergerValidator:
                     ValidationErrorItem(code="required_evidence_missing", category=category)
                 )
 
-        causal, impact, rule, compensation, sources, merge_errors = self._merge_sections(
-            category_results
+        causal, correlation, impact, rule, compensation, sources, merge_errors = (
+            self._merge_sections(category_results)
         )
         errors.extend(merge_errors)
-        errors.extend(self._validate_cross_tool(tool_plan, causal, impact, compensation))
+        errors.extend(
+            self._validate_cross_tool(tool_plan, causal, correlation, impact, compensation)
+        )
         result = ValidatedExecutionResult(
             snapshot_identifier=tool_plan.snapshot_identifier,
             execution_status=executor_result.status,
             validation_status=ValidationStatus.INVALID if errors else ValidationStatus.VALID,
             causal_summary=CausalSummary(**causal) if causal else None,
+            cross_incident_correlation_summary=(
+                CrossIncidentCorrelationSummary(**correlation) if correlation else None
+            ),
             impact_summary=ImpactSummary(**impact) if impact else None,
             rule_summary=RuleSummary(**rule) if rule else None,
             compensation_summary=CompensationSummary(**compensation) if compensation else None,
@@ -649,7 +721,8 @@ class ResultMergerValidator:
             categories.add(EvidenceCategory.RULE_EVIDENCE)
         if (
             RequestedOutput.EVIDENCE in outputs
-            and query.intent not in {
+            and query.intent
+            not in {
                 StructuredQueryIntent.COMPENSATION_EVALUATION,
                 StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL,
             }
@@ -666,10 +739,14 @@ class ResultMergerValidator:
             categories.add(EvidenceCategory.DOCUMENT_RETRIEVAL)
             if query.causal_event_code or query.outage_code:
                 categories.add(EvidenceCategory.RULE_EVIDENCE)
+        if query.intent == StructuredQueryIntent.ALARM_CORRELATION:
+            categories.add(EvidenceCategory.CROSS_INCIDENT_CORRELATION)
         return frozenset(categories)
 
     @staticmethod
     def _category_for_call(server: MCPServer, tool_name: str) -> EvidenceCategory | None:
+        if (server, tool_name) == (MCPServer.NETWORK, "correlate_causal_events"):
+            return EvidenceCategory.CROSS_INCIDENT_CORRELATION
         if (server, tool_name) in {
             (MCPServer.NETWORK, "aggregate_location_impact"),
             (MCPServer.NETWORK, "correlate_alarms"),
@@ -718,10 +795,12 @@ class ResultMergerValidator:
         dict[str, Any],
         dict[str, Any],
         dict[str, Any],
+        dict[str, Any],
         list[RetrievalSource],
         list[ValidationErrorItem],
     ]:
         causal: dict[str, Any] = {}
+        correlation: dict[str, Any] = {}
         impact: dict[str, Any] = {}
         rule: dict[str, Any] = {}
         compensation: dict[str, Any] = {}
@@ -731,6 +810,7 @@ class ResultMergerValidator:
             for extracted in results:
                 for target, incoming in (
                     (causal, extracted.causal),
+                    (correlation, extracted.cross_incident_correlation),
                     (impact, extracted.impact),
                     (rule, extracted.rule),
                     (compensation, extracted.compensation),
@@ -755,12 +835,13 @@ class ResultMergerValidator:
                         errors.append(ValidationErrorItem(code="conflicting_fact"))
                     else:
                         sources[key] = source
-        for section in (causal, impact, rule, compensation):
+        for section in (causal, correlation, impact, rule, compensation):
             for key, value in list(section.items()):
                 if isinstance(value, list):
                     section[key] = sorted(set(value))
         return (
             causal,
+            correlation,
             impact,
             rule,
             compensation,
@@ -775,6 +856,7 @@ class ResultMergerValidator:
     def _validate_cross_tool(
         plan: ToolPlan,
         causal: Mapping[str, Any],
+        correlation: Mapping[str, Any],
         impact: Mapping[str, Any],
         compensation: Mapping[str, Any],
     ) -> list[ValidationErrorItem]:
@@ -784,6 +866,18 @@ class ResultMergerValidator:
             query.causal_event_code
             and causal.get("causal_event_code")
             and query.causal_event_code != causal["causal_event_code"]
+        ):
+            errors.append(ValidationErrorItem(code="public_reference_conflict"))
+        if (
+            query.causal_event_code
+            and correlation.get("anchor_event_code")
+            and query.causal_event_code != correlation["anchor_event_code"]
+        ):
+            errors.append(ValidationErrorItem(code="public_reference_conflict"))
+        if (
+            query.comparison_causal_event_code
+            and correlation.get("candidate_event_code")
+            and query.comparison_causal_event_code != correlation["candidate_event_code"]
         ):
             errors.append(ValidationErrorItem(code="public_reference_conflict"))
         if (

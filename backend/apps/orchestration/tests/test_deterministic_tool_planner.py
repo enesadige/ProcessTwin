@@ -73,6 +73,34 @@ def test_network_causal_plan_preserves_reference_and_uses_parallel_causal_tools(
     assert {call.parallel_group for call in result.tool_plan.calls} == {"causal_analysis"}
 
 
+def test_cross_incident_correlation_uses_one_bounded_deterministic_network_tool():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            intent="alarm_correlation",
+            requested_outputs=["summary", "correlation", "evidence"],
+            causal_event_code="CE-GPON-001",
+            comparison_causal_event_code="CE-GPON-002",
+            correlation_window_minutes=60,
+            correlation_direction="before",
+            correlation_other_region_only=True,
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert result.tool_plan is not None
+    assert [(call.server.value, call.tool_name) for call in result.tool_plan.calls] == [
+        ("network", "correlate_causal_events")
+    ]
+    assert result.tool_plan.calls[0].arguments == {
+        "snapshot_identifier": "multi-city-realism-v2-causal-r1",
+        "causal_event_code": "CE-GPON-001",
+        "candidate_causal_event_code": "CE-GPON-002",
+        "window_minutes": 60,
+        "direction": "before",
+        "other_region_only": True,
+    }
+
+
 def test_network_investigation_with_resolved_outage_keeps_the_outage_anchor():
     result = DeterministicToolPlanner().plan(
         query_payload(
