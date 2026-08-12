@@ -254,6 +254,13 @@ class OrchestrationFacade:
             finalized_run = self._merger.finalize_query_run(query_run, validated)
             if QueryRunStatus(finalized_run.status) == QueryRunStatus.FAILED:
                 return self._failed_run_outcome(finalized_run, execution_result)
+            self._query_run_service.save_response_audit(
+                finalized_run,
+                audit=self._pending_response_audit(
+                    provider=active_provider,
+                    fallback_provider=llm_descriptor,
+                ),
+            )
             response = self._response_builder.build(
                 finalized_run,
                 mode=response_mode,
@@ -261,7 +268,7 @@ class OrchestrationFacade:
                 provider=active_provider,
             )
             self._query_run_service.save_response_audit(
-                finalized_run, audit=response.statement_selection_audit
+                finalized_run, audit=self._response_audit(response)
             )
             return OrchestrationOutcome(
                 http_status=200,
@@ -290,13 +297,24 @@ class OrchestrationFacade:
         status = QueryRunStatus(query_run.status)
         if status == QueryRunStatus.COMPLETED:
             try:
+                self._query_run_service.save_response_audit(
+                    query_run,
+                    audit=self._pending_response_audit(
+                        provider=self._response_provider,
+                        fallback_provider=(
+                            get_llm_descriptor(self._response_provider.provider_name)
+                            if self._response_provider is not None
+                            else None
+                        ),
+                    ),
+                )
                 response = self._response_builder.build(
                     query_run,
                     mode=response_mode,
                     provider=self._response_provider,
                 )
                 self._query_run_service.save_response_audit(
-                    query_run, audit=response.statement_selection_audit
+                    query_run, audit=self._response_audit(response)
                 )
             except Exception:
                 return self._error(
@@ -312,6 +330,7 @@ class OrchestrationFacade:
                     response=response,
                 ),
             )
+
         if status in {QueryRunStatus.PENDING, QueryRunStatus.EXECUTING}:
             return self._error(
                 202,
@@ -336,6 +355,37 @@ class OrchestrationFacade:
                     query_run, planner_result.status, planner_result.reason_codes, replayed=True
                 )
         return None
+
+    @staticmethod
+    def _pending_response_audit(*, provider, fallback_provider) -> dict[str, Any]:
+        provider_name = getattr(provider, "provider_name", None) or getattr(
+            fallback_provider, "provider", None
+        )
+        model = getattr(provider, "model_name", None) or getattr(
+            fallback_provider, "model", None
+        )
+        return {
+            "status": "pending",
+            "provider": provider_name,
+            "model": model,
+            "generation_mode": "pending",
+            "selected_statement_ids": [],
+            "grounded_relationships": [],
+            "warnings": [],
+        }
+
+    @staticmethod
+    def _response_audit(response: ValidatedNaturalLanguageResponse) -> dict[str, Any]:
+        audit = dict(response.statement_selection_audit)
+        audit.update(
+            {
+                "generation_mode": response.generation_mode.value,
+                "warnings": list(response.warnings),
+                "selected_statement_ids": audit.get("selected_statement_ids", []),
+                "grounded_relationships": list(response.grounded_relationships),
+            }
+        )
+        return audit
 
     @staticmethod
     def _snapshot(identifier: str) -> DataSnapshot | None:

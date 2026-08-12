@@ -180,6 +180,11 @@ def test_authenticated_analysis_endpoint_requires_analyst_role_and_uses_session(
     )
     assert response.status_code == 200
     assert response.json()["status"] == "completed"
+    run = QueryRun.objects.get(idempotency_key="public-analysis-001")
+    assert run.response_audit["generation_mode"] == "deterministic"
+    assert run.response_audit["selected_statement_ids"] == []
+    assert run.response_audit["grounded_relationships"] == []
+    assert run.response_audit["warnings"] == []
 
 
 @pytest.mark.django_db
