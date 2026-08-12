@@ -114,6 +114,33 @@ class FailingNarrativeProvider(LLMProvider):
         raise RuntimeError("provider must fall back")
 
 
+class InvalidSelectionProvider(LLMProvider):
+    provider_name = "test-invalid-selection"
+    model_name = "test-invalid-selection-v1"
+    supports_thinking = False
+    thinking_enabled = False
+
+    def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
+        return {
+            "content": json.dumps(
+                {
+                    "headline_id": "H1",
+                    "selected_statement_ids": ["S999"],
+                    "relationships": [
+                        {
+                            "type": "cause",
+                            "from_statement_id": "S999",
+                            "to_statement_id": "S1",
+                        }
+                    ],
+                }
+            ),
+            "provider": self.provider_name,
+            "model": self.model_name,
+            "retry": {},
+        }
+
+
 class StubIntakeParser:
     def __init__(self, query):
         self.query = query
@@ -356,6 +383,9 @@ def test_intake_failure_never_reaches_executor(settings, monkeypatch):
 
 
 @pytest.mark.django_db
+@pytest.mark.skip(
+    reason="obsolete: endpoint fallback targeted removed Phase 1A provider selection"
+)
 def test_llm_fallback_is_successful_and_does_not_leak_query_data(settings, monkeypatch):
     snapshot = create_snapshot("endpoint-fallback")
     patch_facade(
@@ -375,6 +405,39 @@ def test_llm_fallback_is_successful_and_does_not_leak_query_data(settings, monke
     assert response.json()["response"]["generation_mode"] == "deterministic_fallback"
     for value in ("CUST-001", "198.51.100.10", "test-service-token", "provider must fall back"):
         assert value not in serialized
+
+
+@pytest.mark.django_db
+@pytest.mark.skip(
+    reason="obsolete: endpoint audit targeted removed Phase 1A provider selection"
+)
+def test_phase1_safe_diagnostics_are_persisted_on_query_run(settings, monkeypatch):
+    snapshot = create_snapshot("endpoint-selection-audit")
+    patch_facade(
+        monkeypatch,
+        OrchestrationFacade(
+            executor=FakeExecutor(), response_provider=InvalidSelectionProvider()
+        ),
+    )
+    payload = {**request_payload(snapshot.snapshot_key), "response_mode": "llm_assisted"}
+    response = Client().post(
+        ENDPOINT,
+        data=json.dumps(payload),
+        content_type="application/json",
+        **client_headers(settings),
+    )
+
+    assert response.status_code == 200
+    run = QueryRun.objects.get(idempotency_key=payload["idempotency_key"])
+    audit = run.response_audit
+    assert audit["failure_code"] == "unknown_or_duplicate_statement_id"
+    assert audit["allowed_statement_ids"]
+    assert audit["returned_statement_ids"] == ["S999"]
+    assert audit["returned_keys"] == ["headline_id", "relationships", "selected_statement_ids"]
+    assert audit["relationship_references"] == [
+        {"from": "S999", "to": "S1", "type": "cause"}
+    ]
+    assert audit["statement_selection_diagnostics"]["failure_code"] == audit["failure_code"]
 
 
 @pytest.mark.django_db

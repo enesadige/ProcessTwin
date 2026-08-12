@@ -41,6 +41,15 @@ def test_gemini_descriptor_keeps_default_when_no_model_override(settings):
     assert descriptor.model == "gemini-3.6-flash"
 
 
+def test_gemini_selection_uses_gemini_default_when_process_default_is_gemma(settings):
+    settings.LLM_MODEL = GEMMA4_MODEL
+
+    descriptor = get_llm_descriptor("gemini")
+
+    assert descriptor.provider == "gemini"
+    assert descriptor.model == "gemini-3.6-flash"
+
+
 def test_resolved_model_is_written_to_query_run_provider_provenance(settings, db):
     from apps.operations.tests.test_operations_models import create_snapshot
     from apps.orchestration.models import QueryRun

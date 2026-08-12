@@ -22,7 +22,9 @@ from apps.orchestration.structured_query import StructuredQuery
 from apps.orchestration.tool_plan import ToolPlan
 
 
-def make_plan(snapshot_identifier: str, *, requested_outputs=None, calls=None) -> ToolPlan:
+def make_plan(
+    snapshot_identifier: str, *, requested_outputs=None, calls=None, customer_impact_requested=False
+) -> ToolPlan:
     requested_outputs = requested_outputs or ["summary", "root_cause", "impact", "evidence"]
     causal_args = {"snapshot_identifier": snapshot_identifier, "causal_event_code": "CE-GPON-001"}
     calls = calls or [
@@ -67,6 +69,7 @@ def make_plan(snapshot_identifier: str, *, requested_outputs=None, calls=None) -
                 "requested_outputs": requested_outputs,
                 "snapshot_identifier": snapshot_identifier,
                 "causal_event_code": "CE-GPON-001",
+                "customer_impact_requested": customer_impact_requested,
             },
             "calls": calls,
         }
@@ -177,7 +180,7 @@ def full_result(snapshot_identifier: str, *, impact=None, compensation=None) -> 
 @pytest.mark.django_db
 def test_merge_validates_safe_result_and_completes_query_run():
     snapshot = create_snapshot("merge-valid-001")
-    plan = make_plan(snapshot.snapshot_key)
+    plan = make_plan(snapshot.snapshot_key, customer_impact_requested=True)
     run = create_executing_run(snapshot, plan)
     merged = ResultMergerValidator().validate_and_merge(
         run, plan, full_result(run.data_snapshot.snapshot_key)
@@ -246,7 +249,7 @@ def test_compensation_reason_without_documentary_dimension_does_not_require_rule
 @pytest.mark.django_db
 def test_required_failure_and_audit_only_runtime_result_fail_query_run():
     snapshot = create_snapshot("merge-required-001")
-    plan = make_plan(snapshot.snapshot_key)
+    plan = make_plan(snapshot.snapshot_key, customer_impact_requested=True)
     run = create_executing_run(snapshot, plan)
     result = full_result(run.data_snapshot.snapshot_key)
     result.call_results[1] = failed("impact", "customer", "get_customer_outage_history")

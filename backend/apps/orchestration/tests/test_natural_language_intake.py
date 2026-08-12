@@ -14,10 +14,23 @@ from apps.orchestration.natural_language_intake import (
     LLMSemanticDecomposer,
     NaturalLanguageQueryParseError,
     NaturalLanguageStructuredQueryParser,
+    query_requests_customer_impact,
 )
 from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.gemini import GeminiLLMProviderError
 from apps.orchestration.structured_query import RequestedOutput, SemanticDimension, StructuredQuery
+
+
+@pytest.mark.parametrize(
+    ("query", "expected"),
+    [
+        ("AGG-ANK-002 olayında kaç müşteri ve kaç abonelik etkilendi?", True),
+        ("CE-MCR-0023 için kök alarm ve kök kaynak nedir?", False),
+        ("müşteri etkisi doğrulandı mı?", True),
+    ],
+)
+def test_customer_impact_intent_is_explicit_and_typed(query, expected):
+    assert query_requests_customer_impact(query.casefold()) is expected
 
 
 class RecordingProvider(LLMProvider):

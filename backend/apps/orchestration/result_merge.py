@@ -21,6 +21,7 @@ from apps.orchestration.structured_query import (
     RequestedOutput,
     StructuredQuery,
     StructuredQueryIntent,
+    requires_customer_impact_evidence,
     requires_documentary_evidence,
 )
 from apps.orchestration.tool_plan import MCPServer, ToolPlan
@@ -639,9 +640,7 @@ class ResultMergerValidator:
         outputs = set(query.requested_outputs)
         if RequestedOutput.ROOT_CAUSE in outputs:
             categories.add(EvidenceCategory.NETWORK_CAUSAL)
-        if RequestedOutput.IMPACT in outputs:
-            categories.add(EvidenceCategory.CUSTOMER_IMPACT)
-        if query.intent == StructuredQueryIntent.OUTAGE_IMPACT:
+        if requires_customer_impact_evidence(query):
             categories.add(EvidenceCategory.CUSTOMER_IMPACT)
         if query.intent in {
             StructuredQueryIntent.RULE_RETRIEVAL,

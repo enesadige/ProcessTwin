@@ -91,6 +91,50 @@ def test_network_investigation_with_resolved_outage_keeps_the_outage_anchor():
     assert all(call.arguments["outage_code"] == "OUT-MCR-0018" for call in result.tool_plan.calls)
 
 
+def test_network_root_evidence_noise_does_not_plan_customer_impact():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            requested_outputs=["summary", "root_cause", "evidence", "impact"],
+            semantic_dimensions=["evidence_gap", "root_resource"],
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert all(
+        call.tool_name != "calculate_customer_impact" for call in result.tool_plan.calls
+    )
+
+
+def test_explicit_customer_impact_dimension_plans_customer_impact():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            intent="outage_impact",
+            requested_outputs=["summary", "impact"],
+            semantic_dimensions=["verified_customer_impact"],
+            causal_event_code=None,
+            outage_code="OUT-MAL-001",
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert any(call.tool_name == "calculate_customer_impact" for call in result.tool_plan.calls)
+
+
+def test_explicit_customer_impact_request_flag_plans_customer_impact():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            intent="outage_impact",
+            requested_outputs=["summary", "impact"],
+            customer_impact_requested=True,
+            causal_event_code=None,
+            outage_code="OUT-MAL-001",
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert any(call.tool_name == "calculate_customer_impact" for call in result.tool_plan.calls)
+
+
 def test_outage_impact_has_deterministic_details_then_customer_impact_dependency():
     result = DeterministicToolPlanner().plan(
         query_payload(

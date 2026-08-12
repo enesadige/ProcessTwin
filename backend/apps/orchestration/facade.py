@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
@@ -377,6 +378,35 @@ class OrchestrationFacade:
     @staticmethod
     def _response_audit(response: ValidatedNaturalLanguageResponse) -> dict[str, Any]:
         audit = dict(response.statement_selection_audit)
+        diagnostics = {
+            key: audit[key]
+            for key in (
+                "allowed_statement_ids",
+                "allowed_statement_concepts",
+                "allowed_relationship_endpoints",
+                "returned_keys",
+                "returned_statement_ids",
+                "returned_concepts",
+                "normalized_concepts",
+                "relationship_references",
+                "failure_code",
+            )
+            if key in audit
+        }
+        warning_prefix = "llm_statement_selection_"
+        for warning in response.warnings:
+            if not isinstance(warning, str) or not warning.startswith(warning_prefix):
+                continue
+            key, separator, value = warning[len(warning_prefix) :].partition(":")
+            if separator and key not in diagnostics:
+                try:
+                    diagnostics[key] = json.loads(value)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    continue
+        if diagnostics:
+            audit["statement_selection_diagnostics"] = diagnostics
+            for key, value in diagnostics.items():
+                audit.setdefault(key, value)
         audit.update(
             {
                 "generation_mode": response.generation_mode.value,

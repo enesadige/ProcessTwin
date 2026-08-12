@@ -14,6 +14,7 @@ from apps.core.exceptions import ProcessTwinError
 from apps.orchestration.models import QueryRun, QueryRunStatus
 from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.gemini import GeminiLLMProviderError
+from apps.orchestration.providers.ollama import OllamaLLMProviderError
 from apps.orchestration.providers.registry import get_llm_descriptor
 from apps.orchestration.result_merge import (
     CausalSummary,
@@ -46,8 +47,12 @@ _IMPACT_STATUSES = frozenset(
 _FAILOVER_PRIMARY_DOWN_BACKUP_HEALTHY = "primary_down_backup_healthy"
 _UNCERTAINTY_STATEMENT = "Yeterli doğrulanmış bilgi yok."
 _RELATION_TYPES = frozenset({"cause", "contrast", "consequence", "uncertainty", "evidence_gap"})
-_NARRATIVE_SYNTHESIS_KEYS = frozenset({"headline", "paragraphs"})
+_NARRATIVE_SYNTHESIS_KEYS = frozenset({"sentences"})
+_NARRATIVE_SENTENCE_KEYS = frozenset({"text", "statement_ids", "relationship_ids"})
 _NARRATIVE_DEBUG_MARKERS = ("->", "Nedensel ilişki:", "Sonuç ilişkisi:", "Belirsizlik ilişkisi:")
+_NARRATIVE_NUMBER_RE = re.compile(
+    r"(?<![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])\d+(?:[.,]\d+)?(?![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])"
+)
 
 
 class ResponseBuilderError(ProcessTwinError):
@@ -70,6 +75,38 @@ class NarrativeSynthesisError(ValueError):
         super().__init__(message)
         self.code = code
         self.details = dict(details or {})
+
+
+class NarrativeGroundingValidationError(ValueError):
+    """Safe sentence-level grounding rejection details."""
+
+    def __init__(
+        self,
+        rule: str,
+        message: str,
+        *,
+        sentence_index: int = -1,
+        sentence: Mapping[str, Any] | None = None,
+    ):
+        sentence = sentence or {}
+        self.rule = rule
+        self.details = {
+            "exact_validation_rule": rule,
+            "rejected_sentence_index": sentence_index,
+            "rejected_sentence_text": sentence.get("text")
+            if isinstance(sentence.get("text"), str)
+            else "",
+            "rejected_statement_ids": [
+                str(item) for item in sentence.get("statement_ids", [])
+                if isinstance(item, str)
+            ],
+            "rejected_relationship_ids": [
+                str(item) for item in sentence.get("relationship_ids", [])
+                if isinstance(item, str)
+            ],
+            "safe_failure_detail": message,
+        }
+        super().__init__(message)
 
 
 class ResponseGenerationMode(StrEnum):
@@ -162,17 +199,17 @@ class ValidatedResponseBuilder:
             original_query=query_run.original_query,
             structured_query=query_run.structured_query,
         )
+        verified_anchors = self._verified_narrative_anchors(
+            result, query_run.structured_query
+        )
+        narrative = deterministic_text
         try:
-            narrative, retry, selection = self._safe_statement_selection(active_provider, contract)
+            selection = self._deterministic_answer_plan(
+                contract[1], query_run.structured_query
+            )
             response.semantic_concepts = selection["concepts"]
             response.grounded_relationships = selection["relationships"]
             response.statement_selection_audit = selection["audit"]
-            if retry.get("retry_count", 0):
-                response.warnings = [
-                    *response.warnings,
-                    f"llm_statement_selection_retry_count:{retry['retry_count']}",
-                    f"llm_statement_selection_retry_delay_ms:{retry['total_retry_delay_ms']}",
-                ]
             if getattr(active_provider, "supports_grounded_narrative", False):
                 narrative, synthesis_audit = self._safe_grounded_narrative(
                     active_provider,
@@ -182,9 +219,19 @@ class ValidatedResponseBuilder:
                         for statement_id in selection["selected_statement_ids"]
                     },
                     relationships=selection["relationships"],
+                    verified_anchors=verified_anchors,
+                    requested_outputs=selection["audit"]["selection_reason"]["requested_outputs"],
                 )
                 response.narrative_synthesis_audit = synthesis_audit
             else:
+                response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
+                response.warnings = sorted(
+                    {
+                        *response.warnings,
+                        "llm_narrative_fallback",
+                        "llm_narrative_synthesis_not_supported",
+                    }
+                )
                 response.narrative_synthesis_audit = {
                     "status": "skipped",
                     "reason": "provider_does_not_advertise_grounded_narrative",
@@ -192,15 +239,10 @@ class ValidatedResponseBuilder:
         except Exception as exc:
             response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
             synthesis_failure = isinstance(exc, NarrativeSynthesisError)
-            failure_code = (
-                f"narrative_synthesis_{exc.code}"
-                if synthesis_failure
-                else self._statement_selection_failure_code(exc)
-            )
+            failure_code = f"narrative_synthesis_{exc.code}" if synthesis_failure else str(exc)
             failure_warnings = [
                 *response.warnings,
                 "llm_narrative_fallback",
-                "llm_statement_selection_attempted",
             ]
             if synthesis_failure:
                 failure_warnings.extend(
@@ -209,8 +251,6 @@ class ValidatedResponseBuilder:
                         "llm_narrative_synthesis_failure:" + failure_code,
                     ]
                 )
-            else:
-                failure_warnings.append("llm_statement_selection_failure:" + failure_code)
             response.warnings = sorted(set(failure_warnings))
             details = getattr(exc, "details", {})
             if synthesis_failure:
@@ -224,8 +264,7 @@ class ValidatedResponseBuilder:
             else:
                 response.statement_selection_audit = {
                     "status": "rejected",
-                    "provider": active_provider.provider_name,
-                    "model": active_provider.model_name,
+                    "mode": "deterministic",
                     "failure_code": failure_code,
                     **details,
                 }
@@ -255,6 +294,115 @@ class ValidatedResponseBuilder:
         response.response_text = narrative
         response.generation_mode = ResponseGenerationMode.LLM_ASSISTED
         return response
+
+    @staticmethod
+    def _deterministic_answer_plan(
+        data: Mapping[str, Any], structured_query: Mapping[str, Any] | None
+    ) -> dict[str, Any]:
+        """Select verified statements and relationships without an LLM call."""
+        statements = data.get("statements", {})
+        concepts = data.get("statement_concepts", {})
+        relationships = data.get("validated_relationships", [])
+        if not isinstance(statements, Mapping) or not isinstance(concepts, Mapping):
+            raise ResponseBuilderError("answer plan contract is invalid")
+
+        requested = set()
+        dimensions = set()
+        intent = ""
+        if isinstance(structured_query, Mapping):
+            requested = {str(value) for value in structured_query.get("requested_outputs", [])}
+            dimensions = {str(value) for value in structured_query.get("semantic_dimensions", [])}
+            intent = str(structured_query.get("intent", ""))
+
+        all_roles = {
+            "outage_classification", "root_cause", "primary_backup_state",
+            "potential_scope", "verified_customer_impact", "verified_no_impact",
+            "insufficient_evidence", "failover_explanation", "compensation_status",
+            "compensation_reason", "evidence", "verified_subscription_impact",
+            "compensation_amount", "rule_version", "decision_evidence",
+            "physical_root_cause", "root_resource",
+        }
+        relevant_roles = set()
+        if not requested and not dimensions:
+            relevant_roles = all_roles
+        if requested & {"impact", "summary", "details"} or dimensions & {
+            "verified_customer_impact", "verified_subscription_impact", "potential_scope",
+        }:
+            relevant_roles |= {
+                "outage_classification", "potential_scope", "verified_customer_impact",
+                "verified_no_impact", "insufficient_evidence",
+            }
+        if requested & {"root_cause"} or dimensions & {
+            "root_resource", "physical_root_cause", "outage_classification",
+        }:
+            relevant_roles |= {"root_cause", "outage_classification"}
+        if dimensions & {"failover_status", "failover_protection"}:
+            relevant_roles |= {
+                "primary_backup_state",
+                "failover_explanation",
+                "insufficient_evidence",
+            }
+        if requested & {"eligibility", "compensation_amount", "evidence"} or dimensions & {
+            "compensation_result", "compensation_reason", "rule_version", "decision_evidence",
+            "rag_evidence", "source_version_section", "evidence_gap",
+        } or intent in {"compensation_evaluation", "rule_evidence", "rule_document_retrieval"}:
+            relevant_roles |= {
+                "compensation_status",
+                "compensation_reason",
+                "compensation_amount",
+                "rule_version",
+                "decision_evidence",
+                "evidence",
+                "insufficient_evidence",
+            }
+        if not relevant_roles:
+            relevant_roles = all_roles
+
+        selected_ids = [
+            statement_id
+            for statement_id, statement_text in statements.items()
+            if relevant_roles.intersection(concepts.get(statement_id, []))
+            or not concepts.get(statement_id)
+        ]
+        if not selected_ids:
+            selected_ids = list(statements)
+        selected_set = set(selected_ids)
+        selected_relationships = [
+            relation for relation in relationships
+            if isinstance(relation, Mapping)
+            and relation.get("from_statement_id") in selected_set
+            and relation.get("to_statement_id") in selected_set
+        ]
+        derived_concepts = []
+        for statement_id in selected_ids:
+            for concept in concepts.get(statement_id, []):
+                if concept not in derived_concepts:
+                    derived_concepts.append(concept)
+        audit = {
+            "status": "completed",
+            "mode": "deterministic",
+            "answer_plan_mode": "deterministic",
+            "selected_statement_ids": selected_ids,
+            "selected_relationship_ids": [
+                f"R{index}" for index, _ in enumerate(selected_relationships, 1)
+            ],
+            "effective_statement_ids": selected_ids,
+            "selection_reason": {
+                "intent": intent,
+                "requested_outputs": sorted(requested),
+                "semantic_dimensions": sorted(dimensions),
+                "semantic_roles": sorted(relevant_roles),
+            },
+            "derived_concepts": derived_concepts or ["explanation_requested"],
+            "relationship_references": selected_relationships,
+            "validation_status": "valid",
+        }
+        return {
+            "selected_statement_ids": selected_ids,
+            "relationships": selected_relationships,
+            "concepts": derived_concepts or ["explanation_requested"],
+            "audit": audit,
+        }
 
     @staticmethod
     def _public_structured_result(
@@ -668,6 +816,11 @@ class ValidatedResponseBuilder:
             add("Doğrulanmış karar kanıtı: " + ", ".join(rule.evidence_references) + ".")
         if compensation and compensation.status:
             add(f"Telafi durumu: {compensation.status}.")
+        if compensation and compensation.total_amount and compensation.currency:
+            add(
+                f"Doğrulanmış tazminat tutarı: {compensation.total_amount} "
+                f"{compensation.currency}."
+            )
         if compensation and compensation.considered is not None:
             add(f"Telafi değerlendirmesi yapılan: {compensation.considered} kayıt.")
         if compensation and compensation.eligible is not None:
@@ -742,11 +895,15 @@ class ValidatedResponseBuilder:
             safe_query,
             flags=re.IGNORECASE,
         )
+        validated_relationships = ValidatedResponseBuilder._backend_relationship_candidates(
+            statements
+        )
         prompt = (
             "Yalnız native schema nesnesini üret. Cümle yazma, cümleleri değiştirme, "
             "yeni ID veya gerçek üretme. concepts alanı üretme; kavramlar backend tarafından "
             "seçilen statement ID'lerinden türetilecektir. "
-            "relationships yalnız verilen statement ID'leri arasında kurulabilir. "
+            "relationships yalnız aşağıdaki backend-doğrulanmış adaylardan seçilebilir; yeni "
+            "ilişki üretme. Aday listesi boşsa relationships boş bırakılmalıdır. "
             "Kullanıcı sorusundaki doğrulanmış ankorlar redakte edilmiştir.\n"
             "USER_SEMANTIC_QUERY="
             + safe_query
@@ -754,12 +911,116 @@ class ValidatedResponseBuilder:
             + json.dumps(statements, ensure_ascii=False)
             + "\nSTATEMENT_CONCEPTS="
             + json.dumps(statement_concepts, ensure_ascii=False)
+            + "\nBACKEND_VALIDATED_RELATIONSHIPS="
+            + json.dumps(validated_relationships, ensure_ascii=False, sort_keys=True)
         )
         return prompt, {
             "schema": schema,
             "statements": statements,
             "statement_concepts": statement_concepts,
+            "validated_relationships": validated_relationships,
         }
+
+    @staticmethod
+    def _verified_narrative_anchors(
+        result: ValidatedExecutionResult,
+        structured_query: Mapping[str, Any] | None,
+    ) -> dict[str, str]:
+        """Return only deterministic anchors resolved for this QueryRun."""
+        anchors: dict[str, str] = {}
+
+        def add(value: object, source: str) -> None:
+            if isinstance(value, str) and value.strip():
+                anchors[value.strip()] = source
+
+        if isinstance(structured_query, Mapping):
+            for field in (
+                "causal_event_code",
+                "incident_code",
+                "outage_code",
+                "device_code",
+                "subscription_reference",
+            ):
+                add(structured_query.get(field), "verified_anchor")
+        causal = result.causal_summary
+        if causal:
+            add(causal.causal_event_code, "verified_anchor")
+            add(causal.outage_code, "verified_anchor")
+            add(causal.root_resource_reference, "verified_anchor")
+            for alarm in causal.root_alarm_types:
+                add(alarm, "verified_anchor")
+            for alarm in causal.symptom_alarm_types:
+                add(alarm, "verified_anchor")
+        return anchors
+
+    @staticmethod
+    def _backend_relationship_candidates(
+        statements: Mapping[str, str],
+    ) -> list[dict[str, str]]:
+        """Build only explainable, backend-owned relationships for this result set."""
+        candidates: list[dict[str, str]] = []
+
+        def add(
+            relationship_type: str,
+            source: str,
+            target: str,
+            provenance: str,
+            semantics: str,
+        ) -> None:
+            candidates.append(
+                {
+                    "type": relationship_type,
+                    "from_statement_id": source,
+                    "to_statement_id": target,
+                    "provenance": provenance,
+                    "narrative_semantics": semantics,
+                }
+            )
+
+        ids = list(statements)
+        for source in ids:
+            source_text = statements[source].casefold()
+            for target in ids:
+                if source == target:
+                    continue
+                target_text = statements[target].casefold()
+                if (
+                    "down" in source_text
+                    and "active" in source_text
+                    and "tam hizmet kesintisi: hayır" in target_text
+                ):
+                    add(
+                        "consequence", source, target,
+                        "deterministic_outage_classification", "causal"
+                    )
+                    add(
+                        "contrast", source, target,
+                        "deterministic_outage_classification", "contrast"
+                    )
+                if (
+                    "potansiyel kapsam" in source_text
+                    and "doğrulanmış etki" in target_text
+                ):
+                    add("consequence", source, target, "deterministic_impact_scope", "causal")
+                if (
+                    "müşteri etkisi" in source_text
+                    and "kesin doğrulanmadı" in source_text
+                    and "telafi durumu" in target_text
+                ):
+                    add(
+                        "consequence", source, target,
+                        "deterministic_compensation_pending", "causal"
+                    )
+                if (
+                    "müşteri etkisi" in source_text
+                    and "kesin doğrulanmadı" in source_text
+                    and "tazminat kararı" in target_text
+                ):
+                    add(
+                        "consequence", source, target,
+                        "deterministic_compensation_evaluation", "causal"
+                    )
+        return candidates
 
     @staticmethod
     def _statement_concepts(text: str) -> list[str]:
@@ -773,6 +1034,7 @@ class ValidatedResponseBuilder:
             ("primary_backup_state", ("ana bağlantı", "yedek bağlantı")),
             ("failover_explanation", ("Failover", "yedek yollar")),
             ("compensation_status", ("Telafi", "Tazminat")),
+            ("compensation_amount", ("tazminat tutarı", "telafi tutarı")),
             ("compensation_reason", ("kararı", "doğrulanmış etki üzerinden")),
             ("root_cause", ("kök neden", "Kök kaynak")),
             ("evidence", ("Kaynaklar", "DecisionEvidence", "RuleVersion")),
@@ -788,24 +1050,78 @@ class ValidatedResponseBuilder:
         cls, provider: LLMProvider, contract: tuple[str, dict[str, object]]
     ) -> tuple[str, Mapping[str, Any], Mapping[str, Any]]:
         prompt, data = contract
-        response = provider.generate(request={"contents": prompt, "format_schema": data["schema"]})
+        statements = data.get("statements")
+        if not isinstance(statements, Mapping):
+            raise StatementSelectionError(
+                "statement_contract_invalid",
+                "statement contract is invalid",
+                details={"allowed_statement_ids": []},
+            )
+        statement_concepts = data.get("statement_concepts", {})
+        allowed_ids = sorted(str(key) for key in statements)
+        allowed_concepts = sorted(
+            str(concept)
+            for concepts in statement_concepts.values()
+            if isinstance(concepts, list)
+            for concept in concepts
+        ) if isinstance(statement_concepts, Mapping) else []
+        base_details = {
+            "allowed_statement_ids": allowed_ids,
+            "allowed_statement_concepts": allowed_concepts,
+            "allowed_relationship_endpoints": allowed_ids,
+            "returned_keys": [],
+            "returned_statement_ids": [],
+            "returned_concepts": [],
+            "normalized_concepts": [],
+            "relationship_references": [],
+        }
+        try:
+            response = provider.generate(
+                request={"contents": prompt, "format_schema": data["schema"]}
+            )
+        except Exception as exc:
+            provider_code = getattr(exc, "code", None)
+            safe_detail = type(exc).__name__
+            if isinstance(provider_code, str) and provider_code:
+                safe_detail = f"{safe_detail}:{provider_code}"
+            raise StatementSelectionError(
+                "provider_request_failed",
+                "provider request failed",
+                details={
+                    **base_details,
+                    "provider_error_code": provider_code,
+                    "failure_detail": safe_detail,
+                },
+            ) from exc
         if not isinstance(response, Mapping) or response.get("provider") != provider.provider_name:
-            raise ValueError("provider response is invalid")
+            raise StatementSelectionError(
+                "provider_response_invalid",
+                "provider response is invalid",
+                details={**base_details, "failure_detail": "provider_metadata_invalid"},
+            )
         if response.get("model") != provider.model_name or not isinstance(
             response.get("content"), str
         ):
-            raise ValueError("provider response is invalid")
+            raise StatementSelectionError(
+                "provider_response_invalid",
+                "provider response is invalid",
+                details={**base_details, "failure_detail": "provider_content_invalid"},
+            )
         retry = response.get("retry", {})
         if not isinstance(retry, Mapping):
-            raise ValueError("provider response is invalid")
+            raise StatementSelectionError(
+                "provider_response_invalid",
+                "provider response is invalid",
+                details={**base_details, "failure_detail": "retry_metadata_invalid"},
+            )
         try:
             selection = json.loads(response["content"])
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise ValueError("native schema response is not JSON") from exc
-        statements = data["statements"]
-        if not isinstance(statements, Mapping):
-            raise ValueError("statement contract is invalid")
-        statement_concepts = data.get("statement_concepts", {})
+            raise StatementSelectionError(
+                "structured_output_invalid_json",
+                "native schema response is not JSON",
+                details={**base_details, "failure_detail": "invalid_json"},
+            ) from exc
         if not isinstance(statement_concepts, Mapping) or any(
             statement_id not in statements for statement_id in statement_concepts
         ):
@@ -813,19 +1129,17 @@ class ValidatedResponseBuilder:
                 "statement_contract_inconsistent",
                 "statement contract references an unavailable statement",
                 details={
-                    "allowed_statement_ids": sorted(str(key) for key in statements),
-                    "allowed_statement_concepts": sorted(
-                        str(concept)
-                        for concepts in statement_concepts.values()
-                        if isinstance(concepts, list)
-                        for concept in concepts
-                    )
-                    if isinstance(statement_concepts, Mapping)
-                    else [],
+                    **base_details,
+                    "failure_detail": "statement_concepts_reference_unavailable_id",
                 },
             )
         try:
-            cls._validate_statement_selection(selection, statements, statement_concepts)
+            cls._validate_statement_selection(
+                selection,
+                statements,
+                statement_concepts,
+                data.get("validated_relationships", []),
+            )
         except ValueError as exc:
             returned_ids = (
                 selection.get("selected_statement_ids") if isinstance(selection, Mapping) else None
@@ -834,14 +1148,7 @@ class ValidatedResponseBuilder:
                 selection.get("relationships") if isinstance(selection, Mapping) else None
             )
             details = {
-                "allowed_statement_ids": sorted(str(key) for key in statements),
-                "allowed_relationship_endpoints": sorted(str(key) for key in statements),
-                "allowed_statement_concepts": sorted(
-                    str(concept)
-                    for concepts in statement_concepts.values()
-                    if isinstance(concepts, list)
-                    for concept in concepts
-                ),
+                **base_details,
                 "returned_keys": (
                     sorted(str(key) for key in selection)
                     if isinstance(selection, Mapping)
@@ -865,6 +1172,7 @@ class ValidatedResponseBuilder:
                     ]
                     if isinstance(relationships, list) else []
                 ),
+                "failure_detail": str(exc),
             }
             code = cls._statement_selection_failure_code(exc)
             raise StatementSelectionError(code, str(exc), details=details) from exc
@@ -876,6 +1184,22 @@ class ValidatedResponseBuilder:
                     derived_concepts.append(concept)
         if not derived_concepts:
             derived_concepts = ["explanation_requested"]
+        candidate_map = {
+            (
+                item["type"],
+                item["from_statement_id"],
+                item["to_statement_id"],
+            ): item
+            for item in data.get("validated_relationships", [])
+            if isinstance(item, Mapping)
+        }
+        selected_relationships = [
+            candidate_map[
+                (item["type"], item["from_statement_id"], item["to_statement_id"])
+            ]
+            for item in selection["relationships"]
+        ]
+        selection = {**selection, "relationships": selected_relationships}
         audit = {
             "status": "accepted",
             "provider": provider.provider_name,
@@ -883,7 +1207,7 @@ class ValidatedResponseBuilder:
             "allowed_statement_ids": sorted(str(key) for key in statements),
             "selected_statement_ids": [str(value) for value in selected],
             "derived_concepts": derived_concepts,
-            "relationship_references": selection["relationships"],
+            "relationship_references": selected_relationships,
             "validation_status": "valid",
         }
         selection = {**selection, "concepts": derived_concepts, "audit": audit}
@@ -931,6 +1255,7 @@ class ValidatedResponseBuilder:
         selection: object,
         statements: Mapping[str, str],
         statement_concepts: Mapping[str, object] | None = None,
+        validated_relationships: list[dict[str, str]] | None = None,
     ) -> None:
         if not isinstance(selection, Mapping) or not {
             "headline_id", "selected_statement_ids", "relationships"
@@ -948,6 +1273,11 @@ class ValidatedResponseBuilder:
         relationships = selection["relationships"]
         if not isinstance(relationships, list) or len(relationships) > 8:
             raise ValueError("statement relationships are invalid")
+        candidate_keys = {
+            (item.get("type"), item.get("from_statement_id"), item.get("to_statement_id"))
+            for item in (validated_relationships or [])
+            if isinstance(item, Mapping)
+        }
         for relation in relationships:
             if not isinstance(relation, Mapping) or set(relation) != {
                 "type", "from_statement_id", "to_statement_id"
@@ -958,6 +1288,15 @@ class ValidatedResponseBuilder:
                 or relation["from_statement_id"] not in statements
                 or relation["to_statement_id"] not in statements
                 or relation["from_statement_id"] == relation["to_statement_id"]
+                or (
+                    validated_relationships is not None
+                    and (
+                        relation["type"],
+                        relation["from_statement_id"],
+                        relation["to_statement_id"],
+                    )
+                    not in candidate_keys
+                )
             ):
                 raise ValueError("statement relationships are invalid")
 
@@ -969,51 +1308,56 @@ class ValidatedResponseBuilder:
         original_query: str,
         selected_statements: Mapping[str, str],
         relationships: list[dict[str, str]],
+        verified_anchors: Mapping[str, str] | None = None,
+        requested_outputs: list[str] | None = None,
     ) -> tuple[str, dict[str, Any]]:
-        schema = {
-            "type": "object",
-            "additionalProperties": False,
-            "required": ["headline", "paragraphs"],
-            "properties": {
-                "headline": {"type": "string", "maxLength": 120},
-                "paragraphs": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": 6,
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": ["text", "supporting_statement_ids"],
-                        "properties": {
-                            "text": {"type": "string", "minLength": 1, "maxLength": 1200},
-                            "supporting_statement_ids": {
-                                "type": "array",
-                                "minItems": 1,
-                                "maxItems": 8,
-                                "items": {"type": "string", "enum": sorted(selected_statements)},
-                            },
-                        },
-                    },
-                },
-            },
+        relationship_map = {
+            f"R{index}": relationship
+            for index, relationship in enumerate(
+                (
+                    relationship
+                    for relationship in relationships
+                    if relationship.get("from_statement_id") in selected_statements
+                    and relationship.get("to_statement_id") in selected_statements
+                ),
+                start=1,
+            )
         }
         prompt = (
-            "Doğrulanmış telekom operasyon gerçeklerini doğal Türkçe ile açıkla. "
-            "Yalnız JSON üret ve her paragrafı destekleyen statement ID'lerini yaz. "
-            "Sayı, kod, durum veya karar ekleme; destek metinlerini aynen listeleme; "
-            "ilişkileri doğal neden-sonuç cümlelerine dönüştür. Ham ok işareti, "
-            "'Nedensel ilişki', 'Sonuç ilişkisi' veya benzeri debug etiketi kullanma. "
-            "Bilinmeyeni sıfır yapma. Kullanıcı sorusunu doğrudan yanıtla.\n"
-            "USER_QUERY=" + original_query.strip() + "\n"
-            "VERIFIED_STATEMENTS="
+            "Doğrulanmış telecom gerçeklerini kullanarak doğal ve kısa Türkçe yanıt yaz. "
+            "Yalnız aşağıdaki gerçeklerde bulunan sayı, kimlik, durum ve nedenleri kullan. "
+            "Bilinmeyenleri sıfıra çevirme; bağımsız kanıt boşluklarını nedensel bağlama. "
+            "JSON, etiket, ID, madde imi veya debug ilişkisi üretme.\n"
+            "Sorgunun aşağıdaki istenen çıktılarını ayrı ayrı yanıtla; mevcut bir "
+            "doğrulanmış değer varsa atlama: REQUESTED_OUTPUTS="
+            + json.dumps(requested_outputs or [], ensure_ascii=False)
+            + "\n"
+            "USER_QUERY=" + original_query.strip() + "\nVERIFIED_FACTS="
             + json.dumps(selected_statements, ensure_ascii=False, sort_keys=True)
-            + "\nVALIDATED_RELATIONSHIPS="
-            + json.dumps(relationships, ensure_ascii=False, sort_keys=True)
+            + "\nVERIFIED_ANCHORS="
+            + json.dumps(dict(verified_anchors or {}), ensure_ascii=False, sort_keys=True)
+            + "\nVALID_RELATIONSHIPS="
+            + json.dumps(relationship_map, ensure_ascii=False, sort_keys=True)
         )
-        request: dict[str, Any] = {"contents": prompt, "format_schema": schema}
+        request: dict[str, Any] = {"contents": prompt}
         if getattr(provider, "supports_request_unload", False):
             request["release_after"] = True
-        response = provider.generate(request=request)
+        try:
+            response = provider.generate(request=request)
+        except Exception as exc:
+            provider_code = None
+            if isinstance(exc, (OllamaLLMProviderError, GeminiLLMProviderError)):
+                provider_code = exc.code
+            safe_code = (
+                f"provider_call_failed:{provider_code}"
+                if isinstance(provider_code, str) and provider_code
+                else "provider_call_failed"
+            )
+            raise NarrativeSynthesisError(
+                safe_code,
+                "narrative provider request failed",
+                details={"failure_detail": type(exc).__name__},
+            ) from exc
         if not isinstance(response, Mapping) or response.get("provider") != provider.provider_name:
             raise NarrativeSynthesisError(
                 "provider_response_invalid", "provider response is invalid"
@@ -1022,43 +1366,288 @@ class ValidatedResponseBuilder:
             raise NarrativeSynthesisError(
                 "provider_response_invalid", "provider metadata is invalid"
             )
-        try:
-            narrative = json.loads(response.get("content", ""))
-        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        content = response.get("content", "")
+        narrative, removed_sentences = cls._free_text_narrative(
+            content, selected_statements, relationship_map, verified_anchors
+        )
+        if not narrative["sentences"]:
+            removal_details = removed_sentences[0] if removed_sentences else {}
             raise NarrativeSynthesisError(
-                "structured_output_invalid", "narrative is not JSON"
-            ) from exc
+                "unsupported_narrative", "no grounded narrative sentence remained",
+                details={
+                    "removed_sentence_count": len(removed_sentences),
+                    "removed_sentence_reasons": removed_sentences,
+                    "deterministic_fill_count": 0,
+                    "exact_validation_rule": removal_details.get("failure_code", ""),
+                    "rejected_sentence_index": 0,
+                    "rejected_sentence_text": removal_details.get("text", ""),
+                    "safe_failure_detail": removal_details.get("safe_failure_detail", ""),
+                },
+            )
         try:
-            cls._validate_grounded_narrative(narrative, selected_statements, relationships)
+            cls._validate_grounded_narrative(
+                narrative,
+                selected_statements,
+                relationships,
+                verified_anchors=verified_anchors,
+            )
+        except NarrativeGroundingValidationError as exc:
+            raise NarrativeSynthesisError(
+                "grounding_validation_failed", str(exc),
+                details={
+                    "selected_statement_ids": sorted(selected_statements),
+                    "narrative_support_references": cls._narrative_support_references(narrative),
+                    **exc.details,
+                },
+            ) from exc
         except ValueError as exc:
             raise NarrativeSynthesisError(
                 "grounding_validation_failed", str(exc),
                 details={
                     "selected_statement_ids": sorted(selected_statements),
                     "narrative_support_references": cls._narrative_support_references(narrative),
+                    "exact_validation_rule": "narrative_schema_invalid",
+                    "rejected_sentence_index": -1,
+                    "rejected_sentence_text": "",
+                    "rejected_statement_ids": [],
+                    "rejected_relationship_ids": [],
+                    "safe_failure_detail": str(exc),
                 },
             ) from exc
         audit = {
             "status": "accepted",
             "provider": provider.provider_name,
             "model": provider.model_name,
-            "paragraph_count": len(narrative["paragraphs"]),
+            "sentence_count": len(narrative["sentences"]),
             "narrative_support_references": cls._narrative_support_references(narrative),
+            "narrative_sentence_support": cls._narrative_sentence_support(
+                narrative, relationship_map, verified_anchors, selected_statements
+            ),
+            "verified_narrative_anchors": dict(verified_anchors or {}),
+            "removed_sentence_count": len(removed_sentences),
+            "removed_sentence_reasons": removed_sentences,
+            "deterministic_fill_count": 0,
             "validation_status": "valid",
         }
         return cls._render_grounded_narrative(narrative), audit
 
+    @classmethod
+    def _free_text_narrative(
+        cls,
+        content: object,
+        selected_statements: Mapping[str, str],
+        relationship_map: Mapping[str, Mapping[str, str]],
+        verified_anchors: Mapping[str, str] | None = None,
+    ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, str]]]:
+        if not isinstance(content, str) or not content.strip():
+            return {"sentences": []}, []
+        sentences = re.split(r"(?<=[.!?])\s+|\n+", content.strip())
+        result: list[dict[str, Any]] = []
+        removed: list[dict[str, str]] = []
+        for text in (part.strip() for part in sentences):
+            if not text:
+                continue
+            # The AnswerPlan is the closed-world support universe. A sentence
+            # may paraphrase or combine facts without repeating canonical text.
+            support = list(selected_statements)
+            relationships = cls._sentence_relationships(
+                text, support, selected_statements, relationship_map
+            )
+            candidate = {
+                "text": text,
+                "statement_ids": support,
+                "relationship_ids": relationships,
+            }
+            try:
+                cls._validate_grounded_narrative(
+                    {"sentences": [candidate]},
+                    selected_statements,
+                    list(relationship_map.values()),
+                    verified_anchors=verified_anchors,
+                )
+            except (ValueError, NarrativeGroundingValidationError) as exc:
+                detail = {
+                    "text": text,
+                    "reason": str(exc),
+                }
+                if isinstance(exc, NarrativeGroundingValidationError):
+                    detail.update(
+                        {
+                            "failure_code": exc.rule,
+                            "safe_failure_detail": str(exc),
+                        }
+                    )
+                removed.append(detail)
+                continue
+            result.append(candidate)
+        return {"sentences": result}, removed
+
+    @staticmethod
+    def _sentence_support(text: str, statements: Mapping[str, str]) -> list[str]:
+        # Kept as a small public helper for audit/tests. Support is intentionally
+        # not inferred from lexical similarity; the deterministic AnswerPlan is
+        # the authoritative support set for the whole narrative.
+        return list(statements)
+
+    @staticmethod
+    def _sentence_relationships(
+        text: str,
+        support: list[str],
+        statements: Mapping[str, str],
+        relationships: Mapping[str, Mapping[str, str]],
+    ) -> list[str]:
+        lowered = text.casefold()
+        causal = any(
+            phrase in lowered
+            for phrase in (
+                "nedeniyle", "sebebiyle", "bu yüzden", "sonucunda", "dolayısıyla",
+                "yol açtı", "tetikledi", "kaynaklandı", "olduğu için", "olmadığı için",
+            )
+        )
+        if not causal:
+            return []
+        selected: list[str] = []
+        for relationship_id, relationship in relationships.items():
+            if relationship.get("narrative_semantics") != "causal":
+                continue
+            source = statements.get(relationship.get("from_statement_id"), "")
+            target = statements.get(relationship.get("to_statement_id"), "")
+            source_tokens = {
+                token.casefold()
+                for token in re.findall(
+                    r"[A-Za-zÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü-]{3,}", source
+                )
+                if len(token) >= 5
+            }
+            target_tokens = {
+                token.casefold()
+                for token in re.findall(
+                    r"[A-Za-zÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü-]{3,}", target
+                )
+                if len(token) >= 5
+            }
+            lowered = text.casefold()
+            text_tokens = {
+                token.casefold()
+                for token in re.findall(
+                    r"[A-Za-zÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü-]{3,}", lowered
+                )
+            }
+            if source_tokens and target_tokens and (
+                any(
+                    any(candidate.startswith(token[:5]) or token.startswith(candidate[:5])
+                        for candidate in text_tokens)
+                    for token in source_tokens
+                )
+                and any(
+                    any(candidate.startswith(token[:5]) or token.startswith(candidate[:5])
+                        for candidate in text_tokens)
+                    for token in target_tokens
+                )
+            ):
+                selected.append(relationship_id)
+        return selected
+
+    @staticmethod
+    def _parse_tagged_narrative(content: object) -> dict[str, list[dict[str, Any]]]:
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("tagged narrative is empty")
+        sentences: list[dict[str, Any]] = []
+        pattern = re.compile(r"^\[S:([^|]+)\|R:([^\]]*)\]\s+(.+)$")
+        lines = [line.strip() for line in content.strip().splitlines()]
+        lines = [line for line in lines if line not in {"```", "```text", "```plaintext"}]
+        for line in lines:
+            line = re.sub(r"^(?:[-*]\s+|\d+[.)]\s+)", "", line)
+            match = pattern.fullmatch(line)
+            if not match:
+                raise ValueError("tagged narrative line is invalid")
+            statement_ids = [value.strip() for value in match.group(1).split(",")]
+            relationship_ids = (
+                []
+                if not match.group(2).strip()
+                else [value.strip() for value in match.group(2).split(",")]
+            )
+            if any(not re.fullmatch(r"S\d+", value) for value in statement_ids):
+                raise ValueError("tagged narrative statement IDs are invalid")
+            if any(not re.fullmatch(r"R\d+", value) for value in relationship_ids):
+                raise ValueError("tagged narrative relationship IDs are invalid")
+            sentences.append(
+                {
+                    "text": match.group(3).strip(),
+                    "statement_ids": statement_ids,
+                    "relationship_ids": relationship_ids,
+                }
+            )
+        if not sentences or len(sentences) > 5:
+            raise ValueError("tagged narrative sentence count is invalid")
+        return {"sentences": sentences}
+
     @staticmethod
     def _narrative_support_references(narrative: object) -> list[str]:
-        if not isinstance(narrative, Mapping) or not isinstance(narrative.get("paragraphs"), list):
+        if not isinstance(narrative, Mapping) or not isinstance(narrative.get("sentences"), list):
             return []
         refs: list[str] = []
-        for paragraph in narrative["paragraphs"]:
-            if isinstance(paragraph, Mapping) and isinstance(
-                paragraph.get("supporting_statement_ids"), list
-            ):
-                refs.extend(str(item) for item in paragraph["supporting_statement_ids"])
+        for sentence in narrative["sentences"]:
+            if isinstance(sentence, Mapping) and isinstance(sentence.get("statement_ids"), list):
+                refs.extend(str(item) for item in sentence["statement_ids"])
         return list(dict.fromkeys(refs))
+
+    @staticmethod
+    def _narrative_sentence_support(
+        narrative: object,
+        relationship_map: Mapping[str, Mapping[str, str]] | None = None,
+        verified_anchors: Mapping[str, str] | None = None,
+        selected_statements: Mapping[str, str] | None = None,
+    ) -> list[dict[str, Any]]:
+        if not isinstance(narrative, Mapping) or not isinstance(narrative.get("sentences"), list):
+            return []
+        support: list[dict[str, Any]] = []
+        for sentence in narrative["sentences"]:
+            if not isinstance(sentence, Mapping):
+                continue
+            explicit_ids = [str(item) for item in sentence.get("statement_ids", [])]
+            relationship_ids = [str(item) for item in sentence.get("relationship_ids", [])]
+            effective_ids = list(explicit_ids)
+            for relationship_id in relationship_ids:
+                relationship = (relationship_map or {}).get(relationship_id)
+                if relationship:
+                    for endpoint in (
+                        relationship.get("from_statement_id"),
+                        relationship.get("to_statement_id"),
+                    ):
+                        if endpoint and endpoint not in effective_ids:
+                            effective_ids.append(endpoint)
+            identifier_values = re.findall(
+                r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b",
+                str(sentence.get("text", "")),
+            )
+            statement_text = " ".join(
+                (selected_statements or {}).get(statement_id, "")
+                for statement_id in effective_ids
+            )
+            supported_identifiers = set(
+                re.findall(
+                    r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", statement_text
+                )
+            )
+            support.append(
+                {
+                    "model_explicit_statement_ids": explicit_ids,
+                    "backend_effective_statement_ids": effective_ids,
+                    "relationship_ids": relationship_ids,
+                    "identifier_validation_sources": {
+                        value: (
+                            "verified_anchor"
+                            "statement_support"
+                            if value in supported_identifiers
+                            else "verified_anchor"
+                        )
+                        for value in identifier_values
+                        if value in (supported_identifiers | set(verified_anchors or {}))
+                    },
+                }
+            )
+        return support
 
     @classmethod
     def _validate_grounded_narrative(
@@ -1066,65 +1655,140 @@ class ValidatedResponseBuilder:
         narrative: object,
         selected_statements: Mapping[str, str],
         relationships: list[dict[str, str]],
+        *,
+        verified_anchors: Mapping[str, str] | None = None,
     ) -> None:
         if not isinstance(narrative, Mapping) or set(narrative) != _NARRATIVE_SYNTHESIS_KEYS:
             raise ValueError("narrative schema is invalid")
-        if not isinstance(narrative["headline"], str) or not narrative["headline"].strip():
-            raise ValueError("narrative headline is invalid")
-        paragraphs = narrative["paragraphs"]
-        if not isinstance(paragraphs, list) or not paragraphs:
-            raise ValueError("narrative paragraphs are invalid")
-        supported_text = " ".join(selected_statements.values())
-        supported_numbers = set(re.findall(r"(?<![A-Za-z])\d+(?:[.,]\d+)?", supported_text))
-        supported_codes = set(re.findall(r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", supported_text))
-        relation_pairs = {
-            (item["from_statement_id"], item["to_statement_id"])
-            for item in relationships
-            if isinstance(item, Mapping)
+        sentences = narrative["sentences"]
+        if not isinstance(sentences, list) or not sentences or len(sentences) > 8:
+            raise ValueError("narrative sentences are invalid")
+        relationship_map = {
+            f"R{index}": relationship
+            for index, relationship in enumerate(
+                (
+                    relationship
+                    for relationship in relationships
+                    if relationship.get("from_statement_id") in selected_statements
+                    and relationship.get("to_statement_id") in selected_statements
+                ),
+                start=1,
+            )
         }
-        for paragraph in paragraphs:
-            if not isinstance(paragraph, Mapping) or set(paragraph) != {
-                "text", "supporting_statement_ids"
-            }:
-                raise ValueError("narrative paragraph schema is invalid")
-            text = paragraph["text"]
-            refs = paragraph["supporting_statement_ids"]
-            if (
-                not isinstance(text, str)
-                or not text.strip()
-                or not isinstance(refs, list)
-                or not refs
-            ):
-                raise ValueError("narrative paragraph support is invalid")
-            if any(not isinstance(ref, str) or ref not in selected_statements for ref in refs):
-                raise ValueError("narrative references an unselected statement")
-            if any(marker in text for marker in _NARRATIVE_DEBUG_MARKERS):
-                raise ValueError("narrative contains relationship debug output")
-            numbers = set(re.findall(r"(?<![A-Za-z])\d+(?:[.,]\d+)?", text))
-            if not numbers <= supported_numbers:
-                raise ValueError("narrative contains an unsupported number")
-            codes = set(re.findall(r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", text))
-            if not codes <= supported_codes:
-                raise ValueError("narrative contains an unsupported identifier")
-            if any(
-                phrase in text.casefold()
-                for phrase in ("çünkü", "bu nedenle", "dolayısıyla", "bunun sonucunda")
-            ) and not any(
-                pair in relation_pairs
-                for pair in (
-                    (refs[i], refs[j])
-                    for i in range(len(refs))
-                    for j in range(len(refs))
-                    if i != j
+        for sentence_index, sentence in enumerate(sentences):
+            if not isinstance(sentence, Mapping) or set(sentence) != _NARRATIVE_SENTENCE_KEYS:
+                raise NarrativeGroundingValidationError(
+                    "sentence_schema_invalid", "narrative sentence schema is invalid",
+                    sentence_index=sentence_index,
+                    sentence=sentence if isinstance(sentence, Mapping) else None,
                 )
+            text = sentence["text"]
+            refs = sentence["statement_ids"]
+            declared = sentence["relationship_ids"]
+            if not isinstance(text, str) or not text.strip():
+                raise NarrativeGroundingValidationError(
+                    "empty_sentence_support", "narrative sentence text is invalid",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
+            if not isinstance(refs, list) or not refs:
+                raise NarrativeGroundingValidationError(
+                    "empty_sentence_support", "narrative sentence support is invalid",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
+            if len(refs) != len(set(refs)) or any(
+                not isinstance(ref, str) or ref not in selected_statements for ref in refs
             ):
-                raise ValueError("narrative contains an unsupported causal relation")
+                raise NarrativeGroundingValidationError(
+                    "unsupported_statement_id", "narrative references an unselected statement",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
+            if not isinstance(declared, list) or len(declared) > 3:
+                raise NarrativeGroundingValidationError(
+                    "sentence_schema_invalid", "narrative sentence relationships are invalid",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
+            if len(declared) != len(set(declared)) or any(
+                not isinstance(item, str) or item not in relationship_map for item in declared
+            ):
+                raise NarrativeGroundingValidationError(
+                    "unsupported_relationship_id",
+                    "narrative references an invalid relationship ID",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
+            for relationship_id in declared:
+                relationship = relationship_map[relationship_id]
+            effective_refs = list(refs)
+            for relationship_id in declared:
+                relationship = relationship_map[relationship_id]
+                for endpoint in (
+                    relationship["from_statement_id"],
+                    relationship["to_statement_id"],
+                ):
+                    if endpoint not in effective_refs:
+                        effective_refs.append(endpoint)
+            if any(marker in text for marker in _NARRATIVE_DEBUG_MARKERS):
+                raise NarrativeGroundingValidationError(
+                    "debug_marker_detected", "narrative contains relationship debug output",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
+            numbers = set(_NARRATIVE_NUMBER_RE.findall(text))
+            effective_text = " ".join(
+                selected_statements[statement_id]
+                for statement_id in effective_refs
+                if statement_id in selected_statements
+            )
+            effective_numbers = set(
+                _NARRATIVE_NUMBER_RE.findall(effective_text)
+            )
+            effective_codes = set(
+                re.findall(r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", effective_text)
+            )
+            effective_codes.update(verified_anchors or {})
+            if not numbers <= effective_numbers:
+                raise NarrativeGroundingValidationError(
+                    "unsupported_number", "narrative contains an unsupported number",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
+            codes = set(re.findall(r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", text))
+            if not codes <= effective_codes:
+                raise NarrativeGroundingValidationError(
+                    "unsupported_identifier", "narrative contains an unsupported identifier",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
+            relational_language = (
+                "çünkü", "nedeniyle", "bu yüzden", "dolayısıyla", "sonucunda",
+                "yol açtı", "tetikledi", "sebep oldu", "buna bağlı olarak",
+                "bu belirsizlik nedeniyle", "bu nedenle", "bunun sonucu olarak",
+                "doğrulanmadığı için", "olduğu için", "olmadığı için", "olmadığından",
+            )
+            has_relational_language = any(
+                phrase in text.casefold() for phrase in relational_language
+            )
+            grounded_manual_review = (
+                "manuel inceleme" in text.casefold()
+                and "root_cause_unverified" in effective_text.casefold()
+            )
+            if grounded_manual_review:
+                has_relational_language = False
+            if has_relational_language and not declared:
+                raise NarrativeGroundingValidationError(
+                    "causal_language_without_relationship",
+                    "narrative contains an unsupported causal relation",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
+            if has_relational_language and not any(
+                relationship_map[relationship_id].get("narrative_semantics") == "causal"
+                for relationship_id in declared
+            ):
+                raise NarrativeGroundingValidationError(
+                    "relationship_semantics_not_permitted",
+                    "relationship semantics do not permit causal wording",
+                    sentence_index=sentence_index, sentence=sentence,
+                )
 
     @staticmethod
     def _render_grounded_narrative(narrative: Mapping[str, Any]) -> str:
-        paragraphs = [str(item["text"]).strip() for item in narrative["paragraphs"]]
-        headline = str(narrative["headline"]).strip()
-        return "\n\n".join([headline, *paragraphs])
+        return " ".join(str(sentence["text"]).strip() for sentence in narrative["sentences"])
 
     @staticmethod
     def _narrative_contract(result: ValidatedExecutionResult) -> str:

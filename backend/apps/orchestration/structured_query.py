@@ -65,6 +65,28 @@ _DOCUMENTARY_EVIDENCE_DIMENSIONS = frozenset(
     }
 )
 
+_CUSTOMER_IMPACT_DIMENSIONS = frozenset(
+    {
+        SemanticDimension.VERIFIED_CUSTOMER_IMPACT,
+        SemanticDimension.VERIFIED_SUBSCRIPTION_IMPACT,
+        SemanticDimension.POTENTIAL_SCOPE,
+    }
+)
+
+
+def requires_customer_impact_evidence(query: StructuredQuery) -> bool:
+    """Return whether the query explicitly needs customer-impact evidence."""
+    if query.customer_impact_requested:
+        return True
+    if query.intent == StructuredQueryIntent.COMPENSATION_EVALUATION:
+        return True
+    if _CUSTOMER_IMPACT_DIMENSIONS.intersection(query.semantic_dimensions):
+        return True
+    # A deterministic outage-impact query with no semantic decomposition is
+    # already an explicit impact request. Other dimensions such as failover,
+    # root cause, or evidence gap must not be widened into customer impact.
+    return query.intent == StructuredQueryIntent.OUTAGE_IMPACT and not query.semantic_dimensions
+
 
 def requires_documentary_evidence(query: StructuredQuery) -> bool:
     """Return whether the query explicitly needs a rule/evidence document lookup."""
@@ -74,6 +96,8 @@ def requires_documentary_evidence(query: StructuredQuery) -> bool:
         StructuredQueryIntent.COMPENSATION_EVALUATION,
     }:
         return True
+    if query.intent == StructuredQueryIntent.NETWORK_INVESTIGATION and query.causal_event_code:
+        return bool(_DOCUMENTARY_EVIDENCE_DIMENSIONS.intersection(query.semantic_dimensions))
     if query.decision_type != "compensation":
         return RequestedOutput.EVIDENCE in query.requested_outputs
     if not query.semantic_dimensions:
@@ -159,6 +183,7 @@ class StructuredQuery(BaseModel):
     intent: StructuredQueryIntent
     requested_outputs: list[RequestedOutput] = Field(default_factory=list)
     semantic_dimensions: list[SemanticDimension] = Field(default_factory=list)
+    customer_impact_requested: bool = False
     semantic_decomposition_status: Literal["not_attempted", "accepted", "fallback"] = (
         "not_attempted"
     )

@@ -119,7 +119,9 @@ def get_llm_descriptor(provider_name: str | None = None) -> LLMProviderDescripto
         raise ImproperlyConfigured("Mock LLM provider is disabled outside tests.")
     if selected == GEMINI_PROVIDER:
         configured_model = (getattr(settings, "LLM_MODEL", "") or "").strip()
-        model = configured_model or descriptor.model
+        # The UI may select Gemini while the process default remains Gemma.
+        # A local model is not a Gemini override; use Gemini's own allowlisted default.
+        model = descriptor.model if configured_model in {"", GEMMA4_MODEL} else configured_model
         if model not in GEMINI_ALLOWED_MODELS:
             raise ImproperlyConfigured("Unsupported Gemini LLM model configuration.")
         if model != descriptor.model:

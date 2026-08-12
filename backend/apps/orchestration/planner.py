@@ -15,6 +15,7 @@ from apps.orchestration.structured_query import (
     RequestedOutput,
     StructuredQuery,
     StructuredQueryIntent,
+    requires_customer_impact_evidence,
     requires_documentary_evidence,
 )
 from apps.orchestration.tool_plan import ToolPlan
@@ -40,6 +41,7 @@ _SUPPORTED_OUTPUTS = {
         {
             RequestedOutput.SUMMARY,
             RequestedOutput.DETAILS,
+            RequestedOutput.IMPACT,
             RequestedOutput.ROOT_CAUSE,
             RequestedOutput.EVIDENCE,
         }
@@ -260,16 +262,19 @@ class DeterministicToolPlanner:
                     "get_outage_details",
                     self._snapshot_args(query, outage_code=query.outage_code),
                     1,
-                ),
-                self._call(
-                    "customer_impact",
-                    "network",
-                    "calculate_customer_impact",
-                    self._snapshot_args(query, outage_code=query.outage_code),
-                    2,
-                    depends_on=["outage_details"],
-                ),
+                )
             ]
+            if requires_customer_impact_evidence(query):
+                calls.append(
+                    self._call(
+                        "customer_impact",
+                        "network",
+                        "calculate_customer_impact",
+                        self._snapshot_args(query, outage_code=query.outage_code),
+                        2,
+                        depends_on=["outage_details"],
+                    )
+                )
             if RequestedOutput.ROOT_CAUSE in query.requested_outputs:
                 calls.append(
                     self._call(
@@ -277,8 +282,12 @@ class DeterministicToolPlanner:
                         "network",
                         "rank_root_cause_candidates",
                         self._snapshot_args(query, outage_code=query.outage_code),
-                        3,
-                        depends_on=["customer_impact"],
+                        2 if not requires_customer_impact_evidence(query) else 3,
+                        depends_on=[
+                            "customer_impact"
+                            if requires_customer_impact_evidence(query)
+                            else "outage_details"
+                        ],
                     )
                 )
             self._append_rule_evidence_if_requested(query, calls)

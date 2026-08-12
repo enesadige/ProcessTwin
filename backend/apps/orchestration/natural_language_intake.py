@@ -58,6 +58,23 @@ _TURKISH_MONTHS = {
 _CAUSAL_CODE_RE = re.compile(r"\bCE-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
 _OUTAGE_CODE_RE = re.compile(r"\bOUT-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
 _SUBSCRIPTION_RE = re.compile(r"\bSUB-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
+_CUSTOMER_IMPACT_REQUEST_TERMS = (
+    "kaç müşteri",
+    "kac musteri",
+    "kaç abonelik",
+    "kac abonelik",
+    "müşteri etkisi",
+    "musteri etkisi",
+    "abonelik etkisi",
+    "müşteri sayısı",
+    "musteri sayisi",
+    "abonelik sayısı",
+    "abonelik sayisi",
+    "müşteriler gerçekten etkilendi",
+    "musteriler gercekten etkilendi",
+    "customer impact",
+    "subscription impact",
+)
 
 
 class NaturalLanguageQueryParseError(Exception):
@@ -248,6 +265,11 @@ def _fold(value: str) -> str:
     )
 
 
+def query_requests_customer_impact(folded_query: str) -> bool:
+    """Detect explicit customer/subscription impact intent, independent of LLM labels."""
+    return any(term in folded_query for term in _CUSTOMER_IMPACT_REQUEST_TERMS)
+
+
 class DeterministicStructuredQueryParser:
     """Provider-free extraction of safe scope fields from a Turkish user query."""
 
@@ -306,6 +328,7 @@ class DeterministicStructuredQueryParser:
             {
                 "intent": intent,
                 "requested_outputs": requested_outputs,
+                "customer_impact_requested": query_requests_customer_impact(folded),
                 "snapshot_identifier": snapshot.snapshot_key,
                 "causal_event_code": causal_event_code,
                 "outage_code": outage_code,
