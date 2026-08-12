@@ -492,10 +492,25 @@ def test_phase1b_synthesizes_grounded_natural_language_and_records_support():
     assert len(provider.requests) == 1
     assert "JSON" in provider.requests[0]["contents"]
     prompt = provider.requests[0]["contents"]
+    assert "kök kaynak X olarak doğrulanmıştır" not in prompt
+    assert response.narrative_synthesis_audit["removed_sentence_count"] == 0
+
+
+@pytest.mark.django_db
+def test_phase1b_keeps_extended_root_cause_prose_instructions_for_gemini_only():
+    run = completed_run("response-grounded-narrative-gemini")
+    provider = GroundedNarrativeProvider()
+    provider.provider_name = "gemini"
+    provider.model_name = "gemini-test"
+
+    ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    prompt = provider.requests[0]["contents"]
     assert "kök kaynak X olarak doğrulanmıştır" in prompt
     assert "Failover başarısızlığı doğrulanmıştır" in prompt
     assert "shared failure domain" in prompt
-    assert response.narrative_synthesis_audit["removed_sentence_count"] == 0
 
 
 @pytest.mark.django_db

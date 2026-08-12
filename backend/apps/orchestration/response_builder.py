@@ -1500,13 +1500,6 @@ class ValidatedResponseBuilder:
             "root_cause:, impact: veya eligibility: gibi iç rol etiketleriyle başlama. "
             "root_cause_unverified, same_resource, temporal_propagation veya evidence_gap "
             "gibi iç reason code'larını da gösterme; desteklenen anlamı doğal Türkçeyle ifade et. "
-            "Kök kaynak doğrulanmış, fiziksel kök neden doğrulanmamışsa yalnızca "
-            "'kök kaynak X olarak doğrulanmıştır' de; X'in olaya neden olduğunu söyleme. "
-            "Failover başarısızlığı doğrulanmış ancak fiziksel nedeni doğrulanmamışsa bunu "
-            "'Failover başarısızlığı doğrulanmıştır; ancak başarısızlığın fiziksel nedeni "
-            "mevcut kanıtlarla kesin olarak doğrulanmamıştır.' çizgisinde ifade et. "
-            "Mevcut AnswerPlan'da açıkça desteklenmiyorsa path/source independence, "
-            "shared failure domain veya ortak kaynak iddiası kurma. "
             "JSON, ID, madde imi veya debug ilişkisi üretme.\n"
             "Sorgunun aşağıdaki istenen çıktılarını ayrı ayrı yanıtla; mevcut bir "
             "doğrulanmış değer varsa atlama: REQUESTED_OUTPUTS="
@@ -1521,6 +1514,16 @@ class ValidatedResponseBuilder:
             + "\nVALID_RELATIONSHIPS="
             + json.dumps(relationship_map, ensure_ascii=False, sort_keys=True)
         )
+        if provider.provider_name == "gemini":
+            prompt += (
+                "\nKök kaynak doğrulanmış, fiziksel kök neden doğrulanmamışsa yalnızca "
+                "'kök kaynak X olarak doğrulanmıştır' de; X'in olaya neden olduğunu söyleme. "
+                "Failover başarısızlığı doğrulanmış ancak fiziksel nedeni doğrulanmamışsa bunu "
+                "'Failover başarısızlığı doğrulanmıştır; ancak başarısızlığın fiziksel nedeni "
+                "mevcut kanıtlarla kesin olarak doğrulanmamıştır.' çizgisinde ifade et. "
+                "Mevcut AnswerPlan'da açıkça desteklenmiyorsa path/source independence, "
+                "shared failure domain veya ortak kaynak iddiası kurma."
+            )
         request: dict[str, Any] = {"contents": prompt}
         if getattr(provider, "supports_request_unload", False):
             request["release_after"] = True
