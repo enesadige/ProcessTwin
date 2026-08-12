@@ -491,6 +491,10 @@ def test_phase1b_synthesizes_grounded_natural_language_and_records_support():
     assert "->" not in response.response_text
     assert len(provider.requests) == 1
     assert "JSON" in provider.requests[0]["contents"]
+    prompt = provider.requests[0]["contents"]
+    assert "kök kaynak X olarak doğrulanmıştır" in prompt
+    assert "Failover başarısızlığı doğrulanmıştır" in prompt
+    assert "shared failure domain" in prompt
     assert response.narrative_synthesis_audit["removed_sentence_count"] == 0
 
 
