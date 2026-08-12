@@ -54,6 +54,24 @@ _NARRATIVE_ROLE_PREFIX_RE = re.compile(
     r"^\s*(?:details|evidence|summary|root_cause|impact|eligibility)\s*:\s*",
     re.IGNORECASE,
 )
+_NARRATIVE_INTERNAL_REASON_RE = re.compile(
+    r"\b(?:root_cause_unverified|same_resource|temporal_propagation|evidence_gap)\b",
+    re.IGNORECASE,
+)
+_NARRATIVE_INTERNAL_REASON_SEQUENCE_RE = re.compile(
+    r"\b(?:root_cause_unverified|same_resource|temporal_propagation|evidence_gap)\b"
+    r"(?:\s*,?\s*(?:ve\s*)?\b(?:root_cause_unverified|same_resource|temporal_propagation|evidence_gap)\b)+",
+    re.IGNORECASE,
+)
+_NARRATIVE_DOMAIN_INTERPRETATION_RE = re.compile(
+    r"\b(?:ortak kaynak|ortak kaynaklı|ortak arıza alanı|ortak arıza|aynı kaynak|"
+    r"zamansal yayılım|bağımsızlık|bağımsız yollar|"
+    r"shared[- ](?:source|failure|risk)|common[- ](?:cause|source|failure))\b",
+    re.IGNORECASE,
+)
+_NARRATIVE_FACT_TOKEN_RE = re.compile(
+    r"(?:\b\d+(?:[.,]\d+)?\b|\b[A-Z][A-Z0-9_:-]{3,}\b|\b[A-Z][A-Z0-9]+(?:-[A-Z0-9]+)+\b)"
+)
 _NARRATIVE_NUMBER_RE = re.compile(
     r"(?<![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])\d+(?:[.,]\d+)?(?![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])"
 )
@@ -101,12 +119,10 @@ class NarrativeGroundingValidationError(ValueError):
             if isinstance(sentence.get("text"), str)
             else "",
             "rejected_statement_ids": [
-                str(item) for item in sentence.get("statement_ids", [])
-                if isinstance(item, str)
+                str(item) for item in sentence.get("statement_ids", []) if isinstance(item, str)
             ],
             "rejected_relationship_ids": [
-                str(item) for item in sentence.get("relationship_ids", [])
-                if isinstance(item, str)
+                str(item) for item in sentence.get("relationship_ids", []) if isinstance(item, str)
             ],
             "safe_failure_detail": message,
         }
@@ -203,14 +219,10 @@ class ValidatedResponseBuilder:
             original_query=query_run.original_query,
             structured_query=query_run.structured_query,
         )
-        verified_anchors = self._verified_narrative_anchors(
-            result, query_run.structured_query
-        )
+        verified_anchors = self._verified_narrative_anchors(result, query_run.structured_query)
         narrative = deterministic_text
         try:
-            selection = self._deterministic_answer_plan(
-                contract[1], query_run.structured_query
-            )
+            selection = self._deterministic_answer_plan(contract[1], query_run.structured_query)
             response.semantic_concepts = selection["concepts"]
             response.grounded_relationships = selection["relationships"]
             response.statement_selection_audit = selection["audit"]
@@ -222,10 +234,31 @@ class ValidatedResponseBuilder:
                         statement_id: contract[1]["statements"][statement_id]
                         for statement_id in selection["selected_statement_ids"]
                     },
+                    statement_concepts={
+                        statement_id: contract[1]
+                        .get("statement_concepts", {})
+                        .get(statement_id, [])
+                        for statement_id in selection["selected_statement_ids"]
+                    },
                     relationships=selection["relationships"],
                     verified_anchors=verified_anchors,
                     requested_outputs=selection["audit"]["selection_reason"]["requested_outputs"],
                 )
+                narrative, coverage_fill_count = self._ensure_requested_narrative_coverage(
+                    narrative,
+                    original_query=query_run.original_query,
+                    selected_statements={
+                        statement_id: contract[1]["statements"][statement_id]
+                        for statement_id in selection["selected_statement_ids"]
+                    },
+                    statement_concepts={
+                        statement_id: contract[1]
+                        .get("statement_concepts", {})
+                        .get(statement_id, [])
+                        for statement_id in selection["selected_statement_ids"]
+                    },
+                )
+                synthesis_audit["deterministic_fill_count"] = coverage_fill_count
                 response.narrative_synthesis_audit = synthesis_audit
             else:
                 response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
@@ -299,6 +332,97 @@ class ValidatedResponseBuilder:
         response.generation_mode = ResponseGenerationMode.LLM_ASSISTED
         return response
 
+    @classmethod
+    def _ensure_requested_narrative_coverage(
+        cls,
+        narrative: str,
+        *,
+        original_query: str,
+        selected_statements: Mapping[str, str],
+        statement_concepts: Mapping[str, list[str]],
+    ) -> tuple[str, int]:
+        """Add only explicitly requested verified facts omitted by the provider."""
+        query = original_query.casefold()
+        requested_roles: set[str] = set()
+        if any(term in query for term in ("kaç abonelik", "kac abonelik", "abonelik")):
+            requested_roles.add("verified_subscription_impact")
+        if any(term in query for term in ("kaç müşteri", "kac musteri", "müşteri", "musteri")):
+            requested_roles.add("verified_customer_impact")
+        if any(term in query for term in ("tazminat", "telafi", "tutar", "amount")):
+            requested_roles.add("compensation_amount")
+        if any(term in query for term in ("uygulanan kural", "ruleversion", "rule version")):
+            requested_roles.add("rule_version")
+        if any(
+            term in query for term in ("decisionevidence", "decision evidence", "kararın dayandığı")
+        ):
+            requested_roles.add("decision_evidence")
+        if any(term in query for term in ("tam hizmet", "tam kesinti", "full outage")):
+            requested_roles.add("outage_classification")
+        if any(term in query for term in ("kök kaynak", "kok kaynak", "root resource")):
+            requested_roles.add("root_resource")
+        if any(
+            term in query for term in ("detaylı analiz", "detayli analiz", "analiz et", "analyze")
+        ):
+            requested_roles.add("root_resource")
+        if "failover" in query and any(
+            term in query for term in ("neden", "başarılı olmadı", "basarili olmadi")
+        ):
+            requested_roles.add("failover_explanation")
+            requested_roles.add("physical_root_cause")
+
+        text = narrative
+        fill_count = 0
+        for role in requested_roles:
+            candidates = [
+                (statement_id, statement_text)
+                for statement_id, statement_text in selected_statements.items()
+                if role in set(statement_concepts.get(statement_id, []))
+            ]
+            if not candidates:
+                continue
+            supported_tokens = {
+                token.casefold()
+                for _, statement_text in candidates
+                for token in _NARRATIVE_FACT_TOKEN_RE.findall(statement_text)
+            }
+            combined_candidate_text = " ".join(
+                statement_text for _, statement_text in candidates
+            ).casefold()
+            lower_text = text.casefold()
+            role_present = (
+                (role == "outage_classification" and "tam hizmet kesintisi" in lower_text)
+                or (
+                    role in {"verified_customer_impact", "verified_subscription_impact"}
+                    and any(token in lower_text for token in supported_tokens)
+                )
+                or (
+                    role == "root_resource"
+                    and any(token in lower_text for token in supported_tokens)
+                )
+                or (
+                    role == "failover_explanation"
+                    and "failover" in lower_text
+                    and any(token in lower_text for token in supported_tokens)
+                )
+                or (
+                    role == "physical_root_cause"
+                    and ("kök neden" in lower_text or "fiziksel" in lower_text)
+                )
+                or (
+                    role in {"compensation_amount", "rule_version", "decision_evidence"}
+                    and any(token in lower_text for token in supported_tokens)
+                )
+                or (combined_candidate_text and combined_candidate_text in lower_text)
+            )
+            if supported_tokens and not role_present:
+                appended = _NARRATIVE_ROLE_PREFIX_RE.sub("", candidates[0][1], count=1).strip()
+                appended = _NARRATIVE_INTERNAL_REASON_RE.sub(
+                    "doğrulanmamış teknik gerekçe", appended
+                ).strip()
+                text = f"{text.rstrip()} {appended}"
+                fill_count += 1
+        return text, fill_count
+
     @staticmethod
     def _deterministic_answer_plan(
         data: Mapping[str, Any], structured_query: Mapping[str, Any] | None
@@ -319,25 +443,43 @@ class ValidatedResponseBuilder:
             intent = str(structured_query.get("intent", ""))
 
         all_roles = {
-            "outage_classification", "root_cause", "primary_backup_state",
-            "potential_scope", "verified_customer_impact", "verified_no_impact",
-            "insufficient_evidence", "failover_explanation", "compensation_status",
-            "compensation_reason", "evidence", "verified_subscription_impact",
-            "compensation_amount", "rule_version", "decision_evidence",
-            "physical_root_cause", "root_resource",
+            "outage_classification",
+            "root_cause",
+            "primary_backup_state",
+            "potential_scope",
+            "verified_customer_impact",
+            "verified_no_impact",
+            "insufficient_evidence",
+            "failover_explanation",
+            "compensation_status",
+            "compensation_reason",
+            "evidence",
+            "verified_subscription_impact",
+            "compensation_amount",
+            "rule_version",
+            "decision_evidence",
+            "physical_root_cause",
+            "root_resource",
         }
         relevant_roles = set()
         if not requested and not dimensions:
             relevant_roles = all_roles
         if requested & {"impact", "summary", "details"} or dimensions & {
-            "verified_customer_impact", "verified_subscription_impact", "potential_scope",
+            "verified_customer_impact",
+            "verified_subscription_impact",
+            "potential_scope",
         }:
             relevant_roles |= {
-                "outage_classification", "potential_scope", "verified_customer_impact",
-                "verified_no_impact", "insufficient_evidence",
+                "outage_classification",
+                "potential_scope",
+                "verified_customer_impact",
+                "verified_no_impact",
+                "insufficient_evidence",
             }
         if requested & {"root_cause"} or dimensions & {
-            "root_resource", "physical_root_cause", "outage_classification",
+            "root_resource",
+            "physical_root_cause",
+            "outage_classification",
         }:
             relevant_roles |= {"root_cause", "outage_classification"}
         if dimensions & {"failover_status", "failover_protection"}:
@@ -346,10 +488,20 @@ class ValidatedResponseBuilder:
                 "failover_explanation",
                 "insufficient_evidence",
             }
-        if requested & {"eligibility", "compensation_amount", "evidence"} or dimensions & {
-            "compensation_result", "compensation_reason", "rule_version", "decision_evidence",
-            "rag_evidence", "source_version_section", "evidence_gap",
-        } or intent in {"compensation_evaluation", "rule_evidence", "rule_document_retrieval"}:
+        if (
+            requested & {"eligibility", "compensation_amount", "evidence"}
+            or dimensions
+            & {
+                "compensation_result",
+                "compensation_reason",
+                "rule_version",
+                "decision_evidence",
+                "rag_evidence",
+                "source_version_section",
+                "evidence_gap",
+            }
+            or intent in {"compensation_evaluation", "rule_evidence", "rule_document_retrieval"}
+        ):
             relevant_roles |= {
                 "compensation_status",
                 "compensation_reason",
@@ -372,7 +524,8 @@ class ValidatedResponseBuilder:
             selected_ids = list(statements)
         selected_set = set(selected_ids)
         selected_relationships = [
-            relation for relation in relationships
+            relation
+            for relation in relationships
             if isinstance(relation, Mapping)
             and relation.get("from_statement_id") in selected_set
             and relation.get("to_statement_id") in selected_set
@@ -822,8 +975,7 @@ class ValidatedResponseBuilder:
             add(f"Telafi durumu: {compensation.status}.")
         if compensation and compensation.total_amount and compensation.currency:
             add(
-                f"Doğrulanmış tazminat tutarı: {compensation.total_amount} "
-                f"{compensation.currency}."
+                f"Doğrulanmış tazminat tutarı: {compensation.total_amount} {compensation.currency}."
             )
         if compensation and compensation.considered is not None:
             add(f"Telafi değerlendirmesi yapılan: {compensation.considered} kayıt.")
@@ -994,17 +1146,20 @@ class ValidatedResponseBuilder:
                     and "tam hizmet kesintisi: hayır" in target_text
                 ):
                     add(
-                        "consequence", source, target,
-                        "deterministic_outage_classification", "causal"
+                        "consequence",
+                        source,
+                        target,
+                        "deterministic_outage_classification",
+                        "causal",
                     )
                     add(
-                        "contrast", source, target,
-                        "deterministic_outage_classification", "contrast"
+                        "contrast",
+                        source,
+                        target,
+                        "deterministic_outage_classification",
+                        "contrast",
                     )
-                if (
-                    "potansiyel kapsam" in source_text
-                    and "doğrulanmış etki" in target_text
-                ):
+                if "potansiyel kapsam" in source_text and "doğrulanmış etki" in target_text:
                     add("consequence", source, target, "deterministic_impact_scope", "causal")
                 if (
                     "müşteri etkisi" in source_text
@@ -1012,8 +1167,11 @@ class ValidatedResponseBuilder:
                     and "telafi durumu" in target_text
                 ):
                     add(
-                        "consequence", source, target,
-                        "deterministic_compensation_pending", "causal"
+                        "consequence",
+                        source,
+                        target,
+                        "deterministic_compensation_pending",
+                        "causal",
                     )
                 if (
                     "müşteri etkisi" in source_text
@@ -1021,8 +1179,11 @@ class ValidatedResponseBuilder:
                     and "tazminat kararı" in target_text
                 ):
                     add(
-                        "consequence", source, target,
-                        "deterministic_compensation_evaluation", "causal"
+                        "consequence",
+                        source,
+                        target,
+                        "deterministic_compensation_evaluation",
+                        "causal",
                     )
         return candidates
 
@@ -1063,12 +1224,16 @@ class ValidatedResponseBuilder:
             )
         statement_concepts = data.get("statement_concepts", {})
         allowed_ids = sorted(str(key) for key in statements)
-        allowed_concepts = sorted(
-            str(concept)
-            for concepts in statement_concepts.values()
-            if isinstance(concepts, list)
-            for concept in concepts
-        ) if isinstance(statement_concepts, Mapping) else []
+        allowed_concepts = (
+            sorted(
+                str(concept)
+                for concepts in statement_concepts.values()
+                if isinstance(concepts, list)
+                for concept in concepts
+            )
+            if isinstance(statement_concepts, Mapping)
+            else []
+        )
         base_details = {
             "allowed_statement_ids": allowed_ids,
             "allowed_statement_concepts": allowed_concepts,
@@ -1154,13 +1319,10 @@ class ValidatedResponseBuilder:
             details = {
                 **base_details,
                 "returned_keys": (
-                    sorted(str(key) for key in selection)
-                    if isinstance(selection, Mapping)
-                    else []
+                    sorted(str(key) for key in selection) if isinstance(selection, Mapping) else []
                 ),
                 "returned_statement_ids": (
-                    [str(value) for value in returned_ids]
-                    if isinstance(returned_ids, list) else []
+                    [str(value) for value in returned_ids] if isinstance(returned_ids, list) else []
                 ),
                 "returned_concepts": [],
                 "normalized_concepts": [],
@@ -1174,7 +1336,8 @@ class ValidatedResponseBuilder:
                         for item in relationships
                         if isinstance(item, Mapping)
                     ]
-                    if isinstance(relationships, list) else []
+                    if isinstance(relationships, list)
+                    else []
                 ),
                 "failure_detail": str(exc),
             }
@@ -1198,9 +1361,7 @@ class ValidatedResponseBuilder:
             if isinstance(item, Mapping)
         }
         selected_relationships = [
-            candidate_map[
-                (item["type"], item["from_statement_id"], item["to_statement_id"])
-            ]
+            candidate_map[(item["type"], item["from_statement_id"], item["to_statement_id"])]
             for item in selection["relationships"]
         ]
         selection = {**selection, "relationships": selected_relationships}
@@ -1261,11 +1422,12 @@ class ValidatedResponseBuilder:
         statement_concepts: Mapping[str, object] | None = None,
         validated_relationships: list[dict[str, str]] | None = None,
     ) -> None:
-        if not isinstance(selection, Mapping) or not {
-            "headline_id", "selected_statement_ids", "relationships"
-        }.issubset(selection) or set(selection) - {
-            "headline_id", "concepts", "selected_statement_ids", "relationships"
-        }:
+        if (
+            not isinstance(selection, Mapping)
+            or not {"headline_id", "selected_statement_ids", "relationships"}.issubset(selection)
+            or set(selection)
+            - {"headline_id", "concepts", "selected_statement_ids", "relationships"}
+        ):
             raise ValueError("statement selection schema is invalid")
         if selection["headline_id"] not in {"H1", None}:
             raise ValueError("unknown headline ID")
@@ -1284,7 +1446,9 @@ class ValidatedResponseBuilder:
         }
         for relation in relationships:
             if not isinstance(relation, Mapping) or set(relation) != {
-                "type", "from_statement_id", "to_statement_id"
+                "type",
+                "from_statement_id",
+                "to_statement_id",
             }:
                 raise ValueError("statement relationships are invalid")
             if (
@@ -1314,6 +1478,7 @@ class ValidatedResponseBuilder:
         relationships: list[dict[str, str]],
         verified_anchors: Mapping[str, str] | None = None,
         requested_outputs: list[str] | None = None,
+        statement_concepts: Mapping[str, list[str]] | None = None,
     ) -> tuple[str, dict[str, Any]]:
         relationship_map = {
             f"R{index}": relationship
@@ -1333,12 +1498,16 @@ class ValidatedResponseBuilder:
             "Bilinmeyenleri sıfıra çevirme; bağımsız kanıt boşluklarını nedensel bağlama. "
             "4-8 kısa cümleyle tüm istenen noktaları kapsa. details:, evidence:, summary:, "
             "root_cause:, impact: veya eligibility: gibi iç rol etiketleriyle başlama. "
+            "root_cause_unverified, same_resource, temporal_propagation veya evidence_gap "
+            "gibi iç reason code'larını da gösterme; desteklenen anlamı doğal Türkçeyle ifade et. "
             "JSON, ID, madde imi veya debug ilişkisi üretme.\n"
             "Sorgunun aşağıdaki istenen çıktılarını ayrı ayrı yanıtla; mevcut bir "
             "doğrulanmış değer varsa atlama: REQUESTED_OUTPUTS="
             + json.dumps(requested_outputs or [], ensure_ascii=False)
             + "\n"
-            "USER_QUERY=" + original_query.strip() + "\nVERIFIED_FACTS="
+            "USER_QUERY="
+            + original_query.strip()
+            + "\nVERIFIED_FACTS="
             + json.dumps(selected_statements, ensure_ascii=False, sort_keys=True)
             + "\nVERIFIED_ANCHORS="
             + json.dumps(dict(verified_anchors or {}), ensure_ascii=False, sort_keys=True)
@@ -1374,12 +1543,13 @@ class ValidatedResponseBuilder:
             )
         content = response.get("content", "")
         narrative, removed_sentences = cls._free_text_narrative(
-            content, selected_statements, relationship_map, verified_anchors
+            content, selected_statements, relationship_map, verified_anchors, statement_concepts
         )
         if not narrative["sentences"]:
             removal_details = removed_sentences[0] if removed_sentences else {}
             raise NarrativeSynthesisError(
-                "unsupported_narrative", "no grounded narrative sentence remained",
+                "unsupported_narrative",
+                "no grounded narrative sentence remained",
                 details={
                     "removed_sentence_count": len(removed_sentences),
                     "removed_sentence_reasons": removed_sentences,
@@ -1399,7 +1569,8 @@ class ValidatedResponseBuilder:
             )
         except NarrativeGroundingValidationError as exc:
             raise NarrativeSynthesisError(
-                "grounding_validation_failed", str(exc),
+                "grounding_validation_failed",
+                str(exc),
                 details={
                     "selected_statement_ids": sorted(selected_statements),
                     "narrative_support_references": cls._narrative_support_references(narrative),
@@ -1408,7 +1579,8 @@ class ValidatedResponseBuilder:
             ) from exc
         except ValueError as exc:
             raise NarrativeSynthesisError(
-                "grounding_validation_failed", str(exc),
+                "grounding_validation_failed",
+                str(exc),
                 details={
                     "selected_statement_ids": sorted(selected_statements),
                     "narrative_support_references": cls._narrative_support_references(narrative),
@@ -1444,6 +1616,7 @@ class ValidatedResponseBuilder:
         selected_statements: Mapping[str, str],
         relationship_map: Mapping[str, Mapping[str, str]],
         verified_anchors: Mapping[str, str] | None = None,
+        statement_concepts: Mapping[str, list[str]] | None = None,
     ) -> tuple[dict[str, list[dict[str, Any]]], list[dict[str, str]]]:
         if not isinstance(content, str) or not content.strip():
             return {"sentences": []}, []
@@ -1453,8 +1626,22 @@ class ValidatedResponseBuilder:
         for text in (part.strip() for part in sentences):
             if not text:
                 continue
-            text = _NARRATIVE_ROLE_PREFIX_RE.sub("", text, count=1).strip()
+            text = cls._sanitize_narrative_text(text)
             if not text:
+                continue
+            if cls._contains_unsupported_domain_interpretation(
+                text, selected_statements, relationship_map
+            ):
+                removed.append(
+                    {
+                        "text": text,
+                        "reason": "unsupported domain interpretation",
+                        "failure_code": "unsupported_domain_interpretation",
+                        "safe_failure_detail": (
+                            "current-query evidence does not support the domain interpretation"
+                        ),
+                    }
+                )
                 continue
             # The AnswerPlan is the closed-world support universe. A sentence
             # may paraphrase or combine facts without repeating canonical text.
@@ -1492,6 +1679,34 @@ class ValidatedResponseBuilder:
         return {"sentences": result}, removed
 
     @staticmethod
+    def _sanitize_narrative_text(text: str) -> str:
+        text = _NARRATIVE_ROLE_PREFIX_RE.sub("", text, count=1).strip()
+        if _NARRATIVE_INTERNAL_REASON_RE.search(text):
+            text = _NARRATIVE_INTERNAL_REASON_SEQUENCE_RE.sub("doğrulanmamış teknik gerekçe", text)
+            text = _NARRATIVE_INTERNAL_REASON_RE.sub("", text)
+            text = re.sub(r"\s*,\s*(?:ve\s*)?", " ", text)
+            text = re.sub(r"\s{2,}", " ", text)
+            text = text.replace("gerekçeleriyle", "mevcut kanıtlarla")
+            text = text.replace("gerekçeleri", "mevcut kanıtlar")
+        return text.strip(" ,")
+
+    @staticmethod
+    def _contains_unsupported_domain_interpretation(
+        text: str,
+        statements: Mapping[str, str],
+        relationships: Mapping[str, Mapping[str, str]],
+    ) -> bool:
+        if not _NARRATIVE_DOMAIN_INTERPRETATION_RE.search(text):
+            return False
+        relationship_text = " ".join(
+            json.dumps(value, ensure_ascii=False) for value in relationships.values()
+        ).casefold()
+        return not any(
+            marker in relationship_text
+            for marker in ("ortak kaynak", "ortak arıza", "bağımsız", "shared", "common")
+        )
+
+    @staticmethod
     def _sentence_support(text: str, statements: Mapping[str, str]) -> list[str]:
         # Kept as a small public helper for audit/tests. Support is intentionally
         # not inferred from lexical similarity; the deterministic AnswerPlan is
@@ -1509,8 +1724,16 @@ class ValidatedResponseBuilder:
         causal = any(
             phrase in lowered
             for phrase in (
-                "nedeniyle", "sebebiyle", "bu yüzden", "sonucunda", "dolayısıyla",
-                "yol açtı", "tetikledi", "kaynaklandı", "olduğu için", "olmadığı için",
+                "nedeniyle",
+                "sebebiyle",
+                "bu yüzden",
+                "sonucunda",
+                "dolayısıyla",
+                "yol açtı",
+                "tetikledi",
+                "kaynaklandı",
+                "olduğu için",
+                "olmadığı için",
             )
         )
         if not causal:
@@ -1523,35 +1746,37 @@ class ValidatedResponseBuilder:
             target = statements.get(relationship.get("to_statement_id"), "")
             source_tokens = {
                 token.casefold()
-                for token in re.findall(
-                    r"[A-Za-zÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü-]{3,}", source
-                )
+                for token in re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü-]{3,}", source)
                 if len(token) >= 5
             }
             target_tokens = {
                 token.casefold()
-                for token in re.findall(
-                    r"[A-Za-zÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü-]{3,}", target
-                )
+                for token in re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü-]{3,}", target)
                 if len(token) >= 5
             }
             lowered = text.casefold()
             text_tokens = {
                 token.casefold()
-                for token in re.findall(
-                    r"[A-Za-zÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü-]{3,}", lowered
-                )
+                for token in re.findall(r"[A-Za-zÇĞİÖŞÜçğıöşü][\wÇĞİÖŞÜçğıöşü-]{3,}", lowered)
             }
-            if source_tokens and target_tokens and (
-                any(
-                    any(candidate.startswith(token[:5]) or token.startswith(candidate[:5])
-                        for candidate in text_tokens)
-                    for token in source_tokens
-                )
-                and any(
-                    any(candidate.startswith(token[:5]) or token.startswith(candidate[:5])
-                        for candidate in text_tokens)
-                    for token in target_tokens
+            if (
+                source_tokens
+                and target_tokens
+                and (
+                    any(
+                        any(
+                            candidate.startswith(token[:5]) or token.startswith(candidate[:5])
+                            for candidate in text_tokens
+                        )
+                        for token in source_tokens
+                    )
+                    and any(
+                        any(
+                            candidate.startswith(token[:5]) or token.startswith(candidate[:5])
+                            for candidate in text_tokens
+                        )
+                        for token in target_tokens
+                    )
                 )
             ):
                 selected.append(relationship_id)
@@ -1631,13 +1856,10 @@ class ValidatedResponseBuilder:
                 str(sentence.get("text", "")),
             )
             statement_text = " ".join(
-                (selected_statements or {}).get(statement_id, "")
-                for statement_id in effective_ids
+                (selected_statements or {}).get(statement_id, "") for statement_id in effective_ids
             )
             supported_identifiers = set(
-                re.findall(
-                    r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", statement_text
-                )
+                re.findall(r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", statement_text)
             )
             support.append(
                 {
@@ -1646,8 +1868,7 @@ class ValidatedResponseBuilder:
                     "relationship_ids": relationship_ids,
                     "identifier_validation_sources": {
                         value: (
-                            "verified_anchor"
-                            "statement_support"
+                            "verified_anchorstatement_support"
                             if value in supported_identifiers
                             else "verified_anchor"
                         )
@@ -1687,7 +1908,8 @@ class ValidatedResponseBuilder:
         for sentence_index, sentence in enumerate(sentences):
             if not isinstance(sentence, Mapping) or set(sentence) != _NARRATIVE_SENTENCE_KEYS:
                 raise NarrativeGroundingValidationError(
-                    "sentence_schema_invalid", "narrative sentence schema is invalid",
+                    "sentence_schema_invalid",
+                    "narrative sentence schema is invalid",
                     sentence_index=sentence_index,
                     sentence=sentence if isinstance(sentence, Mapping) else None,
                 )
@@ -1696,25 +1918,33 @@ class ValidatedResponseBuilder:
             declared = sentence["relationship_ids"]
             if not isinstance(text, str) or not text.strip():
                 raise NarrativeGroundingValidationError(
-                    "empty_sentence_support", "narrative sentence text is invalid",
-                    sentence_index=sentence_index, sentence=sentence,
+                    "empty_sentence_support",
+                    "narrative sentence text is invalid",
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
             if not isinstance(refs, list) or not refs:
                 raise NarrativeGroundingValidationError(
-                    "empty_sentence_support", "narrative sentence support is invalid",
-                    sentence_index=sentence_index, sentence=sentence,
+                    "empty_sentence_support",
+                    "narrative sentence support is invalid",
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
             if len(refs) != len(set(refs)) or any(
                 not isinstance(ref, str) or ref not in selected_statements for ref in refs
             ):
                 raise NarrativeGroundingValidationError(
-                    "unsupported_statement_id", "narrative references an unselected statement",
-                    sentence_index=sentence_index, sentence=sentence,
+                    "unsupported_statement_id",
+                    "narrative references an unselected statement",
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
             if not isinstance(declared, list) or len(declared) > 3:
                 raise NarrativeGroundingValidationError(
-                    "sentence_schema_invalid", "narrative sentence relationships are invalid",
-                    sentence_index=sentence_index, sentence=sentence,
+                    "sentence_schema_invalid",
+                    "narrative sentence relationships are invalid",
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
             if len(declared) != len(set(declared)) or any(
                 not isinstance(item, str) or item not in relationship_map for item in declared
@@ -1722,7 +1952,8 @@ class ValidatedResponseBuilder:
                 raise NarrativeGroundingValidationError(
                     "unsupported_relationship_id",
                     "narrative references an invalid relationship ID",
-                    sentence_index=sentence_index, sentence=sentence,
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
             for relationship_id in declared:
                 relationship = relationship_map[relationship_id]
@@ -1737,8 +1968,10 @@ class ValidatedResponseBuilder:
                         effective_refs.append(endpoint)
             if any(marker in text for marker in _NARRATIVE_DEBUG_MARKERS):
                 raise NarrativeGroundingValidationError(
-                    "debug_marker_detected", "narrative contains relationship debug output",
-                    sentence_index=sentence_index, sentence=sentence,
+                    "debug_marker_detected",
+                    "narrative contains relationship debug output",
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
             numbers = set(_NARRATIVE_NUMBER_RE.findall(text))
             effective_text = " ".join(
@@ -1746,29 +1979,43 @@ class ValidatedResponseBuilder:
                 for statement_id in effective_refs
                 if statement_id in selected_statements
             )
-            effective_numbers = set(
-                _NARRATIVE_NUMBER_RE.findall(effective_text)
-            )
+            effective_numbers = set(_NARRATIVE_NUMBER_RE.findall(effective_text))
             effective_codes = set(
                 re.findall(r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", effective_text)
             )
             effective_codes.update(verified_anchors or {})
             if not numbers <= effective_numbers:
                 raise NarrativeGroundingValidationError(
-                    "unsupported_number", "narrative contains an unsupported number",
-                    sentence_index=sentence_index, sentence=sentence,
+                    "unsupported_number",
+                    "narrative contains an unsupported number",
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
             codes = set(re.findall(r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", text))
             if not codes <= effective_codes:
                 raise NarrativeGroundingValidationError(
-                    "unsupported_identifier", "narrative contains an unsupported identifier",
-                    sentence_index=sentence_index, sentence=sentence,
+                    "unsupported_identifier",
+                    "narrative contains an unsupported identifier",
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
             relational_language = (
-                "çünkü", "nedeniyle", "bu yüzden", "dolayısıyla", "sonucunda",
-                "yol açtı", "tetikledi", "sebep oldu", "buna bağlı olarak",
-                "bu belirsizlik nedeniyle", "bu nedenle", "bunun sonucu olarak",
-                "doğrulanmadığı için", "olduğu için", "olmadığı için", "olmadığından",
+                "çünkü",
+                "nedeniyle",
+                "bu yüzden",
+                "dolayısıyla",
+                "sonucunda",
+                "yol açtı",
+                "tetikledi",
+                "sebep oldu",
+                "buna bağlı olarak",
+                "bu belirsizlik nedeniyle",
+                "bu nedenle",
+                "bunun sonucu olarak",
+                "doğrulanmadığı için",
+                "olduğu için",
+                "olmadığı için",
+                "olmadığından",
             )
             has_relational_language = any(
                 phrase in text.casefold() for phrase in relational_language
@@ -1783,7 +2030,8 @@ class ValidatedResponseBuilder:
                 raise NarrativeGroundingValidationError(
                     "causal_language_without_relationship",
                     "narrative contains an unsupported causal relation",
-                    sentence_index=sentence_index, sentence=sentence,
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
             if has_relational_language and not any(
                 relationship_map[relationship_id].get("narrative_semantics") == "causal"
@@ -1792,7 +2040,8 @@ class ValidatedResponseBuilder:
                 raise NarrativeGroundingValidationError(
                     "relationship_semantics_not_permitted",
                     "relationship semantics do not permit causal wording",
-                    sentence_index=sentence_index, sentence=sentence,
+                    sentence_index=sentence_index,
+                    sentence=sentence,
                 )
 
     @staticmethod

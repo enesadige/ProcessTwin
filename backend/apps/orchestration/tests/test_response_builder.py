@@ -100,9 +100,7 @@ class NarrativeFailureProvider(GroundedNarrativeProvider):
         call_number = len(self.requests) + 1
         self.requests.append(dict(request))
         if call_number == 1:
-            raise OllamaLLMProviderError(
-                message="Ollama request timed out.", code="timeout"
-            )
+            raise OllamaLLMProviderError(message="Ollama request timed out.", code="timeout")
         return super().generate(request=request)
 
 
@@ -270,8 +268,10 @@ def test_llm_assisted_mode_uses_only_safe_fact_sheet_and_preserves_deterministic
     assert response.provider == "recording"
     assert response.model == "recording-v1"
     assert response.response_text == (
-        "Doğrulanmış operasyon kayıtlarına dayalı doğal bir değerlendirme."
+        "Doğrulanmış operasyon kayıtlarına dayalı doğal bir değerlendirme. "
+        "Doğrulanmış etki: 2 bağlantı."
     )
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 1
     assert response.statement_selection_audit["mode"] == "deterministic"
     assert response.statement_selection_audit["status"] == "completed"
     prompt = provider.requests[0]["contents"]
@@ -601,9 +601,7 @@ def test_sentence_grounding_accepts_only_the_exact_declared_relationship():
         ]
     }
 
-    ValidatedResponseBuilder._validate_grounded_narrative(
-        narrative, statements, [relationship]
-    )
+    ValidatedResponseBuilder._validate_grounded_narrative(narrative, statements, [relationship])
 
 
 def test_causal_sentence_may_include_additional_valid_noncausal_support():
@@ -637,9 +635,7 @@ def test_causal_sentence_may_include_additional_valid_noncausal_support():
         ]
     }
 
-    ValidatedResponseBuilder._validate_grounded_narrative(
-        narrative, statements, relationships
-    )
+    ValidatedResponseBuilder._validate_grounded_narrative(narrative, statements, relationships)
 
 
 def test_relationship_endpoints_become_effective_support_without_model_duplication():
@@ -664,9 +660,7 @@ def test_relationship_endpoints_become_effective_support_without_model_duplicati
         ]
     }
 
-    ValidatedResponseBuilder._validate_grounded_narrative(
-        narrative, statements, [relationship]
-    )
+    ValidatedResponseBuilder._validate_grounded_narrative(narrative, statements, [relationship])
 
 
 def test_backend_relationship_candidates_keep_independent_evidence_gaps_separate():
@@ -701,9 +695,7 @@ def test_uncertainty_relationship_cannot_support_causal_wording():
     }
 
     with pytest.raises(ValueError, match="semantics do not permit"):
-        ValidatedResponseBuilder._validate_grounded_narrative(
-            narrative, statements, [relationship]
-        )
+        ValidatedResponseBuilder._validate_grounded_narrative(narrative, statements, [relationship])
 
 
 @pytest.mark.parametrize(
@@ -734,9 +726,7 @@ def test_compact_narrative_requires_valid_relationship_support(relationship_ids,
     }
 
     with pytest.raises(ValueError, match=message):
-        ValidatedResponseBuilder._validate_grounded_narrative(
-            narrative, statements, [relationship]
-        )
+        ValidatedResponseBuilder._validate_grounded_narrative(narrative, statements, [relationship])
 
 
 def test_compact_narrative_rejects_unsupported_numeric_claim():
@@ -1092,6 +1082,41 @@ def test_free_text_narrative_preserves_colon_identifiers_and_natural_text():
     assert narrative["sentences"][0]["text"] == "RuleVersion BB-DEGRADATION-QUALITY:v1 uygulandı."
 
 
+def test_free_text_narrative_hides_internal_reason_codes_without_changing_ids():
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        (
+            "Kök neden root_cause_unverified, same_resource ve temporal_propagation "
+            "kodlarıyla işaretlendi."
+        ),
+        {"S1": "Kök neden doğrulanmamıştır."},
+        {},
+    )
+
+    assert removed == []
+    assert "root_cause_unverified" not in narrative["sentences"][0]["text"]
+    assert "same_resource" not in narrative["sentences"][0]["text"]
+    assert "temporal_propagation" not in narrative["sentences"][0]["text"]
+
+
+def test_requested_narrative_coverage_adds_only_missing_verified_fact():
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "Olay tam hizmet kesintisidir.",
+        original_query="Uygulanan kural ve tazminat tutarı nedir?",
+        selected_statements={
+            "S1": "Doğrulanmış tazminat tutarı: 839.99 TRY.",
+            "S2": "Uygulanan RuleVersion: ME-FAILED-FAILOVER:v1.",
+        },
+        statement_concepts={
+            "S1": ["compensation_amount"],
+            "S2": ["rule_version"],
+        },
+    )
+
+    assert fill_count == 2
+    assert "839.99" in text
+    assert "ME-FAILED-FAILOVER:v1" in text
+
+
 def test_free_text_narrative_accepts_eight_short_grounded_sentences():
     statements = {f"S{index}": f"Doğrulanmış bilgi {index}." for index in range(1, 9)}
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
@@ -1130,9 +1155,7 @@ def test_free_text_narrative_removes_only_fabricated_sentence_and_records_reason
         {},
     )
 
-    assert [sentence["text"] for sentence in narrative["sentences"]] == [
-        "495 müşteri etkilendi."
-    ]
+    assert [sentence["text"] for sentence in narrative["sentences"]] == ["495 müşteri etkilendi."]
     assert removed[0]["failure_code"] == "unsupported_number"
 
 
