@@ -497,3 +497,38 @@ def test_partial_result_warning_and_empty_summaries_do_not_invent_values():
     assert response.structured_result.impact_summary.verified_impacted == 0
     assert response.structured_result.impact_summary.potential is None
     assert response.structured_result.compensation_summary is None
+
+
+@pytest.mark.django_db
+def test_unknown_impact_quantities_are_not_rendered_as_zero():
+    snapshot = create_snapshot("response-unknown-impact")
+    result = valid_result(snapshot.snapshot_key).model_copy(
+        update={
+            "causal_summary": CausalSummary(
+                causal_event_code="CE-MCR-0010",
+                root_resource_type="subscription_connection",
+                root_resource_reference="SUB-MCR-00011",
+                primary_status="down",
+                backup_status="active",
+                full_outage=False,
+            ),
+            "impact_summary": ImpactSummary(
+                assessment_record_count=0,
+                missing_evidence_categories=["customer_impact_assessment"],
+            ),
+            "compensation_summary": CompensationSummary(status="pending", scope="verified_impact"),
+        }
+    )
+    response = ValidatedResponseBuilder().build(
+        completed_run("response-unknown-impact-run", result=result, snapshot=snapshot)
+    )
+
+    assert "Failover ile korunan: 0" not in response.response_text
+    assert "Potansiyel etki: 0" not in response.response_text
+    assert "Doğrulanmış etki: 0" not in response.response_text
+    assert "Kanıtı yetersiz: 0" not in response.response_text
+    assert "doğrulanmış sayısal kayıt yok" in response.response_text
+    structured = response.structured_result
+    assert structured is not None and structured.impact_summary is not None
+    assert structured.impact_summary.failover_protected is None
+    assert structured.impact_summary.potential is None

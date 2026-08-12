@@ -281,26 +281,16 @@ def _customer_causal_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
     return _ExtractedToolResult(
         category=EvidenceCategory.CUSTOMER_IMPACT,
         causal={
-            "causal_event_code": _string(
-                data.get("causal_event_code"), "causal_event_code", required=True
-            )
+            "causal_event_code": _string(data.get("causal_event_code"), "causal_event_code")
         },
         impact={
-            "potential": _non_negative_int(
-                data.get("potential_connection_count"), "potential_connection_count"
+            "potential": _optional_non_negative(data, "potential_connection_count"),
+            "verified_impacted": _optional_non_negative(data, "verified_impacted_count"),
+            "verified_no_impact": _optional_non_negative(data, "verified_no_impact_count"),
+            "insufficient_evidence": _optional_non_negative(
+                data, "insufficient_evidence_count"
             ),
-            "verified_impacted": _non_negative_int(
-                data.get("verified_impacted_count"), "verified_impacted_count"
-            ),
-            "verified_no_impact": _non_negative_int(
-                data.get("verified_no_impact_count"), "verified_no_impact_count"
-            ),
-            "insufficient_evidence": _non_negative_int(
-                data.get("insufficient_evidence_count"), "insufficient_evidence_count"
-            ),
-            "failover_protected": _non_negative_int(
-                data.get("failover_protected_count"), "failover_protected_count"
-            ),
+            "failover_protected": _optional_non_negative(data, "failover_protected_count"),
             "reason_code_distribution": _count_mapping(
                 data.get("reason_code_distribution"), "reason_code_distribution"
             ),
@@ -316,25 +306,32 @@ def _network_outage_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
     affected_subscriptions = _non_negative_int(
         data.get("affected_subscription_count"), "affected_subscription_count"
     )
-    failover_protected = _non_negative_int(
-        (_mapping(data.get("protected_failover")) or {}).get("subscription_count", 0),
-        "failover_protected_subscription_count",
+    protected_failover = _mapping(data.get("protected_failover"))
+    failover_protected = (
+        _optional_non_negative(protected_failover, "subscription_count")
+        if protected_failover is not None
+        else None
     )
+    impact = {
+        "potential": (
+            affected_subscriptions + failover_protected
+            if failover_protected is not None
+            else None
+        ),
+        "verified_impacted": affected_subscriptions,
+        "affected_subscription_count": affected_subscriptions,
+        "affected_customer_count": _non_negative_int(
+            data.get("affected_customer_count"), "affected_customer_count"
+        ),
+        "failover_protected": failover_protected,
+        "failover_path_diversity_counts": _count_mapping(
+            data.get("failover_path_diversity_counts"), "failover_path_diversity_counts"
+        ),
+    }
     return _ExtractedToolResult(
         category=EvidenceCategory.CUSTOMER_IMPACT,
         causal={"outage_code": _string(data.get("outage_code"), "outage_code", required=True)},
-        impact={
-            "potential": affected_subscriptions + failover_protected,
-            "verified_impacted": affected_subscriptions,
-            "affected_subscription_count": affected_subscriptions,
-            "affected_customer_count": _non_negative_int(
-                data.get("affected_customer_count"), "affected_customer_count"
-            ),
-            "failover_protected": failover_protected,
-            "failover_path_diversity_counts": _count_mapping(
-                data.get("failover_path_diversity_counts"), "failover_path_diversity_counts"
-            ),
-        },
+        impact=impact,
     )
 
 
@@ -343,21 +340,11 @@ def _network_location_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
         category=EvidenceCategory.CUSTOMER_IMPACT,
         impact={
             "outage_count": _non_negative_int(data.get("outage_count"), "outage_count"),
-            "potential": _non_negative_int(
-                data.get("potential_connection_count"), "potential_connection_count"
-            ),
-            "verified_impacted": _non_negative_int(
-                data.get("verified_impacted_count"), "verified_impacted_count"
-            ),
-            "verified_no_impact": _non_negative_int(
-                data.get("verified_no_impact_count"), "verified_no_impact_count"
-            ),
-            "insufficient_evidence": _non_negative_int(
-                data.get("insufficient_evidence_count"), "insufficient_evidence_count"
-            ),
-            "failover_protected": _non_negative_int(
-                data.get("failover_protected_count"), "failover_protected_count"
-            ),
+            "potential": _optional_non_negative(data, "potential_connection_count"),
+            "verified_impacted": _optional_non_negative(data, "verified_impacted_count"),
+            "verified_no_impact": _optional_non_negative(data, "verified_no_impact_count"),
+            "insufficient_evidence": _optional_non_negative(data, "insufficient_evidence_count"),
+            "failover_protected": _optional_non_negative(data, "failover_protected_count"),
         },
     )
 

@@ -102,6 +102,7 @@ def causal_analysis(request, event_code):
         .order_by("created_at")
         .first()
     )
+    has_assessments = assessment_record_count > 0
     return JsonResponse(
         {
             "data": {
@@ -124,12 +125,20 @@ def causal_analysis(request, event_code):
                 },
                 "failover": failover,
                 "impact": {
-                    "potential": impact.potential_connection_count,
-                    "verified_impacted": impact.verified_impacted_count,
-                    "verified_no_impact": impact.verified_no_impact_count,
-                    "insufficient_evidence": impact.insufficient_evidence_count,
-                    "pending": impact.pending_count,
-                    "failover_protected_count": impact.failover_protected_count,
+                    "potential": impact.potential_connection_count if has_assessments else None,
+                    "verified_impacted": (
+                        impact.verified_impacted_count if has_assessments else None
+                    ),
+                    "verified_no_impact": (
+                        impact.verified_no_impact_count if has_assessments else None
+                    ),
+                    "insufficient_evidence": (
+                        impact.insufficient_evidence_count if has_assessments else None
+                    ),
+                    "pending": impact.pending_count if has_assessments else None,
+                    "failover_protected_count": (
+                        impact.failover_protected_count if has_assessments else None
+                    ),
                     "reason_codes": impact.reason_code_counts,
                     "assessment_record_count": assessment_record_count,
                     "missing_evidence_categories": (
@@ -164,9 +173,9 @@ def compensation_payload(*, outage, snapshot):
     if summary is None or summary.compensation_considered_count == 0:
         return {
             "status": "pending",
-            "consideration_count": 0,
-            "eligible": 0,
-            "ineligible_pending": 0,
+            "consideration_count": None,
+            "eligible": None,
+            "ineligible_pending": None,
             "total_amount": None,
             "rule_versions": {},
             "selected_rule_version": None,

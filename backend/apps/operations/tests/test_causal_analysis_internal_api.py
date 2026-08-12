@@ -58,8 +58,14 @@ def test_causal_analysis_requires_auth_and_returns_pending_safe_public_shape(cli
         "evidence",
     }
     assert data["compensation"]["status"] == "pending"
-    assert data["compensation"]["consideration_count"] == 0
-    assert data["impact"]["failover_protected_count"] == 0
+    assert data["compensation"]["consideration_count"] is None
+    assert data["compensation"]["eligible"] is None
+    assert data["compensation"]["ineligible_pending"] is None
+    assert data["impact"]["potential"] is None
+    assert data["impact"]["verified_impacted"] is None
+    assert data["impact"]["verified_no_impact"] is None
+    assert data["impact"]["insufficient_evidence"] is None
+    assert data["impact"]["failover_protected_count"] is None
     assert data["evidence"] is None
     assert "cust-" not in str(data).lower()
     assert "raw_payload" not in str(data).lower()

@@ -327,7 +327,10 @@ class ValidatedResponseBuilder:
                 else:
                     sections.append(f"Potansiyel etki: {impact.potential} bağlantı.")
             if impact.verified_impacted is not None:
-                if impact.affected_customer_count is not None:
+                if (
+                    impact.affected_subscription_count is not None
+                    and impact.affected_customer_count is not None
+                ):
                     sections.append(
                         "Doğrulanmış etki: "
                         f"{impact.affected_subscription_count} abonelik / "
@@ -364,7 +367,7 @@ class ValidatedResponseBuilder:
                 sections.append(
                     "Gerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok."
                 )
-                if impact.failover_protected == 0:
+                if impact.failover_protected is None:
                     sections.append(
                         "Failover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok."
                     )
@@ -536,7 +539,10 @@ class ValidatedResponseBuilder:
         if impact:
             if impact.outage_count is not None:
                 add(f"Kesinti sayısı: {impact.outage_count}.")
-            if impact.affected_subscription_count is not None:
+            if (
+                impact.affected_subscription_count is not None
+                and impact.affected_customer_count is not None
+            ):
                 add(f"Potansiyel kapsam: {impact.potential} abonelik.")
                 add(
                     "Doğrulanmış etki: "
@@ -575,7 +581,7 @@ class ValidatedResponseBuilder:
                 add(
                     "Gerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok."
                 )
-                if impact.failover_protected == 0:
+                if impact.failover_protected is None:
                     add("Failover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok.")
         compensation = result.compensation_summary
         rule = None if compensation and compensation.rule_versions else result.rule_summary

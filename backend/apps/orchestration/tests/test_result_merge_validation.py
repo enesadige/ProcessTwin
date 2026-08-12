@@ -10,7 +10,12 @@ from apps.orchestration.executor import (
     ToolExecutionStatus,
 )
 from apps.orchestration.models import QueryRunStatus
-from apps.orchestration.result_merge import ResultMergerValidator, ValidationStatus
+from apps.orchestration.result_merge import (
+    ResultMergerValidator,
+    ValidationStatus,
+    _customer_causal_impact,
+    _network_outage_impact,
+)
 from apps.orchestration.services import QueryRunError, QueryRunService
 from apps.orchestration.structured_query import StructuredQuery
 from apps.orchestration.tool_plan import ToolPlan
@@ -186,6 +191,40 @@ def test_merge_validates_safe_result_and_completes_query_run():
     serialized = str(completed.final_result)
     assert "CUST-DO-NOT-PERSIST" not in serialized
     assert "not-persisted" not in serialized
+
+
+def test_missing_protected_failover_preserves_unknown_quantities():
+    extracted = _network_outage_impact(
+        {
+            "outage_code": "OUT-GPON-001",
+            "affected_subscription_count": 0,
+            "affected_customer_count": 0,
+        }
+    )
+
+    assert extracted.impact["failover_protected"] is None
+    assert extracted.impact["potential"] is None
+    assert extracted.impact["verified_impacted"] == 0
+
+
+def test_missing_customer_assessment_counts_remain_unknown():
+    extracted = _customer_causal_impact({"causal_event_code": "CE-MCR-0010"})
+
+    assert extracted.impact["potential"] is None
+    assert extracted.impact["verified_impacted"] is None
+    assert extracted.impact["verified_no_impact"] is None
+    assert extracted.impact["insufficient_evidence"] is None
+    assert extracted.impact["failover_protected"] is None
+
+
+def test_customer_history_without_aggregate_counters_is_safe_unknown_impact():
+    extracted = _customer_causal_impact(
+        {"outages": [], "result_count": 0, "next_cursor": None}
+    )
+
+    assert extracted.causal["causal_event_code"] is None
+    assert extracted.impact["verified_impacted"] is None
+    assert extracted.impact["failover_protected"] is None
 
 
 @pytest.mark.django_db

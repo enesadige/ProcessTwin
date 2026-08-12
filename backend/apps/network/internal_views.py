@@ -823,25 +823,34 @@ def aggregate_location_impact(request):
         if district:
             outages = outages.filter(source_device__district__name=district)
             assessments = assessments.filter(causal_event__root_device__district__name=district)
+        assessment_count = assessments.count()
         status_counts = dict(assessments.values_list("status").annotate(count=Count("id")))
         return _ok(
             request=request,
             snapshot=snapshot,
             data={
                 "outage_count": outages.count(),
-                "potential_connection_count": assessments.count(),
-                "verified_impacted_count": status_counts.get(
-                    CustomerImpactStatus.VERIFIED_IMPACT.value, 0
+                "potential_connection_count": assessment_count if assessment_count else None,
+                "verified_impacted_count": (
+                    status_counts.get(CustomerImpactStatus.VERIFIED_IMPACT.value, 0)
+                    if assessment_count
+                    else None
                 ),
-                "verified_no_impact_count": status_counts.get(
-                    CustomerImpactStatus.VERIFIED_NO_IMPACT.value, 0
+                "verified_no_impact_count": (
+                    status_counts.get(CustomerImpactStatus.VERIFIED_NO_IMPACT.value, 0)
+                    if assessment_count
+                    else None
                 ),
-                "insufficient_evidence_count": status_counts.get(
-                    CustomerImpactStatus.INSUFFICIENT_EVIDENCE.value, 0
+                "insufficient_evidence_count": (
+                    status_counts.get(CustomerImpactStatus.INSUFFICIENT_EVIDENCE.value, 0)
+                    if assessment_count
+                    else None
                 ),
-                "failover_protected_count": assessments.filter(
-                    reasons__contains=[ImpactReason.FAILOVER_PROTECTED.value]
-                ).count(),
+                "failover_protected_count": (
+                    assessments.filter(reasons__contains=[ImpactReason.FAILOVER_PROTECTED.value]).count()
+                    if assessment_count
+                    else None
+                ),
             },
         )
     except InternalNetworkAPIError as exc:
