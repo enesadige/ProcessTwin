@@ -25,6 +25,8 @@ class OllamaLLMProvider(LLMProvider):
     model_name = OLLAMA_LLM_MODEL
     supports_thinking = True
     thinking_enabled = False
+    supports_grounded_narrative = True
+    supports_request_unload = True
 
     def __init__(
         self,
@@ -35,9 +37,9 @@ class OllamaLLMProvider(LLMProvider):
         self._client: Any | None = None
 
     def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
-        contents, format_schema = self._validate_request(request)
+        contents, format_schema, release_after = self._validate_request(request)
         max_attempts = self._max_attempts()
-        payload = self._request_payload(contents, format_schema)
+        payload = self._request_payload(contents, format_schema, release_after=release_after)
 
         for attempt in range(max_attempts):
             try:
@@ -80,12 +82,14 @@ class OllamaLLMProvider(LLMProvider):
         return httpx.Client(base_url=base_url, timeout=timeout_seconds)
 
     @staticmethod
-    def _validate_request(request: Mapping[str, Any]) -> tuple[str, Mapping[str, Any] | None]:
+    def _validate_request(
+        request: Mapping[str, Any],
+    ) -> tuple[str, Mapping[str, Any] | None, bool]:
         if not isinstance(request, Mapping):
             raise OllamaLLMProviderError(
                 message="Ollama request must be an object.", code="invalid_request"
             )
-        if set(request) - {"contents", "format_schema"}:
+        if set(request) - {"contents", "format_schema", "release_after"}:
             raise OllamaLLMProviderError(
                 message="Ollama request contains unsupported fields.", code="invalid_request"
             )
@@ -99,11 +103,20 @@ class OllamaLLMProvider(LLMProvider):
             raise OllamaLLMProviderError(
                 message="Ollama format schema is invalid.", code="invalid_request"
             )
-        return contents, format_schema
+        release_after = request.get("release_after", False)
+        if not isinstance(release_after, bool):
+            raise OllamaLLMProviderError(
+                message="Ollama unload setting is invalid.", code="invalid_request"
+            )
+        return contents, format_schema, release_after
 
     @classmethod
     def _request_payload(
-        cls, contents: str, format_schema: Mapping[str, Any] | None = None
+        cls,
+        contents: str,
+        format_schema: Mapping[str, Any] | None = None,
+        *,
+        release_after: bool = False,
     ) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "model": cls.model_name,
@@ -115,6 +128,8 @@ class OllamaLLMProvider(LLMProvider):
         }
         if format_schema is not None:
             payload["format"] = dict(format_schema)
+        if release_after:
+            payload["keep_alive"] = 0
         return payload
 
     @staticmethod

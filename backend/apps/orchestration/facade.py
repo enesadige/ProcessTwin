@@ -383,6 +383,7 @@ class OrchestrationFacade:
                 "warnings": list(response.warnings),
                 "selected_statement_ids": audit.get("selected_statement_ids", []),
                 "grounded_relationships": list(response.grounded_relationships),
+                "narrative_synthesis": dict(response.narrative_synthesis_audit),
             }
         )
         return audit

@@ -112,6 +112,14 @@ def test_request_body_has_fixed_model_thinking_stream_and_native_schema_contract
     }
 
 
+def test_final_grounded_generation_releases_ollama_model(settings):
+    provider, client, _ = provider_with_outcomes(settings, [success_response()])
+
+    provider.generate(request={"contents": "final grounded answer", "release_after": True})
+
+    assert client.calls[0]["json"]["keep_alive"] == 0
+
+
 @pytest.mark.parametrize(
     "input_data",
     [

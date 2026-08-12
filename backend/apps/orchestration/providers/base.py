@@ -18,6 +18,8 @@ class LLMProvider(ABC):
     model_name: str | None
     supports_thinking: bool
     thinking_enabled: bool
+    supports_grounded_narrative: bool = False
+    supports_request_unload: bool = False
 
     @abstractmethod
     def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:

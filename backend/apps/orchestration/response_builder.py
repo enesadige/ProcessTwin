@@ -46,6 +46,8 @@ _IMPACT_STATUSES = frozenset(
 _FAILOVER_PRIMARY_DOWN_BACKUP_HEALTHY = "primary_down_backup_healthy"
 _UNCERTAINTY_STATEMENT = "Yeterli doğrulanmış bilgi yok."
 _RELATION_TYPES = frozenset({"cause", "contrast", "consequence", "uncertainty", "evidence_gap"})
+_NARRATIVE_SYNTHESIS_KEYS = frozenset({"headline", "paragraphs"})
+_NARRATIVE_DEBUG_MARKERS = ("->", "Nedensel ilişki:", "Sonuç ilişkisi:", "Belirsizlik ilişkisi:")
 
 
 class ResponseBuilderError(ProcessTwinError):
@@ -54,6 +56,15 @@ class ResponseBuilderError(ProcessTwinError):
 
 class StatementSelectionError(ValueError):
     """Safe structured diagnostics for a rejected closed-world selection."""
+
+    def __init__(self, code: str, message: str, *, details: Mapping[str, Any] | None = None):
+        super().__init__(message)
+        self.code = code
+        self.details = dict(details or {})
+
+
+class NarrativeSynthesisError(ValueError):
+    """Safe rejection for grounded natural-language synthesis."""
 
     def __init__(self, code: str, message: str, *, details: Mapping[str, Any] | None = None):
         super().__init__(message)
@@ -108,6 +119,7 @@ class ValidatedNaturalLanguageResponse(BaseModel):
     semantic_concepts: list[str] = Field(default_factory=list)
     grounded_relationships: list[dict[str, str]] = Field(default_factory=list)
     statement_selection_audit: dict[str, Any] = Field(default_factory=dict)
+    narrative_synthesis_audit: dict[str, Any] = Field(default_factory=dict)
     structured_result: StructuredVerifiedResult | None = None
 
 
@@ -161,27 +173,62 @@ class ValidatedResponseBuilder:
                     f"llm_statement_selection_retry_count:{retry['retry_count']}",
                     f"llm_statement_selection_retry_delay_ms:{retry['total_retry_delay_ms']}",
                 ]
+            if getattr(active_provider, "supports_grounded_narrative", False):
+                narrative, synthesis_audit = self._safe_grounded_narrative(
+                    active_provider,
+                    original_query=query_run.original_query,
+                    selected_statements={
+                        statement_id: contract[1]["statements"][statement_id]
+                        for statement_id in selection["selected_statement_ids"]
+                    },
+                    relationships=selection["relationships"],
+                )
+                response.narrative_synthesis_audit = synthesis_audit
+            else:
+                response.narrative_synthesis_audit = {
+                    "status": "skipped",
+                    "reason": "provider_does_not_advertise_grounded_narrative",
+                }
         except Exception as exc:
             response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
-            response.warnings = sorted(
-                set(
+            synthesis_failure = isinstance(exc, NarrativeSynthesisError)
+            failure_code = (
+                f"narrative_synthesis_{exc.code}"
+                if synthesis_failure
+                else self._statement_selection_failure_code(exc)
+            )
+            failure_warnings = [
+                *response.warnings,
+                "llm_narrative_fallback",
+                "llm_statement_selection_attempted",
+            ]
+            if synthesis_failure:
+                failure_warnings.extend(
                     [
-                        *response.warnings,
-                        "llm_narrative_fallback",
-                        "llm_statement_selection_attempted",
-                        "llm_statement_selection_failure:"
-                        + self._statement_selection_failure_code(exc),
+                        "llm_narrative_synthesis_attempted",
+                        "llm_narrative_synthesis_failure:" + failure_code,
                     ]
                 )
-            )
+            else:
+                failure_warnings.append("llm_statement_selection_failure:" + failure_code)
+            response.warnings = sorted(set(failure_warnings))
             details = getattr(exc, "details", {})
-            response.statement_selection_audit = {
-                "status": "rejected",
-                "provider": active_provider.provider_name,
-                "model": active_provider.model_name,
-                "failure_code": self._statement_selection_failure_code(exc),
-                **details,
-            }
+            if synthesis_failure:
+                response.narrative_synthesis_audit = {
+                    "status": "rejected",
+                    "provider": active_provider.provider_name,
+                    "model": active_provider.model_name,
+                    "failure_code": failure_code,
+                    **details,
+                }
+            else:
+                response.statement_selection_audit = {
+                    "status": "rejected",
+                    "provider": active_provider.provider_name,
+                    "model": active_provider.model_name,
+                    "failure_code": failure_code,
+                    **details,
+                }
             if isinstance(details, Mapping):
                 for key in (
                     "allowed_statement_ids",
@@ -913,6 +960,171 @@ class ValidatedResponseBuilder:
                 or relation["from_statement_id"] == relation["to_statement_id"]
             ):
                 raise ValueError("statement relationships are invalid")
+
+    @classmethod
+    def _safe_grounded_narrative(
+        cls,
+        provider: LLMProvider,
+        *,
+        original_query: str,
+        selected_statements: Mapping[str, str],
+        relationships: list[dict[str, str]],
+    ) -> tuple[str, dict[str, Any]]:
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["headline", "paragraphs"],
+            "properties": {
+                "headline": {"type": "string", "maxLength": 120},
+                "paragraphs": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 6,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["text", "supporting_statement_ids"],
+                        "properties": {
+                            "text": {"type": "string", "minLength": 1, "maxLength": 1200},
+                            "supporting_statement_ids": {
+                                "type": "array",
+                                "minItems": 1,
+                                "maxItems": 8,
+                                "items": {"type": "string", "enum": sorted(selected_statements)},
+                            },
+                        },
+                    },
+                },
+            },
+        }
+        prompt = (
+            "Doğrulanmış telekom operasyon gerçeklerini doğal Türkçe ile açıkla. "
+            "Yalnız JSON üret ve her paragrafı destekleyen statement ID'lerini yaz. "
+            "Sayı, kod, durum veya karar ekleme; destek metinlerini aynen listeleme; "
+            "ilişkileri doğal neden-sonuç cümlelerine dönüştür. Ham ok işareti, "
+            "'Nedensel ilişki', 'Sonuç ilişkisi' veya benzeri debug etiketi kullanma. "
+            "Bilinmeyeni sıfır yapma. Kullanıcı sorusunu doğrudan yanıtla.\n"
+            "USER_QUERY=" + original_query.strip() + "\n"
+            "VERIFIED_STATEMENTS="
+            + json.dumps(selected_statements, ensure_ascii=False, sort_keys=True)
+            + "\nVALIDATED_RELATIONSHIPS="
+            + json.dumps(relationships, ensure_ascii=False, sort_keys=True)
+        )
+        request: dict[str, Any] = {"contents": prompt, "format_schema": schema}
+        if getattr(provider, "supports_request_unload", False):
+            request["release_after"] = True
+        response = provider.generate(request=request)
+        if not isinstance(response, Mapping) or response.get("provider") != provider.provider_name:
+            raise NarrativeSynthesisError(
+                "provider_response_invalid", "provider response is invalid"
+            )
+        if response.get("model") != provider.model_name:
+            raise NarrativeSynthesisError(
+                "provider_response_invalid", "provider metadata is invalid"
+            )
+        try:
+            narrative = json.loads(response.get("content", ""))
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise NarrativeSynthesisError(
+                "structured_output_invalid", "narrative is not JSON"
+            ) from exc
+        try:
+            cls._validate_grounded_narrative(narrative, selected_statements, relationships)
+        except ValueError as exc:
+            raise NarrativeSynthesisError(
+                "grounding_validation_failed", str(exc),
+                details={
+                    "selected_statement_ids": sorted(selected_statements),
+                    "narrative_support_references": cls._narrative_support_references(narrative),
+                },
+            ) from exc
+        audit = {
+            "status": "accepted",
+            "provider": provider.provider_name,
+            "model": provider.model_name,
+            "paragraph_count": len(narrative["paragraphs"]),
+            "narrative_support_references": cls._narrative_support_references(narrative),
+            "validation_status": "valid",
+        }
+        return cls._render_grounded_narrative(narrative), audit
+
+    @staticmethod
+    def _narrative_support_references(narrative: object) -> list[str]:
+        if not isinstance(narrative, Mapping) or not isinstance(narrative.get("paragraphs"), list):
+            return []
+        refs: list[str] = []
+        for paragraph in narrative["paragraphs"]:
+            if isinstance(paragraph, Mapping) and isinstance(
+                paragraph.get("supporting_statement_ids"), list
+            ):
+                refs.extend(str(item) for item in paragraph["supporting_statement_ids"])
+        return list(dict.fromkeys(refs))
+
+    @classmethod
+    def _validate_grounded_narrative(
+        cls,
+        narrative: object,
+        selected_statements: Mapping[str, str],
+        relationships: list[dict[str, str]],
+    ) -> None:
+        if not isinstance(narrative, Mapping) or set(narrative) != _NARRATIVE_SYNTHESIS_KEYS:
+            raise ValueError("narrative schema is invalid")
+        if not isinstance(narrative["headline"], str) or not narrative["headline"].strip():
+            raise ValueError("narrative headline is invalid")
+        paragraphs = narrative["paragraphs"]
+        if not isinstance(paragraphs, list) or not paragraphs:
+            raise ValueError("narrative paragraphs are invalid")
+        supported_text = " ".join(selected_statements.values())
+        supported_numbers = set(re.findall(r"(?<![A-Za-z])\d+(?:[.,]\d+)?", supported_text))
+        supported_codes = set(re.findall(r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", supported_text))
+        relation_pairs = {
+            (item["from_statement_id"], item["to_statement_id"])
+            for item in relationships
+            if isinstance(item, Mapping)
+        }
+        for paragraph in paragraphs:
+            if not isinstance(paragraph, Mapping) or set(paragraph) != {
+                "text", "supporting_statement_ids"
+            }:
+                raise ValueError("narrative paragraph schema is invalid")
+            text = paragraph["text"]
+            refs = paragraph["supporting_statement_ids"]
+            if (
+                not isinstance(text, str)
+                or not text.strip()
+                or not isinstance(refs, list)
+                or not refs
+            ):
+                raise ValueError("narrative paragraph support is invalid")
+            if any(not isinstance(ref, str) or ref not in selected_statements for ref in refs):
+                raise ValueError("narrative references an unselected statement")
+            if any(marker in text for marker in _NARRATIVE_DEBUG_MARKERS):
+                raise ValueError("narrative contains relationship debug output")
+            numbers = set(re.findall(r"(?<![A-Za-z])\d+(?:[.,]\d+)?", text))
+            if not numbers <= supported_numbers:
+                raise ValueError("narrative contains an unsupported number")
+            codes = set(re.findall(r"\b[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ0-9_-]{2,}\b", text))
+            if not codes <= supported_codes:
+                raise ValueError("narrative contains an unsupported identifier")
+            if any(
+                phrase in text.casefold()
+                for phrase in ("çünkü", "bu nedenle", "dolayısıyla", "bunun sonucunda")
+            ) and not any(
+                pair in relation_pairs
+                for pair in (
+                    (refs[i], refs[j])
+                    for i in range(len(refs))
+                    for j in range(len(refs))
+                    if i != j
+                )
+            ):
+                raise ValueError("narrative contains an unsupported causal relation")
+
+    @staticmethod
+    def _render_grounded_narrative(narrative: Mapping[str, Any]) -> str:
+        paragraphs = [str(item["text"]).strip() for item in narrative["paragraphs"]]
+        headline = str(narrative["headline"]).strip()
+        return "\n\n".join([headline, *paragraphs])
 
     @staticmethod
     def _narrative_contract(result: ValidatedExecutionResult) -> str:

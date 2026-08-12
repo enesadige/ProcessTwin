@@ -31,6 +31,7 @@ class GeminiLLMProvider(LLMProvider):
     model_name = GEMINI_LLM_MODEL
     supports_thinking = False
     thinking_enabled = False
+    supports_grounded_narrative = True
 
     def __init__(
         self,

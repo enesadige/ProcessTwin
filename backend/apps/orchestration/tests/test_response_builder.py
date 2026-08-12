@@ -112,6 +112,49 @@ class DuplicateConceptProvider(RecordingProvider):
         }
 
 
+class GroundedNarrativeProvider(RecordingProvider):
+    supports_grounded_narrative = True
+
+    def __init__(self, narrative: dict[str, Any] | None = None) -> None:
+        super().__init__()
+        self.narrative = narrative
+
+    def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
+        self.requests.append(dict(request))
+        if len(self.requests) == 1:
+            statement_ids = request["format_schema"]["properties"]["selected_statement_ids"][
+                "items"
+            ]["enum"]
+            content = json.dumps(
+                {
+                    "headline_id": "H1",
+                    "selected_statement_ids": statement_ids,
+                    "relationships": [],
+                }
+            )
+        else:
+            payload = self.narrative or {
+                "headline": "Kesinti değerlendirmesi",
+                "paragraphs": [
+                    {
+                        "text": "Bu değerlendirme doğrulanmış operasyon kayıtlarına dayanıyor.",
+                        "supporting_statement_ids": [
+                            request["contents"].split('"S1"', 1)[0] and "S1"
+                        ],
+                    }
+                ],
+            }
+            content = json.dumps(payload, ensure_ascii=False)
+        return {
+            "content": content,
+            "provider": self.provider_name,
+            "model": self.model_name,
+            "retry": {},
+            "finish_reason": "stop",
+            "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+        }
+
+
 def valid_result(snapshot_identifier: str, *, warnings: list[str] | None = None):
     return ValidatedExecutionResult(
         snapshot_identifier=snapshot_identifier,
@@ -478,6 +521,47 @@ def test_semantic_decomposition_and_grounded_relationships_change_safe_answer_or
     assert response.statement_selection_audit["status"] == "accepted"
     assert response.statement_selection_audit["selected_statement_ids"]
     assert response.statement_selection_audit["derived_concepts"] == response.semantic_concepts
+
+
+@pytest.mark.django_db
+def test_phase1b_synthesizes_grounded_natural_language_and_records_support():
+    run = completed_run("response-grounded-narrative")
+    provider = GroundedNarrativeProvider()
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
+    assert response.narrative_synthesis_audit["status"] == "accepted"
+    assert response.narrative_synthesis_audit["narrative_support_references"] == ["S1"]
+    assert "Nedensel ilişki:" not in response.response_text
+    assert "->" not in response.response_text
+    assert len(provider.requests) == 2
+    assert provider.requests[1]["format_schema"]["properties"]["paragraphs"]
+
+
+@pytest.mark.django_db
+def test_phase1b_rejects_unselected_statement_reference_and_falls_back():
+    run = completed_run("response-invalid-grounded-narrative")
+    provider = GroundedNarrativeProvider(
+        narrative={
+            "headline": "Kesinti değerlendirmesi",
+            "paragraphs": [
+                {"text": "Desteksiz iddia.", "supporting_statement_ids": ["S999"]}
+            ],
+        }
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
+    assert (
+        "llm_narrative_synthesis_failure:narrative_synthesis_grounding_validation_failed"
+        in response.warnings
+    )
 
 
 @pytest.mark.django_db
