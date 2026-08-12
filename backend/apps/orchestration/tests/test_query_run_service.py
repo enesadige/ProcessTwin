@@ -288,6 +288,36 @@ def test_privacy_sanitization_and_snapshot_protect(snapshot, service):
 
 
 @pytest.mark.django_db
+def test_response_audit_persists_safe_terminal_selection_diagnostics(snapshot, service):
+    run, _ = service.create_or_get(
+        data_snapshot=snapshot,
+        idempotency_key="query-run-response-audit",
+        original_query="Audit.",
+    )
+    service.transition(run, target_status=QueryRunStatus.PLANNED)
+    service.transition(run, target_status=QueryRunStatus.EXECUTING)
+    completed = service.complete(run, final_result={"validation_status": "valid"})
+
+    service.save_response_audit(
+        completed,
+        audit={
+            "status": "rejected",
+            "failure_code": "unknown_or_duplicate_statement_id",
+            "allowed_statement_ids": ["S1"],
+            "returned_statement_ids": ["S999"],
+        },
+    )
+
+    persisted = QueryRun.objects.get(pk=completed.pk)
+    assert persisted.response_audit == {
+        "status": "rejected",
+        "failure_code": "unknown_or_duplicate_statement_id",
+        "allowed_statement_ids": ["S1"],
+        "returned_statement_ids": ["S999"],
+    }
+
+
+@pytest.mark.django_db
 def test_model_validation_rejects_nonterminal_completed_at_and_wrong_json_types(snapshot):
     run = QueryRun(
         data_snapshot=snapshot,

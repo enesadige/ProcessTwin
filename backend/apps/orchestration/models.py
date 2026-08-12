@@ -64,6 +64,7 @@ class QueryRun(TimeStampedModel):
         default=QueryRunStatus.PENDING,
     )
     final_result = models.JSONField(null=True, blank=True)
+    response_audit = models.JSONField(default=dict, blank=True)
     model_version = models.CharField(max_length=160, blank=True)
     prompt_version = models.CharField(max_length=160, blank=True)
     requested_llm_provider = models.CharField(max_length=32, blank=True)
@@ -153,6 +154,7 @@ class QueryRun(TimeStampedModel):
                     "planned_tools",
                     "executed_tools",
                     "final_result",
+                    "response_audit",
                     "model_version",
                     "prompt_version",
                     "requested_llm_provider",
@@ -185,6 +187,7 @@ class QueryRun(TimeStampedModel):
                     "planned_tools": self.planned_tools,
                     "executed_tools": self.executed_tools,
                     "final_result": self.final_result,
+                    "response_audit": self.response_audit,
                     "model_version": self.model_version,
                     "prompt_version": self.prompt_version,
                     "requested_llm_provider": self.requested_llm_provider,

@@ -47,11 +47,9 @@ class RecordingProvider(LLMProvider):
             statement_ids = request["format_schema"]["properties"]["selected_statement_ids"][
                 "items"
             ]["enum"]
-            concepts = request["format_schema"]["properties"]["concepts"]["items"]["enum"]
             content = json.dumps(
                 {
                     "headline_id": "H1",
-                    "concepts": concepts[:2],
                     "selected_statement_ids": statement_ids,
                     "relationships": [],
                 }
@@ -70,11 +68,9 @@ class RelationshipProvider(RecordingProvider):
         self.requests.append(dict(request))
         schema = request["format_schema"]
         statement_ids = schema["properties"]["selected_statement_ids"]["items"]["enum"]
-        concepts = schema["properties"]["concepts"]["items"]["enum"]
         content = json.dumps(
             {
                 "headline_id": "H1",
-                "concepts": ["primary_backup_state", "failover_explanation"],
                 "selected_statement_ids": statement_ids,
                 "relationships": (
                     []
@@ -89,7 +85,6 @@ class RelationshipProvider(RecordingProvider):
                 ),
             }
         )
-        assert "primary_backup_state" in concepts
         return {
             "content": content,
             "provider": self.provider_name,
@@ -430,11 +425,7 @@ def test_statement_selection_normalizes_phase_two_semantic_aliases():
     )
 
     assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
-    assert response.semantic_concepts == [
-        "primary_backup_state",
-        "insufficient_evidence",
-        "compensation_status",
-    ]
+    assert response.semantic_concepts == ["root_cause"]
 
 
 @pytest.mark.django_db
@@ -456,11 +447,7 @@ def test_statement_selection_normalizes_common_allowlisted_concept_variants():
     )
 
     assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
-    assert response.semantic_concepts == [
-        "verified_customer_impact",
-        "failover_explanation",
-        "compensation_status",
-    ]
+    assert response.semantic_concepts == ["root_cause"]
 
 
 @pytest.mark.django_db
@@ -483,8 +470,14 @@ def test_semantic_decomposition_and_grounded_relationships_change_safe_answer_or
     assert "Tam hizmet kesintisi: Hayır." in response.response_text
     assert "CUST-001" not in provider.requests[0]["contents"]
     assert "198.51.100.10" not in provider.requests[0]["contents"]
-    assert "concepts" in provider.requests[0]["format_schema"]["properties"]
+    assert "concepts" not in provider.requests[0]["format_schema"]["properties"]
+    assert provider.requests[0]["format_schema"]["properties"]["selected_statement_ids"][
+        "items"
+    ]["enum"]
     assert "relationships" in provider.requests[0]["format_schema"]["properties"]
+    assert response.statement_selection_audit["status"] == "accepted"
+    assert response.statement_selection_audit["selected_statement_ids"]
+    assert response.statement_selection_audit["derived_concepts"] == response.semantic_concepts
 
 
 @pytest.mark.django_db
@@ -503,7 +496,8 @@ def test_simple_date_location_selection_normalizes_repeated_allowlisted_concept(
     )
 
     assert response.generation_mode == ResponseGenerationMode.LLM_ASSISTED
-    assert response.semantic_concepts == ["verified_customer_impact"]
+    assert "verified_customer_impact" in response.semantic_concepts
+    assert len(response.semantic_concepts) == len(set(response.semantic_concepts))
     assert "Doğrulanmış etki: 2 bağlantı." in response.response_text
 
 
@@ -514,7 +508,7 @@ def test_invalid_semantic_decomposition_keeps_deterministic_fallback_safe():
         {
             "headline_id": "H1",
             "concepts": ["invented_concept"],
-            "selected_statement_ids": [],
+            "selected_statement_ids": ["S999"],
             "relationships": [],
         }
     )
@@ -555,7 +549,7 @@ def test_statement_selection_failure_persists_safe_structured_diagnostics():
     )
 
     assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC_FALLBACK
-    assert "llm_statement_selection_failure:semantic_concept_validation_failed" in response.warnings
+    assert "llm_statement_selection_failure:unknown_or_duplicate_statement_id" in response.warnings
     assert any(
         warning.startswith("llm_statement_selection_allowed_statement_ids:")
         for warning in response.warnings

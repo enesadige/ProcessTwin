@@ -45,37 +45,6 @@ _IMPACT_STATUSES = frozenset(
 )
 _FAILOVER_PRIMARY_DOWN_BACKUP_HEALTHY = "primary_down_backup_healthy"
 _UNCERTAINTY_STATEMENT = "Yeterli doğrulanmış bilgi yok."
-_SEMANTIC_CONCEPTS = frozenset(
-    {
-        "outage_classification",
-        "potential_scope",
-        "verified_customer_impact",
-        "verified_no_impact",
-        "insufficient_evidence",
-        "primary_backup_state",
-        "failover_explanation",
-        "compensation_status",
-        "compensation_reason",
-        "root_cause",
-        "evidence",
-        "explanation_requested",
-    }
-)
-_SEMANTIC_CONCEPT_ALIASES = {
-    "outage_type": "outage_classification",
-    "impact": "verified_customer_impact",
-    "customer_impact": "verified_customer_impact",
-    "failover_status": "primary_backup_state",
-    "failover": "failover_explanation",
-    "failover_protection": "failover_explanation",
-    "evidence_gap": "insufficient_evidence",
-    "compensation_result": "compensation_status",
-    "compensation_evaluation": "compensation_status",
-    "verified_subscription_impact": "verified_customer_impact",
-    "root_resource": "root_cause",
-    "physical_root_cause": "root_cause",
-    "summary": "explanation_requested",
-}
 _RELATION_TYPES = frozenset({"cause", "contrast", "consequence", "uncertainty", "evidence_gap"})
 
 
@@ -138,6 +107,7 @@ class ValidatedNaturalLanguageResponse(BaseModel):
     validation_status: ValidationStatus
     semantic_concepts: list[str] = Field(default_factory=list)
     grounded_relationships: list[dict[str, str]] = Field(default_factory=list)
+    statement_selection_audit: dict[str, Any] = Field(default_factory=dict)
     structured_result: StructuredVerifiedResult | None = None
 
 
@@ -184,6 +154,7 @@ class ValidatedResponseBuilder:
             narrative, retry, selection = self._safe_statement_selection(active_provider, contract)
             response.semantic_concepts = selection["concepts"]
             response.grounded_relationships = selection["relationships"]
+            response.statement_selection_audit = selection["audit"]
             if retry.get("retry_count", 0):
                 response.warnings = [
                     *response.warnings,
@@ -204,6 +175,13 @@ class ValidatedResponseBuilder:
                 )
             )
             details = getattr(exc, "details", {})
+            response.statement_selection_audit = {
+                "status": "rejected",
+                "provider": active_provider.provider_name,
+                "model": active_provider.model_name,
+                "failure_code": self._statement_selection_failure_code(exc),
+                **details,
+            }
             if isinstance(details, Mapping):
                 for key in (
                     "allowed_statement_ids",
@@ -676,12 +654,6 @@ class ValidatedResponseBuilder:
             "type": "object",
             "properties": {
                 "headline_id": {"type": ["string", "null"], "enum": ["H1", None]},
-                "concepts": {
-                    "type": "array",
-                    "items": {"type": "string", "enum": sorted(_SEMANTIC_CONCEPTS)},
-                    "uniqueItems": True,
-                    "minItems": 1,
-                },
                 "selected_statement_ids": {
                     "type": "array",
                     "items": {"type": "string", "enum": list(statements)},
@@ -703,7 +675,7 @@ class ValidatedResponseBuilder:
                     "maxItems": 8,
                 },
             },
-            "required": ["headline_id", "concepts", "selected_statement_ids", "relationships"],
+            "required": ["headline_id", "selected_statement_ids", "relationships"],
             "additionalProperties": False,
         }
         safe_query = original_query
@@ -725,7 +697,8 @@ class ValidatedResponseBuilder:
         )
         prompt = (
             "Yalnız native schema nesnesini üret. Cümle yazma, cümleleri değiştirme, "
-            "yeni ID veya gerçek üretme. concepts yalnız allowlist'ten seçilir; "
+            "yeni ID veya gerçek üretme. concepts alanı üretme; kavramlar backend tarafından "
+            "seçilen statement ID'lerinden türetilecektir. "
             "relationships yalnız verilen statement ID'leri arasında kurulabilir. "
             "Kullanıcı sorusundaki doğrulanmış ankorlar redakte edilmiştir.\n"
             "USER_SEMANTIC_QUERY="
@@ -782,16 +755,6 @@ class ValidatedResponseBuilder:
             selection = json.loads(response["content"])
         except (TypeError, ValueError, json.JSONDecodeError) as exc:
             raise ValueError("native schema response is not JSON") from exc
-        if isinstance(selection, Mapping) and isinstance(selection.get("concepts"), list):
-            # Normalize only known Phase-2 aliases; IDs and relationships remain strict.
-            normalized_selection = dict(selection)
-            concepts: list[object] = []
-            for concept in selection["concepts"]:
-                concept = _SEMANTIC_CONCEPT_ALIASES.get(concept, concept)
-                if concept not in concepts:
-                    concepts.append(concept)
-            normalized_selection["concepts"] = concepts
-            selection = normalized_selection
         statements = data["statements"]
         if not isinstance(statements, Mapping):
             raise ValueError("statement contract is invalid")
@@ -841,16 +804,8 @@ class ValidatedResponseBuilder:
                     [str(value) for value in returned_ids]
                     if isinstance(returned_ids, list) else []
                 ),
-                "returned_concepts": (
-                    [str(value) for value in selection.get("concepts", [])]
-                    if isinstance(selection.get("concepts"), list)
-                    else []
-                ),
-                "normalized_concepts": (
-                    [str(value) for value in selection.get("concepts", [])]
-                    if isinstance(selection.get("concepts"), list)
-                    else []
-                ),
+                "returned_concepts": [],
+                "normalized_concepts": [],
                 "relationship_references": (
                     [
                         {
@@ -866,9 +821,27 @@ class ValidatedResponseBuilder:
             }
             code = cls._statement_selection_failure_code(exc)
             raise StatementSelectionError(code, str(exc), details=details) from exc
+        selected = selection["selected_statement_ids"]
+        derived_concepts: list[str] = []
+        for statement_id in selected:
+            for concept in statement_concepts.get(statement_id, []):
+                if concept not in derived_concepts:
+                    derived_concepts.append(concept)
+        if not derived_concepts:
+            derived_concepts = ["explanation_requested"]
+        audit = {
+            "status": "accepted",
+            "provider": provider.provider_name,
+            "model": provider.model_name,
+            "allowed_statement_ids": sorted(str(key) for key in statements),
+            "selected_statement_ids": [str(value) for value in selected],
+            "derived_concepts": derived_concepts,
+            "relationship_references": selection["relationships"],
+            "validation_status": "valid",
+        }
+        selection = {**selection, "concepts": derived_concepts, "audit": audit}
         headline = "Kesinti değerlendirmesi" if selection["headline_id"] == "H1" else None
         lines = [headline] if headline else []
-        selected = selection["selected_statement_ids"]
         concepts = selection["concepts"]
         concept_rank = {concept: index for index, concept in enumerate(concepts)}
         selected_position = {statement_id: index for index, statement_id in enumerate(selected)}
@@ -912,23 +885,14 @@ class ValidatedResponseBuilder:
         statements: Mapping[str, str],
         statement_concepts: Mapping[str, object] | None = None,
     ) -> None:
-        if not isinstance(selection, Mapping) or set(selection) != {
-            "headline_id",
-            "concepts",
-            "selected_statement_ids",
-            "relationships",
+        if not isinstance(selection, Mapping) or not {
+            "headline_id", "selected_statement_ids", "relationships"
+        }.issubset(selection) or set(selection) - {
+            "headline_id", "concepts", "selected_statement_ids", "relationships"
         }:
             raise ValueError("statement selection schema is invalid")
         if selection["headline_id"] not in {"H1", None}:
             raise ValueError("unknown headline ID")
-        concepts = selection["concepts"]
-        if (
-            not isinstance(concepts, list)
-            or not concepts
-            or len(concepts) != len(set(concepts))
-            or any(concept not in _SEMANTIC_CONCEPTS for concept in concepts)
-        ):
-            raise ValueError("semantic decomposition is invalid")
         selected = selection["selected_statement_ids"]
         if not isinstance(selected, list) or not all(isinstance(item, str) for item in selected):
             raise ValueError("statement selection IDs are invalid")

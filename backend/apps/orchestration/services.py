@@ -401,6 +401,21 @@ class QueryRunService:
         query_run.refresh_from_db()
         return query_run
 
+    def save_response_audit(
+        self, query_run: QueryRun, *, audit: Mapping[str, Any]
+    ) -> QueryRun:
+        """Persist bounded response diagnostics without mutating terminal facts."""
+        if QueryRunStatus(query_run.status) not in TERMINAL_QUERY_RUN_STATUSES:
+            raise QueryRunTransitionError(
+                current=query_run.status, target="response_audit"
+            )
+        normalized = sanitize_json(dict(audit))
+        QueryRun.objects.filter(pk=query_run.pk).update(
+            response_audit=normalized, updated_at=timezone.now()
+        )
+        query_run.response_audit = normalized
+        return query_run
+
     def fail(self, query_run: QueryRun, *, error_code: str, error_summary: str) -> QueryRun:
         normalized_code = (error_code or "").strip().lower()
         if not _ERROR_CODE_RE.fullmatch(normalized_code):

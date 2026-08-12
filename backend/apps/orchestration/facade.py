@@ -260,6 +260,9 @@ class OrchestrationFacade:
                 provider_name=llm_descriptor.provider,
                 provider=active_provider,
             )
+            self._query_run_service.save_response_audit(
+                finalized_run, audit=response.statement_selection_audit
+            )
             return OrchestrationOutcome(
                 http_status=200,
                 envelope=OrchestrationEnvelope(
@@ -291,6 +294,9 @@ class OrchestrationFacade:
                     query_run,
                     mode=response_mode,
                     provider=self._response_provider,
+                )
+                self._query_run_service.save_response_audit(
+                    query_run, audit=response.statement_selection_audit
                 )
             except Exception:
                 return self._error(
