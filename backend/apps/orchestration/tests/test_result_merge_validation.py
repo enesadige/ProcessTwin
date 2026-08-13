@@ -510,6 +510,39 @@ def test_analytics_normalizer_preserves_rows_and_unknown_exclusion_count():
     assert extracted.analytics["excluded_unknown_count"] == 1
 
 
+def test_ranked_analytics_mapping_rows_keep_backend_order_through_merge():
+    extracted = _operational_analytics(
+        {
+            "metric": "affected_customers",
+            "aggregation": "sum",
+            "group_by": "event",
+            "ranking_direction": "desc",
+            "limit": 3,
+            "time_grain": None,
+            "filters": {},
+            "rows": [
+                {"label": "CE-RANK-300", "value": 300, "event_count": 1},
+                {"label": "CE-RANK-200", "value": 200, "event_count": 1},
+                {"label": "CE-RANK-100", "value": 100, "event_count": 1},
+            ],
+            "included_event_count": 3,
+            "excluded_unknown_count": 0,
+            "deduplication_grain": "causal_event",
+        }
+    )
+
+    *_, analytics, _sources, errors = ResultMergerValidator._merge_sections(
+        {EvidenceCategory.ANALYTICS: [extracted]}
+    )
+
+    assert errors == []
+    assert [row["label"] for row in analytics["rows"]] == [
+        "CE-RANK-300",
+        "CE-RANK-200",
+        "CE-RANK-100",
+    ]
+
+
 def test_analytics_requires_only_its_backend_owned_evidence_category():
     query = StructuredQuery.model_validate(
         {

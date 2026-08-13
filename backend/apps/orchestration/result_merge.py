@@ -904,7 +904,12 @@ class ResultMergerValidator:
                             and isinstance(target[key], list)
                             and isinstance(value, list)
                         ):
-                            target[key] = sorted(set(target[key]) | set(value))
+                            if all(isinstance(item, Mapping) for item in [*target[key], *value]):
+                                target[key] = ResultMergerValidator._stable_mapping_deduplicate(
+                                    [*target[key], *value]
+                                )
+                            else:
+                                target[key] = sorted(set(target[key]) | set(value))
                             continue
                         if key in target and target[key] != value:
                             errors.append(ValidationErrorItem(code="conflicting_fact"))
@@ -920,12 +925,9 @@ class ResultMergerValidator:
             for key, value in list(section.items()):
                 if isinstance(value, list):
                     if all(isinstance(item, Mapping) for item in value):
-                        section[key] = sorted(
-                            value,
-                            key=lambda item: json.dumps(
-                                item, ensure_ascii=True, sort_keys=True, separators=(",", ":")
-                            ),
-                        )
+                        # Tool contracts own the order of mapping rows. In particular,
+                        # analytics rows are already deterministically ranked upstream.
+                        section[key] = ResultMergerValidator._stable_mapping_deduplicate(value)
                     else:
                         section[key] = sorted(set(value))
         return (
@@ -941,6 +943,18 @@ class ResultMergerValidator:
             ),
             errors,
         )
+
+    @staticmethod
+    def _stable_mapping_deduplicate(rows: list[Mapping[str, Any]]) -> list[Mapping[str, Any]]:
+        """Remove identical mapping rows without changing deterministic source order."""
+        seen: set[str] = set()
+        deduplicated: list[Mapping[str, Any]] = []
+        for row in rows:
+            key = json.dumps(row, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+            if key not in seen:
+                seen.add(key)
+                deduplicated.append(row)
+        return deduplicated
 
     @staticmethod
     def _validate_cross_tool(

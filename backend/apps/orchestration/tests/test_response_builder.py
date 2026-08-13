@@ -1192,6 +1192,33 @@ def test_free_text_narrative_accepts_eight_short_grounded_sentences():
     assert removed == []
 
 
+def test_analytics_ranking_facts_remain_grounded_in_natural_ordered_prose():
+    statements = {
+        "S1": "1. CE-RANK-300: 300 doğrulanmış müşteri etkisi.",
+        "S2": "2. CE-RANK-200: 200 doğrulanmış müşteri etkisi.",
+        "S3": "3. CE-RANK-100: 100 doğrulanmış müşteri etkisi.",
+        "S4": "3 olay hesaplamaya dahil edildi.",
+        "S5": "2 olay, doğrulanmış etki kanıtı olmadığı için hesaplamaya dahil edilmedi.",
+    }
+    content = (
+        "En yüksek doğrulanmış müşteri etkisi sıralaması hazırdır. "
+        "CE-RANK-300 ilk sırada 300 müşteri etkisiyle yer alır. "
+        "CE-RANK-200 ikinci sırada 200 müşteri etkisiyle yer alır. "
+        "CE-RANK-100 üçüncü sırada 100 müşteri etkisiyle yer alır. "
+        "Bu sıralama yalnız doğrulanmış müşteri etkisini kullanır. "
+        "Üç olay hesaplamaya dahil edilmiştir. "
+        "Yetersiz etki kanıtı bulunan iki olay hariç tutulmuştur. "
+        "Eksik etki kayıtları sıfır müşteri etkisi olarak yorumlanmaz. "
+        "Sonuçlar mevcut veri seti kapsamındadır."
+    )
+
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(content, statements, {})
+
+    assert removed == []
+    assert len(narrative["sentences"]) == 9
+    ValidatedResponseBuilder._validate_grounded_narrative(narrative, statements, [])
+
+
 def test_free_text_narrative_keeps_independent_facts_and_unknown_wording():
     statements = {
         "S1": "Gerçek müşteri etkisi kesin doğrulanmadı.",

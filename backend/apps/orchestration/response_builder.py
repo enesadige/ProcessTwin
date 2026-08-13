@@ -2077,7 +2077,7 @@ class ValidatedResponseBuilder:
         if not isinstance(narrative, Mapping) or set(narrative) != _NARRATIVE_SYNTHESIS_KEYS:
             raise ValueError("narrative schema is invalid")
         sentences = narrative["sentences"]
-        if not isinstance(sentences, list) or not sentences or len(sentences) > 8:
+        if not isinstance(sentences, list) or not sentences or len(sentences) > 16:
             raise ValueError("narrative sentences are invalid")
         relationship_map = {
             f"R{index}": relationship
