@@ -593,3 +593,40 @@ def test_device_resolution_prefers_reconciled_canonical_chain_over_history():
 
     assert parsed.structured_query.outage_code == "OUT-CANONICAL-001"
     assert parsed.missing_fields == ()
+
+
+@pytest.mark.django_db
+def test_analytics_ranking_is_a_typed_deterministic_query_without_an_anchor():
+    snapshot = create_snapshot("analytics-query")
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query="Hangi şehirde en fazla tam hizmet kesintisi yaşandı?",
+        snapshot=snapshot,
+    )
+
+    query = parsed.structured_query
+    assert query.intent.value == "operational_analytics"
+    assert query.analytics is not None
+    assert query.analytics.metric == "full_outage_count"
+    assert query.analytics.group_by == "city"
+    assert query.analytics.limit == 1
+    assert query.clarification_required is False
+
+
+@pytest.mark.django_db
+def test_analytics_parser_supports_generic_potential_scope_and_event_count_metrics():
+    snapshot = create_snapshot("analytics-generic-metrics")
+
+    potential_scope = DeterministicStructuredQueryParser().parse(
+        original_query="Potansiyel abonelik kapsamını şehirlere göre sırala.",
+        snapshot=snapshot,
+    ).structured_query
+    event_count = DeterministicStructuredQueryParser().parse(
+        original_query="Şehirlere göre olay sayısını göster.",
+        snapshot=snapshot,
+    ).structured_query
+
+    assert potential_scope.analytics is not None
+    assert potential_scope.analytics.metric == "potential_subscriptions"
+    assert event_count.analytics is not None
+    assert event_count.analytics.metric == "event_count"

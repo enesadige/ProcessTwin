@@ -107,10 +107,25 @@ export type CrossIncidentCorrelationSummary = {
   root_symptom_status?: string
 }
 
+export type AnalyticsSummary = {
+  metric: string
+  aggregation: string
+  group_by?: string
+  ranking_direction: string
+  limit?: number
+  time_grain?: string
+  filters?: Record<string, unknown>
+  rows: Array<{ label: string; value: string | number; event_count: number; trend_direction?: string; absolute_change?: string | number }>
+  included_event_count: number
+  excluded_unknown_count: number
+  deduplication_grain: string
+}
+
 export type StructuredVerifiedResult = {
   schema_version: string
   causal_summary?: CausalSummary
   cross_incident_correlation_summary?: CrossIncidentCorrelationSummary
+  analytics_summary?: AnalyticsSummary
   impact_summary?: ImpactSummary
   rule_summary?: RuleSummary
   compensation_summary?: CompensationSummary

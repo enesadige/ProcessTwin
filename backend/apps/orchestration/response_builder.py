@@ -17,6 +17,7 @@ from apps.orchestration.providers.gemini import GeminiLLMProviderError
 from apps.orchestration.providers.ollama import OllamaLLMProviderError
 from apps.orchestration.providers.registry import get_llm_descriptor
 from apps.orchestration.result_merge import (
+    AnalyticsSummary,
     CausalSummary,
     CompensationSummary,
     CrossIncidentCorrelationSummary,
@@ -182,6 +183,7 @@ class StructuredVerifiedResult(BaseModel):
     schema_version: str = "structured-verified-result.v1"
     causal_summary: CausalSummary | None = None
     cross_incident_correlation_summary: CrossIncidentCorrelationSummary | None = None
+    analytics_summary: AnalyticsSummary | None = None
     impact_summary: ImpactSummary | None = None
     rule_summary: RuleSummary | None = None
     compensation_summary: CompensationSummary | None = None
@@ -627,6 +629,7 @@ class ValidatedResponseBuilder:
         return StructuredVerifiedResult(
             causal_summary=result.causal_summary,
             cross_incident_correlation_summary=result.cross_incident_correlation_summary,
+            analytics_summary=result.analytics_summary,
             impact_summary=result.impact_summary,
             rule_summary=result.rule_summary,
             compensation_summary=result.compensation_summary,
@@ -698,6 +701,42 @@ class ValidatedResponseBuilder:
     @staticmethod
     def _render_deterministic(result: ValidatedExecutionResult) -> str:
         sections = ["Genel sonuç"]
+        analytics = result.analytics_summary
+        if analytics:
+            metric_labels = {
+                "affected_customers": "doğrulanmış müşteri etkisi",
+                "affected_subscriptions": "doğrulanmış abonelik etkisi",
+                "compensation_amount": "toplam tazminat",
+                "full_outage_count": "tam hizmet kesintisi",
+                "failed_failover_count": "başarısız failover olayı",
+                "outage_count": "kesinti",
+                "event_count": "olay",
+                "alarm_count": "kök alarm",
+            }
+            group_labels = {
+                "root_alarm_type": "Alarm tipi",
+                "city": "Şehir",
+                "district": "İlçe",
+                "event": "Olay",
+                "time_bucket": "Dönem",
+            }
+            sections.append(
+                f"Hesaplanan metrik: {metric_labels.get(analytics.metric, analytics.metric)}."
+            )
+            if analytics.rows:
+                sections.append(
+                    f"Gruplama: {group_labels.get(analytics.group_by or '', 'Toplam')}."
+                )
+                for index, row in enumerate(analytics.rows, 1):
+                    sections.append(f"{index}. {row['label']}: {row['value']}.")
+            else:
+                sections.append("Uygulanan filtrelerde doğrulanmış hesaplama kaydı bulunmuyor.")
+            if analytics.excluded_unknown_count:
+                sections.append(
+                    f"{analytics.excluded_unknown_count} olay, doğrulanmış etki kanıtı olmadığı "
+                    "için hesaplamaya dahil edilmedi."
+                )
+            return "\n".join(sections)
         if result.causal_summary:
             reference = result.causal_summary.causal_event_code or result.causal_summary.outage_code
             if reference:
@@ -955,6 +994,29 @@ class ValidatedResponseBuilder:
 
         def add(text: str) -> None:
             statements[f"S{len(statements) + 1}"] = text
+
+        analytics = result.analytics_summary
+        if analytics:
+            metric_labels = {
+                "affected_customers": "doğrulanmış müşteri etkisi",
+                "affected_subscriptions": "doğrulanmış abonelik etkisi",
+                "compensation_amount": "toplam tazminat",
+                "full_outage_count": "tam hizmet kesintisi",
+                "failed_failover_count": "başarısız failover olayı",
+                "outage_count": "kesinti",
+                "event_count": "olay",
+                "alarm_count": "kök alarm",
+            }
+            for index, row in enumerate(analytics.rows, 1):
+                add(
+                    f"{index}. {row['label']}: {row['value']} "
+                    f"{metric_labels.get(analytics.metric, analytics.metric)}."
+                )
+            if analytics.excluded_unknown_count:
+                add(
+                    f"{analytics.excluded_unknown_count} olay, doğrulanmış etki kanıtı olmadığı "
+                    "için hesaplamaya dahil edilmedi."
+                )
 
         causal = result.causal_summary
         if causal:

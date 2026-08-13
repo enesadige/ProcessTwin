@@ -37,6 +37,9 @@ class PlannerReasonCode(StrEnum):
 
 
 _SUPPORTED_OUTPUTS = {
+    StructuredQueryIntent.OPERATIONAL_ANALYTICS: frozenset(
+        {RequestedOutput.SUMMARY, RequestedOutput.ANALYTICS, RequestedOutput.DETAILS}
+    ),
     StructuredQueryIntent.ALARM_CORRELATION: frozenset(
         {RequestedOutput.SUMMARY, RequestedOutput.CORRELATION, RequestedOutput.EVIDENCE}
     ),
@@ -154,6 +157,20 @@ class DeterministicToolPlanner:
         }
 
     def _calls_for_intent(self, query: StructuredQuery) -> list[dict[str, object]] | PlannerResult:
+        if query.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS:
+            return [
+                self._call(
+                    "operational_analytics",
+                    "network",
+                    "analyze_operational_analytics",
+                    self._snapshot_args(
+                        query,
+                        **query.analytics.model_dump(exclude_none=True),
+                        **self._analytics_scope_args(query),
+                    ),
+                    1,
+                )
+            ]
         if query.intent == StructuredQueryIntent.ALARM_CORRELATION:
             return self._cross_incident_correlation_calls(query)
         if query.intent == StructuredQueryIntent.NETWORK_INVESTIGATION:
@@ -226,6 +243,21 @@ class DeterministicToolPlanner:
                 )
             return calls
         return PlannerResult.unplannable(PlannerReasonCode.NO_SAFE_TOOL_MAPPING.value)
+
+    @staticmethod
+    def _analytics_scope_args(query: StructuredQuery) -> dict[str, object]:
+        result: dict[str, object] = {}
+        if query.location:
+            if query.location.city:
+                result["city"] = query.location.city
+            if query.location.district:
+                result["district"] = query.location.district
+        if query.time_window:
+            if query.time_window.from_time:
+                result["from_time"] = query.time_window.from_time
+            if query.time_window.to_time:
+                result["to_time"] = query.time_window.to_time
+        return result
 
     def _cross_incident_correlation_calls(
         self, query: StructuredQuery

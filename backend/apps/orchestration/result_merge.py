@@ -33,6 +33,7 @@ class ValidationStatus(StrEnum):
 
 
 class EvidenceCategory(StrEnum):
+    ANALYTICS = "analytics"
     CROSS_INCIDENT_CORRELATION = "cross_incident_correlation"
     NETWORK_CAUSAL = "network_causal"
     CUSTOMER_IMPACT = "customer_impact"
@@ -129,6 +130,22 @@ class CompensationSummary(BaseModel):
     scope: str | None = None
 
 
+class AnalyticsSummary(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    metric: str
+    aggregation: str
+    group_by: str | None = None
+    ranking_direction: str
+    limit: int | None = None
+    time_grain: str | None = None
+    filters: dict[str, Any] = Field(default_factory=dict)
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+    included_event_count: int
+    excluded_unknown_count: int
+    deduplication_grain: str
+
+
 class RetrievalSource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -158,6 +175,7 @@ class ValidatedExecutionResult(BaseModel):
     validation_status: ValidationStatus
     causal_summary: CausalSummary | None = None
     cross_incident_correlation_summary: CrossIncidentCorrelationSummary | None = None
+    analytics_summary: AnalyticsSummary | None = None
     impact_summary: ImpactSummary | None = None
     rule_summary: RuleSummary | None = None
     compensation_summary: CompensationSummary | None = None
@@ -177,6 +195,7 @@ class _ExtractedToolResult(BaseModel):
     category: EvidenceCategory
     causal: dict[str, Any] = Field(default_factory=dict)
     cross_incident_correlation: dict[str, Any] = Field(default_factory=dict)
+    analytics: dict[str, Any] = Field(default_factory=dict)
     impact: dict[str, Any] = Field(default_factory=dict)
     rule: dict[str, Any] = Field(default_factory=dict)
     compensation: dict[str, Any] = Field(default_factory=dict)
@@ -543,7 +562,61 @@ def _document_retrieval(data: Mapping[str, Any]) -> _ExtractedToolResult:
     )
 
 
+def _operational_analytics(data: Mapping[str, Any]) -> _ExtractedToolResult:
+    metric = _string(data.get("metric"), "metric", required=True)
+    aggregation = _string(data.get("aggregation"), "aggregation", required=True)
+    direction = _string(data.get("ranking_direction"), "ranking_direction", required=True)
+    rows = data.get("rows")
+    if not isinstance(rows, list) or not all(isinstance(item, Mapping) for item in rows):
+        raise ValueError("analytics rows must be a list")
+    normalized_rows = []
+    for row in rows:
+        label = _string(row.get("label"), "analytics row label", required=True)
+        value = row.get("value")
+        if not isinstance(value, (int, float, str)) or isinstance(value, bool):
+            raise ValueError("analytics row value is invalid")
+        normalized = {
+            "label": label,
+            "value": value,
+            "event_count": _non_negative_int(row.get("event_count"), "event_count"),
+        }
+        if row.get("trend_direction") is not None:
+            normalized["trend_direction"] = _string(row.get("trend_direction"), "trend_direction")
+        if row.get("absolute_change") is not None:
+            change = row.get("absolute_change")
+            if not isinstance(change, (int, float, str)) or isinstance(change, bool):
+                raise ValueError("analytics absolute change is invalid")
+            normalized["absolute_change"] = change
+        normalized_rows.append(normalized)
+    filters = data.get("filters", {})
+    if not isinstance(filters, Mapping):
+        raise ValueError("analytics filters are invalid")
+    return _ExtractedToolResult(
+        category=EvidenceCategory.ANALYTICS,
+        analytics={
+            "metric": metric,
+            "aggregation": aggregation,
+            "group_by": _string(data.get("group_by"), "group_by"),
+            "ranking_direction": direction,
+            "limit": _optional_non_negative(data, "limit"),
+            "time_grain": _string(data.get("time_grain"), "time_grain"),
+            "filters": dict(filters),
+            "rows": normalized_rows,
+            "included_event_count": _non_negative_int(
+                data.get("included_event_count"), "included_event_count"
+            ),
+            "excluded_unknown_count": _non_negative_int(
+                data.get("excluded_unknown_count"), "excluded_unknown_count"
+            ),
+            "deduplication_grain": _string(
+                data.get("deduplication_grain"), "deduplication_grain", required=True
+            ),
+        },
+    )
+
+
 NORMALIZERS: dict[tuple[MCPServer, str], Normalizer] = {
+    (MCPServer.NETWORK, "analyze_operational_analytics"): _operational_analytics,
     (MCPServer.NETWORK, "correlate_causal_events"): _cross_incident_correlation,
     (MCPServer.NETWORK, "aggregate_location_impact"): _network_location_impact,
     (MCPServer.NETWORK, "correlate_alarms"): _network_causal,
@@ -647,7 +720,7 @@ class ResultMergerValidator:
                     ValidationErrorItem(code="required_evidence_missing", category=category)
                 )
 
-        causal, correlation, impact, rule, compensation, sources, merge_errors = (
+        causal, correlation, impact, rule, compensation, analytics, sources, merge_errors = (
             self._merge_sections(category_results)
         )
         errors.extend(merge_errors)
@@ -662,6 +735,7 @@ class ResultMergerValidator:
             cross_incident_correlation_summary=(
                 CrossIncidentCorrelationSummary(**correlation) if correlation else None
             ),
+            analytics_summary=AnalyticsSummary(**analytics) if analytics else None,
             impact_summary=ImpactSummary(**impact) if impact else None,
             rule_summary=RuleSummary(**rule) if rule else None,
             compensation_summary=CompensationSummary(**compensation) if compensation else None,
@@ -741,10 +815,14 @@ class ResultMergerValidator:
                 categories.add(EvidenceCategory.RULE_EVIDENCE)
         if query.intent == StructuredQueryIntent.ALARM_CORRELATION:
             categories.add(EvidenceCategory.CROSS_INCIDENT_CORRELATION)
+        if query.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS:
+            categories.add(EvidenceCategory.ANALYTICS)
         return frozenset(categories)
 
     @staticmethod
     def _category_for_call(server: MCPServer, tool_name: str) -> EvidenceCategory | None:
+        if (server, tool_name) == (MCPServer.NETWORK, "analyze_operational_analytics"):
+            return EvidenceCategory.ANALYTICS
         if (server, tool_name) == (MCPServer.NETWORK, "correlate_causal_events"):
             return EvidenceCategory.CROSS_INCIDENT_CORRELATION
         if (server, tool_name) in {
@@ -796,6 +874,7 @@ class ResultMergerValidator:
         dict[str, Any],
         dict[str, Any],
         dict[str, Any],
+        dict[str, Any],
         list[RetrievalSource],
         list[ValidationErrorItem],
     ]:
@@ -804,6 +883,7 @@ class ResultMergerValidator:
         impact: dict[str, Any] = {}
         rule: dict[str, Any] = {}
         compensation: dict[str, Any] = {}
+        analytics: dict[str, Any] = {}
         sources: dict[tuple[str, int | None, str | None], RetrievalSource] = {}
         errors: list[ValidationErrorItem] = []
         for results in category_results.values():
@@ -814,6 +894,7 @@ class ResultMergerValidator:
                     (impact, extracted.impact),
                     (rule, extracted.rule),
                     (compensation, extracted.compensation),
+                    (analytics, extracted.analytics),
                 ):
                     for key, value in incoming.items():
                         if value in (None, [], {}):
@@ -835,16 +916,25 @@ class ResultMergerValidator:
                         errors.append(ValidationErrorItem(code="conflicting_fact"))
                     else:
                         sources[key] = source
-        for section in (causal, correlation, impact, rule, compensation):
+        for section in (causal, correlation, impact, rule, compensation, analytics):
             for key, value in list(section.items()):
                 if isinstance(value, list):
-                    section[key] = sorted(set(value))
+                    if all(isinstance(item, Mapping) for item in value):
+                        section[key] = sorted(
+                            value,
+                            key=lambda item: json.dumps(
+                                item, ensure_ascii=True, sort_keys=True, separators=(",", ":")
+                            ),
+                        )
+                    else:
+                        section[key] = sorted(set(value))
         return (
             causal,
             correlation,
             impact,
             rule,
             compensation,
+            analytics,
             sorted(
                 sources.values(),
                 key=lambda item: (item.source_code, item.version or -1, item.section or ""),

@@ -15,6 +15,7 @@ _SNAPSHOT_IDENTIFIER_RE = re.compile(r"^[a-z0-9][a-z0-9-]{2,159}$")
 
 
 class StructuredQueryIntent(StrEnum):
+    OPERATIONAL_ANALYTICS = "operational_analytics"
     ALARM_CORRELATION = "alarm_correlation"
     NETWORK_INVESTIGATION = "network_investigation"
     OUTAGE_IMPACT = "outage_impact"
@@ -26,6 +27,7 @@ class StructuredQueryIntent(StrEnum):
 
 
 class RequestedOutput(StrEnum):
+    ANALYTICS = "analytics"
     CORRELATION = "correlation"
     SUMMARY = "summary"
     DETAILS = "details"
@@ -79,6 +81,9 @@ _CUSTOMER_IMPACT_DIMENSIONS = frozenset(
 
 def requires_customer_impact_evidence(query: StructuredQuery) -> bool:
     """Return whether the query explicitly needs customer-impact evidence."""
+    if query.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS:
+        # The analytics tool owns its scoped, event-grain evidence policy.
+        return False
     if query.customer_impact_requested:
         return True
     if query.intent == StructuredQueryIntent.COMPENSATION_EVALUATION:
@@ -179,6 +184,61 @@ class StructuredQueryTimeWindow(BaseModel):
         return self
 
 
+class AnalyticsSpecification(BaseModel):
+    """Validated, provider-independent analytical operation."""
+
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
+    metric: Literal[
+        "affected_customers",
+        "affected_subscriptions",
+        "potential_subscriptions",
+        "outage_count",
+        "event_count",
+        "alarm_count",
+        "compensation_amount",
+        "failed_failover_count",
+        "full_outage_count",
+    ]
+    aggregation: Literal["count", "sum", "average", "min", "max"]
+    group_by: (
+        Literal[
+            "event",
+            "root_alarm_type",
+            "city",
+            "district",
+            "device_type",
+            "event_type",
+            "full_outage_status",
+            "failover_status",
+            "time_bucket",
+        ]
+        | None
+    ) = None
+    direction: Literal["asc", "desc"] = "desc"
+    limit: int | None = Field(default=None, ge=1, le=100)
+    time_grain: Literal["day", "week", "month"] | None = None
+    root_alarm_type: str | None = Field(default=None, max_length=100)
+    event_type: str | None = Field(default=None, max_length=80)
+    device_type: str | None = Field(default=None, max_length=80)
+    full_outage: bool | None = None
+    failed_failover: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_semantics(self):
+        count_only = {
+            "outage_count",
+            "event_count",
+            "alarm_count",
+            "failed_failover_count",
+            "full_outage_count",
+        }
+        if self.metric in count_only and self.aggregation != "count":
+            raise ValueError("count metric requires count aggregation")
+        if self.group_by == "time_bucket" and self.time_grain is None:
+            raise ValueError("time_bucket requires time_grain")
+        return self
+
+
 class StructuredQuery(BaseModel):
     """Validated query intent and filters; no tool plan or raw user data."""
 
@@ -187,6 +247,7 @@ class StructuredQuery(BaseModel):
     schema_version: str = "structured-query.v1"
     intent: StructuredQueryIntent
     requested_outputs: list[RequestedOutput] = Field(default_factory=list)
+    analytics: AnalyticsSpecification | None = None
     semantic_dimensions: list[SemanticDimension] = Field(default_factory=list)
     customer_impact_requested: bool = False
     semantic_decomposition_status: Literal["not_attempted", "accepted", "fallback"] = (
@@ -211,6 +272,17 @@ class StructuredQuery(BaseModel):
     time_window: StructuredQueryTimeWindow | None = None
     clarification_required: bool = False
     clarification_reasons: list[ClarificationReason] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_analytics_intent(self):
+        if self.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS and self.analytics is None:
+            raise ValueError("analytics intent requires analytics specification")
+        if (
+            self.intent != StructuredQueryIntent.OPERATIONAL_ANALYTICS
+            and self.analytics is not None
+        ):
+            raise ValueError("analytics specification requires analytics intent")
+        return self
 
     @field_validator("snapshot_identifier")
     @classmethod

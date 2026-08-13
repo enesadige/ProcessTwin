@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { useAuth } from '../auth/AuthContext'
-import { AnalysisRequestError, getAnalysisStatus, submitAnalysis, type AnalysisStatus, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type ViewMode } from '../auth/api'
+import { AnalysisRequestError, getAnalysisStatus, submitAnalysis, type AnalysisStatus, type AnalyticsSummary, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type ViewMode } from '../auth/api'
 import './AIAnalysisPage.css'
 
 const SNAPSHOT_IDENTIFIER =
@@ -48,6 +48,7 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
   const compensation: CompensationSummary | undefined = result.compensation_summary
   const rule: RuleSummary | undefined = result.rule_summary
   const correlation: CrossIncidentCorrelationSummary | undefined = result.cross_incident_correlation_summary
+  const analytics: AnalyticsSummary | undefined = result.analytics_summary
   const impactCards: ReactNode[] = []
   if (impact) {
     if (impact.outage_count !== undefined) impactCards.push(<FactCard key="outage-count" label="Kesinti sayısı" value={impact.outage_count} />)
@@ -96,6 +97,12 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
     if (topology) correlationCards.push(<FactCard key="topology" label="Topoloji ilişkisi" value={topology} />)
     if (correlation.root_symptom_status) correlationCards.push(<FactCard key="root-symptom" label="Kök/belirti yönü" value={correlation.root_symptom_status === 'not_verified' ? 'Doğrulanmadı' : 'Doğrulandı'} />)
   }
+  const analyticsCards: ReactNode[] = []
+  if (analytics) {
+    analytics.rows.forEach((row, index) => analyticsCards.push(<FactCard key={`analytics-${index}-${row.label}`} label={`${index + 1}. ${row.label}`} value={row.value} />))
+    analyticsCards.push(<FactCard key="analytics-included" label="Hesaba dahil edilen olay" value={analytics.included_event_count} />)
+    if (analytics.excluded_unknown_count) analyticsCards.push(<FactCard key="analytics-excluded" label="Bilinmeyen etki nedeniyle hariç" value={analytics.excluded_unknown_count} tone="warning" />)
+  }
   return <div className="analysis-facts" aria-label="Doğrulanmış sonuç kartları">
     <div className="analysis-facts__heading"><div><p className="analysis-page__eyebrow">Doğrulanmış veri</p><h2>Operasyon özeti</h2></div><span>Kaynak: backend</span></div>
     {impactCards.length ? <FactGroup title="Müşteri etkisi">{impactCards}</FactGroup> : null}
@@ -103,9 +110,14 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
     {technical && rootCards.length ? <FactGroup title="Kök neden">{rootCards}</FactGroup> : null}
     {decisionCards.length ? <FactGroup title="Telafi ve karar">{decisionCards}</FactGroup> : null}
     {correlationCards.length ? <FactGroup title="Korelasyon kanıtı">{correlationCards}</FactGroup> : null}
+    {analyticsCards.length ? <FactGroup title={analytics ? `${metricLabelsForTitle(analytics.metric)} analitiği` : 'Analitik'}>{analyticsCards}</FactGroup> : null}
     {technical && result.retrieval_sources?.length ? <FactGroup title="Kanıt referansları">{result.retrieval_sources.map((source) => <FactCard key={`${source.source_code}-${source.version ?? ''}-${source.section ?? ''}`} label={source.section ?? 'Kaynak'} value={`${source.source_code}${source.version !== undefined ? ` v${source.version}` : ''}`} />)}</FactGroup> : null}
-    {!impactCards.length && !outageCards.length && !rootCards.length && !decisionCards.length && !correlationCards.length ? <p className="analysis-message">Bu sorgu için yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}
+    {!impactCards.length && !outageCards.length && !rootCards.length && !decisionCards.length && !correlationCards.length && !analyticsCards.length ? <p className="analysis-message">Bu sorgu için yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}
   </div>
+}
+
+function metricLabelsForTitle(metric: string) {
+  return ({ affected_customers: 'Müşteri etkisi', affected_subscriptions: 'Abonelik etkisi', compensation_amount: 'Tazminat', full_outage_count: 'Tam kesinti', failed_failover_count: 'Failover', outage_count: 'Kesinti', event_count: 'Olay', alarm_count: 'Alarm' } as Record<string, string>)[metric] ?? 'Operasyon'
 }
 
 export function AIAnalysisPage() {

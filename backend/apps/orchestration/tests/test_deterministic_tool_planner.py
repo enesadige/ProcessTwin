@@ -44,6 +44,29 @@ def test_same_structured_query_produces_the_same_validated_plan_without_network(
     assert ToolPlan.model_validate(first.tool_plan.model_dump(mode="json")) == first.tool_plan
 
 
+def test_operational_analytics_uses_one_typed_backend_tool_without_provider_selection():
+    result = DeterministicToolPlanner().plan(
+        query_payload(
+            intent="operational_analytics",
+            requested_outputs=["summary", "analytics"],
+            causal_event_code=None,
+            analytics={
+                "metric": "affected_customers",
+                "aggregation": "sum",
+                "group_by": "root_alarm_type",
+                "limit": 7,
+            },
+        )
+    )
+
+    assert result.status == PlannerResultStatus.PLANNED
+    assert result.tool_plan is not None
+    call = result.tool_plan.calls[0]
+    assert (call.server.value, call.tool_name) == ("network", "analyze_operational_analytics")
+    assert call.arguments["metric"] == "affected_customers"
+    assert call.arguments["limit"] == 7
+
+
 def test_query_clarification_does_not_produce_a_plan():
     result = DeterministicToolPlanner().plan(
         query_payload(

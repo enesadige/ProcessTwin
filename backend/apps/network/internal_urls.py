@@ -5,6 +5,7 @@ from apps.network import internal_views
 app_name = "network_internal"
 
 urlpatterns = [
+    path("analytics/", internal_views.analyze_operational_analytics, name="operational-analytics"),
     path(
         "devices/<str:device_code>/",
         internal_views.get_device_details,

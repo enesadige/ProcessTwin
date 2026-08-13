@@ -7,7 +7,7 @@ import re
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
@@ -20,6 +20,7 @@ from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.gemini import GeminiLLMProviderError
 from apps.orchestration.providers.ollama import OllamaLLMProvider, OllamaLLMProviderError
 from apps.orchestration.structured_query import (
+    AnalyticsSpecification,
     ClarificationReason,
     RequestedOutput,
     SemanticDimension,
@@ -213,6 +214,9 @@ class LLMSemanticDecomposer:
     @staticmethod
     def _allowed_outputs(query: StructuredQuery) -> frozenset[RequestedOutput]:
         """Keep probabilistic dimensions inside the deterministic intent contract."""
+        if query.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS:
+            # The typed analytics specification, not LLM dimensions, fixes scope.
+            return frozenset(query.requested_outputs)
         if query.intent == StructuredQueryIntent.ALARM_CORRELATION:
             return frozenset(
                 {
@@ -298,6 +302,7 @@ class DeterministicStructuredQueryParser:
             raise NaturalLanguageQueryParseError("invalid_structured_query")
         text = original_query.strip()
         folded = _fold(text)
+        analytics = self._analytics_spec(folded, snapshot)
         causal_event_codes = self._extract_codes(_CAUSAL_CODE_RE, text)
         if not causal_event_codes:
             causal_event_codes = self._causal_events_for_alarm_codes(
@@ -324,6 +329,11 @@ class DeterministicStructuredQueryParser:
             outage_code = self._outage_for_device(snapshot, device_code, dates=dates)
         location, ambiguous_location = self._resolve_location(snapshot, folded)
         intent, requested_outputs = self._intent_and_outputs(folded)
+        if analytics:
+            intent, requested_outputs = (
+                StructuredQueryIntent.OPERATIONAL_ANALYTICS,
+                [RequestedOutput.SUMMARY, RequestedOutput.ANALYTICS],
+            )
         correlation_window_minutes, correlation_direction = self._correlation_window(folded)
         correlation_other_region_only = any(
             term in folded
@@ -347,16 +357,20 @@ class DeterministicStructuredQueryParser:
             if outage_code:
                 causal_event_code = None
         decision_type = self._decision_type(folded)
-        missing = self._missing_fields(
-            intent=intent,
-            causal_event_code=causal_event_code,
-            outage_code=outage_code,
-            subscription_reference=subscription_reference,
-            device_code=device_code,
-            location=location,
-            dates=dates,
-            ambiguous_location=ambiguous_location,
-            requested_outputs=requested_outputs,
+        missing = (
+            []
+            if analytics
+            else self._missing_fields(
+                intent=intent,
+                causal_event_code=causal_event_code,
+                outage_code=outage_code,
+                subscription_reference=subscription_reference,
+                device_code=device_code,
+                location=location,
+                dates=dates,
+                ambiguous_location=ambiguous_location,
+                requested_outputs=requested_outputs,
+            )
         )
         reasons = {
             MissingField.OPERATIONAL_REFERENCE: ClarificationReason.MISSING_OPERATIONAL_ANCHOR,
@@ -368,6 +382,7 @@ class DeterministicStructuredQueryParser:
             {
                 "intent": intent,
                 "requested_outputs": requested_outputs,
+                "analytics": analytics.model_dump() if analytics else None,
                 "customer_impact_requested": query_requests_customer_impact(folded),
                 "snapshot_identifier": snapshot.snapshot_key,
                 "causal_event_code": causal_event_code,
@@ -380,7 +395,9 @@ class DeterministicStructuredQueryParser:
                 "subscription_reference": subscription_reference,
                 "decision_type": decision_type,
                 "location": location,
-                "time_window": self._time_window(dates),
+                "time_window": self._analytics_time_window(text, dates)
+                if analytics
+                else self._time_window(dates),
                 "retrieval_query": text
                 if intent == StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL
                 else None,
@@ -576,9 +593,12 @@ class DeterministicStructuredQueryParser:
         device_code: str | None,
     ) -> None:
         for event_code in (causal_event_code, comparison_causal_event_code):
-            if event_code and not CausalEvent.objects.filter(
-                data_snapshot=snapshot, event_code=event_code
-            ).exists():
+            if (
+                event_code
+                and not CausalEvent.objects.filter(
+                    data_snapshot=snapshot, event_code=event_code
+                ).exists()
+            ):
                 raise NaturalLanguageQueryParseError("reference_not_found")
         if (
             device_code
@@ -752,6 +772,189 @@ class DeterministicStructuredQueryParser:
             RequestedOutput.DETAILS,
             RequestedOutput.IMPACT,
         ]
+
+    @staticmethod
+    def _analytics_spec(folded: str, snapshot: DataSnapshot) -> AnalyticsSpecification | None:
+        analytic_terms = (
+            "sırala",
+            "sirala",
+            "en çok",
+            "en cok",
+            "en fazla",
+            "en az",
+            "toplam",
+            "ortalama",
+            "trend",
+            "artmış",
+            "artmis",
+            "azalmış",
+            "azalmis",
+            "aylara göre",
+            "haftalara göre",
+            "karşılaştır",
+            "karsilastir",
+            "göster",
+            "goster",
+            "ilk ",
+            "son ",
+        )
+        if not any(term in folded for term in analytic_terms):
+            return None
+        metric_terms = (
+            (
+                "potential_subscriptions",
+                ("potansiyel kapsam", "potansiyel abonelik", "potansiyel abone"),
+            ),
+            ("affected_customers", ("müşteri", "musteri")),
+            ("affected_subscriptions", ("abonelik", "abone")),
+            ("compensation_amount", ("tazminat", "telafi tutarı", "telafi tutari")),
+            (
+                "failed_failover_count",
+                ("failed failover", "başarısız failover", "basarisiz failover"),
+            ),
+            ("full_outage_count", ("tam hizmet kesintisi", "full outage", "tam kesinti")),
+            ("alarm_count", ("alarm sayısı", "alarm sayisi")),
+            ("outage_count", ("kesinti sayısı", "kesinti sayisi")),
+            ("event_count", ("olay sayısı", "olay sayisi")),
+        )
+        metric = next(
+            (key for key, terms in metric_terms if any(term in folded for term in terms)), None
+        )
+        if metric is None:
+            return None
+        aggregation = (
+            "sum"
+            if metric
+            in {
+                "affected_customers",
+                "affected_subscriptions",
+                "potential_subscriptions",
+                "compensation_amount",
+            }
+            else "count"
+        )
+        if "ortalama" in folded:
+            aggregation = "average"
+        if "en yüksek" in folded or "en yuksek" in folded:
+            aggregation = "max"
+        if "en düşük" in folded or "en dusuk" in folded:
+            aggregation = "min"
+        group_by = None
+        groups = (
+            ("root_alarm_type", ("alarm tipi", "alarm türü", "alarm turu")),
+            ("city", ("şehir", "sehir", "şehirlere", "sehirlere")),
+            ("district", ("ilçe", "ilce")),
+            ("event", ("olay",)),
+            ("time_bucket", ("aylara göre", "haftalara göre", "günlere göre", "gunlere göre")),
+        )
+        group_by = next(
+            (key for key, terms in groups if any(term in folded for term in terms)), None
+        )
+        month_mentions = re.findall(r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s+\d{4}\b", folded)
+        if len(month_mentions) > 1:
+            group_by = "time_bucket"
+        grain = (
+            "month"
+            if "aylara göre" in folded or len(month_mentions) > 1
+            else "week"
+            if "haftalara göre" in folded
+            else "day"
+            if group_by == "time_bucket"
+            else None
+        )
+        limit_match = re.search(r"\b(?:ilk|top|en çok|en cok)\s*(\d{1,3})\b", folded)
+        limit = (
+            int(limit_match.group(1))
+            if limit_match
+            else (
+                1
+                if any(
+                    term in folded
+                    for term in (
+                        "en çok",
+                        "en cok",
+                        "en fazla",
+                        "en az",
+                        "en düşük",
+                        "en dusuk",
+                        "en yüksek",
+                        "en yuksek",
+                    )
+                )
+                else None
+            )
+        )
+        return AnalyticsSpecification(
+            metric=metric,
+            aggregation=aggregation,
+            group_by=group_by,
+            time_grain=grain,
+            limit=limit,
+            direction="asc"
+            if any(term in folded for term in ("en az", "en düşük", "en dusuk"))
+            else "desc",
+            failed_failover=True
+            if "failover" in folded
+            and any(term in folded for term in ("başarısız", "basarisiz", "failed"))
+            else None,
+            full_outage=True
+            if "tam hizmet kesintisi" in folded or "full outage" in folded
+            else None,
+            root_alarm_type=DeterministicStructuredQueryParser._exact_snapshot_value(
+                folded,
+                Alarm.objects.filter(data_snapshot=snapshot).values_list(
+                    "alarm_type__code", flat=True
+                ),
+            ),
+            event_type=DeterministicStructuredQueryParser._exact_snapshot_value(
+                folded,
+                CausalEvent.objects.filter(data_snapshot=snapshot).values_list(
+                    "event_type", flat=True
+                ),
+            ),
+            device_type=DeterministicStructuredQueryParser._exact_snapshot_value(
+                folded,
+                NetworkDevice.objects.filter(data_snapshot=snapshot).values_list(
+                    "device_type", flat=True
+                ),
+            ),
+        )
+
+    @staticmethod
+    def _exact_snapshot_value(folded: str, values) -> str | None:
+        """Resolve only an exact current-snapshot analytic filter, never a model guess."""
+        matches = sorted(
+            {
+                str(value)
+                for value in values
+                if value
+                and re.search(
+                    rf"(?<![a-z0-9_-]){re.escape(_fold(str(value)))}(?![a-z0-9_-])", folded
+                )
+            }
+        )
+        return matches[0] if len(matches) == 1 else None
+
+    @staticmethod
+    def _analytics_time_window(text: str, dates: list[str]) -> dict[str, str] | None:
+        window = DeterministicStructuredQueryParser._time_window(dates)
+        if window:
+            return window
+        matches = re.findall(r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s+(\d{4})\b", _fold(text))
+        if not matches:
+            return None
+        months = sorted((int(year), _TURKISH_MONTHS[month]) for month, year in matches)
+        first_year, first_month = months[0]
+        last_year, last_month = months[-1]
+        start = date(first_year, first_month, 1)
+        next_month = date(
+            last_year + (last_month == 12), 1 if last_month == 12 else last_month + 1, 1
+        )
+        end = next_month - timedelta(days=1)
+        return {
+            "from_time": f"{start.isoformat()}T00:00:00+00:00",
+            "to_time": f"{end.isoformat()}T23:59:59+00:00",
+        }
 
     @staticmethod
     def _decision_type(folded: str) -> str | None:

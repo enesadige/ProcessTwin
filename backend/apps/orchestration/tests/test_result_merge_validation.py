@@ -16,6 +16,7 @@ from apps.orchestration.result_merge import (
     ValidationStatus,
     _customer_causal_impact,
     _network_outage_impact,
+    _operational_analytics,
 )
 from apps.orchestration.services import QueryRunError, QueryRunService
 from apps.orchestration.structured_query import StructuredQuery
@@ -483,3 +484,45 @@ def test_rule_document_retrieval_with_public_event_requires_rule_evidence_too():
         "document_retrieval",
         "rule_evidence",
     }
+
+
+def test_analytics_normalizer_preserves_rows_and_unknown_exclusion_count():
+    extracted = _operational_analytics(
+        {
+            "metric": "affected_customers",
+            "aggregation": "sum",
+            "group_by": "city",
+            "ranking_direction": "desc",
+            "limit": 3,
+            "time_grain": None,
+            "filters": {"city": "İzmir"},
+            "rows": [{"label": "İzmir", "value": 42, "event_count": 2}],
+            "included_event_count": 2,
+            "excluded_unknown_count": 1,
+            "deduplication_grain": "causal_event",
+        }
+    )
+
+    assert extracted.category == EvidenceCategory.ANALYTICS
+    assert extracted.analytics["rows"] == [
+        {"label": "İzmir", "value": 42, "event_count": 2}
+    ]
+    assert extracted.analytics["excluded_unknown_count"] == 1
+
+
+def test_analytics_requires_only_its_backend_owned_evidence_category():
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "operational_analytics",
+            "requested_outputs": ["summary", "analytics"],
+            "snapshot_identifier": "multi-city-realism-v2-causal-r1",
+            "analytics": {
+                "metric": "full_outage_count",
+                "aggregation": "count",
+                "group_by": "city",
+            },
+            "semantic_dimensions": ["verified_customer_impact"],
+        }
+    )
+
+    assert ResultMergerValidator.required_categories(query) == {EvidenceCategory.ANALYTICS}

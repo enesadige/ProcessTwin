@@ -13,9 +13,10 @@ from mcp_servers.shared.contracts import MCPError, MCPErrorCode
 def test_all_network_tools_are_registered():
     assert sorted(NETWORK_TOOL_DEFINITIONS) == [
         "aggregate_location_impact",
-            "calculate_customer_impact",
-            "correlate_alarms",
-            "correlate_causal_events",
+        "analyze_operational_analytics",
+        "calculate_customer_impact",
+        "correlate_alarms",
+        "correlate_causal_events",
         "get_device_details",
         "get_device_topology",
         "get_longest_outage",

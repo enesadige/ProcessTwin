@@ -9,6 +9,7 @@ from pydantic import BaseModel, ValidationError
 from mcp_servers.network import NETWORK_MCP_VERSION
 from mcp_servers.network.models import (
     AggregateLocationImpactInput,
+    AnalyzeOperationalAnalyticsInput,
     CalculateCustomerImpactInput,
     CorrelateAlarmsInput,
     CorrelateCausalEventsInput,
@@ -82,6 +83,16 @@ def _causal_or_path(path: str, field_name: str):
 
 
 NETWORK_TOOL_DEFINITIONS: dict[str, NetworkToolDefinition] = {
+    "analyze_operational_analytics": NetworkToolDefinition(
+        name="analyze_operational_analytics",
+        description=(
+            "Compute deterministic aggregate, ranking, and time-bucket operational analytics."
+        ),
+        input_model=AnalyzeOperationalAnalyticsInput,
+        method="GET",
+        path_builder=_path("/api/internal/v1/network/analytics/"),
+        params_builder=_params,
+    ),
     "aggregate_location_impact": NetworkToolDefinition(
         name="aggregate_location_impact",
         description="Return canonical aggregate impact counts for an explicit date/location scope.",

@@ -159,3 +159,34 @@ class AggregateLocationImpactInput(TemporalSnapshotInput):
         if not self.city and not self.district:
             raise ValueError("city or district is required")
         return self
+
+
+class AnalyzeOperationalAnalyticsInput(SnapshotRequiredInput):
+    """Closed-world aggregation specification for deterministic operational analytics."""
+
+    metric: str = Field(
+        pattern="^(affected_customers|affected_subscriptions|potential_subscriptions|outage_count|event_count|alarm_count|compensation_amount|failed_failover_count|full_outage_count)$"
+    )
+    aggregation: str = Field(pattern="^(count|sum|average|min|max)$")
+    group_by: str | None = Field(
+        default=None,
+        pattern="^(event|root_alarm_type|city|district|device_type|event_type|full_outage_status|failover_status|time_bucket)$",
+    )
+    direction: str = Field(default="desc", pattern="^(asc|desc)$")
+    limit: int | None = Field(default=None, ge=1, le=100)
+    time_grain: str | None = Field(default=None, pattern="^(day|week|month)$")
+    from_time: datetime | None = None
+    to_time: datetime | None = None
+    city: str | None = None
+    district: str | None = None
+    root_alarm_type: str | None = None
+    event_type: str | None = None
+    device_type: str | None = None
+    full_outage: bool | None = None
+    failed_failover: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_time_bucket(self):
+        if self.group_by == "time_bucket" and not self.time_grain:
+            raise ValueError("time_bucket requires time_grain")
+        return self

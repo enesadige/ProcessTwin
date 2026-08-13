@@ -44,6 +44,11 @@ from apps.operations.services.alarm_correlation import (
     AlarmCorrelationService,
     AlarmCorrelationServiceError,
 )
+from apps.operations.services.analytics import (
+    AnalyticsInputError,
+    AnalyticsSpec,
+    OperationalAnalyticsService,
+)
 from apps.operations.services.outages import OutageService, OutageServiceError
 from apps.operations.services.root_cause import RootCauseService, RootCauseServiceError
 
@@ -847,7 +852,9 @@ def aggregate_location_impact(request):
                     else None
                 ),
                 "failover_protected_count": (
-                    assessments.filter(reasons__contains=[ImpactReason.FAILOVER_PROTECTED.value]).count()
+                    assessments.filter(
+                        reasons__contains=[ImpactReason.FAILOVER_PROTECTED.value]
+                    ).count()
                     if assessment_count
                     else None
                 ),
@@ -855,6 +862,51 @@ def aggregate_location_impact(request):
         )
     except InternalNetworkAPIError as exc:
         return _error(exc)
+    except Exception as exc:  # noqa: BLE001
+        return _sanitize_error(exc)
+
+
+@require_GET
+@internal_service_required
+def analyze_operational_analytics(request):
+    """Return a backend-owned aggregate result; raw alarm rows never reach the LLM."""
+    try:
+        snapshot = _resolve_snapshot(request.GET.get("snapshot_identifier"))
+
+        def optional_bool(name: str) -> bool | None:
+            value = request.GET.get(name)
+            if value is None:
+                return None
+            if value.lower() not in {"true", "false"}:
+                raise InternalNetworkAPIError("validation_error", f"{name} is invalid.", status=400)
+            return value.lower() == "true"
+
+        spec = AnalyticsSpec(
+            metric=request.GET.get("metric", ""),
+            aggregation=request.GET.get("aggregation", ""),
+            group_by=request.GET.get("group_by") or None,
+            direction=request.GET.get("direction", "desc"),
+            limit=_parse_limit(request) if request.GET.get("limit") else None,
+            time_grain=request.GET.get("time_grain") or None,
+            from_time=_parse_dt(request.GET.get("from_time"), field_name="from_time"),
+            to_time=_parse_dt(request.GET.get("to_time"), field_name="to_time"),
+            city=request.GET.get("city") or None,
+            district=request.GET.get("district") or None,
+            root_alarm_type=request.GET.get("root_alarm_type") or None,
+            event_type=request.GET.get("event_type") or None,
+            device_type=request.GET.get("device_type") or None,
+            full_outage=optional_bool("full_outage"),
+            failed_failover=optional_bool("failed_failover"),
+        )
+        return _ok(
+            request=request,
+            snapshot=snapshot,
+            data=OperationalAnalyticsService().analyze(snapshot=snapshot, spec=spec),
+        )
+    except (AnalyticsInputError, InternalNetworkAPIError) as exc:
+        if isinstance(exc, InternalNetworkAPIError):
+            return _error(exc)
+        return _error(InternalNetworkAPIError("validation_error", str(exc), status=400))
     except Exception as exc:  # noqa: BLE001
         return _sanitize_error(exc)
 
