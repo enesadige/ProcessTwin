@@ -3,8 +3,8 @@
 ## Güncel Otoriter Durum
 
 Bu bölüm, aşağıdaki tarihsel PRE-061 ve eski MAIN checkpoint notlarının yerini
-alır. Güncel kaynak; `4aa0394 fix: harden unanswerable and partial query
-handling` commit'indeki repository durumudur. Çalışma ağacı bu checkpoint'te
+alır. Güncel kaynak; `1b8b0af feat: add deterministic operational trend
+analytics` commit'indeki repository durumudur. Çalışma ağacı bu checkpoint'te
 temiz olmalıdır.
 
 - Frontend uygulama kabuğu, rol tabanlı oturum kimlik doğrulaması, AI Analysis
@@ -36,6 +36,14 @@ temiz olmalıdır.
   döner; desteklenmeyen capability ayrı sınıflanır ve gereksiz LLM/MCP çalışmaz;
   partial doğrulanmış yanıtlar korunur; eksik kanıt unknown/unverified olarak
   kalır ve sıfıra dönüştürülmez. Gerekli clarification bilgisi korunur.
+- Deterministic operational analytics tamamlandı. Mevcut veri setinde olay
+  granülünde affected customer/subscription, potential scope, event/outage/alarm
+  count, full-outage/failed-failover count ve authoritative compensation amount
+  için typed count/sum/average/min/max hesapları yapılır. Event, root alarm,
+  konum, cihaz/event tipi, outage/failover ve zaman bucket'larıyla grouping;
+  tarih, konum ve durum filtreleri; kullanıcıdan alınan generic top/bottom N ve
+  dönem değişimi desteklenir. Unknown impact event'leri sıfır sayılmaz,
+  hesap dışı bırakılır ve excluded count olarak görünür.
 - Bu proje mevcut sentetik/erişilebilir veri seti üzerinde çalışır; canlı,
   ülke çapında Turkcell üretim analizi olarak tanımlanmaz.
 
@@ -50,9 +58,8 @@ temiz olmalıdır.
 
 ## Kilitli Sonraki Öncelik
 
-1. Genel trend, ranking ve aggregate alarm/outage analytics.
-2. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
-3. Final polish, daha geniş regresyon ve demo hazırlığı.
+1. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
+2. Final polish, daha geniş regresyon ve demo hazırlığı.
 
 ## Latest MAIN-065 Checkpoint
 
@@ -125,7 +132,7 @@ temiz olmalıdır.
 - Aktif branch ve HEAD her oturum başında `git status --short` ve
   `git rev-parse HEAD` ile doğrulanır; bu belge sabit bir branch adı veya eski
   test toplamını otoriter kaynak kabul etmez.
-- Güncel ürün checkpoint'i `4aa0394` ve üstteki **Güncel Otoriter Durum**
+- Güncel ürün checkpoint'i `1b8b0af` ve üstteki **Güncel Otoriter Durum**
   bölümüdür. Tarihsel REV/PRE günlükleri karar ve kanıt izi olarak korunur.
 - Kod/test değişikliği sonunda working tree temiz bırakılır. Sadece ilgili
   focused testler çalıştırılır; full suite yalnız ayrı bir kabul kapısı veya
@@ -375,12 +382,12 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
 Bu bölümdeki aşağıdaki REV/PRE kayıtları tarihsel tamamlanma izidir. Güncel
 uygulama sırası şöyledir:
 
-1. Genel trend/ranking/aggregate alarm-outage analytics.
-2. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
-3. Final polish, daha geniş regresyon ve demo hazırlığı.
+1. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
+2. Final polish, daha geniş regresyon ve demo hazırlığı.
 
-Cross-incident correlation ile unsupported/unknown-ID/partial-answer davranışı
-tamamlandı; sonraki görev olarak tekrar açılmaz.
+Cross-incident correlation, unsupported/unknown-ID/partial-answer davranışı ve
+genel trend/ranking/aggregate analytics tamamlandı; sonraki görev olarak tekrar
+açılmaz.
 
 - **REV-02 — Operations contracts and enums:** Tamamlandı; modelden bağımsız enum, immutable dataclass, validation ve privacy serialization sözleşmeleri `apps.operations.contracts` içinde tanımlandı.
 - **REV-03 — Causal operations models:** Tamamlandı; CausalEvent, SessionEvent, CustomerImpactAssessment modelleri, nullable ilişkiler ve snapshot row-count düzeltme migration'ı eklendi.

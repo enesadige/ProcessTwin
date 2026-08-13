@@ -4,8 +4,16 @@
 > REV-00–REV-12, orchestration, frontend shell/auth/AI Analysis ve sonraki
 > grounded narrative/correlation güvenlik işleri tamamlanmıştır. Güncel görev
 > sırası `docs/CODEX_HANDOFF.md` içindeki **Kilitli Sonraki Öncelik** bölümüdür:
-> genel trend/ranking/aggregate analytics, kalan `MAIN-066`+ frontend işleri,
-> ardından final polish. `MAIN-061` veya PRE-061 blocker'ı güncel değildir.
+> kalan `MAIN-066`+ frontend işleri, ardından final polish. `MAIN-061` veya
+> PRE-061 blocker'ı güncel değildir.
+
+> **2026-08-13 analytics checkpoint:** `1b8b0af` ile mevcut
+> sentetik/erişilebilir veri setinde deterministic operational
+> trend/ranking/aggregate analytics tamamlandı. Hesaplama `CausalEvent`
+> granülünde yapılır; semptom alarmlar customer impact'i çoğaltmaz ve unknown
+> impact sıfıra çevrilmez. Typed metric/aggregation/group/filter/ranking/time
+> sözleşmesi backend tarafından doğrulanır; provider yalnız verified sonucu
+> anlatır. Sonraki iş `MAIN-066` ve kalan frontend tamamlamalarıdır.
 
 Bu plan hedef tasarımdır; REV-01 kapsamında implementation yapılmaz. Sıra, schema ve nedensel generator olmadan service/API/MCP davranışının değiştirilmemesi için düzenlenmiştir.
 
