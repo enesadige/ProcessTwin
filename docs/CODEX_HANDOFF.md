@@ -1,5 +1,59 @@
 # ProcessTwin Codex Handoff
 
+## Güncel Otoriter Durum
+
+Bu bölüm, aşağıdaki tarihsel PRE-061 ve eski MAIN checkpoint notlarının yerini
+alır. Güncel kaynak; `4aa0394 fix: harden unanswerable and partial query
+handling` commit'indeki repository durumudur. Çalışma ağacı bu checkpoint'te
+temiz olmalıdır.
+
+- Frontend uygulama kabuğu, rol tabanlı oturum kimlik doğrulaması, AI Analysis
+  workspace'i, sorgu ilerleme görünümü ve doğrulanmış sonuç kartları
+  tamamlandı. Frontend, analyst/admin yetkisiyle public orchestration
+  endpoint'ine bağlıdır.
+- Yerel profil `gemma4:12b-it-qat` + `qwen3-embedding:4b`; Gemini profili de
+  desteklenir. Provider yalnız doğal dil anlayışı ve anlatımı yapar; güvenli
+  fallback provider veya grounding hatasında kullanılmaya devam eder.
+- Güncel analiz hattı şudur: doğal dil sorgusu -> deterministic exact anchor
+  extraction -> LLM semantic decomposition -> deterministic validation/merge
+  -> deterministic planner -> MCP/domain services ve gerektiğinde RAG ->
+  verified machine facts -> canonical statements/relationships -> deterministic
+  AnswerPlan -> provider natural-language synthesis -> backend grounding
+  validation -> kullanıcı yanıtı ve structured verified-data presentation.
+- LLM; müşteri/abonelik sayısı, kesinti süresi, tazminat değeri, RuleVersion,
+  DecisionEvidence, topoloji, korelasyon, fiziksel RCA veya aggregate/ranking
+  hesabının otoritesi değildir. Bu doğrular backend'in deterministic
+  sorumluluğundadır.
+- Cross-incident/cross-region correlation tamamlandı. Explicit pair ve bounded
+  time-window discovery desteklenir; `verified_relation`,
+  `insufficient_evidence` ve `no_relation` sonuçları zaman, kaynak/topoloji ve
+  mevcut event kanıtından deterministik türetilir. Zaman yakınlığı tek başına
+  korelasyon veya fiziksel kök neden kanıtı değildir. Kök/belirti yönü açık
+  deterministic kanıt yoksa doğrulanmamış kalır. Correlation kartı doğal Türkçe
+  kanıt alanlarını gösterir.
+- Unanswerable ve partial davranışı tamamlandı: bilinmeyen exact
+  `CE-*`/`ALM-*`/`AGG-*`/`SUB-*` kimlikleri fuzzy substitution yapmadan not-found
+  döner; desteklenmeyen capability ayrı sınıflanır ve gereksiz LLM/MCP çalışmaz;
+  partial doğrulanmış yanıtlar korunur; eksik kanıt unknown/unverified olarak
+  kalır ve sıfıra dönüştürülmez. Gerekli clarification bilgisi korunur.
+- Bu proje mevcut sentetik/erişilebilir veri seti üzerinde çalışır; canlı,
+  ülke çapında Turkcell üretim analizi olarak tanımlanmaz.
+
+## Düşük Öncelikli Son Parlatmalar
+
+- Local Gemma bazen fiziksel nedensellik kanıtından biraz daha güçlü ifade
+  kullanabilir.
+- Provider anlatımı, structured verified-data kartında görünen bazı doğrulanmış
+  ayrıntıları atlayabilir.
+- Prompt/prose kalitesi final polish aşamasında tekrar ele alınabilir; bunlar
+  mevcut iş akışının veya grounding güvenliğinin bloklayıcısı değildir.
+
+## Kilitli Sonraki Öncelik
+
+1. Genel trend, ranking ve aggregate alarm/outage analytics.
+2. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
+3. Final polish, daha geniş regresyon ve demo hazırlığı.
+
 ## Latest MAIN-065 Checkpoint
 
 - Public orchestration response now includes only backend-validated
@@ -68,14 +122,20 @@
 
 ## 1. Mevcut Checkpoint
 
-- Aktif branch: `main`.
-- Doğrulanmış HEAD: 052-056 integration gate commit'i sonrasında güncel
-  `git rev-parse HEAD` çıktısı kaynak alınmalıdır.
-- Bu checkpoint'te working tree temiz bırakılmalıdır.
-- Son doğrulanmış tam test baseline'i repository root'tan `.venv/bin/pytest -q` ile **612 passed** sonucudur. Bu sonuç REV-00 baseline dokümanında kayıtlıdır; bu handoff hazırlanırken testler yeniden çalıştırılmamalıdır.
-- REV-00, mevcut sistemin ve test baseline'ının belgelenmesiyle `c820d317bf115672b517563aa85f33e95f80aa9f` commit'inde tamamlandı. REV-01, hedef operasyon modeli ve uygulama planıyla tamamlandı; REV-02, modelden bağımsız nedensellik/etki sözleşmelerini `dfca89dff6f4a2c3a1127d2d1b009ad463ba20c3` commit'iyle tamamladı. REV-03, nedensel operasyon modelleri ve migration çalışmasıyla; REV-04 ise GPON alarm/topoloji compatibility validator ve katalog kararıyla tamamlandı.
+- Aktif branch ve HEAD her oturum başında `git status --short` ve
+  `git rev-parse HEAD` ile doğrulanır; bu belge sabit bir branch adı veya eski
+  test toplamını otoriter kaynak kabul etmez.
+- Güncel ürün checkpoint'i `4aa0394` ve üstteki **Güncel Otoriter Durum**
+  bölümüdür. Tarihsel REV/PRE günlükleri karar ve kanıt izi olarak korunur.
+- Kod/test değişikliği sonunda working tree temiz bırakılır. Sadece ilgili
+  focused testler çalıştırılır; full suite yalnız ayrı bir kabul kapısı veya
+  açık istek olduğunda çalıştırılır.
 
 ## Görev Takip Durumu
+
+> Bu başlığın altındaki eski PRE-061 kronolojisi tarihsel kayıttır. Güncel
+> görev sırası üstteki **Kilitli Sonraki Öncelik** bölümüdür; `MAIN-061`
+> frontend blocker'ı ve PRE-061 provider-quota blocker'ı güncel durum değildir.
 
 - **PRE-061 — Final status: PASS.** Retrieval acceptance **PASS**
   (8 source, 54 chunk, 54 real Qwen embeddings; top-3 %93.33, top-5 %100,
@@ -246,7 +306,10 @@ Belge çelişkilerinde öncelik sırası: güncel git/kod durumu, REV-01, REV-00
 
 ProcessTwin, tamamen sentetik fakat bir Turkcell/Superonline sabit genişbant operasyonuna benzeyen telekom operasyon veri seti üzerinde ağ, müşteri etkisi, kural ve telafi analizleri yapan Django tabanlı bir sistemdir. Veri seti Türkiye sabit genişbant pazarını temsil etmez. Sistem, baseline–candidate iş kuralı karşılaştırmasıyla eşik değişimlerinin müşteri kapsamını ve telafi maliyetini ölçmeyi de hedefler.
 
-Mevcut ürün; deterministik backend servisleri, dört MCP sunucusu ve kaynak retrieval için RAG içerir. İleride LLM/orchestrator katmanı doğal dil sorgularını kontrollü araç planlarına dönüştürecektir; deterministic hesaplama, kök neden, uygunluk veya telafi tutarı LLM'e bırakılmayacaktır.
+Mevcut ürün; deterministik backend servisleri, dört MCP sunucusu, kaynak
+retrieval için RAG ve doğal dil orchestration katmanı içerir. LLM semantic
+decomposition ve grounded anlatım sağlar; deterministic hesaplama, kök neden,
+uygunluk, telafi tutarı, topology ve correlation kararı LLM'e bırakılmaz.
 
 ## 3. Mevcut Teknik Mimari
 
@@ -254,7 +317,10 @@ Backend Python 3.12.5, Django 5.2.16 ve DRF kullanır; PostgreSQL 14.18 üzerind
 
 Temel veri zinciri müşteri etkisi için `Customer -> Subscription -> SubscriptionConnection -> LineConnection -> NetworkPort -> NetworkDevice` biçimindedir. Operasyon zinciri `AlarmType -> Alarm -> IncidentAlarm -> Incident -> Outage`; kural ve telafi zinciri rule versioning üzerinden `CompensationEvaluation -> immutable DecisionEvidence`; RAG zinciri `SourceDocument -> DocumentChunk -> DocumentChunkEmbedding` şeklindedir. Mevcut müşteri etkisi servisleri topoloji ve sağlıklı yedek yol bilgisine göre potansiyel etki çıkarır; session kanıtına dayalı kalıcı verified impact henüz yoktur.
 
-Dört MCP sunucusu yalnız authenticated backend internal API'lerini çağırır, MCP süreçlerinde Django ORM kullanılmaz: Network 9 tool, Customer 7 tool, Rule 8 tool, Compensation 6 tool. Registry, health ve shared contract testleri bu sayıları korur.
+Dört MCP sunucusu yalnız authenticated backend internal API'lerini çağırır,
+MCP süreçlerinde Django ORM kullanılmaz: Network 11 tool, Customer 7 tool,
+Rule 8 tool, Compensation 6 tool. Registry, health ve shared contract testleri
+bu envanteri korur.
 
 RAG tarafında 10 canonical kaynak doküman, 74 chunk bulunur. Arama full-text, semantic ve hybrid modlarını destekler; Rule MCP'nin `search_rule_documents` aracı yalnız retrieval yapar, karar üretmez. Çoklu embedding kayıtları provider/model/version/prompt/content hash kimliğiyle ayrılır; farklı vektör uzayları asla birlikte aranmaz. Geçmiş model kayıtları silinmeden saklanır, aktif descriptor hangi setin kullanılacağını belirler.
 
@@ -306,6 +372,16 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
 
 ## 11. Sıradaki Görev Sırası
 
+Bu bölümdeki aşağıdaki REV/PRE kayıtları tarihsel tamamlanma izidir. Güncel
+uygulama sırası şöyledir:
+
+1. Genel trend/ranking/aggregate alarm-outage analytics.
+2. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
+3. Final polish, daha geniş regresyon ve demo hazırlığı.
+
+Cross-incident correlation ile unsupported/unknown-ID/partial-answer davranışı
+tamamlandı; sonraki görev olarak tekrar açılmaz.
+
 - **REV-02 — Operations contracts and enums:** Tamamlandı; modelden bağımsız enum, immutable dataclass, validation ve privacy serialization sözleşmeleri `apps.operations.contracts` içinde tanımlandı.
 - **REV-03 — Causal operations models:** Tamamlandı; CausalEvent, SessionEvent, CustomerImpactAssessment modelleri, nullable ilişkiler ve snapshot row-count düzeltme migration'ı eklendi.
 - **REV-04 — GPON topology and alarm catalog:** Tamamlandı; merkezi source/device/technology compatibility validator, idempotent catalog seed ve `DISTRIBUTION_CABLE_DOWN` kararı eklendi. Mevcut operasyon kayıtları yeniden üretilmedi.
@@ -338,7 +414,11 @@ Session identity mapping, masking ve retention; stop/restart/continue semantiği
 
 İşe `git status --short`, `git rev-parse HEAD` ve son commit ile başla. Tamamlanmış görevleri yeniden uygulama, kullanıcı değişikliklerini silme, görevin dışına refactor taşıma. Her görevde tüm repo kataloglanmaz; önce bu handoff ve ilgili REV-01/REV-00 dokümanları okunur. Uygulama görevinde yalnız ilgili testler, önemli entegrasyon kapısında veya finalde full suite çalıştırılır. Her tamamlanan görev ayrı commit alır. 24 saat kuralı doğrulanmadan kodlanmaz; canlı simülasyon veya yeni MCP kendiliğinden başlatılmaz. Görev seçerken `Görev Takip Durumu` bölümündeki MAIN/REV/ORCH ayrımını kullan.
 
-## Latest Provider Selection Audit
+## Tarihsel Provider Selection Audit (Superseded)
+
+Bu bölümdeki rate-limit ve Phase 1A statement-selection notları, güncel
+deterministic AnswerPlan mimarisinden öncedir; güncel durum için üstteki
+**Güncel Otoriter Durum** bölümüne bakılır.
 
 One representative real Gemini case now passes non-fallback statement
 selection. The full 18-case run still has 1/10 original and 0/8 unseen
@@ -346,7 +426,7 @@ provider-selection passes; 17/18 use safe fallback because Gemini rate limits
 remain. Diagnostics are persisted as bounded warning categories, without raw
 provider payloads. PRE-061 remains **NOT COMPLETE**.
 
-## Latest Provider Resilience Status
+## Tarihsel Provider Resilience Status (Superseded)
 
 Gemini now uses bounded two-attempt retry with provider-supplied retry timing
 or capped exponential backoff plus jitter. Acceptance pacing is sequential and
@@ -355,7 +435,7 @@ passed `llm_assisted`; a three-case burst was 0/3 provider selection and 3/3
 safe fallback with `provider_call_failed_rate_limited`. The code path is
 complete, but acceptance is provider-quota-limited. MAIN-061 remains blocked.
 
-## Latest Local Provider Baseline
+## Tarihsel Local Provider Baseline (Superseded)
 
 The same canonical semantic acceptance was run without Gemini: resolved LLM
 `ollama/gemma4:12b-it-qat`, resolved embedding `ollama/qwen3-embedding:4b`
@@ -371,7 +451,7 @@ This does not erase the Gemini quota-limited result. The local provider baseline
 is complete, while overall PRE-061 and MAIN-061 remain blocked until the Gemini
 acceptance criterion is satisfied.
 
-## Latest Semantic Audit
+## Tarihsel Semantic Audit (Superseded)
 
 The old semantic-completeness PASS text is historical and is superseded by
 `artifacts/pre061/semantic_generalization_acceptance.json`. The latest run
@@ -389,7 +469,7 @@ Belgeyle kod çelişirse güncel kod/git durumunu kaynak kabul et. Henüz
 implementasyon yapmadan checkpoint'i en fazla 10 maddede özetle. Sonraki
 görev promptunu kullanıcıdan bekle.
 ```
-## Latest Gemini Final Baseline
+## Tarihsel Gemini Final Baseline (Superseded)
 
 The existing original 10 and unseen 8 questions were run once with real HTTP,
 Gemini `gemini-3.6-flash`, Gemini Embedding `gemini-embedding-2` and 10-second

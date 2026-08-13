@@ -1,5 +1,12 @@
 # REV-01 Uygulama Planı
 
+> **Güncel durum notu:** Bu doküman REV serisinin tarihsel uygulama planıdır.
+> REV-00–REV-12, orchestration, frontend shell/auth/AI Analysis ve sonraki
+> grounded narrative/correlation güvenlik işleri tamamlanmıştır. Güncel görev
+> sırası `docs/CODEX_HANDOFF.md` içindeki **Kilitli Sonraki Öncelik** bölümüdür:
+> genel trend/ranking/aggregate analytics, kalan `MAIN-066`+ frontend işleri,
+> ardından final polish. `MAIN-061` veya PRE-061 blocker'ı güncel değildir.
+
 Bu plan hedef tasarımdır; REV-01 kapsamında implementation yapılmaz. Sıra, schema ve nedensel generator olmadan service/API/MCP davranışının değiştirilmemesi için düzenlenmiştir.
 
 ## İlerleme
@@ -148,12 +155,11 @@ run planned kalir, executing run 202, conflict 409 ve terminal failure yeni
 idempotency key gerektirir. Endpoint yalniz privacy-safe typed response veya
 stable hata doner; gercek network/model cagrilari testlerde kullanilmadi.
 
-**Görev takip notu:** Ana plandaki 052–060 uygulamaları tamamlanmıştır.
-Causal revizyon serisi
-`REV-00–REV-12` de tamamlanmıştır. Bu iki seri ana kümülatif planın görev
-imlecini yeniden numaralandırmaz; dosyadaki ilk tamamlanmamış ana plan maddesi
-`MAIN-061 — Frontend uygulama kabuğunu tasarla`dır. Ancak PRE-061 canlı kabul
-kapısı FAIL durumunda olduğundan frontend başlatılmamalıdır.
+**Görev takip notu:** Ana plandaki 052–060, causal revizyon serisi
+`REV-00–REV-12`, frontend `MAIN-061`–`MAIN-065` ve sonraki grounded narrative,
+cross-incident correlation ve unanswerable/partial-answer güvenlik işleri
+tamamlanmıştır. Güncel sıra: genel trend/ranking/aggregate analytics; kalan
+`MAIN-066`+ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 
 ## Zorunlu domain consistency validator'ları
 
