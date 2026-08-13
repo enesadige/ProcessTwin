@@ -6,6 +6,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from typing import Any
 
+from apps.core.exceptions import ProcessTwinError
+
+
+class LLMProviderError(ProcessTwinError):
+    """Safe normalized LLM adapter failure without request or response content."""
+
 
 class LLMProvider(ABC):
     """Common interface for a future provider adapter.

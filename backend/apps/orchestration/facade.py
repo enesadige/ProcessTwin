@@ -54,7 +54,7 @@ class OrchestrationRequest(BaseModel):
     idempotency_key: str = Field(min_length=1, max_length=160)
     original_query: str = Field(min_length=1, max_length=10000)
     structured_query: StructuredQuery | None = None
-    llm_provider: Literal["ollama", "gemini"] | None = None
+    llm_provider: Literal["ollama", "gemini", "nvidia", "groq"] | None = None
     embedding_provider: Literal["ollama", "gemini"] | None = None
     response_mode: ResponseGenerationMode = ResponseGenerationMode.DETERMINISTIC
 

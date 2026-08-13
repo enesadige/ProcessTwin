@@ -8,15 +8,14 @@ from typing import Any
 import httpx
 from django.conf import settings
 
-from apps.core.exceptions import ProcessTwinError
-from apps.orchestration.providers.base import LLMProvider
+from apps.orchestration.providers.base import LLMProvider, LLMProviderError
 
 OLLAMA_LLM_MODEL = "gemma4:12b-it-qat"
 OLLAMA_LLM_PROVIDER = "ollama"
 _TRANSIENT_STATUS_CODES = frozenset({500, 502, 503, 504})
 
 
-class OllamaLLMProviderError(ProcessTwinError):
+class OllamaLLMProviderError(LLMProviderError):
     """Safe Ollama adapter failure without provider request or response data."""
 
 

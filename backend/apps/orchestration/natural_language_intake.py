@@ -16,8 +16,7 @@ from apps.customers.models import Subscription
 from apps.datasets.models import DataSnapshot
 from apps.network.models import NetworkDevice
 from apps.operations.models import Alarm, CausalEvent, Outage
-from apps.orchestration.providers.base import LLMProvider
-from apps.orchestration.providers.gemini import GeminiLLMProviderError
+from apps.orchestration.providers.base import LLMProvider, LLMProviderError
 from apps.orchestration.providers.ollama import OllamaLLMProvider, OllamaLLMProviderError
 from apps.orchestration.structured_query import (
     AnalyticsSpecification,
@@ -229,7 +228,7 @@ class LLMSemanticDecomposer:
 
     @staticmethod
     def _failure_code(exc: Exception) -> str:
-        if isinstance(exc, GeminiLLMProviderError):
+        if isinstance(exc, LLMProviderError):
             return f"provider_call_failed_{exc.code}"
         if isinstance(exc, json.JSONDecodeError):
             return "malformed_schema"

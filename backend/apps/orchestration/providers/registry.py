@@ -13,9 +13,19 @@ from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.gemini import GEMINI_LLM_MODEL, GeminiLLMProvider
 from apps.orchestration.providers.mock import MockLLMProvider
 from apps.orchestration.providers.ollama import OllamaLLMProvider
+from apps.orchestration.providers.openai_compatible import (
+    GROQ_LLM_MODEL,
+    GROQ_LLM_PROVIDER,
+    NVIDIA_LLM_MODEL,
+    NVIDIA_LLM_PROVIDER,
+    groq_provider,
+    nvidia_provider,
+)
 
 OLLAMA_PROVIDER = "ollama"
 GEMINI_PROVIDER = "gemini"
+NVIDIA_PROVIDER = NVIDIA_LLM_PROVIDER
+GROQ_PROVIDER = GROQ_LLM_PROVIDER
 MOCK_PROVIDER = "mock"
 GEMMA4_MODEL = "gemma4:12b-it-qat"
 GEMINI_ALLOWED_MODELS = frozenset(
@@ -90,6 +100,30 @@ LLM_PROVIDER_REGISTRY = MappingProxyType(
             thinking_enabled=False,
             production_allowed=True,
             adapter_factory=GeminiLLMProvider,
+        ),
+        NVIDIA_PROVIDER: LLMProviderDescriptor(
+            registry_key=NVIDIA_PROVIDER,
+            provider=NVIDIA_PROVIDER,
+            model=NVIDIA_LLM_MODEL,
+            model_version="glm-5.2-openai-compatible-v1",
+            prompt_version="llm-provider-contract-v1",
+            is_local=False,
+            supports_thinking=False,
+            thinking_enabled=False,
+            production_allowed=True,
+            adapter_factory=nvidia_provider,
+        ),
+        GROQ_PROVIDER: LLMProviderDescriptor(
+            registry_key=GROQ_PROVIDER,
+            provider=GROQ_PROVIDER,
+            model=GROQ_LLM_MODEL,
+            model_version="gpt-oss-120b-openai-compatible-v1",
+            prompt_version="llm-provider-contract-v1",
+            is_local=False,
+            supports_thinking=False,
+            thinking_enabled=False,
+            production_allowed=True,
+            adapter_factory=groq_provider,
         ),
         MOCK_PROVIDER: LLMProviderDescriptor(
             registry_key=MOCK_PROVIDER,

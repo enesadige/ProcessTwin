@@ -222,7 +222,7 @@ export function AIAnalysisPage() {
             rows={8}
           />
           <div className="analysis-options">
-            <label>LLM provider<select value={llmProvider} onChange={(event) => setLlmProvider(event.target.value as ProviderName)}><option value="ollama">Local Gemma</option><option value="gemini">Gemini</option></select></label>
+            <label>LLM provider<select value={llmProvider} onChange={(event) => setLlmProvider(event.target.value as ProviderName)}><option value="ollama">Local Gemma</option><option value="gemini">Gemini</option><option value="nvidia">NVIDIA GLM-5.2</option><option value="groq">Groq GPT-OSS 120B</option></select></label>
             <label>Embedding provider<select value={embeddingProvider} onChange={(event) => setEmbeddingProvider(event.target.value as ProviderName)}><option value="ollama">Local Qwen</option><option value="gemini">Gemini Embedding</option></select></label>
             <fieldset><legend>Görünüm</legend><label><input type="radio" checked={viewMode === 'management'} onChange={() => setViewMode('management')} /> Yönetim</label><label><input type="radio" checked={viewMode === 'technical'} onChange={() => setViewMode('technical')} /> Teknik</label></fieldset>
           </div>

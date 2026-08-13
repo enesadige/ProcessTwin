@@ -3,9 +3,15 @@ from dataclasses import FrozenInstanceError
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+from apps.orchestration.facade import OrchestrationRequest
 from apps.orchestration.providers import get_llm_descriptor
 from apps.orchestration.providers.ollama import OllamaLLMProvider
-from apps.orchestration.providers.registry import GEMMA4_MODEL, LLM_PROVIDER_REGISTRY
+from apps.orchestration.providers.registry import (
+    GEMMA4_MODEL,
+    GROQ_PROVIDER,
+    LLM_PROVIDER_REGISTRY,
+    NVIDIA_PROVIDER,
+)
 from apps.rag.providers.registry import get_embedding_descriptor
 
 
@@ -48,6 +54,34 @@ def test_gemini_selection_uses_gemini_default_when_process_default_is_gemma(sett
 
     assert descriptor.provider == "gemini"
     assert descriptor.model == "gemini-3.6-flash"
+
+
+@pytest.mark.parametrize(
+    ("provider_name", "model"),
+    [(NVIDIA_PROVIDER, "z-ai/glm-5.2"), (GROQ_PROVIDER, "openai/gpt-oss-120b")],
+)
+def test_openai_compatible_descriptors_are_fixed_allowlisted_pairs(provider_name, model):
+    descriptor = get_llm_descriptor(provider_name)
+
+    assert descriptor.provider == provider_name
+    assert descriptor.model == model
+    assert descriptor.is_local is False
+    assert descriptor.create_provider().metadata()["model"] == model
+
+
+@pytest.mark.parametrize("provider_name", [NVIDIA_PROVIDER, GROQ_PROVIDER])
+def test_orchestration_request_allows_registered_cloud_generation_providers(provider_name):
+    request = OrchestrationRequest.model_validate(
+        {
+            "snapshot_identifier": "provider-test-snapshot",
+            "idempotency_key": "provider-test-key",
+            "original_query": "CE-TEST-001 olayını incele.",
+            "llm_provider": provider_name,
+            "embedding_provider": "ollama",
+        }
+    )
+
+    assert request.llm_provider == provider_name
 
 
 def test_resolved_model_is_written_to_query_run_provider_provenance(settings, db):
@@ -103,6 +137,8 @@ def test_registry_and_descriptors_are_immutable_and_construct_allowlisted_adapte
         ("gemini", "ollama", "qwen3-embedding:4b"),
         ("ollama", "gemini", "gemini-embedding-2"),
         ("ollama", "ollama", "qwen3-embedding:4b"),
+        ("nvidia", "ollama", "qwen3-embedding:4b"),
+        ("groq", "ollama", "qwen3-embedding:4b"),
     ],
 )
 def test_llm_and_embedding_provider_selection_remain_independent(

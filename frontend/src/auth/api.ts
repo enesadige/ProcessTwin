@@ -7,7 +7,7 @@ export type AuthUser = {
   role: UserRole
 }
 
-export type ProviderName = 'ollama' | 'gemini'
+export type ProviderName = 'ollama' | 'gemini' | 'nvidia' | 'groq'
 export type ViewMode = 'management' | 'technical'
 
 export type AnalysisRequest = {

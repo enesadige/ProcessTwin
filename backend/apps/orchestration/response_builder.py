@@ -12,9 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from apps.core.exceptions import ProcessTwinError
 from apps.orchestration.models import QueryRun, QueryRunStatus
-from apps.orchestration.providers.base import LLMProvider
-from apps.orchestration.providers.gemini import GeminiLLMProviderError
-from apps.orchestration.providers.ollama import OllamaLLMProviderError
+from apps.orchestration.providers.base import LLMProvider, LLMProviderError
 from apps.orchestration.providers.registry import get_llm_descriptor
 from apps.orchestration.result_merge import (
     AnalyticsSummary,
@@ -641,7 +639,7 @@ class ValidatedResponseBuilder:
         """Return a bounded diagnostic category without exposing provider payloads."""
         if isinstance(exc, StatementSelectionError):
             return exc.code
-        if isinstance(exc, GeminiLLMProviderError):
+        if isinstance(exc, LLMProviderError):
             return f"provider_call_failed_{exc.code}"
         message = str(exc)
         if "not JSON" in message:
@@ -1711,7 +1709,7 @@ class ValidatedResponseBuilder:
             response = provider.generate(request=request)
         except Exception as exc:
             provider_code = None
-            if isinstance(exc, (OllamaLLMProviderError, GeminiLLMProviderError)):
+            if isinstance(exc, LLMProviderError):
                 provider_code = exc.code
             safe_code = (
                 f"provider_call_failed:{provider_code}"

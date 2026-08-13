@@ -9,8 +9,7 @@ from typing import Any
 
 from django.conf import settings
 
-from apps.core.exceptions import ProcessTwinError
-from apps.orchestration.providers.base import LLMProvider
+from apps.orchestration.providers.base import LLMProvider, LLMProviderError
 
 GEMINI_LLM_MODEL = "gemini-3.6-flash"
 GEMINI_LLM_PROVIDER = "gemini"
@@ -22,7 +21,7 @@ TRANSIENT_ERROR_CODES = frozenset(
 )
 
 
-class GeminiLLMProviderError(ProcessTwinError):
+class GeminiLLMProviderError(LLMProviderError):
     """Safe Gemini adapter failure; never include provider request/response data."""
 
 
