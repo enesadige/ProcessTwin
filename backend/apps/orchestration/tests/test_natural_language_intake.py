@@ -634,6 +634,30 @@ def test_count_metric_uses_count_when_ranked_highest_to_lowest():
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("question", "expected_limit"),
+    [
+        ("Hangi şehirde en fazla tam hizmet kesintisi yaşandı?", 1),
+        ("Tam hizmet kesintisine göre ilk 3 şehri sırala.", 3),
+        ("Şehirleri tam hizmet kesintisine göre sırala.", None),
+    ],
+)
+def test_analytics_ranking_limit_distinguishes_winner_from_exhaustive_list(
+    question, expected_limit
+):
+    snapshot = create_snapshot("analytics-ranking-limit")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=question,
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.analytics is not None
+    assert query.analytics.group_by == "city"
+    assert query.analytics.limit == expected_limit
+
+
+@pytest.mark.django_db
 def test_analytics_parser_supports_generic_potential_scope_and_event_count_metrics():
     snapshot = create_snapshot("analytics-generic-metrics")
 

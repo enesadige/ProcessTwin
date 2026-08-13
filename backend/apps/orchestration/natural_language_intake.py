@@ -853,7 +853,19 @@ class DeterministicStructuredQueryParser:
         group_by = None
         groups = (
             ("root_alarm_type", ("alarm tipi", "alarm türü", "alarm turu")),
-            ("city", ("şehir", "sehir", "şehirlere", "sehirlere")),
+            (
+                "city",
+                (
+                    "şehir",
+                    "sehir",
+                    "şehri",
+                    "sehri",
+                    "şehirleri",
+                    "sehirleri",
+                    "şehirlere",
+                    "sehirlere",
+                ),
+            ),
             ("district", ("ilçe", "ilce")),
             ("event", ("olay",)),
             ("time_bucket", ("aylara göre", "haftalara göre", "günlere göre", "gunlere göre")),
@@ -874,12 +886,28 @@ class DeterministicStructuredQueryParser:
             else None
         )
         limit_match = re.search(r"\b(?:ilk|top|en çok|en cok)\s*(\d{1,3})\b", folded)
+        exhaustive_ranking = any(
+            term in folded
+            for term in (
+                "sırala",
+                "sirala",
+                "her şehir",
+                "her sehir",
+                "tüm şehir",
+                "tum sehir",
+                "şehir bazında",
+                "sehir bazinda",
+                "en yüksekten en düşüğe",
+                "en yuksekten en dusuge",
+            )
+        )
         limit = (
             int(limit_match.group(1))
             if limit_match
             else (
                 1
-                if any(
+                if not exhaustive_ranking
+                and any(
                     term in folded
                     for term in (
                         "en çok",
