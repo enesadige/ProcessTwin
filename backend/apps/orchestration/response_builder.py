@@ -1313,7 +1313,12 @@ class ValidatedResponseBuilder:
             ("root_cause", ("kök neden", "Kök kaynak")),
             (
                 "alarm_correlation",
-                ("Karşılaştırılan olaylar", "operasyonel ilişki", "topoloji ilişkisi"),
+                (
+                    "Karşılaştırılan olaylar",
+                    "operasyonel ilişki",
+                    "topoloji ilişkisi",
+                    "zaman farkı",
+                ),
             ),
             ("correlation_temporal_evidence", ("Zaman farkı:",)),
             ("evidence", ("Kaynaklar", "DecisionEvidence", "RuleVersion")),
