@@ -608,9 +608,29 @@ def test_analytics_ranking_is_a_typed_deterministic_query_without_an_anchor():
     assert query.intent.value == "operational_analytics"
     assert query.analytics is not None
     assert query.analytics.metric == "full_outage_count"
+    assert query.analytics.aggregation == "count"
     assert query.analytics.group_by == "city"
     assert query.analytics.limit == 1
     assert query.clarification_required is False
+
+
+@pytest.mark.django_db
+def test_count_metric_uses_count_when_ranked_highest_to_lowest():
+    snapshot = create_snapshot("analytics-ranked-city-count")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "Mevcut veri setinde şehirleri tam hizmet kesintisi sayısına göre "
+            "en yüksekten en düşüğe sırala."
+        ),
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.analytics is not None
+    assert query.analytics.metric == "full_outage_count"
+    assert query.analytics.aggregation == "count"
+    assert query.analytics.direction == "desc"
+    assert query.analytics.group_by == "city"
 
 
 @pytest.mark.django_db

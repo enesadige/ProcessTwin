@@ -822,6 +822,13 @@ class DeterministicStructuredQueryParser:
         )
         if metric is None:
             return None
+        count_only_metrics = {
+            "outage_count",
+            "event_count",
+            "alarm_count",
+            "failed_failover_count",
+            "full_outage_count",
+        }
         aggregation = (
             "sum"
             if metric
@@ -839,6 +846,10 @@ class DeterministicStructuredQueryParser:
             aggregation = "max"
         if "en düşük" in folded or "en dusuk" in folded:
             aggregation = "min"
+        # "En yüksek/düşük" expresses ranking direction for event counts;
+        # it must not turn a count-only metric into an invalid max/min request.
+        if metric in count_only_metrics:
+            aggregation = "count"
         group_by = None
         groups = (
             ("root_alarm_type", ("alarm tipi", "alarm türü", "alarm turu")),
