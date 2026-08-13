@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -37,12 +38,14 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         model_name: str,
         base_url: str,
         api_key_env: str,
+        structured_output_mode: str = "json_schema",
         client_factory: Callable[[str, float, str], Any] | None = None,
     ) -> None:
         self.provider_name = provider_name
         self.model_name = model_name
         self._base_url_value = base_url
         self._api_key_env = api_key_env
+        self._structured_output_mode = structured_output_mode
         self._client_factory = client_factory or self._build_http_client
         self._client: Any | None = None
 
@@ -117,14 +120,26 @@ class OpenAICompatibleLLMProvider(LLMProvider):
             "stream": False,
         }
         if format_schema is not None:
-            payload["response_format"] = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "processtwin_semantic_decomposition",
-                    "strict": True,
-                    "schema": dict(format_schema),
-                },
-            }
+            if self._structured_output_mode == "json_schema":
+                payload["response_format"] = {
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "processtwin_semantic_decomposition",
+                        "strict": True,
+                        "schema": dict(format_schema),
+                    },
+                }
+            elif self._structured_output_mode == "json_object":
+                payload["messages"][0]["content"] += (
+                    "\nYalnız şu JSON şemasına uyan bir nesne döndür: "
+                    + json.dumps(format_schema, ensure_ascii=False, sort_keys=True)
+                )
+                payload["response_format"] = {"type": "json_object"}
+            else:
+                raise OpenAICompatibleLLMProviderError(
+                    message="Cloud LLM structured output configuration is invalid.",
+                    code="configuration_error",
+                )
         return payload
 
     def _base_url(self) -> str:
@@ -237,5 +252,6 @@ def groq_provider(*, client_factory: Callable[[str, float, str], Any] | None = N
         model_name=GROQ_LLM_MODEL,
         base_url=GROQ_LLM_BASE_URL,
         api_key_env="GROQ_API_KEY",
+        structured_output_mode="json_object",
         client_factory=client_factory,
     )

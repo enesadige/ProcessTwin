@@ -49,14 +49,26 @@ def success_payload(content="OK"):
 
 
 @pytest.mark.parametrize(
-    ("factory", "env_name", "base_url", "model"),
+    ("factory", "env_name", "base_url", "model", "structured_output_mode"),
     [
-        (nvidia_provider, "NVIDIA_API_KEY", NVIDIA_LLM_BASE_URL, NVIDIA_LLM_MODEL),
-        (groq_provider, "GROQ_API_KEY", GROQ_LLM_BASE_URL, GROQ_LLM_MODEL),
+        (
+            nvidia_provider,
+            "NVIDIA_API_KEY",
+            NVIDIA_LLM_BASE_URL,
+            NVIDIA_LLM_MODEL,
+            "json_schema",
+        ),
+        (
+            groq_provider,
+            "GROQ_API_KEY",
+            GROQ_LLM_BASE_URL,
+            GROQ_LLM_MODEL,
+            "json_object",
+        ),
     ],
 )
 def test_openai_compatible_provider_uses_allowlisted_endpoint_model_and_safe_key(
-    settings, factory, env_name, base_url, model
+    settings, factory, env_name, base_url, model, structured_output_mode
 ):
     setattr(settings, env_name, "test-secret-key")
     captured = []
@@ -75,29 +87,29 @@ def test_openai_compatible_provider_uses_allowlisted_endpoint_model_and_safe_key
     )
 
     assert captured == [(base_url, 120.0, "test-secret-key")]
-    assert client.calls == [
-        (
-            "/chat/completions",
-            {
-                "model": model,
-                "messages": [{"role": "user", "content": "Yalnızca OK yaz."}],
-                "temperature": 0,
-                "stream": False,
-                "response_format": {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "processtwin_semantic_decomposition",
-                        "strict": True,
-                        "schema": {
-                            "type": "object",
-                            "properties": {},
-                            "additionalProperties": False,
-                        },
-                    },
+    payload = client.calls[0][1]
+    assert client.calls[0][0] == "/chat/completions"
+    assert payload["model"] == model
+    assert payload["temperature"] == 0
+    assert payload["stream"] is False
+    if structured_output_mode == "json_schema":
+        assert payload["messages"] == [{"role": "user", "content": "Yalnızca OK yaz."}]
+        assert payload["response_format"] == {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "processtwin_semantic_decomposition",
+                "strict": True,
+                "schema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
                 },
             },
-        )
-    ]
+        }
+    else:
+        assert payload["response_format"] == {"type": "json_object"}
+        assert payload["messages"][0]["content"].startswith("Yalnızca OK yaz.")
+        assert '"type": "object"' in payload["messages"][0]["content"]
     assert response["content"] == "OK"
     assert response["provider"] == provider.provider_name
     assert response["model"] == model
