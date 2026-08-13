@@ -1680,6 +1680,9 @@ class ValidatedResponseBuilder:
             "Sorgunun aşağıdaki istenen çıktılarını ayrı ayrı yanıtla; mevcut bir "
             "doğrulanmış değer varsa atlama: REQUESTED_OUTPUTS="
             + json.dumps(requested_outputs or [], ensure_ascii=False)
+            + "\nZaman serisi veya dönem karşılaştırması istenmişse, doğrulanmış her dönem "
+            "değerini, sağlanan farkı ve eğilim yönünü aynı doğal yanıtta birlikte belirt; "
+            "yalnızca yönü ya da tek bir dönemi yazma."
             + "\n"
             "USER_QUERY="
             + original_query.strip()

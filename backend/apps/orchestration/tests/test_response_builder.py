@@ -186,6 +186,32 @@ def completed_run(
     return service.complete(run, final_result=result.to_final_result())
 
 
+def test_grounded_narrative_prompt_requires_full_requested_analytics_comparison_coverage():
+    provider = GroundedNarrativeProvider(
+        "Haziran 2026'da 8, Temmuz 2026'da 5 tam hizmet kesintisi yaşandı. "
+        "Fark 3'tür ve kesinti sayısı azaldı."
+    )
+
+    ValidatedResponseBuilder._safe_grounded_narrative(
+        provider,
+        original_query=(
+            "Haziran 2026 ile Temmuz 2026 tam hizmet kesintilerini karşılaştır; "
+            "değerleri, farkı ve yönü yaz."
+        ),
+        selected_statements={
+            "S1": "Haziran 2026: 8 tam hizmet kesintisi.",
+            "S2": "Temmuz 2026: 5 tam hizmet kesintisi.",
+            "S3": "Haziran 2026 ile Temmuz 2026 arasındaki fark: -3; yön: decrease.",
+        },
+        relationships=[],
+        requested_outputs=["analytics", "summary"],
+    )
+
+    prompt = provider.requests[0]["contents"]
+    assert "doğrulanmış her dönem değerini, sağlanan farkı ve eğilim yönünü" in prompt
+    assert "yalnızca yönü ya da tek bir dönemi yazma" in prompt
+
+
 @pytest.mark.django_db
 def test_deterministic_response_renders_validated_sections_and_keeps_run_unchanged():
     run = completed_run("response-deterministic")
