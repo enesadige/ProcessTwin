@@ -414,6 +414,13 @@ Session identity mapping, masking ve retention; stop/restart/continue semantiği
 
 İşe `git status --short`, `git rev-parse HEAD` ve son commit ile başla. Tamamlanmış görevleri yeniden uygulama, kullanıcı değişikliklerini silme, görevin dışına refactor taşıma. Her görevde tüm repo kataloglanmaz; önce bu handoff ve ilgili REV-01/REV-00 dokümanları okunur. Uygulama görevinde yalnız ilgili testler, önemli entegrasyon kapısında veya finalde full suite çalıştırılır. Her tamamlanan görev ayrı commit alır. 24 saat kuralı doğrulanmadan kodlanmaz; canlı simülasyon veya yeni MCP kendiliğinden başlatılmaz. Görev seçerken `Görev Takip Durumu` bölümündeki MAIN/REV/ORCH ayrımını kullan.
 
+Her **major completed task** sonrasında mevcut takip yüzeyleri birlikte
+güncellenir: `docs/CODEX_HANDOFF.md`,
+`docs/revision/REV-01-IMPLEMENTATION-PLAN.md`, üst proje klasöründeki
+`proje_ilerleme_gunlugu.txt` ve tarihsel olarak kullanılan görev/roadmap dosyası.
+Tek satırlık küçük bug fix'ler, proje durumunu değiştirmiyorsa ayrı günlük
+girdisi gerektirmez.
+
 ## Tarihsel Provider Selection Audit (Superseded)
 
 Bu bölümdeki rate-limit ve Phase 1A statement-selection notları, güncel
