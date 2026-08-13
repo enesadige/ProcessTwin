@@ -74,9 +74,10 @@ repository durumudur. Çalışma ağacı bu checkpoint'te temiz olmalıdır.
   doğrulamasından geçer; operasyonel gerçek veya hesaplama yetkisi taşımaz.
 - Anahtarlar yalnız ortam değişkenlerinden okunur: `NVIDIA_API_KEY` ve
   `GROQ_API_KEY`. Anahtarlar audit, hata, Git veya dokümantasyona yazılmaz.
-  Bu geliştirme oturumunda iki anahtar görünmediğinden canlı API kabulü
-  çalıştırılamadı; mock adapter/Phase 2/Phase 1B sözleşme testleri geçti.
-  Kod commit'i: `c66ef23`.
+  Canlı ön-kontroller ve AGG-ANK-002 ProcessTwin kabulü iki provider ile de
+  `llm_assisted`, uyarısız ve grounding valid geçti. NVIDIA'nın sonraki
+  analytics narrative çağrısı dış `rate_limited` yanıtı verdi; deterministic
+  analytics fallback doğru kaldı. Kod commitleri: `c66ef23`, `ef436ea`.
 
 ## Latest MAIN-065 Checkpoint
 

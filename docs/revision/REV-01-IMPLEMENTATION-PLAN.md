@@ -22,10 +22,12 @@
 > OpenAI-compatible chat adapter ile eklendi. Her iki adapter mevcut
 > Phase 2 ve Phase 1B sözleşmesini kullanır; deterministic AnswerPlan,
 > grounding, embedding seçimi ve domain hesapları değişmedi. API anahtarları
-> yalnız `NVIDIA_API_KEY`/`GROQ_API_KEY` ortam değişkenlerindedir. Bu oturumda
-> anahtarlar görünmediği için canlı kabul `PARTIAL_PROVIDER_LIMIT` olarak
-> kaydedildi; mock integration testleri geçti. Sonraki iş kalibrasyondan önce
-> dataset inventory / audit'tir. Kod commit'i: `c66ef23`.
+> yalnız `NVIDIA_API_KEY`/`GROQ_API_KEY` ortam değişkenlerindedir. Canlı
+> ön-kontrol ve AGG-ANK-002 kabulü iki provider ile de geçti; Groq Phase 2
+> `json_object` transportuyla uyumlu hale getirildi (`ef436ea`). NVIDIA'nın
+> sonraki analytics narrative çağrısındaki dış rate-limit nedeniyle genel
+> kabul `PARTIAL_PROVIDER_LIMIT` olarak kaydedildi. Sonraki iş kalibrasyondan
+> önce dataset inventory / audit'tir. Provider kod commit'i: `c66ef23`.
 
 Bu plan hedef tasarımdır; REV-01 kapsamında implementation yapılmaz. Sıra, schema ve nedensel generator olmadan service/API/MCP davranışının değiştirilmemesi için düzenlenmiştir.
 
