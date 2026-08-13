@@ -10,6 +10,15 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from apps.datasets.models import DataSnapshot
+from apps.orchestration.answerability import (
+    AnswerabilityStatus,
+    PreflightAnswerability,
+    classify_completed_answerability,
+    classify_unsupported_capability,
+    unknown_identifier_answer,
+    unresolved_identifier_answer,
+    unresolved_identifiers,
+)
 from apps.orchestration.executor import ExecutorResult, ToolExecutor
 from apps.orchestration.models import QueryRun, QueryRunStatus
 from apps.orchestration.natural_language_intake import (
@@ -159,13 +168,39 @@ class OrchestrationFacade:
 
         structured_query = normalized_request.structured_query
         active_provider = self._response_provider
+        if (
+            not created
+            and (query_run.final_result or {}).get("schema_version") == "answerability-result.v1"
+        ):
+            return self._preflight_answerability_outcome(
+                query_run,
+                self._persisted_answerability(query_run),
+                replayed=True,
+            )
         if structured_query is None:
+            unsupported = classify_unsupported_capability(normalized_request.original_query)
+            if unsupported is not None:
+                return self._preflight_answerability_outcome(query_run, unsupported)
+            missing_identifiers = unresolved_identifiers(
+                query=normalized_request.original_query,
+                snapshot=snapshot,
+            )
+            if missing_identifiers:
+                return self._preflight_answerability_outcome(
+                    query_run,
+                    unresolved_identifier_answer(missing_identifiers),
+                )
             try:
                 parsed = self._intake_parser.parse(
                     original_query=normalized_request.original_query,
                     snapshot=snapshot,
                 )
             except NaturalLanguageQueryParseError as exc:
+                if exc.code == "reference_not_found":
+                    return self._preflight_answerability_outcome(
+                        query_run,
+                        unknown_identifier_answer(normalized_request.original_query),
+                    )
                 return self._error(
                     422 if exc.code in {"invalid_structured_query", "reference_not_found"} else 503,
                     exc.code,
@@ -268,9 +303,12 @@ class OrchestrationFacade:
                 provider_name=llm_descriptor.provider,
                 provider=active_provider,
             )
-            self._query_run_service.save_response_audit(
-                finalized_run, audit=self._response_audit(response)
+            response_audit = self._response_audit(response)
+            response_audit["answerability"] = classify_completed_answerability(
+                final_result=finalized_run.final_result,
+                requested_outputs=[item.value for item in structured_query.requested_outputs],
             )
+            self._query_run_service.save_response_audit(finalized_run, audit=response_audit)
             return OrchestrationOutcome(
                 http_status=200,
                 envelope=OrchestrationEnvelope(
@@ -297,6 +335,10 @@ class OrchestrationFacade:
     ) -> OrchestrationOutcome | None:
         status = QueryRunStatus(query_run.status)
         if status == QueryRunStatus.COMPLETED:
+            if (query_run.final_result or {}).get("schema_version") == "answerability-result.v1":
+                return self._preflight_answerability_outcome(
+                    query_run, self._persisted_answerability(query_run), replayed=True
+                )
             try:
                 self._query_run_service.save_response_audit(
                     query_run,
@@ -356,6 +398,31 @@ class OrchestrationFacade:
                     query_run, planner_result.status, planner_result.reason_codes, replayed=True
                 )
         return None
+
+    @staticmethod
+    def _answerability_response_text(query_run: QueryRun) -> str:
+        answerability = query_run.response_audit.get("answerability", {})
+        persisted_text = answerability.get("response_text")
+        if isinstance(persisted_text, str) and persisted_text:
+            return persisted_text
+        status = answerability.get("status")
+        identifiers = tuple(answerability.get("identifiers", []))
+        if status == AnswerabilityStatus.UNKNOWN_IDENTIFIER.value:
+            return unresolved_identifier_answer(identifiers).response_text
+        if status == AnswerabilityStatus.UNSUPPORTED_CAPABILITY.value:
+            return "Bu sorgu mevcut analiz kapsamı tarafından desteklenmiyor."
+        if status == AnswerabilityStatus.CLARIFICATION_REQUIRED.value:
+            return "Ek doğrulanmış kapsam bilgisi gerekiyor."
+        return "Bu istek için doğrulanmış bir operasyon kaydı bulunamadı."
+
+    @classmethod
+    def _persisted_answerability(cls, query_run: QueryRun) -> PreflightAnswerability:
+        answerability = query_run.response_audit.get("answerability", {})
+        return PreflightAnswerability(
+            status=AnswerabilityStatus(answerability["status"]),
+            response_text=cls._answerability_response_text(query_run),
+            identifiers=tuple(answerability.get("identifiers", [])),
+        )
 
     @staticmethod
     def _pending_response_audit(*, provider, fallback_provider) -> dict[str, Any]:
@@ -439,25 +506,24 @@ class OrchestrationFacade:
                 original_query=query_run.original_query,
                 snapshot=query_run.data_snapshot,
             )
-            message = "Additional safe query scope is required."
+            message = "Ek doğrulanmış kapsam bilgisi gerekiyor."
             if len(candidates) > 1:
                 message = (
                     "Birden fazla uygun olay bulundu. "
                     + ", ".join(candidates)
                     + " arasından hangisini kastediyorsunuz?"
                 )
-            return OrchestrationOutcome(
-                http_status=422,
-                envelope=OrchestrationEnvelope(
-                    query_run_code=query_run.query_run_code,
-                    status=QueryRunStatus.PLANNED,
-                    snapshot_identifier=query_run.data_snapshot.snapshot_key,
-                    replayed=replayed,
-                    clarification=OrchestrationClarification(
-                        code="clarification_required",
-                        reasons=sorted(reasons),
-                        message=message,
-                    ),
+            return self._preflight_answerability_outcome(
+                query_run,
+                PreflightAnswerability(
+                    status=AnswerabilityStatus.CLARIFICATION_REQUIRED,
+                    response_text=message,
+                ),
+                replayed=replayed,
+                clarification=OrchestrationClarification(
+                    code="clarification_required",
+                    reasons=sorted(reasons),
+                    message=message,
                 ),
             )
         return self._error(
@@ -466,6 +532,60 @@ class OrchestrationFacade:
             "Query cannot be mapped to safe tools.",
             query_run=query_run,
             replayed=replayed,
+        )
+
+    def _preflight_answerability_outcome(
+        self,
+        query_run: QueryRun,
+        answerability: PreflightAnswerability,
+        *,
+        replayed: bool = False,
+        clarification: OrchestrationClarification | None = None,
+    ) -> OrchestrationOutcome:
+        """Complete an honest no-provider response for a deterministic preflight result."""
+        service = self._query_run_service
+        if QueryRunStatus(query_run.status) in {QueryRunStatus.PENDING, QueryRunStatus.PLANNED}:
+            if QueryRunStatus(query_run.status) == QueryRunStatus.PENDING:
+                service.transition(query_run, target_status=QueryRunStatus.PLANNED)
+            service.transition(query_run, target_status=QueryRunStatus.EXECUTING)
+            service.complete(
+                query_run,
+                final_result={
+                    "schema_version": "answerability-result.v1",
+                    "answerability": {
+                        "status": answerability.status.value,
+                        "identifiers": list(answerability.identifiers),
+                    },
+                },
+            )
+        response = ValidatedNaturalLanguageResponse(
+            response_text=answerability.response_text,
+            generation_mode=ResponseGenerationMode.DETERMINISTIC,
+            validation_status="valid",
+        )
+        service.save_response_audit(
+            query_run,
+            audit={
+                "status": "completed",
+                "generation_mode": ResponseGenerationMode.DETERMINISTIC.value,
+                "answerability": {
+                    "status": answerability.status.value,
+                    "identifiers": list(answerability.identifiers),
+                    "response_text": answerability.response_text,
+                },
+                "warnings": [],
+            },
+        )
+        return OrchestrationOutcome(
+            http_status=200,
+            envelope=OrchestrationEnvelope(
+                query_run_code=query_run.query_run_code,
+                status=QueryRunStatus.COMPLETED,
+                snapshot_identifier=query_run.data_snapshot.snapshot_key,
+                replayed=replayed,
+                response=response,
+                clarification=clarification,
+            ),
         )
 
     def _failed_run_outcome(

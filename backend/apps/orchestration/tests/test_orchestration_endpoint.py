@@ -215,6 +215,85 @@ def test_authenticated_analysis_endpoint_requires_analyst_role_and_uses_session(
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("original_query", "expected_status", "expected_text"),
+    [
+        (
+            "CE-DOES-NOT-EXIST olayını incele.",
+            "unknown_identifier",
+            "CE-DOES-NOT-EXIST için doğrulanmış bir kayıt bulunamadı.",
+        ),
+        (
+            "AGG-İZM-DOES-NOT-EXIST cihazını incele.",
+            "unknown_identifier",
+            "AGG-İZM-DOES-NOT-EXIST için doğrulanmış bir kayıt bulunamadı.",
+        ),
+        (
+            "Bu müşterinin gelecek ay internet kullanımını tahmin et.",
+            "unsupported_capability",
+            "Bu sorgu mevcut analiz kapsamı tarafından desteklenmiyor.",
+        ),
+    ],
+)
+def test_preflight_answerability_completes_without_provider_or_tools(
+    settings, monkeypatch, original_query, expected_status, expected_text
+):
+    snapshot = create_snapshot("endpoint-answerability")
+    executor = FakeExecutor()
+    facade = OrchestrationFacade(executor=executor)
+    patch_facade(monkeypatch, facade)
+    payload = {
+        "snapshot_identifier": snapshot.snapshot_key,
+        "idempotency_key": f"answerability-{expected_status}",
+        "original_query": original_query,
+    }
+    response = Client().post(
+        ENDPOINT,
+        data=json.dumps(payload),
+        content_type="application/json",
+        **client_headers(settings),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "completed"
+    assert response.json()["response"]["response_text"] == expected_text
+    assert executor.calls == 0
+    run = QueryRun.objects.get(idempotency_key=payload["idempotency_key"])
+    assert run.status == QueryRunStatus.COMPLETED
+    assert run.response_audit["answerability"]["status"] == expected_status
+    assert run.response_audit["warnings"] == []
+
+
+@pytest.mark.django_db
+def test_preflight_answerability_replay_is_stable(settings, monkeypatch):
+    snapshot = create_snapshot("endpoint-answerability-replay")
+    facade = OrchestrationFacade()
+    patch_facade(monkeypatch, facade)
+    payload = {
+        "snapshot_identifier": snapshot.snapshot_key,
+        "idempotency_key": "answerability-replay",
+        "original_query": "ALM-DOES-NOT-EXIST için durum nedir?",
+    }
+    client = Client()
+    first = client.post(
+        ENDPOINT,
+        data=json.dumps(payload),
+        content_type="application/json",
+        **client_headers(settings),
+    )
+    replay = client.post(
+        ENDPOINT,
+        data=json.dumps(payload),
+        content_type="application/json",
+        **client_headers(settings),
+    )
+
+    assert first.status_code == replay.status_code == 200
+    assert replay.json()["replayed"] is True
+    assert replay.json()["response"]["response_text"] == first.json()["response"]["response_text"]
+
+
+@pytest.mark.django_db
 def test_analysis_status_is_owned_role_limited_and_safe():
     snapshot = create_snapshot("public-analysis-status")
     analyst = get_user_model().objects.create_user(
@@ -475,14 +554,14 @@ def test_clarification_and_unplannable_do_not_execute_tools(settings, monkeypatc
         **client_headers(settings),
     )
 
-    assert clarification_response.status_code == 422
-    assert clarification_response.json()["clarification"]["code"] == "clarification_required"
+    assert clarification_response.status_code == 200
+    assert "Ek doğrulanmış kapsam" in clarification_response.json()["response"]["response_text"]
     assert unplannable_response.status_code == 422
     assert unplannable_response.json()["error"]["code"] == "planner_unplannable"
     assert executor.calls == 0
     assert (
         QueryRun.objects.get(idempotency_key="endpoint-clarify-001").status
-        == QueryRunStatus.PLANNED
+        == QueryRunStatus.COMPLETED
     )
 
 
@@ -561,7 +640,7 @@ def test_snapshot_and_structured_query_idempotency_conflicts(settings, monkeypat
 
 def test_mcp_tool_counts_remain_unchanged():
     assert {server.value: len(tools) for server, tools in MCP_TOOL_REGISTRIES.items()} == {
-        "network": 10,
+        "network": 11,
         "customer": 7,
         "rule": 8,
         "compensation": 6,
