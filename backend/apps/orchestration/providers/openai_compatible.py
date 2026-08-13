@@ -174,7 +174,9 @@ class OpenAICompatibleLLMProvider(LLMProvider):
             )
         if status_code == 429:
             return OpenAICompatibleLLMProviderError(
-                message="Cloud LLM rate limit was reached.", code="rate_limited"
+                message="Cloud LLM rate limit was reached.",
+                code="rate_limited",
+                details=OpenAICompatibleLLMProvider._rate_limit_details(response),
             )
         if status_code == 404:
             return OpenAICompatibleLLMProviderError(
@@ -191,6 +193,31 @@ class OpenAICompatibleLLMProvider(LLMProvider):
         return OpenAICompatibleLLMProviderError(
             message="Cloud LLM provider is unavailable.", code="provider_unavailable"
         )
+
+    @staticmethod
+    def _rate_limit_details(response: Any) -> dict[str, str | int]:
+        """Keep only safe provider rate-limit metadata; never retain auth headers."""
+        headers = getattr(response, "headers", {})
+        if not isinstance(headers, Mapping):
+            return {"http_status": 429}
+        allowed_names = (
+            "retry-after",
+            "x-ratelimit-limit-requests",
+            "x-ratelimit-remaining-requests",
+            "x-ratelimit-reset-requests",
+            "x-ratelimit-limit-tokens",
+            "x-ratelimit-remaining-tokens",
+            "x-ratelimit-reset-tokens",
+            "x-request-id",
+            "request-id",
+            "nvidia-request-id",
+        )
+        details: dict[str, str | int] = {"http_status": 429}
+        for name in allowed_names:
+            value = headers.get(name)
+            if isinstance(value, str) and value.strip():
+                details[name] = value.strip()[:128]
+        return details
 
     def _normalize_response(self, response: Any) -> Mapping[str, Any]:
         try:

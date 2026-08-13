@@ -1153,6 +1153,90 @@ def test_free_text_narrative_hides_internal_reason_codes_without_changing_ids():
     assert "temporal_propagation" not in narrative["sentences"][0]["text"]
 
 
+def test_deterministic_fallback_uses_explicit_device_anchor_and_hides_internal_causal_fields():
+    result = valid_result("response-device-anchor").model_copy(
+        update={
+            "causal_summary": CausalSummary(
+                causal_event_code="CE-UNRELATED-001",
+                root_resource_type="device",
+                root_resource_reference="AGG-TEST-002",
+                root_cause_reason_codes=["root_cause_unverified", "same_resource"],
+                propagation_summary="Candidate matches the causal event physical root resource.",
+                full_outage=True,
+            )
+        }
+    )
+
+    text = ValidatedResponseBuilder._render_deterministic(
+        result, {"device_code": "AGG-TEST-002"}
+    )
+
+    assert "Doğrulanan operasyon referansı: AGG-TEST-002." in text
+    assert "CE-UNRELATED-001" not in text
+    assert "root_cause_unverified" not in text
+    assert "same_resource" not in text
+    assert "Candidate matches" not in text
+    assert result.causal_summary.root_cause_reason_codes == [
+        "root_cause_unverified",
+        "same_resource",
+    ]
+    assert result.causal_summary.propagation_summary == (
+        "Candidate matches the causal event physical root resource."
+    )
+
+
+def test_deterministic_fallback_keeps_explicit_causal_event_anchor():
+    result = valid_result("response-causal-anchor")
+
+    text = ValidatedResponseBuilder._render_deterministic(
+        result, {"causal_event_code": "CE-GPON-001"}
+    )
+
+    assert "Doğrulanan operasyon referansı: CE-GPON-001." in text
+
+
+def test_deterministic_fallback_allows_second_verified_root_resource_identifier():
+    result = valid_result("response-second-anchor")
+
+    text = ValidatedResponseBuilder._render_deterministic(
+        result, {"causal_event_code": "CE-GPON-001"}
+    )
+
+    assert "Doğrulanan operasyon referansı: CE-GPON-001." in text
+    assert "Kök kaynak: device OLT-001." in text
+
+
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "Kesinti müşteri memnuniyetini olumsuz etkiledi.",
+        "Müşteriler alternatif çözümler aramak zorunda kaldı.",
+        "Kesinti iş sürekliliğini olumsuz etkiledi.",
+        "Olay ticari etki yarattı.",
+    ],
+)
+def test_free_text_narrative_rejects_unsupported_qualitative_impact_claim(claim):
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        claim,
+        {"S1": "Doğrulanmış müşteri etkisi 495 müşteridir."},
+        {},
+    )
+
+    assert narrative["sentences"] == []
+    assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
+
+
+def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "Müşteri memnuniyeti olumsuz etkilendi.",
+        {"S1": "Doğrulanmış müşteri memnuniyeti olumsuz etkilendi."},
+        {},
+    )
+
+    assert removed == []
+    assert narrative["sentences"][0]["text"] == "Müşteri memnuniyeti olumsuz etkilendi."
+
+
 def test_requested_narrative_coverage_adds_only_missing_verified_fact():
     text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
         "Olay tam hizmet kesintisidir.",

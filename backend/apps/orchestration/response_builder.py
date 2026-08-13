@@ -69,6 +69,14 @@ _NARRATIVE_DOMAIN_INTERPRETATION_RE = re.compile(
     r"shared[- ](?:source|failure|risk)|common[- ](?:cause|source|failure))\b",
     re.IGNORECASE,
 )
+_NARRATIVE_QUALITATIVE_IMPACT_RE = re.compile(
+    r"\b(?:müşteri(?:ler(?:in)?|nin)?\s+(?:alternatif|başka)\s+(?:çözüm|çözümler)|"
+    r"customer(?:s)?\s+(?:sought|seek|using)\s+alternative|"
+    r"müşteri memnuniyet\w*|customer satisfaction|iş süreklili\w*|business continuity|"
+    r"ticari etki|financial impact|business impact|organizasyonel etki|"
+    r"organizational impact)\b",
+    re.IGNORECASE,
+)
 _NARRATIVE_FACT_TOKEN_RE = re.compile(
     r"(?:\b\d+(?:[.,]\d+)?\b|\b[A-Z][A-Z0-9_:-]{3,}\b|\b[A-Z][A-Z0-9]+(?:-[A-Z0-9]+)+\b)"
 )
@@ -224,7 +232,7 @@ class ValidatedResponseBuilder:
     ) -> ValidatedNaturalLanguageResponse:
         requested_mode = ResponseGenerationMode(mode)
         result = self._validated_result(query_run)
-        deterministic_text = self._render_deterministic(result)
+        deterministic_text = self._render_deterministic(result, query_run.structured_query)
         citations = self._citations(result)
         warnings = list(result.warnings)
         response = ValidatedNaturalLanguageResponse(
@@ -697,7 +705,9 @@ class ValidatedResponseBuilder:
         return result
 
     @staticmethod
-    def _render_deterministic(result: ValidatedExecutionResult) -> str:
+    def _render_deterministic(
+        result: ValidatedExecutionResult, structured_query: Mapping[str, Any] | None = None
+    ) -> str:
         sections = ["Genel sonuç"]
         analytics = result.analytics_summary
         if analytics:
@@ -738,7 +748,22 @@ class ValidatedResponseBuilder:
                 )
             return "\n".join(sections)
         if result.causal_summary:
-            reference = result.causal_summary.causal_event_code or result.causal_summary.outage_code
+            # Exact query anchors are authoritative for presentation. A device-scoped query
+            # must not surface a linked incident code merely because it sorts first in data.
+            query = structured_query or {}
+            reference = next(
+                (
+                    value
+                    for value in (
+                        query.get("device_code"),
+                        query.get("causal_event_code"),
+                        query.get("outage_code"),
+                        query.get("subscription_reference"),
+                    )
+                    if isinstance(value, str) and value
+                ),
+                None,
+            )
             if reference:
                 sections.append(f"Doğrulanan operasyon referansı: {reference}.")
 
@@ -789,12 +814,6 @@ class ValidatedResponseBuilder:
                     f"{causal.primary_status or 'doğrulanmadı'}, yedek bağlantı "
                     f"{causal.backup_status or 'doğrulanmadı'}."
                 )
-            if causal.root_cause_reason_codes:
-                sections.append(
-                    "Gerekçe kodları: " + ", ".join(causal.root_cause_reason_codes) + "."
-                )
-            if causal.propagation_summary:
-                sections.append(f"Yayılım özeti: {causal.propagation_summary}")
 
         correlation = result.cross_incident_correlation_summary
         if correlation:
@@ -1709,8 +1728,10 @@ class ValidatedResponseBuilder:
             response = provider.generate(request=request)
         except Exception as exc:
             provider_code = None
+            provider_error_metadata: dict[str, Any] = {}
             if isinstance(exc, LLMProviderError):
                 provider_code = exc.code
+                provider_error_metadata = dict(exc.details)
             safe_code = (
                 f"provider_call_failed:{provider_code}"
                 if isinstance(provider_code, str) and provider_code
@@ -1719,7 +1740,10 @@ class ValidatedResponseBuilder:
             raise NarrativeSynthesisError(
                 safe_code,
                 "narrative provider request failed",
-                details={"failure_detail": type(exc).__name__},
+                details={
+                    "failure_detail": type(exc).__name__,
+                    "provider_error_metadata": provider_error_metadata,
+                },
             ) from exc
         if not isinstance(response, Mapping) or response.get("provider") != provider.provider_name:
             raise NarrativeSynthesisError(
@@ -1884,6 +1908,12 @@ class ValidatedResponseBuilder:
         statements: Mapping[str, str],
         relationships: Mapping[str, Mapping[str, str]],
     ) -> bool:
+        support_text = " ".join(statements.values()).casefold()
+        qualitative_match = _NARRATIVE_QUALITATIVE_IMPACT_RE.search(text)
+        if qualitative_match:
+            matched_concept = qualitative_match.group(0).casefold()
+            if matched_concept not in support_text:
+                return True
         if not _NARRATIVE_DOMAIN_INTERPRETATION_RE.search(text):
             return False
         relationship_text = " ".join(

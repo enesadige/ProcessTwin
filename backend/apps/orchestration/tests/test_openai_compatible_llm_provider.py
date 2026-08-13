@@ -19,9 +19,10 @@ from apps.orchestration.structured_query import StructuredQuery
 
 
 class FakeResponse:
-    def __init__(self, *, status_code=200, payload=None):
+    def __init__(self, *, status_code=200, payload=None, headers=None):
         self.status_code = status_code
         self._payload = payload
+        self.headers = headers or {}
 
     def json(self):
         if isinstance(self._payload, Exception):
@@ -134,6 +135,30 @@ def test_openai_compatible_provider_has_safe_failure_categories(settings, factor
         assert exc_info.value.code == expected_code
         assert "test-secret-key" not in str(exc_info.value)
         assert "test-secret-key" not in repr(exc_info.value.details)
+
+
+def test_rate_limit_diagnostics_keep_only_safe_provider_metadata(settings):
+    settings.NVIDIA_API_KEY = "test-secret-key"
+    response = FakeResponse(
+        status_code=429,
+        headers={
+            "retry-after": "2",
+            "x-ratelimit-remaining-requests": "0",
+            "x-request-id": "safe-request-id",
+            "authorization": "Bearer test-secret-key",
+        },
+    )
+    provider = nvidia_provider(client_factory=lambda *_: FakeClient(response))
+
+    with pytest.raises(OpenAICompatibleLLMProviderError) as exc_info:
+        provider.generate(request={"contents": "safe"})
+
+    assert exc_info.value.details == {
+        "http_status": 429,
+        "retry-after": "2",
+        "x-ratelimit-remaining-requests": "0",
+        "x-request-id": "safe-request-id",
+    }
 
 
 def test_openai_compatible_provider_rejects_invalid_response_without_payload_leak(settings):
