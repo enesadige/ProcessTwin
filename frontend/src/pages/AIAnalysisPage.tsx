@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { useAuth } from '../auth/AuthContext'
-import { AnalysisRequestError, getAnalysisStatus, submitAnalysis, type AnalysisStatus, type CausalSummary, type CompensationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type ViewMode } from '../auth/api'
+import { AnalysisRequestError, getAnalysisStatus, submitAnalysis, type AnalysisStatus, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type ViewMode } from '../auth/api'
 import './AIAnalysisPage.css'
 
 const SNAPSHOT_IDENTIFIER =
@@ -23,11 +23,31 @@ function FactGroup({ title, children }: { title: string; children: ReactNode }) 
   return <section className="analysis-fact-group"><h3>{title}</h3><div className="analysis-fact-grid">{children}</div></section>
 }
 
+function correlationDuration(seconds: number) {
+  if (seconds < 60) return `${seconds} saniye`
+  const totalMinutes = Math.floor(seconds / 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+  if (hours && minutes) return `${hours} saat ${minutes} dakika`
+  if (hours) return `${hours} saat`
+  return `${totalMinutes} dakika`
+}
+
+function correlationStatus(status: string) {
+  return ({ verified_relation: 'Doğrulandı', insufficient_evidence: 'Kanıt yetersiz', no_relation: 'İlişki bulunmadı' } as Record<string, string>)[status] ?? 'Doğrulanmış durum yok'
+}
+
+function topologyRelationship(correlation: CrossIncidentCorrelationSummary) {
+  const relation = correlation.topology_relation ?? correlation.resource_relation
+  return ({ same_resource: 'Aynı doğrulanmış kaynak', direct_parent_child: 'Doğrudan üst/alt bağlantı', same_bng_branch: 'Aynı upstream BNG dalı', shared_failure_domain: 'Aynı doğrulanmış arıza alanı' } as Record<string, string>)[relation ?? '']
+}
+
 function VerifiedResultCards({ result, technical }: { result: StructuredVerifiedResult; technical: boolean }) {
   const causal: CausalSummary | undefined = result.causal_summary
   const impact: ImpactSummary | undefined = result.impact_summary
   const compensation: CompensationSummary | undefined = result.compensation_summary
   const rule: RuleSummary | undefined = result.rule_summary
+  const correlation: CrossIncidentCorrelationSummary | undefined = result.cross_incident_correlation_summary
   const impactCards: ReactNode[] = []
   if (impact) {
     if (impact.outage_count !== undefined) impactCards.push(<FactCard key="outage-count" label="Kesinti sayısı" value={impact.outage_count} />)
@@ -67,14 +87,24 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
     if (rule.evidence_references?.length) decisionCards.push(<FactCard key="evidence" label="Karar kanıtı" value={rule.evidence_references.join(', ')} />)
     if (!compensation?.status && rule.eligibility_status) decisionCards.push(<FactCard key="eligibility" label="Uygunluk" value={rule.eligibility_status} />)
   }
+  const correlationCards: ReactNode[] = []
+  if (correlation) {
+    correlationCards.push(<FactCard key="correlation-status" label="Korelasyon" value={correlationStatus(correlation.correlation_status)} />)
+    if (correlation.candidate_event_code) correlationCards.push(<FactCard key="compared-events" label="Karşılaştırılan olaylar" value={`${correlation.anchor_event_code} / ${correlation.candidate_event_code}`} />)
+    if (correlation.time_difference_seconds !== undefined) correlationCards.push(<FactCard key="time-difference" label="Zaman farkı" value={correlationDuration(correlation.time_difference_seconds)} />)
+    const topology = topologyRelationship(correlation)
+    if (topology) correlationCards.push(<FactCard key="topology" label="Topoloji ilişkisi" value={topology} />)
+    if (correlation.root_symptom_status) correlationCards.push(<FactCard key="root-symptom" label="Kök/belirti yönü" value={correlation.root_symptom_status === 'not_verified' ? 'Doğrulanmadı' : 'Doğrulandı'} />)
+  }
   return <div className="analysis-facts" aria-label="Doğrulanmış sonuç kartları">
     <div className="analysis-facts__heading"><div><p className="analysis-page__eyebrow">Doğrulanmış veri</p><h2>Operasyon özeti</h2></div><span>Kaynak: backend</span></div>
     {impactCards.length ? <FactGroup title="Müşteri etkisi">{impactCards}</FactGroup> : null}
     {outageCards.length ? <FactGroup title="Kesinti ve ağ">{outageCards}</FactGroup> : null}
     {technical && rootCards.length ? <FactGroup title="Kök neden">{rootCards}</FactGroup> : null}
     {decisionCards.length ? <FactGroup title="Telafi ve karar">{decisionCards}</FactGroup> : null}
+    {correlationCards.length ? <FactGroup title="Korelasyon kanıtı">{correlationCards}</FactGroup> : null}
     {technical && result.retrieval_sources?.length ? <FactGroup title="Kanıt referansları">{result.retrieval_sources.map((source) => <FactCard key={`${source.source_code}-${source.version ?? ''}-${source.section ?? ''}`} label={source.section ?? 'Kaynak'} value={`${source.source_code}${source.version !== undefined ? ` v${source.version}` : ''}`} />)}</FactGroup> : null}
-    {!impactCards.length && !outageCards.length && !rootCards.length && !decisionCards.length ? <p className="analysis-message">Bu sorgu için yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}
+    {!impactCards.length && !outageCards.length && !rootCards.length && !decisionCards.length && !correlationCards.length ? <p className="analysis-message">Bu sorgu için yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}
   </div>
 }
 

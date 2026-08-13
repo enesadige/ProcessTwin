@@ -97,9 +97,20 @@ export type RetrievalSource = {
   source_kind?: string
 }
 
+export type CrossIncidentCorrelationSummary = {
+  anchor_event_code: string
+  candidate_event_code?: string
+  correlation_status: string
+  time_difference_seconds?: number
+  topology_relation?: string
+  resource_relation?: string
+  root_symptom_status?: string
+}
+
 export type StructuredVerifiedResult = {
   schema_version: string
   causal_summary?: CausalSummary
+  cross_incident_correlation_summary?: CrossIncidentCorrelationSummary
   impact_summary?: ImpactSummary
   rule_summary?: RuleSummary
   compensation_summary?: CompensationSummary

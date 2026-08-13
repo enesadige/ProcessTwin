@@ -92,6 +92,21 @@ def _topology_relation_narrative(relation: str | None) -> str | None:
     return _TOPOLOGY_RELATION_NARRATIVE.get(relation or "")
 
 
+def _format_correlation_duration(seconds: int) -> str:
+    """Render a verified correlation delta without exposing transport units by default."""
+    if seconds < 60:
+        return f"{seconds} saniye"
+    minutes, remainder = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours and minutes:
+        return f"{hours} saat {minutes} dakika"
+    if hours:
+        return f"{hours} saat"
+    if remainder:
+        return f"{minutes} dakika {remainder} saniye"
+    return f"{minutes} dakika"
+
+
 class ResponseBuilderError(ProcessTwinError):
     """Stable response-builder precondition failure."""
 
@@ -385,6 +400,22 @@ class ValidatedResponseBuilder:
         ):
             requested_roles.add("failover_explanation")
             requested_roles.add("physical_root_cause")
+        if any(
+            term in query
+            for term in (
+                "zaman farkı",
+                "zaman farki",
+                "zaman",
+                "zamansal kanıt",
+                "zamansal kanit",
+                "ne kadar süre",
+                "ne kadar sure",
+                "ne kadar sonra",
+                "ne kadar önce",
+                "ne kadar once",
+            )
+        ):
+            requested_roles.add("correlation_temporal_evidence")
 
         text = narrative
         fill_count = 0
@@ -426,6 +457,10 @@ class ValidatedResponseBuilder:
                 )
                 or (
                     role in {"compensation_amount", "rule_version", "decision_evidence"}
+                    and any(token in lower_text for token in supported_tokens)
+                )
+                or (
+                    role == "correlation_temporal_evidence"
                     and any(token in lower_text for token in supported_tokens)
                 )
                 or (combined_candidate_text and combined_candidate_text in lower_text)
@@ -737,7 +772,8 @@ class ValidatedResponseBuilder:
                 sections.append("Olaylar arasında doğrulanmış operasyonel ilişki bulunmuyor.")
             if correlation.time_difference_seconds is not None:
                 sections.append(
-                    f"Olaylar arasındaki zaman farkı: {correlation.time_difference_seconds} saniye."
+                    "Olaylar arasındaki zaman farkı: "
+                    f"{_format_correlation_duration(correlation.time_difference_seconds)}."
                 )
             topology_narrative = _topology_relation_narrative(correlation.topology_relation)
             if topology_narrative:
@@ -981,7 +1017,8 @@ class ValidatedResponseBuilder:
                 add("Olaylar arasında doğrulanmış operasyonel ilişki bulunmuyor.")
             if correlation.time_difference_seconds is not None:
                 add(
-                    f"Olaylar arasındaki zaman farkı: {correlation.time_difference_seconds} saniye."
+                    "Olaylar arasındaki zaman farkı: "
+                    f"{_format_correlation_duration(correlation.time_difference_seconds)}."
                 )
             topology_narrative = _topology_relation_narrative(correlation.topology_relation)
             if topology_narrative:
@@ -1278,6 +1315,7 @@ class ValidatedResponseBuilder:
                 "alarm_correlation",
                 ("Karşılaştırılan olaylar", "operasyonel ilişki", "topoloji ilişkisi"),
             ),
+            ("correlation_temporal_evidence", ("Zaman farkı:",)),
             ("evidence", ("Kaynaklar", "DecisionEvidence", "RuleVersion")),
         )
         lowered = text.casefold()

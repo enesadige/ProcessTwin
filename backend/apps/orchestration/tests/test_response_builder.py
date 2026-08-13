@@ -20,6 +20,7 @@ from apps.orchestration.response_builder import (
 from apps.orchestration.result_merge import (
     CausalSummary,
     CompensationSummary,
+    CrossIncidentCorrelationSummary,
     ImpactSummary,
     ProvenanceEntry,
     RetrievalSource,
@@ -1136,6 +1137,47 @@ def test_requested_narrative_coverage_adds_only_missing_verified_fact():
     assert fill_count == 2
     assert "839.99" in text
     assert "ME-FAILED-FAILOVER:v1" in text
+
+
+def test_correlation_temporal_coverage_adds_verified_minutes_only_when_requested():
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "İki olay arasında doğrulanmış operasyonel ilişki bulunuyor.",
+        original_query="Hangi zaman farkı ve topoloji kanıtları ilişkiyi destekliyor?",
+        selected_statements={"S1": "Olaylar arasındaki zaman farkı: 37 dakika."},
+        statement_concepts={"S1": ["correlation_temporal_evidence"]},
+    )
+
+    assert fill_count == 1
+    assert "37 dakika" in text
+
+
+def test_correlation_temporal_coverage_does_not_fill_when_time_is_not_requested():
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "İki olay arasında doğrulanmış operasyonel ilişki bulunuyor.",
+        original_query="İki olay ilişkili mi?",
+        selected_statements={"S1": "Olaylar arasındaki zaman farkı: 37 dakika."},
+        statement_concepts={"S1": ["correlation_temporal_evidence"]},
+    )
+
+    assert fill_count == 0
+    assert text == "İki olay arasında doğrulanmış operasyonel ilişki bulunuyor."
+
+
+def test_structured_result_exposes_verified_correlation_summary():
+    result = valid_result("correlation-structured")
+    result.cross_incident_correlation_summary = CrossIncidentCorrelationSummary(
+        anchor_event_code="CE-XREG-0001",
+        candidate_event_code="CE-XREG-0002",
+        correlation_status="verified_relation",
+        time_difference_seconds=2220,
+        topology_relation="direct_parent_child",
+        root_symptom_status="not_verified",
+    )
+
+    structured = ValidatedResponseBuilder._public_structured_result(result)
+
+    assert structured.cross_incident_correlation_summary is not None
+    assert structured.cross_incident_correlation_summary.time_difference_seconds == 2220
 
 
 def test_free_text_narrative_accepts_eight_short_grounded_sentences():
