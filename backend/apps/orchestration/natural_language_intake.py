@@ -636,16 +636,21 @@ class DeterministicStructuredQueryParser:
                 data_snapshot=snapshot, city__isnull=False, district__isnull=False
             ).select_related("city", "district")
         }
-        district_matches = [
-            value for (city, district), value in pairs.items() if district in folded
-        ]
-        city_matches = [value for (city, _district), value in pairs.items() if city in folded]
-        matches = {(city, district) for city, district in district_matches + city_matches}
-        if len(matches) > 1:
+        district_matches = {
+            value for (_city, district), value in pairs.items() if district in folded
+        }
+        if len(district_matches) > 1:
             return None, True
-        if len(matches) == 1:
-            city, district = matches.pop()
+        if len(district_matches) == 1:
+            city, district = district_matches.pop()
             return {"city": city, "district": district}, False
+        city_matches = {
+            value[0] for (city, _district), value in pairs.items() if city in folded
+        }
+        if len(city_matches) > 1:
+            return None, True
+        if len(city_matches) == 1:
+            return {"city": city_matches.pop()}, False
         return None, False
 
     @staticmethod
@@ -857,9 +862,9 @@ class DeterministicStructuredQueryParser:
         )
         if "ortalama" in folded:
             aggregation = "average"
-        if "en yüksek" in folded or "en yuksek" in folded:
+        if "maksimum" in folded:
             aggregation = "max"
-        if "en düşük" in folded or "en dusuk" in folded:
+        if "minimum" in folded:
             aggregation = "min"
         # "En yüksek/düşük" expresses ranking direction for event counts;
         # it must not turn a count-only metric into an invalid max/min request.

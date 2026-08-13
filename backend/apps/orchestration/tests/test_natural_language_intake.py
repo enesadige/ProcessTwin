@@ -5,6 +5,8 @@ from collections.abc import Mapping
 
 import pytest
 
+from apps.geography.models import AreaProfileType, City, District
+from apps.network.models import NetworkDevice, NetworkDeviceType
 from apps.operations.tests.test_causal_models import create_causal_event
 from apps.operations.tests.test_operations_models import create_snapshot
 from apps.orchestration.natural_language_intake import (
@@ -16,6 +18,7 @@ from apps.orchestration.natural_language_intake import (
     NaturalLanguageStructuredQueryParser,
     query_requests_customer_impact,
 )
+from apps.orchestration.planner import DeterministicToolPlanner
 from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.gemini import GeminiLLMProviderError
 from apps.orchestration.structured_query import RequestedOutput, SemanticDimension, StructuredQuery
@@ -707,6 +710,55 @@ def test_analytics_comparison_without_period_remains_clarification_required():
     assert query.analytics is not None
     assert query.clarification_required is True
     assert [reason.value for reason in query.clarification_reasons] == ["missing_scope_filter"]
+
+
+@pytest.mark.django_db
+def test_analytics_city_month_alarm_type_scope_survives_deterministic_intake():
+    snapshot = create_snapshot("analytics-city-month-scope")
+    city = City.objects.create(name="İzmir", plate_code="35")
+    district = District.objects.create(
+        city=city,
+        name="Konak",
+        profile_type=AreaProfileType.MIXED,
+    )
+    NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="AGG-IZM-TEST-001",
+        name="Analytics scope device",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "Haziran 2026’da İzmir’de gerçekleşen olayları doğrulanmış müşteri etkisine "
+            "göre en yüksekten en düşüğe sırala. En yüksek etkili ilk 3 alarm tipini belirt."
+        ),
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.location is not None
+    assert query.location.city == "İzmir"
+    assert query.time_window is not None
+    assert query.analytics is not None
+    assert query.analytics.aggregation == "sum"
+    assert query.analytics.group_by == "root_alarm_type"
+    assert query.analytics.limit == 3
+
+    plan = DeterministicToolPlanner().plan(query)
+    assert plan.tool_plan is not None
+    assert plan.tool_plan.calls[0].arguments == {
+        "snapshot_identifier": snapshot.snapshot_key,
+        "metric": "affected_customers",
+        "aggregation": "sum",
+        "group_by": "root_alarm_type",
+        "direction": "desc",
+        "limit": 3,
+        "from_time": query.time_window.from_time.isoformat().replace("+00:00", "Z"),
+        "to_time": query.time_window.to_time.isoformat().replace("+00:00", "Z"),
+        "city": "İzmir",
+    }
 
 
 @pytest.mark.django_db

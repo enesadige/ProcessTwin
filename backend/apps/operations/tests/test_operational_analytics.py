@@ -1,8 +1,10 @@
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from django.utils import timezone
 
+from apps.geography.models import AreaProfileType, City, District
+from apps.network.models import NetworkDeviceType
 from apps.operations.contracts import (
     CausalEventStatus,
     CausalEventType,
@@ -20,6 +22,7 @@ from apps.operations.services.analytics import AnalyticsSpec, OperationalAnalyti
 from apps.operations.tests.test_operations_models import (
     create_access_line,
     create_alarm_type,
+    create_network_device,
     create_snapshot,
     create_subscription_connection,
 )
@@ -144,4 +147,97 @@ def test_failed_failover_alarm_filter_preserves_unknown_impact_exclusion():
 
     assert result["rows"] == []
     assert result["included_event_count"] == 0
+    assert result["excluded_unknown_count"] == 1
+
+
+@pytest.mark.django_db
+def test_city_and_month_filters_apply_as_an_intersection_for_unknown_exclusions():
+    snapshot = create_snapshot("analytics-city-month-intersection")
+    _fallback_root, _, _, _, line = create_access_line(snapshot)
+    connection = create_subscription_connection(snapshot, line)
+    izmir = City.objects.create(name="İzmir", plate_code="35")
+    konak = District.objects.create(
+        city=izmir,
+        name="Konak",
+        profile_type=AreaProfileType.MIXED,
+    )
+    ankara = City.objects.create(name="Ankara", plate_code="06")
+    cankaya = District.objects.create(
+        city=ankara,
+        name="Çankaya",
+        profile_type=AreaProfileType.MIXED,
+    )
+    izmir_root = create_network_device(
+        snapshot,
+        code="AGG-IZM-ANALYTICS-001",
+        device_type=NetworkDeviceType.BNG,
+        city=izmir,
+        district=konak,
+    )
+    ankara_root = create_network_device(
+        snapshot,
+        code="AGG-ANK-ANALYTICS-001",
+        device_type=NetworkDeviceType.BNG,
+        city=ankara,
+        district=cankaya,
+    )
+    june = datetime(2026, 6, 10, tzinfo=UTC)
+    known = CausalEvent.objects.create(
+        data_snapshot=snapshot,
+        event_code="CE-IZM-JUNE-KNOWN",
+        event_type=CausalEventType.DEVICE_FAILURE,
+        status=CausalEventStatus.RESOLVED,
+        started_at=june,
+        ended_at=june + timedelta(minutes=5),
+        source_system="test",
+        origin=EventOrigin.SYNTHETIC,
+        root_device=izmir_root,
+    )
+    CausalEvent.objects.create(
+        data_snapshot=snapshot,
+        event_code="CE-IZM-JUNE-UNKNOWN",
+        event_type=CausalEventType.DEVICE_FAILURE,
+        status=CausalEventStatus.RESOLVED,
+        started_at=june + timedelta(minutes=10),
+        ended_at=june + timedelta(minutes=15),
+        source_system="test",
+        origin=EventOrigin.SYNTHETIC,
+        root_device=izmir_root,
+    )
+    CausalEvent.objects.create(
+        data_snapshot=snapshot,
+        event_code="CE-ANK-JULY-UNKNOWN",
+        event_type=CausalEventType.DEVICE_FAILURE,
+        status=CausalEventStatus.RESOLVED,
+        started_at=june + timedelta(days=31),
+        ended_at=june + timedelta(days=31, minutes=5),
+        source_system="test",
+        origin=EventOrigin.SYNTHETIC,
+        root_device=ankara_root,
+    )
+    CustomerImpactAssessment.objects.create(
+        data_snapshot=snapshot,
+        causal_event=known,
+        subscription=connection.subscription,
+        subscription_connection=connection,
+        status=CustomerImpactStatus.VERIFIED_IMPACT.value,
+        potential_impact=True,
+        assessment_started_at=june,
+        assessment_ended_at=june + timedelta(minutes=5),
+    )
+
+    result = OperationalAnalyticsService().analyze(
+        snapshot=snapshot,
+        spec=AnalyticsSpec(
+            metric="affected_customers",
+            aggregation="sum",
+            group_by="city",
+            city="İzmir",
+            from_time=june - timedelta(days=1),
+            to_time=june + timedelta(days=1),
+        ),
+    )
+
+    assert result["rows"] == [{"label": "İzmir", "value": 1, "event_count": 1}]
+    assert result["included_event_count"] == 1
     assert result["excluded_unknown_count"] == 1
