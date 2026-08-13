@@ -9,10 +9,17 @@ from apps.operations.contracts import (
     CustomerImpactStatus,
     EventOrigin,
 )
-from apps.operations.models import CausalEvent, CustomerImpactAssessment
+from apps.operations.models import (
+    Alarm,
+    AlarmStatus,
+    CausalEvent,
+    CustomerImpactAssessment,
+    Severity,
+)
 from apps.operations.services.analytics import AnalyticsSpec, OperationalAnalyticsService
 from apps.operations.tests.test_operations_models import (
     create_access_line,
+    create_alarm_type,
     create_snapshot,
     create_subscription_connection,
 )
@@ -95,3 +102,46 @@ def test_event_grouping_uses_canonical_event_code_not_a_missing_generic_field():
     assert result["rows"] == [
         {"label": "CE-ANALYTICS-EVENT-001", "value": 1, "event_count": 1}
     ]
+
+
+@pytest.mark.django_db
+def test_failed_failover_alarm_filter_preserves_unknown_impact_exclusion():
+    snapshot = create_snapshot("analytics-failed-failover-unknown")
+    root, _, _, _, _ = create_access_line(snapshot)
+    started = timezone.now() - timedelta(hours=1)
+    event = CausalEvent.objects.create(
+        data_snapshot=snapshot,
+        event_code="CE-ANALYTICS-FAILED-001",
+        event_type=CausalEventType.DEVICE_FAILURE,
+        status=CausalEventStatus.RESOLVED,
+        started_at=started,
+        ended_at=started + timedelta(minutes=5),
+        source_system="test",
+        origin=EventOrigin.SYNTHETIC,
+        root_device=root,
+    )
+    Alarm.objects.create(
+        data_snapshot=snapshot,
+        causal_event=event,
+        alarm_id="ALM-ANALYTICS-FAILED-001",
+        alarm_type=create_alarm_type(snapshot, code="FAILOVER_UNSUCCESSFUL"),
+        device=root,
+        severity=Severity.CRITICAL,
+        status=AlarmStatus.CLEARED,
+        detected_at=started,
+        cleared_at=started + timedelta(minutes=5),
+    )
+
+    result = OperationalAnalyticsService().analyze(
+        snapshot=snapshot,
+        spec=AnalyticsSpec(
+            metric="affected_customers",
+            aggregation="sum",
+            group_by="event",
+            failed_failover=True,
+        ),
+    )
+
+    assert result["rows"] == []
+    assert result["included_event_count"] == 0
+    assert result["excluded_unknown_count"] == 1

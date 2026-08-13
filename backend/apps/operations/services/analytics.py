@@ -55,6 +55,7 @@ _COUNT_ONLY = {
     "failed_failover_count",
     "full_outage_count",
 }
+_FAILED_FAILOVER_ALARM_TYPE = "FAILOVER_UNSUCCESSFUL"
 
 
 @dataclass(frozen=True)
@@ -204,20 +205,24 @@ class OperationalAnalyticsService:
         full_outage = any(
             outage.impact_type == ServiceImpactClass.FULL_OUTAGE.value for outage in outages
         )
+        alarms = list(event.alarms.all())
         root_alarm = next(
             (
                 alarm
-                for alarm in event.alarms.all()
+                for alarm in alarms
                 if alarm.metadata.get("causal_role") == "root"
             ),
             None,
         )
-        root_alarm = root_alarm or next(iter(event.alarms.all()), None)
+        root_alarm = root_alarm or next(iter(alarms), None)
         root_device = event.root_device or next((outage.source_device for outage in outages), None)
         compensations = [
             evaluation for outage in outages for evaluation in outage.compensation_evaluations.all()
         ]
         amount = sum((evaluation.proposed_amount for evaluation in compensations), Decimal("0.00"))
+        failed_failover = bool(incident and incident.failover_result == "failed") or any(
+            alarm.alarm_type.code == _FAILED_FAILOVER_ALARM_TYPE for alarm in alarms
+        )
         return {
             "event_code": event.event_code,
             "started_at": event.started_at,
@@ -236,10 +241,10 @@ class OperationalAnalyticsService:
             "event_count": 1,
             "alarm_count": 1 if root_alarm else 0,
             "compensation_amount": amount,
-            "failed_failover_count": int(bool(incident and incident.failover_result == "failed")),
+            "failed_failover_count": int(failed_failover),
             "full_outage_count": int(full_outage),
             "full_outage": full_outage,
-            "failed_failover": bool(incident and incident.failover_result == "failed"),
+            "failed_failover": failed_failover,
             "failover_protected": protected,
         }
 

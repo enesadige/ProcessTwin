@@ -53,7 +53,7 @@ _NARRATIVE_SYNTHESIS_KEYS = frozenset({"sentences"})
 _NARRATIVE_SENTENCE_KEYS = frozenset({"text", "statement_ids", "relationship_ids"})
 _NARRATIVE_DEBUG_MARKERS = ("->", "Nedensel ilişki:", "Sonuç ilişkisi:", "Belirsizlik ilişkisi:")
 _NARRATIVE_ROLE_PREFIX_RE = re.compile(
-    r"^\s*(?:details|evidence|summary|root_cause|impact|eligibility|correlation)\s*:\s*",
+    r"^\s*(?:analytics|details|evidence|summary|root_cause|impact|eligibility|correlation)\s*:\s*",
     re.IGNORECASE,
 )
 _NARRATIVE_INTERNAL_REASON_RE = re.compile(
@@ -723,6 +723,8 @@ class ValidatedResponseBuilder:
             sections.append(
                 f"Hesaplanan metrik: {metric_labels.get(analytics.metric, analytics.metric)}."
             )
+            if analytics.filters.get("failed_failover") is True:
+                sections.append("Başarısız failover filtresi uygulandı.")
             if analytics.rows:
                 sections.append(
                     f"Gruplama: {group_labels.get(analytics.group_by or '', 'Toplam')}."
@@ -1012,6 +1014,8 @@ class ValidatedResponseBuilder:
                     f"{index}. {row['label']}: {row['value']} "
                     f"{metric_labels.get(analytics.metric, analytics.metric)}."
                 )
+            if analytics.filters.get("failed_failover") is True:
+                add("Başarısız failover filtresi uygulandı.")
             if analytics.excluded_unknown_count:
                 add(
                     f"{analytics.excluded_unknown_count} olay, doğrulanmış etki kanıtı olmadığı "
@@ -1680,9 +1684,6 @@ class ValidatedResponseBuilder:
             "Sorgunun aşağıdaki istenen çıktılarını ayrı ayrı yanıtla; mevcut bir "
             "doğrulanmış değer varsa atlama: REQUESTED_OUTPUTS="
             + json.dumps(requested_outputs or [], ensure_ascii=False)
-            + "\nZaman serisi veya dönem karşılaştırması istenmişse, doğrulanmış her dönem "
-            "değerini, sağlanan farkı ve eğilim yönünü aynı doğal yanıtta birlikte belirt; "
-            "yalnızca yönü ya da tek bir dönemi yazma."
             + "\n"
             "USER_QUERY="
             + original_query.strip()

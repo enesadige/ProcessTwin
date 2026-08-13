@@ -18,6 +18,7 @@ from apps.orchestration.response_builder import (
     ValidatedResponseBuilder,
 )
 from apps.orchestration.result_merge import (
+    AnalyticsSummary,
     CausalSummary,
     CompensationSummary,
     CrossIncidentCorrelationSummary,
@@ -184,32 +185,6 @@ def completed_run(
     service.transition(run, target_status=QueryRunStatus.PLANNED)
     service.transition(run, target_status=QueryRunStatus.EXECUTING)
     return service.complete(run, final_result=result.to_final_result())
-
-
-def test_grounded_narrative_prompt_requires_full_requested_analytics_comparison_coverage():
-    provider = GroundedNarrativeProvider(
-        "Haziran 2026'da 8, Temmuz 2026'da 5 tam hizmet kesintisi yaşandı. "
-        "Fark 3'tür ve kesinti sayısı azaldı."
-    )
-
-    ValidatedResponseBuilder._safe_grounded_narrative(
-        provider,
-        original_query=(
-            "Haziran 2026 ile Temmuz 2026 tam hizmet kesintilerini karşılaştır; "
-            "değerleri, farkı ve yönü yaz."
-        ),
-        selected_statements={
-            "S1": "Haziran 2026: 8 tam hizmet kesintisi.",
-            "S2": "Temmuz 2026: 5 tam hizmet kesintisi.",
-            "S3": "Haziran 2026 ile Temmuz 2026 arasındaki fark: -3; yön: decrease.",
-        },
-        relationships=[],
-        requested_outputs=["analytics", "summary"],
-    )
-
-    prompt = provider.requests[0]["contents"]
-    assert "doğrulanmış her dönem değerini, sağlanan farkı ve eğilim yönünü" in prompt
-    assert "yalnızca yönü ya da tek bir dönemi yazma" in prompt
 
 
 @pytest.mark.django_db
@@ -1104,7 +1079,7 @@ def test_free_text_narrative_accepts_natural_paraphrase_without_sentence_repair(
 def test_free_text_narrative_strips_only_known_internal_role_prefixes():
     statements = {"S1": "Ana bağlantı down, yedek bağlantı active."}
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
-        "details: Ana bağlantı down, yedek bağlantı active. "
+        "analytics: Ana bağlantı down, yedek bağlantı active. "
         "evidence: Bilgi doğrulandı. correlation: İlişki doğrulandı.",
         statements,
         {},
@@ -1116,6 +1091,38 @@ def test_free_text_narrative_strips_only_known_internal_role_prefixes():
         "Bilgi doğrulandı.",
         "İlişki doğrulandı.",
     ]
+
+
+def test_analytics_unknown_exclusion_and_failed_failover_filter_are_verified_support():
+    result = valid_result("response-analytics-unknown").model_copy(
+        update={
+            "analytics_summary": AnalyticsSummary(
+                metric="affected_customers",
+                aggregation="sum",
+                group_by="event",
+                ranking_direction="desc",
+                filters={"failed_failover": True},
+                rows=[],
+                included_event_count=0,
+                excluded_unknown_count=2,
+                deduplication_grain="causal_event",
+            )
+        }
+    )
+
+    deterministic = ValidatedResponseBuilder._render_deterministic(result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(result)
+
+    assert "Başarısız failover filtresi uygulandı." in deterministic
+    assert "0 müşteri" not in deterministic
+    assert any(
+        statement == "Başarısız failover filtresi uygulandı."
+        for statement in contract["statements"].values()
+    )
+    assert any(
+        "2 olay, doğrulanmış etki kanıtı olmadığı" in statement
+        for statement in contract["statements"].values()
+    )
 
 
 def test_free_text_narrative_preserves_colon_identifiers_and_natural_text():
