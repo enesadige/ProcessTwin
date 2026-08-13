@@ -4,8 +4,9 @@
 > REV-00–REV-12, orchestration, frontend shell/auth/AI Analysis ve sonraki
 > grounded narrative/correlation güvenlik işleri tamamlanmıştır. Güncel görev
 > sırası `docs/CODEX_HANDOFF.md` içindeki **Kilitli Sonraki Öncelik** bölümüdür:
-> kalan `MAIN-066`+ frontend işleri, ardından final polish. `MAIN-061` veya
-> PRE-061 blocker'ı güncel değildir.
+> kalibrasyondan önce dataset inventory / audit, sonra kalan `MAIN-066`+
+> frontend işleri ve final polish. `MAIN-061` veya PRE-061 blocker'ı güncel
+> değildir.
 
 > **2026-08-13 analytics checkpoint:** `1b8b0af` ile mevcut
 > sentetik/erişilebilir veri setinde deterministic operational
@@ -14,6 +15,17 @@
 > impact sıfıra çevrilmez. Typed metric/aggregation/group/filter/ranking/time
 > sözleşmesi backend tarafından doğrulanır; provider yalnız verified sonucu
 > anlatır. Sonraki iş `MAIN-066` ve kalan frontend tamamlamalarıdır.
+
+> **2026-08-13 cloud LLM provider checkpoint:** NVIDIA GLM-5.2
+> (`nvidia` / `z-ai/glm-5.2`) ve Groq GPT-OSS 120B
+> (`groq` / `openai/gpt-oss-120b`) mevcut LLM registry ve ortak
+> OpenAI-compatible chat adapter ile eklendi. Her iki adapter mevcut
+> Phase 2 ve Phase 1B sözleşmesini kullanır; deterministic AnswerPlan,
+> grounding, embedding seçimi ve domain hesapları değişmedi. API anahtarları
+> yalnız `NVIDIA_API_KEY`/`GROQ_API_KEY` ortam değişkenlerindedir. Bu oturumda
+> anahtarlar görünmediği için canlı kabul `PARTIAL_PROVIDER_LIMIT` olarak
+> kaydedildi; mock integration testleri geçti. Sonraki iş kalibrasyondan önce
+> dataset inventory / audit'tir. Kod commit'i: `c66ef23`.
 
 Bu plan hedef tasarımdır; REV-01 kapsamında implementation yapılmaz. Sıra, schema ve nedensel generator olmadan service/API/MCP davranışının değiştirilmemesi için düzenlenmiştir.
 
@@ -166,8 +178,9 @@ stable hata doner; gercek network/model cagrilari testlerde kullanilmadi.
 **Görev takip notu:** Ana plandaki 052–060, causal revizyon serisi
 `REV-00–REV-12`, frontend `MAIN-061`–`MAIN-065` ve sonraki grounded narrative,
 cross-incident correlation ve unanswerable/partial-answer güvenlik işleri
-tamamlanmıştır. Güncel sıra: genel trend/ranking/aggregate analytics; kalan
-`MAIN-066`+ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
+tamamlanmıştır. Genel trend/ranking/aggregate analytics de tamamlandı. Güncel
+sıra: kalibrasyondan önce dataset inventory / audit; kalan `MAIN-066`+
+frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 
 ## Zorunlu domain consistency validator'ları
 

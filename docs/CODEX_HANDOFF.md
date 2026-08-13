@@ -3,17 +3,20 @@
 ## Güncel Otoriter Durum
 
 Bu bölüm, aşağıdaki tarihsel PRE-061 ve eski MAIN checkpoint notlarının yerini
-alır. Güncel kaynak; `1b8b0af feat: add deterministic operational trend
-analytics` commit'indeki repository durumudur. Çalışma ağacı bu checkpoint'te
-temiz olmalıdır.
+alır. Güncel kaynak; `feat: add nvidia and groq llm providers` commit'indeki
+repository durumudur. Çalışma ağacı bu checkpoint'te temiz olmalıdır.
 
 - Frontend uygulama kabuğu, rol tabanlı oturum kimlik doğrulaması, AI Analysis
   workspace'i, sorgu ilerleme görünümü ve doğrulanmış sonuç kartları
   tamamlandı. Frontend, analyst/admin yetkisiyle public orchestration
   endpoint'ine bağlıdır.
-- Yerel profil `gemma4:12b-it-qat` + `qwen3-embedding:4b`; Gemini profili de
-  desteklenir. Provider yalnız doğal dil anlayışı ve anlatımı yapar; güvenli
-  fallback provider veya grounding hatasında kullanılmaya devam eder.
+- Yerel profil `gemma4:12b-it-qat` + `qwen3-embedding:4b`; Gemini,
+  NVIDIA `z-ai/glm-5.2` ve Groq `openai/gpt-oss-120b` LLM profilleri de
+  desteklenir. NVIDIA/Groq OpenAI-compatible chat adapter üzerinden yalnız
+  Phase 2 semantic decomposition ve Phase 1B narrative üretir. Embedding
+  seçicisi bağımsızdır; yeni LLM'ler embedding sağlayıcısı değildir.
+  Provider yalnız doğal dil anlayışı ve anlatımı yapar; güvenli fallback
+  provider veya grounding hatasında kullanılmaya devam eder.
 - Güncel analiz hattı şudur: doğal dil sorgusu -> deterministic exact anchor
   extraction -> LLM semantic decomposition -> deterministic validation/merge
   -> deterministic planner -> MCP/domain services ve gerektiğinde RAG ->
@@ -58,8 +61,22 @@ temiz olmalıdır.
 
 ## Kilitli Sonraki Öncelik
 
-1. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
-2. Final polish, daha geniş regresyon ve demo hazırlığı.
+1. Kalibrasyondan önce dataset inventory / audit.
+2. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
+3. Final polish, daha geniş regresyon ve demo hazırlığı.
+
+## Cloud LLM Provider Genişletmesi
+
+- NVIDIA GLM-5.2 (`nvidia` / `z-ai/glm-5.2`) ve Groq GPT-OSS 120B
+  (`groq` / `openai/gpt-oss-120b`) AI Analysis LLM seçicisine eklendi.
+  Sabit registry provider/model eşlerini zorunlu kılar; yanlış eşler kabul
+  edilmez. Her ikisi aynı deterministic AnswerPlan ve backend grounding
+  doğrulamasından geçer; operasyonel gerçek veya hesaplama yetkisi taşımaz.
+- Anahtarlar yalnız ortam değişkenlerinden okunur: `NVIDIA_API_KEY` ve
+  `GROQ_API_KEY`. Anahtarlar audit, hata, Git veya dokümantasyona yazılmaz.
+  Bu geliştirme oturumunda iki anahtar görünmediğinden canlı API kabulü
+  çalıştırılamadı; mock adapter/Phase 2/Phase 1B sözleşme testleri geçti.
+  Kod commit'i: `c66ef23`.
 
 ## Latest MAIN-065 Checkpoint
 
@@ -382,8 +399,9 @@ Customer/Subscription ayrımı; bağlantıdan port ve cihaza uzanan topology tra
 Bu bölümdeki aşağıdaki REV/PRE kayıtları tarihsel tamamlanma izidir. Güncel
 uygulama sırası şöyledir:
 
-1. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
-2. Final polish, daha geniş regresyon ve demo hazırlığı.
+1. Kalibrasyondan önce dataset inventory / audit.
+2. Kalan frontend MAIN işleri, `MAIN-066` ve sonrası.
+3. Final polish, daha geniş regresyon ve demo hazırlığı.
 
 Cross-incident correlation, unsupported/unknown-ID/partial-answer davranışı ve
 genel trend/ranking/aggregate analytics tamamlandı; sonraki görev olarak tekrar
