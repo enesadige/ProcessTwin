@@ -1139,21 +1139,12 @@ def test_requested_narrative_coverage_adds_only_missing_verified_fact():
     assert "ME-FAILED-FAILOVER:v1" in text
 
 
-def test_correlation_temporal_coverage_adds_verified_minutes_for_explicit_temporal_question():
+def test_correlation_temporal_coverage_adds_verified_minutes_only_when_requested():
     text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
-        "Kaynaklar arasında doğrulanmış doğrudan üst/alt topoloji bağlantısı bulunuyor.",
-        original_query=(
-            "CE-XREG-0001 ile CE-XREG-0002 arasında ilişki var mı? "
-            "Varsa hangi zaman ve topoloji kanıtlarına dayanıyor?"
-        ),
-        selected_statements={
-            "S1": "Olaylar arasındaki zaman farkı: 37 dakika.",
-            "S2": "Kaynaklar arasında doğrulanmış doğrudan üst/alt topoloji bağlantısı bulunuyor.",
-        },
-        statement_concepts={
-            "S1": ["alarm_correlation", "correlation_temporal_evidence"],
-            "S2": ["alarm_correlation"],
-        },
+        "İki olay arasında doğrulanmış operasyonel ilişki bulunuyor.",
+        original_query="Hangi zaman farkı ve topoloji kanıtları ilişkiyi destekliyor?",
+        selected_statements={"S1": "Olaylar arasındaki zaman farkı: 37 dakika."},
+        statement_concepts={"S1": ["correlation_temporal_evidence"]},
     )
 
     assert fill_count == 1
