@@ -1,3 +1,5 @@
+import json
+
 from data_generator.configs import multi_city_realism_v1 as seed_config
 from data_generator.seeders.multicity_realism import (
     delete_multicity_realism_dataset_tree,
@@ -48,8 +50,66 @@ class Command(BaseCommand):
             action="store_true",
             help="Repair scenario resource links in an existing snapshot without reseeding it.",
         )
+        parser.add_argument(
+            "--checkpointed-v3",
+            action="store_true",
+            help="Build the resumable multi-city V3 candidate from an immutable source snapshot.",
+        )
+        parser.add_argument(
+            "--resume",
+            action="store_true",
+            help="Resume a checkpointed V3 candidate from its last committed event.",
+        )
+        parser.add_argument(
+            "--status",
+            action="store_true",
+            help="Print persisted checkpointed V3 progress without writing data.",
+        )
+        parser.add_argument(
+            "--source-snapshot-id",
+            type=int,
+            default=54,
+            help="Immutable source snapshot for a checkpointed V3 candidate.",
+        )
+        parser.add_argument(
+            "--preview-v3-schedule",
+            action="store_true",
+            help=(
+                "Print the static checkpointed V3 schedule without accessing or writing a snapshot."
+            ),
+        )
+        parser.add_argument(
+            "--repair-v3",
+            action="store_true",
+            help="Create or resume the checkpointed V3 repair revision from snapshot 73.",
+        )
+        parser.add_argument(
+            "--repair-resume",
+            action="store_true",
+            help="Resume a checkpointed V3 repair revision.",
+        )
+        parser.add_argument(
+            "--repair-status",
+            action="store_true",
+            help="Print persisted checkpointed V3 repair progress without writing data.",
+        )
+        parser.add_argument(
+            "--repair-source-snapshot-id",
+            type=int,
+            default=73,
+            help="Validated V3 source snapshot for the repair revision.",
+        )
 
     def handle(self, *args, **options):
+        if options["preview_v3_schedule"]:
+            from data_generator.seeders.causal_timeline import timeline_schedule_preview
+
+            self.stdout.write(json.dumps(timeline_schedule_preview(), ensure_ascii=False, indent=2))
+            return
+        if options["repair_v3"] or options["repair_resume"] or options["repair_status"]:
+            return self._handle_v3_repair(**options)
+        if options["checkpointed_v3"] or options["status"] or options["resume"]:
+            return self._handle_checkpointed_v3(**options)
         reference_datetime = parse_reference_datetime(options["reference_datetime"])
         batch_size = options["batch_size"]
         if batch_size < 1:
@@ -154,6 +214,123 @@ class Command(BaseCommand):
                 f"{seed_counts['quality_measurements']} quality measurements."
             )
         )
+
+    def _handle_checkpointed_v3(self, **options):
+        from data_generator.seeders.checkpointed_v3 import (
+            initialize_run,
+            resume_or_build,
+            status,
+        )
+
+        dataset_slug = options.get("dataset_slug") or "multi-city-realism-v3"
+        dataset = DatasetVersion.objects.filter(slug=dataset_slug).first()
+        if options["status"]:
+            if dataset is None:
+                raise CommandError(f"Checkpointed V3 dataset {dataset_slug} does not exist.")
+            snapshot = dataset.snapshots.order_by("-created_at").first()
+            self.stdout.write(
+                json.dumps(status(snapshot), ensure_ascii=False, indent=2, default=str)
+            )
+            return
+        if not options["checkpointed_v3"]:
+            raise CommandError("--resume requires --checkpointed-v3.")
+        source = DataSnapshot.objects.filter(pk=options["source_snapshot_id"]).first()
+        if source is None:
+            raise CommandError("Source snapshot does not exist.")
+        if dataset is None:
+            with transaction.atomic():
+                dataset = DatasetVersion.objects.create(
+                    name="Multi-city Realism Dataset v3",
+                    slug=dataset_slug,
+                    kind=DatasetKind.SYNTHETIC,
+                    generator_version="multi-city-realism-generator-v3-checkpointed",
+                    seed="multi-city-realism-v3-fixed-seed",
+                    config={
+                        **source.dataset_version.config,
+                        "source_snapshot_id": source.id,
+                        "dataset_slug": dataset_slug,
+                        "generator_version": "multi-city-realism-generator-v3-checkpointed",
+                        "seed": "multi-city-realism-v3-fixed-seed",
+                    },
+                    description=(
+                        "Checkpointed synthetic V3 candidate cloned from an immutable "
+                        "accepted base world."
+                    ),
+                )
+                snapshot = DataSnapshot.objects.create(
+                    dataset_version=dataset,
+                    name="Multi-city Realism Snapshot v3",
+                    status=DatasetSnapshotStatus.DRAFT,
+                    is_active=False,
+                    source_started_at=timezone.now(),
+                )
+                initialize_run(snapshot=snapshot, source=source)
+        else:
+            snapshot = dataset.snapshots.order_by("-created_at").first()
+            if not options["resume"]:
+                raise CommandError("Candidate already exists; use --resume or --status.")
+        resume_or_build(
+            snapshot=snapshot,
+            source=source,
+            batch_size=options["batch_size"],
+            stdout=self.stdout,
+        )
+
+    def _handle_v3_repair(self, **options):
+        from data_generator.seeders.v3_repair import initialize, run, status
+
+        dataset_slug = options.get("dataset_slug") or "multi-city-realism-v3-repair-r1"
+        dataset = DatasetVersion.objects.filter(slug=dataset_slug).first()
+        if options["repair_status"]:
+            if dataset is None:
+                raise CommandError(f"Checkpointed V3 repair dataset {dataset_slug} does not exist.")
+            snapshot = dataset.snapshots.order_by("-created_at").first()
+            self.stdout.write(
+                json.dumps(status(snapshot), ensure_ascii=False, indent=2, default=str)
+            )
+            return
+        if not options["repair_v3"]:
+            raise CommandError("--repair-resume requires --repair-v3.")
+        source = DataSnapshot.objects.filter(pk=options["repair_source_snapshot_id"]).first()
+        if source is None:
+            raise CommandError("Repair source snapshot does not exist.")
+        if source.status != DatasetSnapshotStatus.VALIDATED or source.is_active:
+            raise CommandError("Repair source must be a validated inactive snapshot.")
+        if dataset is None:
+            with transaction.atomic():
+                dataset = DatasetVersion.objects.create(
+                    name="Multi-city Realism Dataset v3 Repair r1",
+                    slug=dataset_slug,
+                    kind=DatasetKind.SYNTHETIC,
+                    generator_version="multi-city-realism-v3-repair-r1",
+                    seed="multi-city-realism-v3-fixed-seed",
+                    config={
+                        **source.dataset_version.config,
+                        "repair_source_snapshot_id": source.id,
+                        "dataset_slug": dataset_slug,
+                        "generator_version": "multi-city-realism-v3-repair-r1",
+                    },
+                    description=(
+                        "Inactive repair revision of a validated V3 candidate. "
+                        "It preserves the base world and operational timeline while repairing "
+                        "hitless evidence and compensation persistence."
+                    ),
+                )
+                snapshot = DataSnapshot.objects.create(
+                    dataset_version=dataset,
+                    name="Multi-city Realism Snapshot v3 Repair r1",
+                    status=DatasetSnapshotStatus.DRAFT,
+                    is_active=False,
+                    source_started_at=timezone.now(),
+                )
+                initialize(snapshot=snapshot, source=source)
+        else:
+            snapshot = dataset.snapshots.order_by("-created_at").first()
+            if not options["repair_resume"]:
+                raise CommandError(
+                    "Repair candidate already exists; use --repair-v3 --repair-resume."
+                )
+        run(snapshot=snapshot, source=source, batch_size=options["batch_size"], stdout=self.stdout)
 
 
 def format_failed_checks(report: dict) -> str:

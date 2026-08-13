@@ -205,6 +205,90 @@ def seed_multicity_realism_dataset(*, snapshot: DataSnapshot, batch_size: int = 
     return collect_seed_counts(snapshot)
 
 
+def load_existing_seed_world(snapshot, cities, districts):
+    """Load an already-persisted base world for a resumable timeline build."""
+    sla_profiles = {item.code: item for item in SLAProfile.objects.filter(data_snapshot=snapshot)}
+    service_packages = {
+        item.package_code: item
+        for item in ServicePackage.objects.filter(data_snapshot=snapshot).select_related(
+            "default_sla_profile"
+        )
+    }
+    campaigns = {item.code: item for item in Campaign.objects.filter(data_snapshot=snapshot)}
+    rule_set = RuleSet.objects.filter(data_snapshot=snapshot).first()
+    rule_versions = list(RuleVersion.objects.filter(data_snapshot=snapshot).select_related("rule"))
+    devices = {
+        item.code: item
+        for item in NetworkDevice.objects.filter(data_snapshot=snapshot).select_related(
+            "city", "district", "neighborhood"
+        )
+    }
+    links = {
+        item.link_code: item
+        for item in NetworkLink.objects.filter(data_snapshot=snapshot).select_related(
+            "source_device", "target_device"
+        )
+    }
+    link_by_pair = {(item.source_device_id, item.target_device_id): item for item in links.values()}
+    ports_by_role = defaultdict(list)
+    for item in NetworkPort.objects.filter(data_snapshot=snapshot).select_related("device"):
+        ports_by_role[item.metadata.get("service_port_role", "other")].append(item)
+    for values in ports_by_role.values():
+        values.sort(key=lambda item: (item.device.code, item.port_code))
+    access_segments = {
+        item.segment_code: item
+        for item in AccessSegment.objects.filter(data_snapshot=snapshot).select_related(
+            "serving_device"
+        )
+    }
+    failure_domains = {
+        item.code: item for item in FailureDomain.objects.filter(data_snapshot=snapshot)
+    }
+    customers_by_district = {
+        name: list(
+            Customer.objects.filter(data_snapshot=snapshot, district=district).order_by(
+                "customer_number"
+            )
+        )
+        for name, district in districts.items()
+    }
+    subscriptions = list(
+        Subscription.objects.filter(data_snapshot=snapshot)
+        .select_related("customer", "service_package", "sla_profile")
+        .order_by("subscription_number")
+    )
+    connections = list(
+        SubscriptionConnection.objects.filter(data_snapshot=snapshot)
+        .select_related("subscription", "line_connection__port__device")
+        .order_by("pk")
+    )
+    primary_connections = [
+        item for item in connections if item.connection_role == SubscriptionConnectionRole.PRIMARY
+    ]
+    backup_connections = [
+        item for item in connections if item.connection_role == SubscriptionConnectionRole.BACKUP
+    ]
+    alarm_types = {item.code: item for item in AlarmType.objects.filter(data_snapshot=snapshot)}
+    return (
+        sla_profiles,
+        service_packages,
+        campaigns,
+        rule_set,
+        rule_versions,
+        devices,
+        links,
+        dict(ports_by_role),
+        access_segments,
+        failure_domains,
+        link_by_pair,
+        customers_by_district,
+        subscriptions,
+        primary_connections,
+        backup_connections,
+        alarm_types,
+    )
+
+
 def reconcile_multicity_ground_truth_links(snapshot: DataSnapshot) -> dict[str, int]:
     """Repair scenario-to-resource links without encoding answers in orchestration.
 

@@ -7,6 +7,7 @@ from data_generator.seeders.causal_timeline import (
     _calibrated_symptom_codes,
     _legacy_scenarios,
     _scenario_sequence,
+    timeline_schedule_preview,
 )
 
 
@@ -59,3 +60,23 @@ def test_fanout_does_not_change_temperature_no_impact_or_optical_intermitttent()
     }:
         scenario = next(item for item in GPON_SCENARIOS if item.code == code)
         assert _calibrated_symptom_codes(scenario, random.Random("fanout-seed"), 12) == []
+
+
+def test_checkpointed_v3_schedule_is_complete_and_city_month_balanced():
+    preview = timeline_schedule_preview()
+
+    assert preview["main_event_count"] == 91
+    assert len(preview["scenario_counts"]) == 28
+    assert min(preview["scenario_counts"].values()) >= 2
+    assert preview["city_month_counts"] == {
+        "Ankara-06": 11,
+        "Ankara-07": 11,
+        "Kocaeli-06": 11,
+        "Kocaeli-07": 11,
+        "İstanbul-06": 12,
+        "İstanbul-07": 12,
+        "İzmir-06": 12,
+        "İzmir-07": 11,
+    }
+    assert preview["base_alarm_count"] == 209
+    assert preview["correlation_helpers_included"] is False

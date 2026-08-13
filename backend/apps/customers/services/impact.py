@@ -169,8 +169,9 @@ class CustomerImpactService:
         snapshot: DataSnapshot,
         window_start,
         window_end,
+        lightweight: bool = False,
     ):
-        return (
+        queryset = (
             SubscriptionConnection.objects.filter(
                 data_snapshot=snapshot,
                 is_active=True,
@@ -196,16 +197,17 @@ class CustomerImpactService:
                 Q(line_connection__valid_to__isnull=True)
                 | Q(line_connection__valid_to__gt=window_start)
             )
-            .select_related(
-                "subscription",
-                "subscription__customer",
-                "subscription__service_package",
-                "line_connection",
-                "line_connection__port",
-                "line_connection__port__device",
-            )
             .order_by("subscription__subscription_number", "connection_role")
         )
+        related_fields = [
+            "subscription",
+            "line_connection",
+            "line_connection__port",
+            "line_connection__port__device",
+        ]
+        if not lightweight:
+            related_fields.extend(["subscription__customer", "subscription__service_package"])
+        return queryset.select_related(*related_fields)
 
     def _resolve_connection_impact(
         self,
