@@ -357,8 +357,15 @@ class DeterministicStructuredQueryParser:
             if outage_code:
                 causal_event_code = None
         decision_type = self._decision_type(folded)
+        analytics_time_window = (
+            self._analytics_time_window(text, dates, snapshot=snapshot) if analytics else None
+        )
         missing = (
-            []
+            [MissingField.SCOPE_FILTER]
+            if analytics and self._analytics_comparison_requires_period(
+                folded, analytics, analytics_time_window
+            )
+            else []
             if analytics
             else self._missing_fields(
                 intent=intent,
@@ -395,9 +402,7 @@ class DeterministicStructuredQueryParser:
                 "subscription_reference": subscription_reference,
                 "decision_type": decision_type,
                 "location": location,
-                "time_window": self._analytics_time_window(text, dates)
-                if analytics
-                else self._time_window(dates),
+                "time_window": analytics_time_window if analytics else self._time_window(dates),
                 "retrieval_query": text
                 if intent == StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL
                 else None,
@@ -793,6 +798,7 @@ class DeterministicStructuredQueryParser:
             "haftalara göre",
             "karşılaştır",
             "karsilastir",
+            "karsılastır",
             "göster",
             "goster",
             "ilk ",
@@ -813,9 +819,18 @@ class DeterministicStructuredQueryParser:
                 ("failed failover", "başarısız failover", "basarisiz failover"),
             ),
             ("full_outage_count", ("tam hizmet kesintisi", "full outage", "tam kesinti")),
-            ("alarm_count", ("alarm sayısı", "alarm sayisi")),
-            ("outage_count", ("kesinti sayısı", "kesinti sayisi")),
-            ("event_count", ("olay sayısı", "olay sayisi")),
+            (
+                "alarm_count",
+                ("alarm sayısı", "alarm sayisi", "alarm sayılarını", "alarm sayilarini"),
+            ),
+            (
+                "outage_count",
+                ("kesinti sayısı", "kesinti sayisi", "kesinti sayılarını", "kesinti sayilarini"),
+            ),
+            (
+                "event_count",
+                ("olay sayısı", "olay sayisi", "olay sayılarını", "olay sayilarini"),
+            ),
         )
         metric = next(
             (key for key, terms in metric_terms if any(term in folded for term in terms)), None
@@ -873,12 +888,15 @@ class DeterministicStructuredQueryParser:
         group_by = next(
             (key for key, terms in groups if any(term in folded for term in terms)), None
         )
-        month_mentions = re.findall(r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s+\d{4}\b", folded)
-        if len(month_mentions) > 1:
+        month_mentions = re.findall(
+            r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s+\d{4}\b", folded
+        )
+        named_months = re.findall(r"\b(" + "|".join(_TURKISH_MONTHS) + r")\b", folded)
+        if len(month_mentions) > 1 or len(set(named_months)) > 1:
             group_by = "time_bucket"
         grain = (
             "month"
-            if "aylara göre" in folded or len(month_mentions) > 1
+            if "aylara göre" in folded or len(month_mentions) > 1 or len(set(named_months)) > 1
             else "week"
             if "haftalara göre" in folded
             else "day"
@@ -975,14 +993,39 @@ class DeterministicStructuredQueryParser:
         return matches[0] if len(matches) == 1 else None
 
     @staticmethod
-    def _analytics_time_window(text: str, dates: list[str]) -> dict[str, str] | None:
+    def _analytics_time_window(
+        text: str,
+        dates: list[str],
+        *,
+        snapshot: DataSnapshot,
+    ) -> dict[str, str] | None:
         window = DeterministicStructuredQueryParser._time_window(dates)
         if window:
             return window
         matches = re.findall(r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s+(\d{4})\b", _fold(text))
-        if not matches:
-            return None
-        months = sorted((int(year), _TURKISH_MONTHS[month]) for month, year in matches)
+        if matches:
+            months = sorted((int(year), _TURKISH_MONTHS[month]) for month, year in matches)
+        else:
+            mentioned = sorted(
+                {
+                    _TURKISH_MONTHS[month]
+                    for month in re.findall(
+                        r"\b(" + "|".join(_TURKISH_MONTHS) + r")\b", _fold(text)
+                    )
+                }
+            )
+            years = sorted(
+                {
+                    value
+                    for value in CausalEvent.objects.filter(data_snapshot=snapshot).values_list(
+                        "started_at__year", flat=True
+                    )
+                    if value is not None
+                }
+            )
+            if not mentioned or len(years) != 1:
+                return None
+            months = [(years[0], month) for month in mentioned]
         first_year, first_month = months[0]
         last_year, last_month = months[-1]
         start = date(first_year, first_month, 1)
@@ -994,6 +1037,18 @@ class DeterministicStructuredQueryParser:
             "from_time": f"{start.isoformat()}T00:00:00+00:00",
             "to_time": f"{end.isoformat()}T23:59:59+00:00",
         }
+
+    @staticmethod
+    def _analytics_comparison_requires_period(
+        folded: str,
+        analytics: AnalyticsSpecification,
+        time_window: dict[str, str] | None,
+    ) -> bool:
+        """Comparison without a grouping or period has no deterministic baseline."""
+        comparison_requested = any(
+            term in folded for term in ("karşılaştır", "karsilastir", "karsılastır")
+        )
+        return comparison_requested and analytics.group_by is None and time_window is None
 
     @staticmethod
     def _decision_type(folded: str) -> str | None:

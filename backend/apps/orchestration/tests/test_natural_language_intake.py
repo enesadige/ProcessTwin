@@ -658,6 +658,58 @@ def test_analytics_ranking_limit_distinguishes_winner_from_exhaustive_list(
 
 
 @pytest.mark.django_db
+def test_explicit_two_month_analytics_comparison_requires_no_operational_anchor():
+    snapshot = create_snapshot("analytics-month-comparison")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "Haziran 2026 ile Temmuz 2026 aylarındaki doğrulanmış tam hizmet "
+            "kesintisi sayılarını karşılaştır."
+        ),
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.intent.value == "operational_analytics"
+    assert query.analytics is not None
+    assert query.analytics.metric == "full_outage_count"
+    assert query.analytics.aggregation == "count"
+    assert query.analytics.group_by == "time_bucket"
+    assert query.analytics.time_grain == "month"
+    assert query.time_window is not None
+    assert query.clarification_required is False
+
+
+@pytest.mark.django_db
+def test_explicit_multi_month_analytics_trend_requires_no_operational_anchor():
+    snapshot = create_snapshot("analytics-multi-month-trend")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query="Ocak 2026, Şubat 2026 ve Mart 2026 aylarına göre olay sayılarını göster.",
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.analytics is not None
+    assert query.analytics.metric == "event_count"
+    assert query.analytics.group_by == "time_bucket"
+    assert query.analytics.time_grain == "month"
+    assert query.clarification_required is False
+
+
+@pytest.mark.django_db
+def test_analytics_comparison_without_period_remains_clarification_required():
+    snapshot = create_snapshot("analytics-comparison-missing-period")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query="Tam hizmet kesintisi sayılarını karşılaştır.",
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.analytics is not None
+    assert query.clarification_required is True
+    assert [reason.value for reason in query.clarification_reasons] == ["missing_scope_filter"]
+
+
+@pytest.mark.django_db
 def test_analytics_parser_supports_generic_potential_scope_and_event_count_metrics():
     snapshot = create_snapshot("analytics-generic-metrics")
 
