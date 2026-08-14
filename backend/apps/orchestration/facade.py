@@ -221,6 +221,22 @@ class OrchestrationFacade:
                     active_provider = llm_descriptor.create_provider()
                 except Exception:
                     active_provider = None
+            if created:
+                self._query_run_service.save_provider_provenance(
+                    query_run,
+                    requested_llm_provider=normalized_request.llm_provider,
+                    resolved_llm_provider=llm_descriptor.provider,
+                    resolved_llm_model=llm_descriptor.model,
+                    requested_embedding_provider=normalized_request.embedding_provider,
+                    resolved_embedding_provider=embedding_descriptor.provider,
+                    resolved_embedding_model=embedding_descriptor.model,
+                    embedding_prompt_version=embedding_descriptor.query_prompt_version,
+                    structured_query_parser=parser_name,
+                    structured_query_parser_version=parser_version,
+                )
+                self._query_run_service.save_structured_query(
+                    query_run, structured_query=structured_query
+                )
             if active_provider is not None:
                 decomposition = LLMSemanticDecomposer(active_provider).merge(
                     original_query=normalized_request.original_query,
@@ -229,6 +245,12 @@ class OrchestrationFacade:
                 structured_query = decomposition.structured_query
                 if decomposition.accepted:
                     parser_version = f"{parser_version}+{SEMANTIC_DECOMPOSITION_PROMPT_VERSION}"
+                if created:
+                    self._query_run_service.replace_structured_query_before_plan(
+                        query_run,
+                        structured_query=structured_query,
+                        parser_version=parser_version,
+                    )
         else:
             parser_name = "replay"
             parser_version = "structured-query.v1"
@@ -267,21 +289,22 @@ class OrchestrationFacade:
 
         try:
             if created:
-                self._query_run_service.save_provider_provenance(
-                    query_run,
-                    requested_llm_provider=normalized_request.llm_provider,
-                    resolved_llm_provider=llm_descriptor.provider,
-                    resolved_llm_model=llm_descriptor.model,
-                    requested_embedding_provider=normalized_request.embedding_provider,
-                    resolved_embedding_provider=embedding_descriptor.provider,
-                    resolved_embedding_model=embedding_descriptor.model,
-                    embedding_prompt_version=embedding_descriptor.query_prompt_version,
-                    structured_query_parser=parser_name,
-                    structured_query_parser_version=parser_version,
-                )
-                self._query_run_service.save_structured_query(
-                    query_run, structured_query=structured_query
-                )
+                if QueryRunStatus(query_run.status) == QueryRunStatus.PENDING:
+                    self._query_run_service.save_provider_provenance(
+                        query_run,
+                        requested_llm_provider=normalized_request.llm_provider,
+                        resolved_llm_provider=llm_descriptor.provider,
+                        resolved_llm_model=llm_descriptor.model,
+                        requested_embedding_provider=normalized_request.embedding_provider,
+                        resolved_embedding_provider=embedding_descriptor.provider,
+                        resolved_embedding_model=embedding_descriptor.model,
+                        embedding_prompt_version=embedding_descriptor.query_prompt_version,
+                        structured_query_parser=parser_name,
+                        structured_query_parser_version=parser_version,
+                    )
+                    self._query_run_service.save_structured_query(
+                        query_run, structured_query=structured_query
+                    )
             planner_result = self._planner.plan_and_save(query_run, structured_query)
             if planner_result.status != PlannerResultStatus.PLANNED:
                 return self._planner_outcome(

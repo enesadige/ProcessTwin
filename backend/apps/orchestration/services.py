@@ -260,6 +260,40 @@ class QueryRunService:
         query_run.structured_query = normalized
         return self.transition(query_run, target_status=QueryRunStatus.PLANNED)
 
+    def replace_structured_query_before_plan(
+        self,
+        query_run: QueryRun,
+        *,
+        structured_query: StructuredQuery | Mapping[str, Any],
+        parser_version: str,
+    ) -> QueryRun:
+        """Persist optional semantic dimensions after the safe deterministic plan state."""
+        query = (
+            structured_query
+            if isinstance(structured_query, StructuredQuery)
+            else StructuredQuery.model_validate(structured_query)
+        )
+        if query.snapshot_identifier != query_run.data_snapshot.snapshot_key:
+            raise QueryRunError(
+                message="Structured query snapshot does not match QueryRun.",
+                code="structured_query_snapshot_mismatch",
+            )
+        if QueryRunStatus(query_run.status) != QueryRunStatus.PLANNED or query_run.planned_tools:
+            raise QueryRunTransitionError(
+                current=query_run.status, target=QueryRunStatus.PLANNED.value
+            )
+        query_run.structured_query = query.to_audit_dict()
+        query_run.structured_query_parser_version = parser_version
+        query_run.full_clean()
+        query_run.save(
+            update_fields=[
+                "structured_query",
+                "structured_query_parser_version",
+                "updated_at",
+            ]
+        )
+        return query_run
+
     def save_provider_provenance(
         self,
         query_run: QueryRun,

@@ -223,6 +223,40 @@ def test_valid_structured_query_moves_pending_run_to_planned_and_is_idempotent()
 
 
 @pytest.mark.django_db
+def test_semantic_dimensions_can_replace_planned_query_before_tool_plan():
+    service = QueryRunService()
+    snapshot = create_snapshot("structured-query-semantic-001")
+    run, _ = service.create_or_get(
+        data_snapshot=snapshot,
+        idempotency_key="structured-query-semantic-001",
+        original_query="Kok neden ve musteri etkisini incele.",
+    )
+    planned = service.save_structured_query(
+        run,
+        structured_query=valid_query(snapshot_identifier=snapshot.snapshot_key),
+    )
+    semantic_query = StructuredQuery.model_validate(
+        valid_query(
+            snapshot_identifier=snapshot.snapshot_key,
+            requested_outputs=["summary", "root_cause", "impact"],
+            semantic_dimensions=["verified_customer_impact"],
+            semantic_decomposition_status="accepted",
+        )
+    )
+
+    replaced = service.replace_structured_query_before_plan(
+        planned,
+        structured_query=semantic_query,
+        parser_version="deterministic+semantic",
+    )
+
+    assert replaced.status == QueryRunStatus.PLANNED
+    assert replaced.planned_tools == []
+    assert replaced.structured_query["semantic_decomposition_status"] == "accepted"
+    assert replaced.structured_query_parser_version == "deterministic+semantic"
+
+
+@pytest.mark.django_db
 def test_invalid_query_leaves_run_pending_and_terminal_runs_cannot_be_changed():
     service = QueryRunService()
     snapshot = create_snapshot("structured-query-service-002")
