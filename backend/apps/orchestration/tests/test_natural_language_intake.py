@@ -458,6 +458,29 @@ def test_deterministic_parser_recognizes_folded_turkish_relation_question():
 
 
 @pytest.mark.django_db
+def test_same_event_alarm_investigation_uses_causal_alarm_tools():
+    snapshot = create_snapshot("same-event-alarm-investigation")
+    create_causal_event(snapshot, code="CE-MCR-0023")
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "CE-MCR-0023 içindeki alarmlar arasında korelasyon var mı? "
+            "Hangisi kök neden alarmı, hangileri semptom?"
+        ),
+        snapshot=snapshot,
+    )
+
+    query = parsed.structured_query
+    assert query.intent.value == "network_investigation"
+    assert query.comparison_causal_event_code is None
+    plan = DeterministicToolPlanner().plan(query)
+    assert [(call.server.value, call.tool_name) for call in plan.tool_plan.calls] == [
+        ("network", "correlate_alarms"),
+        ("network", "rank_root_cause_candidates"),
+    ]
+
+
+@pytest.mark.django_db
 def test_deterministic_parser_recognizes_relation_question_with_modal_wording():
     snapshot = create_snapshot("cross-incident-modal-intake")
     create_causal_event(snapshot, code="CE-CORR-021")

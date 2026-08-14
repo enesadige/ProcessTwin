@@ -391,6 +391,24 @@ class DeterministicStructuredQueryParser:
             outage_code = self._outage_for_device(snapshot, device_code, dates=dates)
         location, ambiguous_location = self._resolve_location(snapshot, folded)
         intent, requested_outputs = self._intent_and_outputs(folded)
+        if (
+            intent == StructuredQueryIntent.ALARM_CORRELATION
+            and causal_event_code
+            and comparison_causal_event_code is None
+            and any(
+                term in folded
+                for term in ("içindeki alarm", "icindeki alarm", "aynı olay", "ayni olay")
+            )
+        ):
+            # A single event's own alarm roles are causal evidence, not a
+            # cross-incident correlation search.
+            intent = StructuredQueryIntent.NETWORK_INVESTIGATION
+            requested_outputs = [
+                RequestedOutput.SUMMARY,
+                RequestedOutput.DETAILS,
+                RequestedOutput.ROOT_CAUSE,
+                RequestedOutput.EVIDENCE,
+            ]
         if analytics:
             intent, requested_outputs = (
                 StructuredQueryIntent.OPERATIONAL_ANALYTICS,
