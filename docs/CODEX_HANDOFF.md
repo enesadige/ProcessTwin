@@ -625,6 +625,18 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   Rule/RAG provenance ve mevcut safe fallback davranışı korundu.
 - Sonraki görev: `MAIN-070`. Başlatılmayacak.
 
+## MAIN-070 Genel Evidence Veri Modeli (2026-08-14)
+
+- `orchestration` altında QueryRun ve exact snapshot'a bağlı, additive
+  `EvidenceRecord` omurgası eklendi. Tool call, explicit RuleVersion,
+  deterministic calculation ve RAG document/chunk/score provenance'i ayrı
+  child kayıtları olarak saklanır.
+- Snapshot uyuşmazlığı model validation ile reddedilir. Finalization sonrası
+  parent ve child kanıt kayıtları değiştirilemez veya genişletilemez.
+  Mevcut compensation `DecisionEvidence` ve `/evidence` akışı değiştirilmedi.
+- MAIN-070 otomatik evidence üretimi, API veya UI eklemez; bunlar sırasıyla
+  MAIN-071/072/073 kapsamındadır. Sonraki görev: `MAIN-071`.
+
 ## AI Analysis Scope ve Telafi Execution Düzeltmesi (2026-08-14)
 
 - Çözülemeyen açık şehir ifadeleri, Türkçe locative yazımı (`Çorum'da`) dahil,

@@ -292,6 +292,18 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 - Snapshot 74, analytics, RAG, provider ve backend hata semantiği değişmedi.
   Sonraki görev `MAIN-070`; başlatılmayacak.
 
+## 2026-08-14 — MAIN-070 Genel Evidence Veri Modeli
+
+- `EvidenceRecord`, `EvidenceToolCall`, `EvidenceRuleReference`,
+  `EvidenceCalculation` ve `EvidenceRAGReference` additive olarak eklendi.
+  EvidenceRecord exact snapshot ve QueryRun bağlamına bağlıdır.
+- Child kayıtlar aynı snapshot'taki explicit RuleVersion ve RAG kaynağına
+  bağlanır; cross-snapshot referansları reddedilir. Finalized parent/child
+  kayıtları immutable'dır.
+- Mevcut compensation DecisionEvidence, snapshot 74, AI Analysis ve evidence
+  detail davranışı korunur. Evidence üretimi/API/UI sonraki MAIN-071/072/073
+  görevleridir; sonraki görev `MAIN-071`dir.
+
 ## 2026-08-14 — AI Analysis Scope ve Telafi Execution Düzeltmesi
 
 - Açık ama snapshot içinde çözülemeyen şehirler, `Çorum'da` gibi locative

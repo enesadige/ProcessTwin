@@ -5,6 +5,7 @@ from uuid import uuid4
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 
 from apps.core.models import TimeStampedModel
 from apps.datasets.models import DataSnapshot
@@ -27,6 +28,10 @@ class QueryRunStatus(models.TextChoices):
 
 
 TERMINAL_QUERY_RUN_STATUSES = frozenset({QueryRunStatus.COMPLETED, QueryRunStatus.FAILED})
+
+
+def generate_evidence_record_code() -> str:
+    return f"EV-{uuid4().hex.upper()}"
 
 
 class QueryRun(TimeStampedModel):
@@ -208,5 +213,230 @@ class QueryRun(TimeStampedModel):
                 }
                 if current != persisted:
                     errors["status"] = "Terminal QueryRun records are immutable."
+        if errors:
+            raise ValidationError(errors)
+
+
+class EvidenceRecord(TimeStampedModel):
+    """Immutable provenance container for one completed analysis run.
+
+    This is deliberately separate from ``compensation.DecisionEvidence``. The
+    latter remains the authoritative compensation decision record; this model
+    records the wider orchestration provenance around a QueryRun.
+    """
+
+    data_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.PROTECT,
+        related_name="evidence_records",
+    )
+    query_run = models.OneToOneField(
+        QueryRun,
+        on_delete=models.PROTECT,
+        related_name="evidence_record",
+    )
+    evidence_code = models.CharField(max_length=48, default=generate_evidence_record_code)
+    snapshot_context = models.JSONField(default=dict, blank=True)
+    warnings = models.JSONField(default=list, blank=True)
+    finalized = models.BooleanField(default=False)
+    finalized_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "orchestration_evidence_record"
+        ordering = ["-created_at", "evidence_code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["data_snapshot", "evidence_code"],
+                name="evidence_record_snapshot_code_uniq",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(finalized=False, finalized_at__isnull=True)
+                    | models.Q(finalized=True, finalized_at__isnull=False)
+                ),
+                name="evidence_record_finalization_timestamp",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["data_snapshot", "finalized", "created_at"],
+                name="evidence_record_snap_final_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.evidence_code
+
+    def clean(self) -> None:
+        errors: dict[str, str] = {}
+        if self.query_run_id and self.data_snapshot_id:
+            if self.query_run.data_snapshot_id != self.data_snapshot_id:
+                errors["query_run"] = "QueryRun must belong to the same data snapshot."
+        if self.finalized and self.finalized_at is None:
+            errors["finalized_at"] = "Finalized evidence requires finalized_at."
+        if not self.finalized and self.finalized_at is not None:
+            errors["finalized_at"] = "Only finalized evidence can have finalized_at."
+        if self.pk:
+            existing = EvidenceRecord.objects.filter(pk=self.pk).values("finalized").first()
+            if existing and existing["finalized"]:
+                errors["finalized"] = "Finalized evidence records are immutable."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean(validate_unique=False, validate_constraints=False)
+        super().save(*args, **kwargs)
+
+    def finalize(self) -> None:
+        if self.finalized:
+            return
+        self.finalized = True
+        self.finalized_at = timezone.now()
+        self.save(update_fields=["finalized", "finalized_at", "updated_at"])
+
+    def delete(self, *args, **kwargs):
+        if self.finalized:
+            raise ValidationError("Finalized evidence records cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+
+class EvidenceChildModel(TimeStampedModel):
+    """Common immutability contract for evidence entries."""
+
+    evidence_record = models.ForeignKey(
+        EvidenceRecord,
+        on_delete=models.CASCADE,
+        related_name="%(class)s_records",
+    )
+
+    class Meta:
+        abstract = True
+
+    def _validate_evidence_record(self, errors: dict[str, str]) -> None:
+        if self.evidence_record_id and self.evidence_record.finalized:
+            errors["evidence_record"] = "Finalized evidence records cannot be changed."
+
+    def clean(self) -> None:
+        errors: dict[str, str] = {}
+        self._validate_evidence_record(errors)
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean(validate_unique=False, validate_constraints=False)
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.evidence_record_id and self.evidence_record.finalized:
+            raise ValidationError("Finalized evidence entries cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+
+class EvidenceToolCall(EvidenceChildModel):
+    sequence = models.PositiveIntegerField()
+    server_name = models.CharField(max_length=80)
+    tool_name = models.CharField(max_length=160)
+    status = models.CharField(max_length=32)
+    request_summary = models.JSONField(default=dict, blank=True)
+    response_summary = models.JSONField(default=dict, blank=True)
+    duration_ms = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = "orchestration_evidence_tool_call"
+        ordering = ["evidence_record", "sequence"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["evidence_record", "sequence"],
+                name="evidence_tool_call_sequence_uniq",
+            ),
+        ]
+
+
+class EvidenceRuleReference(EvidenceChildModel):
+    rule_version = models.ForeignKey(
+        "rules.RuleVersion",
+        on_delete=models.PROTECT,
+        related_name="evidence_rule_references",
+    )
+    reference_role = models.CharField(max_length=32, default="selected")
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "orchestration_evidence_rule_reference"
+        ordering = ["evidence_record", "rule_version"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["evidence_record", "rule_version", "reference_role"],
+                name="evidence_rule_reference_uniq",
+            ),
+        ]
+
+    def clean(self) -> None:
+        errors: dict[str, str] = {}
+        self._validate_evidence_record(errors)
+        if self.rule_version_id and self.evidence_record_id:
+            if self.rule_version.data_snapshot_id != self.evidence_record.data_snapshot_id:
+                errors["rule_version"] = "RuleVersion must belong to the evidence snapshot."
+        if errors:
+            raise ValidationError(errors)
+
+
+class EvidenceCalculation(EvidenceChildModel):
+    sequence = models.PositiveIntegerField()
+    calculation_code = models.CharField(max_length=120)
+    inputs = models.JSONField(default=dict, blank=True)
+    outputs = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = "orchestration_evidence_calculation"
+        ordering = ["evidence_record", "sequence"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["evidence_record", "sequence"],
+                name="evidence_calculation_sequence_uniq",
+            ),
+        ]
+
+
+class EvidenceRAGReference(EvidenceChildModel):
+    source_document = models.ForeignKey(
+        "rag.SourceDocument",
+        on_delete=models.PROTECT,
+        related_name="evidence_rag_references",
+    )
+    document_chunk = models.ForeignKey(
+        "rag.DocumentChunk",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="evidence_rag_references",
+    )
+    section_path = models.JSONField(default=list, blank=True)
+    retrieval_score = models.FloatField(null=True, blank=True)
+
+    class Meta:
+        db_table = "orchestration_evidence_rag_reference"
+        ordering = ["evidence_record", "source_document", "document_chunk"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["evidence_record", "source_document", "document_chunk"],
+                name="evidence_rag_reference_uniq",
+            ),
+        ]
+
+    def clean(self) -> None:
+        errors: dict[str, str] = {}
+        self._validate_evidence_record(errors)
+        if self.source_document_id and self.evidence_record_id:
+            document_snapshot_id = self.source_document.data_snapshot_id
+            if document_snapshot_id not in (None, self.evidence_record.data_snapshot_id):
+                errors["source_document"] = (
+                    "Source document must be global or match evidence snapshot."
+                )
+        if self.document_chunk_id and self.source_document_id:
+            if self.document_chunk.source_document_id != self.source_document_id:
+                errors["document_chunk"] = (
+                    "Document chunk must belong to the selected source document."
+                )
         if errors:
             raise ValidationError(errors)
