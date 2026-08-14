@@ -1338,6 +1338,28 @@ def test_deterministic_fallback_allows_second_verified_root_resource_identifier(
     assert "Kök kaynak: device OLT-001." in text
 
 
+def test_answer_plan_keeps_resolved_event_identity_and_excludes_scenario_from_root_cause():
+    result = valid_result("response-device-event-identity")
+    result.causal_summary.causal_event_code = "CE-MCR-0049"
+    result.causal_summary.outage_code = "OUT-MCR-0049"
+    result.causal_summary.root_resource_reference = "AGG-ANK-002"
+    result.causal_summary.root_cause_summary = "SCN-BNG-DOWN-001"
+
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query="AGG-ANK-002 için ilişkili olayı ve müşteri etkisini söyle.",
+        structured_query={"requested_outputs": ["summary", "details", "impact"]},
+    )
+    statements = contract["statements"]
+
+    assert "İlişkili olay kaydı: CE-MCR-0049; kesinti kaydı: OUT-MCR-0049." in statements.values()
+    assert "Doğrulanmış ana kök neden: SCN-BNG-DOWN-001." not in statements.values()
+    assert (
+        "Kök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi ayrıca doğrulanmadı."
+        in statements.values()
+    )
+
+
 @pytest.mark.parametrize(
     "claim",
     [

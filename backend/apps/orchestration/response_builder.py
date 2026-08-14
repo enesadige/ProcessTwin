@@ -108,6 +108,7 @@ _NARRATIVE_FACT_TOKEN_RE = re.compile(
 _NARRATIVE_NUMBER_RE = re.compile(
     r"(?<![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])\d+(?:[.,]\d+)?(?![A-Za-zÇĞİÖŞÜçğıöşü0-9_-])"
 )
+_SCENARIO_CODE_RE = re.compile(r"^SCN-[A-Z0-9-]+$")
 
 _TOPOLOGY_RELATION_NARRATIVE = {
     "same_resource": "Kaynaklar aynı doğrulanmış kaynak üzerinde yer alıyor.",
@@ -422,6 +423,11 @@ class ValidatedResponseBuilder:
             requested_roles.add("decision_evidence")
         if any(term in query for term in ("tam hizmet", "tam kesinti", "full outage")):
             requested_roles.add("outage_classification")
+        if any(
+            term in query
+            for term in ("ilişkili olay", "iliskili olay", "ilgili olay", "related event")
+        ):
+            requested_roles.add("operational_reference")
         if any(term in query for term in ("kök kaynak", "kok kaynak", "root resource")):
             requested_roles.add("root_resource")
         if any(
@@ -589,6 +595,7 @@ class ValidatedResponseBuilder:
             "analytics_comparison",
             "analytics_included_count",
             "unknown_exclusion",
+            "operational_reference",
         }
         relevant_roles = set()
         if not requested and not dimensions:
@@ -610,6 +617,7 @@ class ValidatedResponseBuilder:
                 "verified_customer_impact",
                 "verified_no_impact",
                 "insufficient_evidence",
+                "operational_reference",
             }
         if intent == "operational_analytics" or "analytics" in requested:
             relevant_roles |= {
@@ -858,9 +866,10 @@ class ValidatedResponseBuilder:
             if (
                 causal.root_cause_summary
                 and causal.root_cause_summary != causal.root_resource_reference
+                and not _SCENARIO_CODE_RE.fullmatch(causal.root_cause_summary)
             ):
                 sections.append(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
-            elif causal.root_cause_summary == causal.root_resource_reference:
+            elif causal.root_resource_reference:
                 sections.append(
                     "Kök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi "
                     "ayrıca doğrulanmadı."
@@ -1209,12 +1218,19 @@ class ValidatedResponseBuilder:
 
         causal = result.causal_summary
         if causal:
+            if causal.causal_event_code or causal.outage_code:
+                add(
+                    "İlişkili olay kaydı: "
+                    f"{causal.causal_event_code or 'doğrulanmadı'}; kesinti kaydı: "
+                    f"{causal.outage_code or 'doğrulanmadı'}."
+                )
             if (
                 causal.root_cause_summary
                 and causal.root_cause_summary != causal.root_resource_reference
+                and not _SCENARIO_CODE_RE.fullmatch(causal.root_cause_summary)
             ):
                 add(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
-            elif causal.root_cause_summary == causal.root_resource_reference:
+            elif causal.root_resource_reference:
                 add(
                     "Kök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi "
                     "ayrıca doğrulanmadı."
@@ -1585,6 +1601,7 @@ class ValidatedResponseBuilder:
             ("analytics_period_evidence", ("dahil,", "hariç)")),
             ("analytics_included_count", ("Hesaba dahil edilen olay sayısı:",)),
             ("unknown_exclusion", ("hesaplamaya dahil edilmedi",)),
+            ("operational_reference", ("İlişkili olay kaydı:",)),
             ("evidence", ("Kaynaklar", "Belge içeriği", "DecisionEvidence", "RuleVersion")),
         )
         lowered = text.casefold()
