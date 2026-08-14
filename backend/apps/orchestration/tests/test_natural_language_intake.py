@@ -718,6 +718,7 @@ def test_deterministic_parser_preserves_unicode_device_and_parses_turkish_date()
     assert date_query.structured_query.intent.value == "operational_analytics"
     assert date_query.structured_query.analytics is not None
     assert date_query.structured_query.analytics.metric == "outage_count"
+    assert date_query.structured_query.analytics.group_by is None
 
 
 @pytest.mark.django_db
@@ -808,6 +809,7 @@ def test_count_metric_uses_count_when_ranked_highest_to_lowest():
     ("question", "expected_limit"),
     [
         ("Hangi şehirde en fazla tam hizmet kesintisi yaşandı?", 1),
+        ("Temmuz 2026'da doğrulanmış müşteri etkisi en yüksek şehir hangisi?", 1),
         ("Tam hizmet kesintisine göre ilk 3 şehri sırala.", 3),
         ("Şehirleri tam hizmet kesintisine göre sırala.", None),
     ],

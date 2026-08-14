@@ -68,9 +68,25 @@ _REMEDIATION_TERMS = (
 def classify_unsupported_capability(query: str) -> PreflightAnswerability | None:
     """Classify requests outside deterministic operational-analysis capabilities."""
     folded = query.casefold()
-    if any(
-        term in folded
-        for term in (*_FORECAST_TERMS, *_REMEDIATION_TERMS)
+    probability_forecast = (
+        any(term in folded for term in ("olasılı", "olasil", "probability"))
+        and any(
+            term in folded
+            for term in (
+                "yüzde",
+                "yuzde",
+                "%",
+                "hesapla",
+                "tekrar",
+                "önümüzdeki",
+                "onumuzdeki",
+                "olacak",
+            )
+        )
+    )
+    if (
+        any(term in folded for term in (*_FORECAST_TERMS, *_REMEDIATION_TERMS))
+        or probability_forecast
     ):
         return PreflightAnswerability(
             status=AnswerabilityStatus.UNSUPPORTED_CAPABILITY,

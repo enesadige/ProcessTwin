@@ -107,6 +107,16 @@ def test_event_grouping_uses_canonical_event_code_not_a_missing_generic_field():
     ]
 
 
+def test_outage_count_sums_persisted_outages_instead_of_counting_events():
+    row = OperationalAnalyticsService._row(
+        "Toplam",
+        [{"outage_count": 2}, {"outage_count": 1}],
+        AnalyticsSpec(metric="outage_count", aggregation="count"),
+    )
+
+    assert row == {"label": "Toplam", "value": 3, "event_count": 2}
+
+
 @pytest.mark.django_db
 def test_failed_failover_alarm_filter_preserves_unknown_impact_exclusion():
     snapshot = create_snapshot("analytics-failed-failover-unknown")

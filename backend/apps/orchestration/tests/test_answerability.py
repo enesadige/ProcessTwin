@@ -13,6 +13,10 @@ from apps.orchestration.answerability import (
     "query",
     [
         "Bu müşterinin gelecek ay kullanımını tahmin et.",
+        (
+            "CE-MCR-0010 olayının önümüzdeki 7 gün içinde tekrar yaşanma "
+            "olasılığını yüzde olarak hesapla."
+        ),
         "AGG-ANK-002 arızasını düzeltmek için cihaz üzerinde hangi komutları çalıştırmalıyım?",
         (
             "CE-MCR-0023 olayında hangi parçanın değiştirilmesi gerektiğini "

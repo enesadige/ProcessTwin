@@ -905,6 +905,10 @@ class DeterministicStructuredQueryParser:
             "en cok",
             "en fazla",
             "en az",
+            "en yüksek",
+            "en yuksek",
+            "en düşük",
+            "en dusuk",
             "toplam",
             "ortalama",
             "trend",
@@ -1004,22 +1008,54 @@ class DeterministicStructuredQueryParser:
         if metric in count_only_metrics:
             aggregation = "count"
         group_by = None
+        # A location mention narrows the result; it becomes a grouping only
+        # when the user explicitly requests a breakdown or ranking by it.
         groups = (
-            ("root_alarm_type", ("alarm tipi", "alarm türü", "alarm turu")),
+            (
+                "root_alarm_type",
+                (
+                    "alarm tipi",
+                    "alarm türü",
+                    "alarm turu",
+                    "alarm tipine göre",
+                    "alarm türüne göre",
+                ),
+            ),
             (
                 "city",
                 (
-                    "şehir",
-                    "sehir",
-                    "şehri",
-                    "sehri",
                     "şehirleri",
                     "sehirleri",
-                    "şehirlere",
-                    "sehirlere",
+                    "şehri sırala",
+                    "sehri sırala",
+                    "sehri sirala",
+                    "şehirlere göre",
+                    "sehirlere gore",
+                    "şehir bazında",
+                    "sehir bazinda",
+                    "her şehir",
+                    "her sehir",
+                    "hangi şehir",
+                    "hangi sehir",
+                    "şehir hangisi",
+                    "sehir hangisi",
                 ),
             ),
-            ("district", ("ilçe", "ilce")),
+            (
+                "district",
+                (
+                    "ilçeleri",
+                    "ilceleri",
+                    "ilçelere göre",
+                    "ilcelere gore",
+                    "ilçe bazında",
+                    "ilce bazinda",
+                    "her ilçe",
+                    "her ilce",
+                    "hangi ilçe",
+                    "hangi ilce",
+                ),
+            ),
             ("event", ("olay",)),
             ("time_bucket", ("aylara göre", "haftalara göre", "günlere göre", "gunlere göre")),
         )

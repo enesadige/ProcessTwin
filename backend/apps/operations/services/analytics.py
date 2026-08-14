@@ -404,7 +404,13 @@ class OperationalAnalyticsService:
         if spec.aggregation == "count":
             result: Any = (
                 sum(numeric)
-                if spec.metric in {"full_outage_count", "failed_failover_count"}
+                if spec.metric
+                in {
+                    "outage_count",
+                    "alarm_count",
+                    "full_outage_count",
+                    "failed_failover_count",
+                }
                 else len(values)
             )
         elif spec.aggregation == "sum":

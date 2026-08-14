@@ -1577,6 +1577,48 @@ def test_builder_skips_provider_for_canonical_no_relation_result():
     assert "verified_anchor" not in response.response_text
 
 
+@pytest.mark.django_db
+def test_builder_skips_provider_when_scoped_analytics_has_no_matching_records():
+    snapshot = create_snapshot("response-empty-analytics-skip")
+    result = valid_result(snapshot.snapshot_key).model_copy(
+        update={
+            "analytics_summary": AnalyticsSummary(
+                metric="outage_count",
+                aggregation="count",
+                ranking_direction="desc",
+                filters={"city": "İzmir", "district": "Konak"},
+                rows=[],
+                included_event_count=0,
+                excluded_unknown_count=0,
+                deduplication_grain="causal_event",
+            )
+        }
+    )
+    run = completed_run(
+        "response-empty-analytics-skip",
+        snapshot=snapshot,
+        result=result,
+        original_query="6 Haziran 2026 tarihinde Konak ilçesinde kaç kesinti yaşandı?",
+    )
+    run.structured_query = {
+        "intent": "operational_analytics",
+        "requested_outputs": ["summary", "analytics"],
+    }
+    run.save(update_fields=["structured_query"])
+    provider = RecordingProvider()
+
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=provider,
+    )
+
+    assert provider.requests == []
+    assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC
+    assert "eşleşen kayıt bulunmuyor" in response.response_text
+    assert response.narrative_synthesis_audit["reason"] == "no_matching_analytics_records"
+
+
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
         "Müşteri memnuniyeti olumsuz etkilendi.",

@@ -323,16 +323,23 @@ class ValidatedResponseBuilder:
                 statement_id: contract[1]["statements"][statement_id]
                 for statement_id in selection["selected_statement_ids"]
             }
+            requires_empty_analytics_response = (
+                self._requires_deterministic_empty_analytics_response(result)
+            )
             if (
                 result.cross_incident_correlation_summary
                 and result.cross_incident_correlation_summary.correlation_status == "no_relation"
             ) or self._requires_deterministic_uncertainty_response(
                 query_run.original_query,
                 selected_statements,
-            ):
+            ) or requires_empty_analytics_response:
                 response.narrative_synthesis_audit = {
                     "status": "skipped",
-                    "reason": "canonical_causality_is_not_explicitly_verified",
+                    "reason": (
+                        "no_matching_analytics_records"
+                        if requires_empty_analytics_response
+                        else "canonical_causality_is_not_explicitly_verified"
+                    ),
                 }
                 return response
             if getattr(active_provider, "supports_grounded_narrative", False):
@@ -882,7 +889,10 @@ class ValidatedResponseBuilder:
                 for index, row in enumerate(analytics.rows, 1):
                     sections.append(f"{index}. {row['label']}: {row['value']}.")
             else:
-                sections.append("Uygulanan filtrelerde doğrulanmış hesaplama kaydı bulunmuyor.")
+                sections.append(
+                    "Uygulanan filtrelerde eşleşen kayıt bulunmuyor; bu sonuç doğrulanmış "
+                    "sıfır kesinti olarak yorumlanmıyor."
+                )
             if analytics.excluded_unknown_count:
                 sections.append(
                     f"{analytics.excluded_unknown_count} olay, doğrulanmış etki kanıtı olmadığı "
@@ -2122,6 +2132,19 @@ class ValidatedResponseBuilder:
             asks_for_physical_causality
             and physical_cause_unverified
             and not has_confirmed_physical_cause
+        )
+
+    @staticmethod
+    def _requires_deterministic_empty_analytics_response(
+        result: ValidatedExecutionResult,
+    ) -> bool:
+        """Do not let an LLM reinterpret absent scoped records as a verified zero."""
+        analytics = result.analytics_summary
+        return bool(
+            analytics
+            and not analytics.rows
+            and analytics.included_event_count == 0
+            and analytics.excluded_unknown_count == 0
         )
 
     @classmethod
