@@ -574,6 +574,29 @@ def test_deterministic_parser_uses_a_snapshot_device_code_as_operational_scope()
 
 
 @pytest.mark.django_db
+def test_device_impact_query_with_related_event_wording_is_not_alarm_correlation():
+    snapshot = create_snapshot("deterministic-device-related-event")
+    from apps.operations.tests.test_operations_models import create_maltepe_bng
+
+    create_maltepe_bng(snapshot, code="AGG-ANK-002")
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "AGG-ANK-002 için ilişkili olayı, kesinti sınıfını ve doğrulanmış "
+            "müşteri/abonelik etkisini söyle. Müşteri etkisi bilinmiyorsa sıfır kabul etme; "
+            "hangi kanıta dayandığını da belirt."
+        ),
+        snapshot=snapshot,
+    )
+
+    assert parsed.structured_query.intent.value == "outage_impact"
+    assert parsed.structured_query.device_code == "AGG-ANK-002"
+    assert "correlation" not in {
+        requested_output.value for requested_output in parsed.structured_query.requested_outputs
+    }
+
+
+@pytest.mark.django_db
 def test_deterministic_parser_does_not_match_a_device_code_prefix():
     snapshot = create_snapshot("deterministic-device-prefix")
     from apps.operations.tests.test_operations_models import create_maltepe_bng

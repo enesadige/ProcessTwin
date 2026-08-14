@@ -723,8 +723,6 @@ class DeterministicStructuredQueryParser:
                 "korelasyon",
                 "ilişkili mi",
                 "iliskili mi",
-                "ilişkili",
-                "iliskili",
                 "ilişki var mı",
                 "iliski var mi",
                 "iliski var mı",

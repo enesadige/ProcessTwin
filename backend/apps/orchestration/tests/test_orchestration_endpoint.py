@@ -459,6 +459,9 @@ def test_intake_failure_never_reaches_executor(settings, monkeypatch):
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "query_parse_unavailable"
     assert executor.calls == 0
+    query_run = QueryRun.objects.get(idempotency_key="endpoint-intake-failure-001")
+    assert query_run.status == QueryRunStatus.FAILED
+    assert query_run.error_code == "query_parse_unavailable"
 
 
 @pytest.mark.django_db

@@ -201,6 +201,11 @@ class OrchestrationFacade:
                         query_run,
                         unknown_identifier_answer(normalized_request.original_query),
                     )
+                self._query_run_service.fail(
+                    query_run,
+                    error_code=exc.code,
+                    error_summary="Query intake could not produce a safe structured query.",
+                )
                 return self._error(
                     422 if exc.code in {"invalid_structured_query", "reference_not_found"} else 503,
                     exc.code,
