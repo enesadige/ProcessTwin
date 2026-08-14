@@ -402,6 +402,38 @@ def test_plan_and_save_records_only_successful_plan_and_keeps_run_planned():
 
 
 @pytest.mark.django_db
+def test_analytics_plan_keeps_persisted_embedding_provider_context():
+    service = QueryRunService()
+    snapshot = create_snapshot("planner-analytics-provider-context")
+    query = query_payload(
+        intent="operational_analytics",
+        requested_outputs=["summary", "analytics"],
+        snapshot_identifier=snapshot.snapshot_key,
+        causal_event_code=None,
+        analytics={
+            "metric": "outage_count",
+            "aggregation": "count",
+            "group_by": "district",
+            "direction": "desc",
+        },
+        embedding_provider="ollama",
+    )
+    run, _ = service.create_or_get(
+        data_snapshot=snapshot,
+        idempotency_key="planner-analytics-provider-context",
+        original_query="6 Haziran 2026 tarihinde Konak ilçesinde kaç kesinti yaşandı?",
+    )
+    service.save_structured_query(run, structured_query=query)
+
+    result = DeterministicToolPlanner().plan_and_save(run, query)
+
+    run.refresh_from_db()
+    assert result.status == PlannerResultStatus.PLANNED
+    assert run.structured_query["embedding_provider"] == "ollama"
+    assert run.planned_tools == result.tool_plan.to_planned_tools()
+
+
+@pytest.mark.django_db
 def test_clarification_does_not_change_a_planned_query_run():
     service = QueryRunService()
     snapshot = create_snapshot("planner-service-002")

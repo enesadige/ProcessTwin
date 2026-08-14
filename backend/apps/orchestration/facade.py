@@ -212,7 +212,15 @@ class OrchestrationFacade:
                     "Query intake could not produce a safe structured query.",
                     query_run=query_run,
                 )
-            structured_query = parsed.structured_query
+            structured_query = parsed.structured_query.model_copy(
+                update={
+                    "embedding_provider": (
+                        embedding_descriptor.provider
+                        if embedding_descriptor.provider in {"ollama", "gemini"}
+                        else None
+                    )
+                }
+            )
             parser_name = "deterministic"
             parser_version = parsed.prompt_version
             response_mode = ResponseGenerationMode.LLM_ASSISTED
