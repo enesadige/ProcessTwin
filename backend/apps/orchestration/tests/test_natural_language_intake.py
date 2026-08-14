@@ -458,6 +458,26 @@ def test_deterministic_parser_recognizes_folded_turkish_relation_question():
 
 
 @pytest.mark.django_db
+def test_two_explicit_events_with_causal_direction_use_correlation_plan():
+    snapshot = create_snapshot("two-event-causal-direction")
+    create_causal_event(snapshot, code="CE-XREG-0001")
+    create_causal_event(snapshot, code="CE-MCR-0023")
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "CE-XREG-0001 ile CE-MCR-0023 arasında hangisinin diğerine neden "
+            "olduğunu ve nedensel zincirin yönünü kesin olarak söyle."
+        ),
+        snapshot=snapshot,
+    )
+
+    query = parsed.structured_query
+    assert query.intent.value == "alarm_correlation"
+    assert query.causal_event_code == "CE-XREG-0001"
+    assert query.comparison_causal_event_code == "CE-MCR-0023"
+
+
+@pytest.mark.django_db
 def test_same_event_alarm_investigation_uses_causal_alarm_tools():
     snapshot = create_snapshot("same-event-alarm-investigation")
     create_causal_event(snapshot, code="CE-MCR-0023")

@@ -1411,6 +1411,29 @@ def test_free_text_narrative_rejects_backup_inference_from_zero_protected_count(
     assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
 
 
+@pytest.mark.parametrize(
+    "claim",
+    [
+        "Yedek cihaz arızalandığı için backup devreye girmedi.",
+        "Device Not Active sinyali dağıtım kablosu arızasından kaynaklandı.",
+        "Fiziksel kök neden kesin olarak belirlendi.",
+    ],
+)
+def test_free_text_narrative_rejects_indirect_physical_causality(claim):
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        claim,
+        {
+            "S1": "Failover ile korunan: 0 bağlantı.",
+            "S2": "Kök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi ayrıca doğrulanmadı.",
+            "S3": "Device Not Active için bu olayda doğrulanmış alarm kaydı yok.",
+        },
+        {},
+    )
+
+    assert narrative["sentences"] == []
+    assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
+
+
 def test_same_event_alarm_query_requires_root_and_symptom_evidence():
     statements = {
         "S1": "Kök neden alarmı: DISTRIBUTION_CABLE_DOWN.",

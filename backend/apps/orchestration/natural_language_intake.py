@@ -391,6 +391,26 @@ class DeterministicStructuredQueryParser:
             outage_code = self._outage_for_device(snapshot, device_code, dates=dates)
         location, ambiguous_location = self._resolve_location(snapshot, folded)
         intent, requested_outputs = self._intent_and_outputs(folded)
+        if comparison_causal_event_code and any(
+            term in folded
+            for term in (
+                "korelasyon",
+                "ilişki",
+                "ilisk",
+                "nedensel",
+                "neden-sonuç",
+                "neden sonuc",
+                "causal",
+                "zincirin yönü",
+                "zincirin yonu",
+            )
+        ):
+            intent = StructuredQueryIntent.ALARM_CORRELATION
+            requested_outputs = [
+                RequestedOutput.SUMMARY,
+                RequestedOutput.CORRELATION,
+                RequestedOutput.EVIDENCE,
+            ]
         if (
             intent == StructuredQueryIntent.ALARM_CORRELATION
             and causal_event_code

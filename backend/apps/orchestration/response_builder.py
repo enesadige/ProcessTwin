@@ -112,6 +112,18 @@ _NARRATIVE_FAILOVER_ZERO_INFERENCE_RE = re.compile(
     r"aktif değildi|aktif degildi)\b",
     re.IGNORECASE,
 )
+_NARRATIVE_BACKUP_FAILURE_RE = re.compile(
+    r"\b(?:yedek|backup)\b.*\b(?:cihaz\w*\s+)?(?:arızalan\w*|arizalan\w*|"
+    r"arızası|arizasi)\b",
+    re.IGNORECASE,
+)
+_NARRATIVE_UNSUPPORTED_PHYSICAL_CAUSALITY_RE = re.compile(
+    r"\bfiziksel\s+(?:kök\s+)?neden\b.*\b(?:belirlen\w*|doğrulan\w*|"
+    r"dogrulan\w*)\b|\b(?:device not active|cihaz(?:ın|in)?\s+aktif\s+olmama)\b"
+    r".*\b(?:kaynaklandı|kaynaklandi|oluşturdu|olusturdu)\b|"
+    r"\b(?:cihaz|device)\b.*\b(?:arızasından|arizasindan)\s+kaynaklandı\b",
+    re.IGNORECASE,
+)
 _NARRATIVE_FACT_TOKEN_RE = re.compile(
     r"(?:\b\d+(?:[.,]\d+)?\b|\b[A-Z][A-Z0-9_:-]{3,}\b|\b[A-Z][A-Z0-9]+(?:-[A-Z0-9]+)+\b)"
 )
@@ -2154,6 +2166,13 @@ class ValidatedResponseBuilder:
         if (
             "failover ile korunan: 0 bağlantı" in support_text
             and _NARRATIVE_FAILOVER_ZERO_INFERENCE_RE.search(text)
+        ):
+            return True
+        if "failover ile korunan:" in support_text and _NARRATIVE_BACKUP_FAILURE_RE.search(text):
+            return True
+        if _NARRATIVE_UNSUPPORTED_PHYSICAL_CAUSALITY_RE.search(text) and not any(
+            statement.startswith("Doğrulanmış ana kök neden:")
+            for statement in statements.values()
         ):
             return True
         if _NARRATIVE_UNSUPPORTED_NO_RELATION_RE.search(text):
