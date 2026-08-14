@@ -141,6 +141,7 @@ class AnalyticsSummary(BaseModel):
     time_grain: str | None = None
     comparison: bool = False
     filters: dict[str, Any] = Field(default_factory=dict)
+    scope_label: str | None = None
     rows: list[dict[str, Any]] = Field(default_factory=list)
     included_event_count: int
     excluded_unknown_count: int
@@ -764,7 +765,10 @@ class ResultMergerValidator:
             self._merge_sections(category_results)
         )
         analytics_items = [
-            extracted.analytics
+            {
+                **extracted.analytics,
+                "scope_label": self._analytics_scope_label(extracted.analytics),
+            }
             for extracted in category_results.get(EvidenceCategory.ANALYTICS, [])
             if extracted.analytics
         ]
@@ -780,7 +784,11 @@ class ResultMergerValidator:
             cross_incident_correlation_summary=(
                 CrossIncidentCorrelationSummary(**correlation) if correlation else None
             ),
-            analytics_summary=AnalyticsSummary(**analytics) if analytics else None,
+            analytics_summary=(
+                AnalyticsSummary(**analytics_items[0])
+                if analytics_items
+                else (AnalyticsSummary(**analytics) if analytics else None)
+            ),
             analytics_summaries=[AnalyticsSummary(**item) for item in analytics_items],
             impact_summary=ImpactSummary(**impact) if impact else None,
             rule_summary=RuleSummary(**rule) if rule else None,
@@ -794,6 +802,17 @@ class ResultMergerValidator:
         )
         result.result_fingerprint = self._fingerprint(result)
         return result
+
+    @staticmethod
+    def _analytics_scope_label(analytics: Mapping[str, Any]) -> str | None:
+        filters = _mapping(analytics.get("filters")) or {}
+        city = filters.get("city")
+        district = filters.get("district")
+        if isinstance(district, str) and district:
+            return district
+        if isinstance(city, str) and city:
+            return city
+        return None
 
     def finalize_query_run(
         self, query_run: QueryRun, validated_result: ValidatedExecutionResult

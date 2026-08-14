@@ -883,7 +883,7 @@ def test_grouped_month_comparison_preserves_alarm_type_and_explicit_limit():
     ).structured_query
 
     assert query.analytics is not None
-    assert query.analytics.group_by == "root_alarm_type"
+    assert query.analytics.group_by == "alarm_type"
     assert query.analytics.comparison is True
     assert query.analytics.time_grain == "month"
     assert query.analytics.limit == 5
@@ -950,7 +950,7 @@ def test_analytics_city_month_alarm_type_scope_survives_deterministic_intake():
     assert query.time_window is not None
     assert query.analytics is not None
     assert query.analytics.aggregation == "sum"
-    assert query.analytics.group_by == "root_alarm_type"
+    assert query.analytics.group_by == "alarm_type"
     assert query.analytics.limit == 3
 
     plan = DeterministicToolPlanner().plan(query)
@@ -959,7 +959,7 @@ def test_analytics_city_month_alarm_type_scope_survives_deterministic_intake():
         "snapshot_identifier": snapshot.snapshot_key,
         "metric": "affected_customers",
         "aggregation": "sum",
-        "group_by": "root_alarm_type",
+        "group_by": "alarm_type",
         "direction": "desc",
         "limit": 3,
         "from_time": query.time_window.from_time.isoformat().replace("+00:00", "Z"),

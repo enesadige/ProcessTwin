@@ -170,7 +170,7 @@ class AnalyzeOperationalAnalyticsInput(SnapshotRequiredInput):
     aggregation: str = Field(pattern="^(count|sum|average|min|max)$")
     group_by: str | None = Field(
         default=None,
-        pattern="^(event|root_alarm_type|city|district|device_type|event_type|full_outage_status|failover_status|time_bucket)$",
+        pattern="^(event|alarm_type|root_alarm_type|city|district|device_type|event_type|full_outage_status|failover_status|time_bucket)$",
     )
     direction: str = Field(default="desc", pattern="^(asc|desc)$")
     limit: int | None = Field(default=None, ge=1, le=100)

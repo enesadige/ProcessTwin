@@ -112,7 +112,9 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
         ? ` (dahil: ${row.included_event_count}, hariç: ${row.excluded_unknown_count})`
         : ''
       const primaryValue = periods || `${row.value}${rowEvidence}`
-      analyticsCards.push(<FactCard key={`analytics-${summaryIndex}-${index}-${row.label}`} label={`${metricLabelsForTitle(summary.metric)}: ${index + 1}. ${row.label}`} value={[primaryValue, change].filter(Boolean).join(' | ')} />)
+      const rowLabel = row.label === 'Toplam' ? (summary.scope_label ?? 'Toplam') : row.label
+      const prefix = row.label === 'Toplam' ? metricLabelsForTitle(summary.metric) : `${metricLabelsForTitle(summary.metric)}: ${index + 1}. ${rowLabel}`
+      analyticsCards.push(<FactCard key={`analytics-${summaryIndex}-${index}-${row.label}`} label={prefix} value={[primaryValue, change].filter(Boolean).join(' | ')} />)
     }))
     analyticsSummaries.forEach((summary, index) => {
       if (summary.metric === 'affected_customers' || summary.metric === 'affected_subscriptions') {

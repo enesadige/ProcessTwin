@@ -201,6 +201,7 @@ class AnalyticsSpecification(BaseModel):
     group_by: (
         Literal[
             "event",
+            "alarm_type",
             "root_alarm_type",
             "city",
             "district",

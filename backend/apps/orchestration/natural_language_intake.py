@@ -1027,7 +1027,7 @@ class DeterministicStructuredQueryParser:
         # when the user explicitly requests a breakdown or ranking by it.
         groups = (
             (
-                "root_alarm_type",
+                "alarm_type",
                 (
                     "alarm tipi",
                     "alarm tiplerine",
@@ -1237,11 +1237,7 @@ class DeterministicStructuredQueryParser:
         for metric in metrics:
             # "tam hizmet kesintisi sayısı" is a metric, not a filter on all
             # other requested metrics in the same sentence.
-            full_outage = (
-                primary.full_outage
-                if metric not in {"full_outage_count", "outage_count", "alarm_count"}
-                else None
-            )
+            full_outage = None if "full_outage_count" in metrics else primary.full_outage
             specs.append(
                 primary.model_copy(
                     update={
@@ -1254,6 +1250,20 @@ class DeterministicStructuredQueryParser:
                         "full_outage": full_outage,
                     }
                 )
+            )
+        # A requested breakdown does not replace its explicitly requested total.
+        # Keep both backend projections so no presentation layer has to add rows.
+        if primary.group_by == "alarm_type" and "toplam" in folded:
+            specs.insert(
+                0,
+                primary.model_copy(
+                    update={
+                        "metric": "alarm_count",
+                        "aggregation": "count",
+                        "group_by": None,
+                        "time_grain": None,
+                    }
+                ),
             )
         return specs
 

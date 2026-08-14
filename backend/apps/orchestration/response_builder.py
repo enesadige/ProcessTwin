@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections.abc import Mapping
+from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
@@ -299,10 +300,6 @@ class ValidatedResponseBuilder:
             validation_status=result.validation_status,
             structured_result=self._public_structured_result(result),
         )
-        # Compound analytics facts are already complete and deterministic. Do
-        # not ask a narrative provider to choose or omit one of the metrics.
-        if len(result.analytics_summaries) > 1:
-            return response
         if requested_mode == ResponseGenerationMode.DETERMINISTIC:
             return response
 
@@ -873,7 +870,12 @@ class ValidatedResponseBuilder:
                 "full_outage_count": "Tam hizmet kesintisi sayısı",
             }
             for analytics in result.analytics_summaries:
-                value = ", ".join(f"{row['label']}: {row['value']}" for row in analytics.rows)
+                value = ", ".join(
+                    f"{analytics.scope_label or row['label']}: {row['value']}"
+                    if row["label"] == "Toplam"
+                    else f"{row['label']}: {row['value']}"
+                    for row in analytics.rows
+                )
                 label = labels.get(analytics.metric, analytics.metric)
                 sections.append(f"{label}: {value or 'Eşleşen kayıt yok'}.")
                 if analytics.metric in {"affected_customers", "affected_subscriptions"}:
@@ -882,8 +884,10 @@ class ValidatedResponseBuilder:
                         f"{analytics.excluded_unknown_count} bilinmeyen etki nedeniyle hariç."
                     )
             return "\n".join(sections)
-        analytics = result.analytics_summary
-        if analytics:
+        analytics_summaries = result.analytics_summaries or (
+            [result.analytics_summary] if result.analytics_summary else []
+        )
+        for analytics in analytics_summaries:
             metric_labels = {
                 "affected_customers": "doğrulanmış müşteri etkisi",
                 "affected_subscriptions": "doğrulanmış abonelik etkisi",
@@ -892,10 +896,11 @@ class ValidatedResponseBuilder:
                 "failed_failover_count": "başarısız failover olayı",
                 "outage_count": "kesinti",
                 "event_count": "olay",
-                "alarm_count": "kök alarm",
+                "alarm_count": "alarm",
             }
             group_labels = {
-                "root_alarm_type": "Alarm tipi",
+                "alarm_type": "Alarm tipi",
+                "root_alarm_type": "Kök alarm tipi",
                 "city": "Şehir",
                 "district": "İlçe",
                 "event": "Olay",
@@ -1203,7 +1208,7 @@ class ValidatedResponseBuilder:
                 "failed_failover_count": "başarısız failover olayı",
                 "outage_count": "kesinti",
                 "event_count": "olay",
-                "alarm_count": "kök alarm",
+                "alarm_count": "alarm",
             }
             for index, row in enumerate(analytics.rows, 1):
                 periods = row.get("period_values")
@@ -1244,8 +1249,13 @@ class ValidatedResponseBuilder:
                             f" ({row['included_event_count']} dahil, "
                             f"{row['excluded_unknown_count']} hariç)"
                         )
+                    row_label = (
+                        analytics.scope_label or row["label"]
+                        if row["label"] == "Toplam"
+                        else row["label"]
+                    )
                     add(
-                        f"{index}. {row['label']}: {row['value']} "
+                        f"{index}. {row_label}: {row['value']} "
                         f"{metric_labels.get(analytics.metric, analytics.metric)}"
                         f"{period_evidence}."
                     )
@@ -1308,6 +1318,47 @@ class ValidatedResponseBuilder:
                     f"{analytics.excluded_unknown_count} olay, doğrulanmış etki kanıtı olmadığı "
                     "için hesaplamaya dahil edilmedi."
                 )
+
+        # Each completed analytics call remains a separate canonical fact.  The
+        # primary summary above is preserved for compatibility; expose every
+        # sibling scope/metric to the closed-world narrative contract as well.
+        for extra in result.analytics_summaries[1:]:
+            metric_labels = {
+                "affected_customers": "doğrulanmış müşteri etkisi",
+                "affected_subscriptions": "doğrulanmış abonelik etkisi",
+                "full_outage_count": "tam hizmet kesintisi",
+                "outage_count": "kesinti",
+                "alarm_count": "alarm",
+            }
+            for row in extra.rows:
+                label = extra.scope_label if row.get("label") == "Toplam" else row.get("label")
+                add(
+                    f"{label or 'Toplam'}: {row.get('value')} "
+                    f"{metric_labels.get(extra.metric, extra.metric)}."
+                )
+            if extra.metric in {"affected_customers", "affected_subscriptions"}:
+                scope = extra.scope_label or "Bu kapsam"
+                add(
+                    f"{scope} için {extra.included_event_count} olay dahil, "
+                    f"{extra.excluded_unknown_count} olay doğrulanmış etki kanıtı olmadığı "
+                    "için hariç."
+                )
+
+        scoped_by_metric: dict[str, list[AnalyticsSummary]] = {}
+        for item in result.analytics_summaries:
+            if item.scope_label and len(item.rows) == 1 and item.rows[0].get("label") == "Toplam":
+                scoped_by_metric.setdefault(item.metric, []).append(item)
+        for metric, items in scoped_by_metric.items():
+            if len(items) < 2:
+                continue
+            highest = max(
+                items,
+                key=lambda item: (Decimal(str(item.rows[0]["value"])), item.scope_label or ""),
+            )
+            add(
+                f"{metric} açısından en yüksek değer: {highest.scope_label}, "
+                f"{highest.rows[0]['value']}."
+            )
 
         causal = result.causal_summary
         if causal:

@@ -39,6 +39,7 @@ _METRICS = {
 _AGGREGATIONS = {"count", "sum", "average", "min", "max"}
 _GROUPS = {
     "event",
+    "alarm_type",
     "root_alarm_type",
     "city",
     "district",
@@ -107,6 +108,8 @@ class OperationalAnalyticsService:
         records = [self._record(event) for event in self._events(snapshot, spec)]
         records = [record for record in records if self._matches(record, spec)]
         eligible, excluded_unknown = self._eligible(records, spec.metric)
+        if spec.metric == "alarm_count" and spec.group_by == "alarm_type":
+            return self._alarm_type_rows(records, spec)
         if spec.comparison and spec.group_by not in {None, "time_bucket"}:
             return self._grouped_comparison(
                 records=records,
@@ -143,6 +146,44 @@ class OperationalAnalyticsService:
             "included_event_count": len(eligible),
             "excluded_unknown_count": excluded_unknown,
             "deduplication_grain": "causal_event",
+        }
+
+    def _alarm_type_rows(
+        self, records: list[dict[str, Any]], spec: AnalyticsSpec
+    ) -> dict[str, Any]:
+        """Count persisted alarm occurrences, not event-level root representatives."""
+        occurrences: dict[str, list[str]] = defaultdict(list)
+        for record in records:
+            for alarm_type in record["alarm_types"]:
+                occurrences[alarm_type].append(record["event_code"])
+        rows = [
+            {
+                "label": alarm_type,
+                "value": len(event_codes),
+                "event_count": len(set(event_codes)),
+            }
+            for alarm_type, event_codes in occurrences.items()
+        ]
+        rows.sort(
+            key=lambda row: (Decimal(str(row["value"])), row["label"]),
+            reverse=spec.direction == "desc",
+        )
+        if spec.limit:
+            rows = rows[: spec.limit]
+        return {
+            "analysis_type": "operational_analytics",
+            "metric": spec.metric,
+            "aggregation": spec.aggregation,
+            "group_by": spec.group_by,
+            "filters": self._filters(spec),
+            "time_grain": spec.time_grain,
+            "comparison": spec.comparison,
+            "ranking_direction": spec.direction,
+            "limit": spec.limit,
+            "rows": rows,
+            "included_event_count": len(records),
+            "excluded_unknown_count": 0,
+            "deduplication_grain": "alarm_occurrence",
         }
 
     def _grouped_comparison(
@@ -337,6 +378,7 @@ class OperationalAnalyticsService:
             else None,
             "device_type": root_device.device_type if root_device else None,
             "root_alarm_type": root_alarm.alarm_type.code if root_alarm else None,
+            "alarm_types": [alarm.alarm_type.code for alarm in alarms],
             "known_impact": known_impact,
             "affected_customers": len(customers),
             "affected_subscriptions": len(subscriptions),

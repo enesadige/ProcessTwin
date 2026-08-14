@@ -1208,6 +1208,41 @@ def test_analytics_included_event_count_is_first_class_verified_support():
     assert "Hesaba dahil edilen olay sayısı: 5." in contract["statements"].values()
 
 
+def test_compositional_analytics_contract_keeps_scope_and_total_projections():
+    total_alarm = AnalyticsSummary(
+        metric="alarm_count",
+        aggregation="count",
+        ranking_direction="desc",
+        filters={"city": "Ankara", "district": "Çankaya"},
+        scope_label="Çankaya",
+        rows=[{"label": "Toplam", "value": 11, "event_count": 2}],
+        included_event_count=2,
+        excluded_unknown_count=0,
+        deduplication_grain="causal_event",
+    )
+    breakdown = total_alarm.model_copy(
+        update={
+            "group_by": "alarm_type",
+            "rows": [
+                {"label": "UPLINK_DOWN", "value": 6, "event_count": 1},
+                {"label": "ACCESS_NODE_UNREACHABLE", "value": 5, "event_count": 1},
+            ],
+            "deduplication_grain": "alarm_occurrence",
+        }
+    )
+    result = valid_result("response-compositional-contract").model_copy(
+        update={"analytics_summary": total_alarm, "analytics_summaries": [total_alarm, breakdown]}
+    )
+
+    deterministic = ValidatedResponseBuilder._render_deterministic(result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(result)
+
+    assert "Alarm sayısı: Çankaya: 11." in deterministic
+    assert "UPLINK_DOWN: 6" in deterministic
+    assert any("Çankaya: 11 alarm." in statement for statement in contract["statements"].values())
+    assert any("UPLINK_DOWN: 6 alarm." in statement for statement in contract["statements"].values())
+
+
 def test_global_comparison_contract_has_period_specific_evidence_counts():
     result = valid_result("response-global-comparison-period-counts").model_copy(
         update={

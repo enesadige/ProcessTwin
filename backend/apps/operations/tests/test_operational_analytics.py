@@ -118,6 +118,50 @@ def test_outage_count_sums_persisted_outages_instead_of_counting_events():
 
 
 @pytest.mark.django_db
+def test_alarm_type_grouping_counts_all_persisted_alarm_occurrences():
+    snapshot = create_snapshot("analytics-alarm-occurrences")
+    root, _, _, _, _ = create_access_line(snapshot)
+    started = timezone.now() - timedelta(hours=1)
+    event = CausalEvent.objects.create(
+        data_snapshot=snapshot,
+        event_code="CE-ANALYTICS-ALARM-001",
+        event_type=CausalEventType.DEVICE_FAILURE,
+        status=CausalEventStatus.RESOLVED,
+        started_at=started,
+        ended_at=started + timedelta(minutes=5),
+        source_system="test",
+        origin=EventOrigin.SYNTHETIC,
+        root_device=root,
+    )
+    alarm_types = {
+        code: create_alarm_type(snapshot, code=code) for code in ("ROOT_A", "SYMPTOM_B")
+    }
+    for index, code in enumerate(("ROOT_A", "SYMPTOM_B", "SYMPTOM_B"), 1):
+        Alarm.objects.create(
+            data_snapshot=snapshot,
+            causal_event=event,
+            alarm_id=f"ALM-ANALYTICS-OCC-{index}",
+            alarm_type=alarm_types[code],
+            device=root,
+            severity=Severity.MAJOR,
+            status=AlarmStatus.CLEARED,
+            detected_at=started,
+            cleared_at=started + timedelta(minutes=5),
+        )
+
+    result = OperationalAnalyticsService().analyze(
+        snapshot=snapshot,
+        spec=AnalyticsSpec(metric="alarm_count", aggregation="count", group_by="alarm_type"),
+    )
+
+    assert result["deduplication_grain"] == "alarm_occurrence"
+    assert {(row["label"], row["value"]) for row in result["rows"]} == {
+        ("ROOT_A", 1),
+        ("SYMPTOM_B", 2),
+    }
+
+
+@pytest.mark.django_db
 def test_failed_failover_alarm_filter_preserves_unknown_impact_exclusion():
     snapshot = create_snapshot("analytics-failed-failover-unknown")
     root, _, _, _, _ = create_access_line(snapshot)
