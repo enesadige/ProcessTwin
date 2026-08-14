@@ -548,3 +548,17 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   olarak yorumlanmaz.
 - Snapshot 74 verisi, RAG, provider konfigürasyonu ve activation seçimi bu
   düzeltmede değiştirilmedi. Sonraki görev hâlâ `MAIN-066`dır.
+
+## V3 / AI Analysis Final Acceptance (2026-08-14)
+
+- Snapshot `74` aktif production candidate; snapshot `54` rollback ve `73`
+  original candidate olarak korunur.
+- Trend/ranking, specific operational investigation ve same-event alarm
+  correlation kabulü geçti. Evidence-limit ve `unknown != 0` sözleşmesi korunur.
+- Forecast, remediation, cihaz komutu, saha prosedürü ve parça değişimi gibi
+  desteklenmeyen istekler provider/tool çağrısı olmadan deterministic
+  unsupported sonucu verir; supported event/impact/correlation sorguları bu
+  filtreden etkilenmez. Unsupported ekranda mevcut "Soruyu düzenle" aksiyonu
+  gösterilir.
+- Son güvenlik commitleri: `460eac9` ve `9d7dbca`. Küçük provider anlatım üslubu
+  kusurları blocker değildir. Sonraki görev `MAIN-066`: topoloji özet görünümü.

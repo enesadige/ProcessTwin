@@ -228,3 +228,13 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   korunur.
 - Canonical analytics `included_event_count` AnswerPlan'a eklendi. Snapshot 74,
   RAG, provider ve activation mekanizması değiştirilmedi.
+
+## 2026-08-14 — V3 / AI Analysis final acceptance
+
+- Active snapshot `74` ile trend/ranking, specific operational investigation,
+  alarm correlation, evidence-limit ve unknown-exclusion kabulü tamamlandı.
+- Forecast ve remediation/command/field-procedure talepleri generic deterministic
+  unsupported contract'a alındı; desteklenen event/impact/correlation yolları
+  korunur. Son commit: `9d7dbca`.
+- Sonraki görev `MAIN-066`: BNG'den alt cihazlara ve müşteri etkisine uzanan
+  topoloji özet görünümü; bu kayıtta başlatılmadı.
