@@ -970,6 +970,7 @@ def analyze_operational_analytics(request):
             direction=request.GET.get("direction", "desc"),
             limit=_parse_limit(request) if request.GET.get("limit") else None,
             time_grain=request.GET.get("time_grain") or None,
+            comparison=optional_bool("comparison") is True,
             from_time=_parse_dt(request.GET.get("from_time"), field_name="from_time"),
             to_time=_parse_dt(request.GET.get("to_time"), field_name="to_time"),
             city=request.GET.get("city") or None,

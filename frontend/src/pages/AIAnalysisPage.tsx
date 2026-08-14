@@ -99,7 +99,11 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
   }
   const analyticsCards: ReactNode[] = []
   if (analytics) {
-    analytics.rows.forEach((row, index) => analyticsCards.push(<FactCard key={`analytics-${index}-${row.label}`} label={`${index + 1}. ${row.label}`} value={row.value} />))
+    analytics.rows.forEach((row, index) => {
+      const periods = row.period_values?.map((period) => `${period.label}: ${period.value}`).join(' | ')
+      const change = row.absolute_change !== undefined ? `Fark: ${row.absolute_change}` : ''
+      analyticsCards.push(<FactCard key={`analytics-${index}-${row.label}`} label={`${index + 1}. ${row.label}`} value={[periods, change].filter(Boolean).join(' | ') || row.value} />)
+    })
     analyticsCards.push(<FactCard key="analytics-included" label="Hesaba dahil edilen olay" value={analytics.included_event_count} />)
     if (analytics.excluded_unknown_count) analyticsCards.push(<FactCard key="analytics-excluded" label="Bilinmeyen etki nedeniyle hariç" value={analytics.excluded_unknown_count} tone="warning" />)
   }

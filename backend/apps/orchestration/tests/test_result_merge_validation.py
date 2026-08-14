@@ -513,6 +513,42 @@ def test_analytics_normalizer_preserves_rows_and_unknown_exclusion_count():
     assert extracted.analytics["excluded_unknown_count"] == 1
 
 
+def test_analytics_normalizer_preserves_grouped_comparison_period_values():
+    extracted = _operational_analytics(
+        {
+            "metric": "affected_customers",
+            "aggregation": "sum",
+            "group_by": "city",
+            "comparison": True,
+            "ranking_direction": "desc",
+            "time_grain": "month",
+            "filters": {},
+            "rows": [
+                {
+                    "label": "İzmir",
+                    "value": -10,
+                    "event_count": 3,
+                    "absolute_change": -10,
+                    "trend_direction": "decrease",
+                    "period_values": [
+                        {"label": "2026-06", "value": 30, "event_count": 2},
+                        {"label": "2026-07", "value": 20, "event_count": 1},
+                    ],
+                    "included_event_count": 3,
+                    "excluded_unknown_count": 1,
+                }
+            ],
+            "included_event_count": 3,
+            "excluded_unknown_count": 1,
+            "deduplication_grain": "causal_event",
+        }
+    )
+
+    assert extracted.analytics["comparison"] is True
+    assert extracted.analytics["rows"][0]["period_values"][1]["value"] == 20
+    assert extracted.analytics["rows"][0]["excluded_unknown_count"] == 1
+
+
 def test_ranked_analytics_mapping_rows_keep_backend_order_through_merge():
     extracted = _operational_analytics(
         {

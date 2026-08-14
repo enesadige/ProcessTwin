@@ -683,6 +683,44 @@ def test_explicit_two_month_analytics_comparison_requires_no_operational_anchor(
 
 
 @pytest.mark.django_db
+def test_grouped_month_comparison_preserves_city_dimension():
+    snapshot = create_snapshot("analytics-city-month-comparison")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "Haziran 2026'dan Temmuz 2026'ya doğrulanmış müşteri etkisindeki "
+            "değişime göre şehirleri sırala."
+        ),
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.analytics is not None
+    assert query.analytics.group_by == "city"
+    assert query.analytics.comparison is True
+    assert query.analytics.time_grain == "month"
+    assert query.analytics.limit is None
+
+
+@pytest.mark.django_db
+def test_grouped_month_comparison_preserves_alarm_type_and_explicit_limit():
+    snapshot = create_snapshot("analytics-alarm-month-comparison")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "Haziran 2026 ile Temmuz 2026 arasında doğrulanmış müşteri etkisi "
+            "en fazla değişen ilk 5 alarm tipini sırala."
+        ),
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.analytics is not None
+    assert query.analytics.group_by == "root_alarm_type"
+    assert query.analytics.comparison is True
+    assert query.analytics.time_grain == "month"
+    assert query.analytics.limit == 5
+
+
+@pytest.mark.django_db
 def test_explicit_multi_month_analytics_trend_requires_no_operational_anchor():
     snapshot = create_snapshot("analytics-multi-month-trend")
 

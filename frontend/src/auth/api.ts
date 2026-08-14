@@ -114,8 +114,9 @@ export type AnalyticsSummary = {
   ranking_direction: string
   limit?: number
   time_grain?: string
+  comparison?: boolean
   filters?: Record<string, unknown>
-  rows: Array<{ label: string; value: string | number; event_count: number; trend_direction?: string; absolute_change?: string | number }>
+  rows: Array<{ label: string; value: string | number; event_count: number; trend_direction?: string; absolute_change?: string | number; period_values?: Array<{ label: string; value: string | number; event_count: number }>; included_event_count?: number; excluded_unknown_count?: number }>
   included_event_count: number
   excluded_unknown_count: number
   deduplication_grain: string

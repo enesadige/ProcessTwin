@@ -139,6 +139,7 @@ class AnalyticsSummary(BaseModel):
     ranking_direction: str
     limit: int | None = None
     time_grain: str | None = None
+    comparison: bool = False
     filters: dict[str, Any] = Field(default_factory=dict)
     rows: list[dict[str, Any]] = Field(default_factory=list)
     included_event_count: int
@@ -595,6 +596,25 @@ def _operational_analytics(data: Mapping[str, Any]) -> _ExtractedToolResult:
             if not isinstance(change, (int, float, str)) or isinstance(change, bool):
                 raise ValueError("analytics absolute change is invalid")
             normalized["absolute_change"] = change
+        period_values = row.get("period_values")
+        if period_values is not None:
+            if not isinstance(period_values, list) or not all(
+                isinstance(item, Mapping) for item in period_values
+            ):
+                raise ValueError("analytics period values are invalid")
+            normalized["period_values"] = [
+                {
+                    "label": _string(item.get("label"), "analytics period label", required=True),
+                    "value": item.get("value"),
+                    "event_count": _non_negative_int(
+                        item.get("event_count"), "analytics period event_count"
+                    ),
+                }
+                for item in period_values
+            ]
+        for field in ("included_event_count", "excluded_unknown_count"):
+            if row.get(field) is not None:
+                normalized[field] = _non_negative_int(row.get(field), f"analytics row {field}")
         normalized_rows.append(normalized)
     filters = data.get("filters", {})
     if not isinstance(filters, Mapping):
@@ -608,6 +628,7 @@ def _operational_analytics(data: Mapping[str, Any]) -> _ExtractedToolResult:
             "ranking_direction": direction,
             "limit": _optional_non_negative(data, "limit"),
             "time_grain": _string(data.get("time_grain"), "time_grain"),
+            "comparison": bool(data.get("comparison", False)),
             "filters": dict(filters),
             "rows": normalized_rows,
             "included_event_count": _non_negative_int(

@@ -66,6 +66,7 @@ class AnalyticsSpec:
     direction: str = "desc"
     limit: int | None = None
     time_grain: str | None = None
+    comparison: bool = False
     from_time: datetime | None = None
     to_time: datetime | None = None
     city: str | None = None
@@ -106,6 +107,13 @@ class OperationalAnalyticsService:
         records = [self._record(event) for event in self._events(snapshot, spec)]
         records = [record for record in records if self._matches(record, spec)]
         eligible, excluded_unknown = self._eligible(records, spec.metric)
+        if spec.comparison and spec.group_by not in {None, "time_bucket"}:
+            return self._grouped_comparison(
+                records=records,
+                eligible=eligible,
+                excluded_unknown=excluded_unknown,
+                spec=spec,
+            )
         grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for record in eligible:
             grouped[self._group_label(record, spec)].append(record)
@@ -127,6 +135,74 @@ class OperationalAnalyticsService:
             "group_by": spec.group_by,
             "filters": self._filters(spec),
             "time_grain": spec.time_grain,
+            "comparison": spec.comparison,
+            "ranking_direction": spec.direction,
+            "limit": spec.limit,
+            "rows": rows,
+            "included_event_count": len(eligible),
+            "excluded_unknown_count": excluded_unknown,
+            "deduplication_grain": "causal_event",
+        }
+
+    def _grouped_comparison(
+        self,
+        *,
+        records: list[dict[str, Any]],
+        eligible: list[dict[str, Any]],
+        excluded_unknown: int,
+        spec: AnalyticsSpec,
+    ) -> dict[str, Any]:
+        """Compare deterministic time buckets inside each requested dimension."""
+        all_by_group: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        eligible_by_group: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for record in records:
+            all_by_group[self._group_label(record, spec)].append(record)
+        for record in eligible:
+            eligible_by_group[self._group_label(record, spec)].append(record)
+
+        rows: list[dict[str, Any]] = []
+        for label, group_records in eligible_by_group.items():
+            buckets: dict[str, list[dict[str, Any]]] = defaultdict(list)
+            for record in group_records:
+                buckets[self._time_bucket_label(record, spec.time_grain)].append(record)
+            periods = [
+                self._row(period_label, values, spec)
+                for period_label, values in sorted(buckets.items())
+            ]
+            self._add_period_changes(periods)
+            comparison = periods[-1] if len(periods) > 1 else None
+            difference = comparison.get("absolute_change") if comparison else None
+            rows.append(
+                {
+                    "label": label,
+                    "value": difference if difference is not None else periods[-1]["value"],
+                    "event_count": len(group_records),
+                    "period_values": periods,
+                    "absolute_change": difference,
+                    "trend_direction": (
+                        comparison.get("trend_direction") if comparison else "unchanged"
+                    ),
+                    "included_event_count": len(group_records),
+                    "excluded_unknown_count": len(all_by_group[label]) - len(group_records),
+                }
+            )
+        rows.sort(
+            key=lambda row: (
+                abs(Decimal(str(row["absolute_change"] or 0))),
+                row["label"],
+            ),
+            reverse=spec.direction == "desc",
+        )
+        if spec.limit:
+            rows = rows[: spec.limit]
+        return {
+            "analysis_type": "operational_analytics",
+            "metric": spec.metric,
+            "aggregation": spec.aggregation,
+            "group_by": spec.group_by,
+            "filters": self._filters(spec),
+            "time_grain": spec.time_grain,
+            "comparison": True,
             "ranking_direction": spec.direction,
             "limit": spec.limit,
             "rows": rows,
@@ -284,6 +360,15 @@ class OperationalAnalyticsService:
             value = record.get(field)
             return str(value) if value is not None else "Bilinmiyor"
         return "Toplam"
+
+    @staticmethod
+    def _time_bucket_label(record: dict[str, Any], time_grain: str | None) -> str:
+        value = record["started_at"]
+        if time_grain == "month":
+            return value.strftime("%Y-%m")
+        if time_grain == "week":
+            return value.strftime("%G-W%V")
+        return value.date().isoformat()
 
     @staticmethod
     def _row(label: str, values: list[dict[str, Any]], spec: AnalyticsSpec) -> dict[str, Any]:

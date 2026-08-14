@@ -442,6 +442,8 @@ class ValidatedResponseBuilder:
             requested_roles.add("analytics_comparison")
         if any(term in query for term in ("hariç", "haric", "dışında", "disinda")):
             requested_roles.add("unknown_exclusion")
+        if any(term in query for term in ("hesaba dahil", "dahil edilen")):
+            requested_roles.add("analytics_included_count")
 
         text = narrative
         fill_count = 0
@@ -452,6 +454,19 @@ class ValidatedResponseBuilder:
                 if role in set(statement_concepts.get(statement_id, []))
             ]
             if not candidates:
+                continue
+            if role == "analytics_comparison":
+                missing = [
+                    statement_text
+                    for _, statement_text in candidates
+                    if not all(
+                        token.casefold() in text.casefold()
+                        for token in _NARRATIVE_FACT_TOKEN_RE.findall(statement_text)
+                    )
+                ]
+                if missing:
+                    text = f"{text.rstrip()} {' '.join(missing)}"
+                    fill_count += len(missing)
                 continue
             supported_tokens = {
                 token.casefold()
@@ -488,6 +503,19 @@ class ValidatedResponseBuilder:
                 or (
                     role == "correlation_temporal_evidence"
                     and any(token in lower_text for token in supported_tokens)
+                )
+                or (
+                    role == "analytics_included_count"
+                    and any(token in lower_text for token in supported_tokens)
+                )
+                or (
+                    role == "unknown_exclusion"
+                    and "olay" in lower_text
+                    and "doğrulanmış etki" in lower_text
+                    and any(
+                        phrase in lower_text
+                        for phrase in ("hariç", "dahil edilme", "çıkarıldı")
+                    )
                 )
                 or (combined_candidate_text and combined_candidate_text in lower_text)
             )
@@ -539,6 +567,7 @@ class ValidatedResponseBuilder:
             "physical_root_cause",
             "root_resource",
             "analytics_comparison",
+            "analytics_included_count",
             "unknown_exclusion",
         }
         relevant_roles = set()
@@ -566,6 +595,7 @@ class ValidatedResponseBuilder:
             relevant_roles |= {
                 "verified_customer_impact",
                 "analytics_comparison",
+                "analytics_included_count",
                 "unknown_exclusion",
             }
         if requested & {"root_cause"} or dimensions & {
@@ -1053,10 +1083,29 @@ class ValidatedResponseBuilder:
                 "alarm_count": "kök alarm",
             }
             for index, row in enumerate(analytics.rows, 1):
-                add(
-                    f"{index}. {row['label']}: {row['value']} "
-                    f"{metric_labels.get(analytics.metric, analytics.metric)}."
-                )
+                periods = row.get("period_values")
+                if isinstance(periods, list) and periods:
+                    direction_labels = {
+                        "increase": "artış",
+                        "decrease": "azalış",
+                        "unchanged": "değişmedi",
+                    }
+                    add(
+                        f"{index}. {row['label']}: "
+                        + ", ".join(
+                            f"{period['label']} {period['value']}" for period in periods
+                        )
+                        + f"; mutlak değişim {row.get('absolute_change')}; yön "
+                        + direction_labels.get(
+                            str(row.get("trend_direction")), str(row.get("trend_direction"))
+                        )
+                        + "."
+                    )
+                else:
+                    add(
+                        f"{index}. {row['label']}: {row['value']} "
+                        f"{metric_labels.get(analytics.metric, analytics.metric)}."
+                    )
             comparison_row = next(
                 (row for row in reversed(analytics.rows) if row.get("absolute_change") is not None),
                 None,
@@ -1082,6 +1131,7 @@ class ValidatedResponseBuilder:
             if analytics.filters.get("failed_failover") is True:
                 add("Başarısız failover filtresi uygulandı.")
             if analytics.metric in {"affected_customers", "affected_subscriptions"}:
+                add(f"Hesaba dahil edilen olay sayısı: {analytics.included_event_count}.")
                 add(
                     f"{analytics.excluded_unknown_count} olay, doğrulanmış etki kanıtı olmadığı "
                     "için hesaplamaya dahil edilmedi."
@@ -1452,7 +1502,8 @@ class ValidatedResponseBuilder:
                 ("Karşılaştırılan olaylar", "operasyonel ilişki", "topoloji ilişkisi"),
             ),
             ("correlation_temporal_evidence", ("Zaman farkı:",)),
-            ("analytics_comparison", ("Dönem karşılaştırması:",)),
+            ("analytics_comparison", ("Dönem karşılaştırması:", "mutlak değişim")),
+            ("analytics_included_count", ("Hesaba dahil edilen olay sayısı:",)),
             ("unknown_exclusion", ("hesaplamaya dahil edilmedi",)),
             ("evidence", ("Kaynaklar", "Belge içeriği", "DecisionEvidence", "RuleVersion")),
         )

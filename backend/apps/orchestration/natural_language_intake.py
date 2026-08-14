@@ -962,7 +962,10 @@ class DeterministicStructuredQueryParser:
             r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s+\d{4}\b", folded
         )
         named_months = re.findall(r"\b(" + "|".join(_TURKISH_MONTHS) + r")\b", folded)
-        if len(month_mentions) > 1 or len(set(named_months)) > 1:
+        comparison = len(month_mentions) > 1 or len(set(named_months)) > 1
+        if comparison and group_by == "event" and not explicit_event_group:
+            group_by = None
+        if comparison and group_by is None:
             group_by = "time_bucket"
         grain = (
             "month"
@@ -1016,6 +1019,7 @@ class DeterministicStructuredQueryParser:
             aggregation=aggregation,
             group_by=group_by,
             time_grain=grain,
+            comparison=comparison,
             limit=limit,
             direction="asc"
             if any(term in folded for term in ("en az", "en düşük", "en dusuk"))

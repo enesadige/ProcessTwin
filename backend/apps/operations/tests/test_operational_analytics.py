@@ -241,3 +241,67 @@ def test_city_and_month_filters_apply_as_an_intersection_for_unknown_exclusions(
     assert result["rows"] == [{"label": "İzmir", "value": 1, "event_count": 1}]
     assert result["included_event_count"] == 1
     assert result["excluded_unknown_count"] == 1
+
+
+@pytest.mark.django_db
+def test_grouped_comparison_keeps_dimension_periods_and_unknown_exclusions():
+    snapshot = create_snapshot("analytics-grouped-comparison")
+    root, _, _, _, line = create_access_line(snapshot)
+    connection = create_subscription_connection(snapshot, line)
+    june = datetime(2026, 6, 10, tzinfo=UTC)
+    july = datetime(2026, 7, 10, tzinfo=UTC)
+    for code, started in (("CE-COMPARE-JUNE", june), ("CE-COMPARE-JULY", july)):
+        event = CausalEvent.objects.create(
+            data_snapshot=snapshot,
+            event_code=code,
+            event_type=CausalEventType.DEVICE_FAILURE,
+            status=CausalEventStatus.RESOLVED,
+            started_at=started,
+            ended_at=started + timedelta(minutes=5),
+            source_system="test",
+            origin=EventOrigin.SYNTHETIC,
+            root_device=root,
+        )
+        CustomerImpactAssessment.objects.create(
+            data_snapshot=snapshot,
+            causal_event=event,
+            subscription=connection.subscription,
+            subscription_connection=connection,
+            status=CustomerImpactStatus.VERIFIED_IMPACT.value,
+            potential_impact=True,
+            assessment_started_at=started,
+            assessment_ended_at=started + timedelta(minutes=5),
+        )
+    CausalEvent.objects.create(
+        data_snapshot=snapshot,
+        event_code="CE-COMPARE-UNKNOWN",
+        event_type=CausalEventType.DEVICE_FAILURE,
+        status=CausalEventStatus.RESOLVED,
+        started_at=july,
+        ended_at=july + timedelta(minutes=5),
+        source_system="test",
+        origin=EventOrigin.SYNTHETIC,
+        root_device=root,
+    )
+
+    result = OperationalAnalyticsService().analyze(
+        snapshot=snapshot,
+        spec=AnalyticsSpec(
+            metric="affected_customers",
+            aggregation="sum",
+            group_by="city",
+            time_grain="month",
+            comparison=True,
+            from_time=june - timedelta(days=1),
+            to_time=july + timedelta(days=1),
+        ),
+    )
+
+    assert result["comparison"] is True
+    assert result["included_event_count"] == 2
+    assert result["excluded_unknown_count"] == 1
+    assert len(result["rows"]) == 1
+    row = result["rows"][0]
+    assert [period["label"] for period in row["period_values"]] == ["2026-06", "2026-07"]
+    assert row["absolute_change"] == 0
+    assert row["excluded_unknown_count"] == 1

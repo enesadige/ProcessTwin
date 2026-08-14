@@ -175,6 +175,7 @@ class AnalyzeOperationalAnalyticsInput(SnapshotRequiredInput):
     direction: str = Field(default="desc", pattern="^(asc|desc)$")
     limit: int | None = Field(default=None, ge=1, le=100)
     time_grain: str | None = Field(default=None, pattern="^(day|week|month)$")
+    comparison: bool | None = None
     from_time: datetime | None = None
     to_time: datetime | None = None
     city: str | None = None

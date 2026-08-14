@@ -158,6 +158,9 @@ class DeterministicToolPlanner:
 
     def _calls_for_intent(self, query: StructuredQuery) -> list[dict[str, object]] | PlannerResult:
         if query.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS:
+            analytics_arguments = query.analytics.model_dump(exclude_none=True)
+            if not query.analytics.comparison:
+                analytics_arguments.pop("comparison", None)
             return [
                 self._call(
                     "operational_analytics",
@@ -165,7 +168,7 @@ class DeterministicToolPlanner:
                     "analyze_operational_analytics",
                     self._snapshot_args(
                         query,
-                        **query.analytics.model_dump(exclude_none=True),
+                        **analytics_arguments,
                         **self._analytics_scope_args(query),
                     ),
                     1,

@@ -215,6 +215,7 @@ class AnalyticsSpecification(BaseModel):
     direction: Literal["asc", "desc"] = "desc"
     limit: int | None = Field(default=None, ge=1, le=100)
     time_grain: Literal["day", "week", "month"] | None = None
+    comparison: bool = False
     root_alarm_type: str | None = Field(default=None, max_length=100)
     event_type: str | None = Field(default=None, max_length=80)
     device_type: str | None = Field(default=None, max_length=80)

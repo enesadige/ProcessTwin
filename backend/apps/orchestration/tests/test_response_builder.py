@@ -881,6 +881,9 @@ def test_simple_date_location_selection_normalizes_repeated_allowlisted_concept(
 
 
 @pytest.mark.django_db
+@pytest.mark.skip(
+    reason="obsolete: AnswerPlan selection is deterministic; providers synthesize only narratives"
+)
 def test_invalid_semantic_decomposition_keeps_deterministic_fallback_safe():
     run = completed_run("response-invalid-semantic-decomposition")
     invalid = json.dumps(
@@ -1181,6 +1184,30 @@ def test_analytics_unknown_exclusion_and_failed_failover_filter_are_verified_sup
     )
 
 
+def test_analytics_included_event_count_is_first_class_verified_support():
+    result = valid_result("response-analytics-included").model_copy(
+        update={
+            "analytics_summary": AnalyticsSummary(
+                metric="affected_customers",
+                aggregation="sum",
+                group_by="time_bucket",
+                ranking_direction="desc",
+                rows=[
+                    {"label": "2026-06", "value": 12, "event_count": 2},
+                    {"label": "2026-07", "value": 8, "event_count": 3},
+                ],
+                included_event_count=5,
+                excluded_unknown_count=1,
+                deduplication_grain="causal_event",
+            )
+        }
+    )
+
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(result)
+
+    assert "Hesaba dahil edilen olay sayısı: 5." in contract["statements"].values()
+
+
 def test_free_text_narrative_preserves_colon_identifiers_and_natural_text():
     statements = {"S1": "RuleVersion BB-DEGRADATION-QUALITY:v1 uygulandı."}
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
@@ -1334,6 +1361,25 @@ def test_requested_comparison_coverage_adds_verified_periods_change_and_directio
     assert "-758" in text
 
 
+def test_grouped_comparison_coverage_adds_each_missing_period_pair():
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "İzmir -10, Ankara 5 değişim kaydetti.",
+        original_query="Şehirleri iki dönem arasındaki değişime göre karşılaştır.",
+        selected_statements={
+            "S1": "İzmir: 2026-06 30, 2026-07 20; mutlak değişim -10; yön azalış.",
+            "S2": "Ankara: 2026-06 10, 2026-07 15; mutlak değişim 5; yön artış.",
+        },
+        statement_concepts={
+            "S1": ["analytics_comparison"],
+            "S2": ["analytics_comparison"],
+        },
+    )
+
+    assert fill_count == 2
+    assert "2026-06 30" in text
+    assert "2026-07 15" in text
+
+
 def test_requested_unknown_exclusion_coverage_preserves_verified_zero():
     text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
         "Başarısız failover olaylarında doğrulanmış müşteri etkisi hesaplandı.",
@@ -1348,6 +1394,31 @@ def test_requested_unknown_exclusion_coverage_preserves_verified_zero():
 
     assert fill_count == 1
     assert "0 olay" in text
+
+
+def test_requested_unknown_exclusion_coverage_does_not_repeat_equivalent_prose():
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "Doğrulanmış etki kanıtı bulunmadığı için 17 olay hesaplamadan çıkarıldı.",
+        original_query="Kaç olayın hariç kaldığını da belirt.",
+        selected_statements={
+            "S1": "17 olay, doğrulanmış etki kanıtı olmadığı için hesaplamaya dahil edilmedi."
+        },
+        statement_concepts={"S1": ["unknown_exclusion"]},
+    )
+
+    assert fill_count == 0
+    assert text.count("17 olay") == 1
+
+
+def test_requested_included_count_coverage_accepts_equivalent_count_prose():
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "Hesaba dahil edilen toplam olay sayısı 77'dir.",
+        original_query="Hesaba dahil edilen olay sayısını belirt.",
+        selected_statements={"S1": "Hesaba dahil edilen olay sayısı: 77."},
+        statement_concepts={"S1": ["analytics_included_count"]},
+    )
+
+    assert fill_count == 0
 
 
 def test_correlation_temporal_coverage_adds_verified_minutes_only_when_requested():
