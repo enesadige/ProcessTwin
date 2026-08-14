@@ -1360,6 +1360,25 @@ def test_answer_plan_keeps_resolved_event_identity_and_excludes_scenario_from_ro
     )
 
 
+def test_answer_plan_does_not_render_an_unconfirmed_root_candidate_as_root_cause():
+    result = valid_result("response-unconfirmed-root-candidate")
+    result.causal_summary.root_resource_type = "failure_domain"
+    result.causal_summary.root_resource_reference = "FD-SITE-459"
+    result.causal_summary.root_cause_summary = "OLT-ETI-002"
+    result.causal_summary.propagation_summary = (
+        "Candidate is retained as causal-chain evidence, not a confirmed root."
+    )
+
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query="CE-MCR-0023 içindeki alarmları incele.",
+        structured_query={"requested_outputs": ["summary", "root_cause"]},
+    )
+
+    assert "Doğrulanmış ana kök neden: OLT-ETI-002." not in contract["statements"].values()
+    assert "Doğrulanmış kök kaynak: failure_domain FD-SITE-459." in contract["statements"].values()
+
+
 @pytest.mark.parametrize(
     "claim",
     [

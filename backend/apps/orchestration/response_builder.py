@@ -70,6 +70,11 @@ _NARRATIVE_INTERNAL_REASON_SEQUENCE_RE = re.compile(
     r"(?:\s*,?\s*(?:ve\s*)?\b(?:root_cause_unverified|same_resource|temporal_propagation|evidence_gap)\b)+",
     re.IGNORECASE,
 )
+_UNCONFIRMED_ROOT_SUMMARY_RE = re.compile(
+    r"\b(?:not\s+(?:a\s+)?confirmed\s+root|root cause unverified|"
+    r"kök neden\s+(?:kesin olarak\s+)?doğrulanmadı)\b",
+    re.IGNORECASE,
+)
 _NARRATIVE_DOMAIN_INTERPRETATION_RE = re.compile(
     r"\b(?:ortak kaynak|ortak kaynaklı|ortak arıza alanı|ortak arıza|aynı kaynak|"
     r"zamansal yayılım|bağımsızlık|bağımsız yollar|"
@@ -892,6 +897,7 @@ class ValidatedResponseBuilder:
                 causal.root_cause_summary
                 and causal.root_cause_summary != causal.root_resource_reference
                 and not _SCENARIO_CODE_RE.fullmatch(causal.root_cause_summary)
+                and not _UNCONFIRMED_ROOT_SUMMARY_RE.search(causal.propagation_summary or "")
             ):
                 sections.append(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
             elif causal.root_resource_reference:
@@ -1253,6 +1259,7 @@ class ValidatedResponseBuilder:
                 causal.root_cause_summary
                 and causal.root_cause_summary != causal.root_resource_reference
                 and not _SCENARIO_CODE_RE.fullmatch(causal.root_cause_summary)
+                and not _UNCONFIRMED_ROOT_SUMMARY_RE.search(causal.propagation_summary or "")
             ):
                 add(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
             elif causal.root_resource_reference:
