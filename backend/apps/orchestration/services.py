@@ -213,6 +213,10 @@ class QueryRunService:
         if updated != 1:
             raise QueryRunTransitionError(current=current.value, target=target.value)
         query_run.refresh_from_db()
+        if target == QueryRunStatus.EXECUTING:
+            from apps.orchestration.evidence_service import DecisionEvidenceService
+
+            DecisionEvidenceService().start(query_run)
         return query_run
 
     def save_plan(
@@ -441,6 +445,9 @@ class QueryRunService:
         if updated != 1:
             raise QueryRunTransitionError(current=query_run.status, target=QueryRunStatus.COMPLETED)
         query_run.refresh_from_db()
+        from apps.orchestration.evidence_service import DecisionEvidenceService
+
+        DecisionEvidenceService().finalize(query_run)
         return query_run
 
     def save_response_audit(
@@ -482,6 +489,9 @@ class QueryRunService:
         if updated != 1:
             raise QueryRunTransitionError(current=query_run.status, target=QueryRunStatus.FAILED)
         query_run.refresh_from_db()
+        from apps.orchestration.evidence_service import DecisionEvidenceService
+
+        DecisionEvidenceService().finalize(query_run)
         return query_run
 
     def create_retry(

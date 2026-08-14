@@ -637,6 +637,18 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
 - MAIN-070 otomatik evidence üretimi, API veya UI eklemez; bunlar sırasıyla
   MAIN-071/072/073 kapsamındadır. Sonraki görev: `MAIN-071`.
 
+## MAIN-071 QueryRun Evidence Materialization (2026-08-14)
+
+- QueryRun `executing` durumunda snapshot-local draft `EvidenceRecord` oluşturur;
+  `completed` veya `failed` olduğunda mevcut kalıcı canonical/audit verisinden
+  tool, explicit RuleVersion, deterministic summary ve RAG provenance child
+  kayıtları yazılarak immutable biçimde finalize edilir.
+- Yeni tool, retrieval, hesaplama veya RuleVersion seçimi yapılmaz. Raw payload,
+  token ve gizli alanlar saklanmaz; compensation `DecisionEvidence` otoriter
+  kaydı değişmeden kalır.
+- Replay finalized record'u yeniden kullanır; retry yeni QueryRun'a ayrı record
+  açar. Focused lifecycle/evidence testleri geçti. Sonraki görev: `MAIN-072`.
+
 ## AI Analysis Scope ve Telafi Execution Düzeltmesi (2026-08-14)
 
 - Çözülemeyen açık şehir ifadeleri, Türkçe locative yazımı (`Çorum'da`) dahil,

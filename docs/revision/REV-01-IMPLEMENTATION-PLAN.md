@@ -304,6 +304,18 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   detail davranışı korunur. Evidence üretimi/API/UI sonraki MAIN-071/072/073
   görevleridir; sonraki görev `MAIN-071`dir.
 
+## 2026-08-14 — MAIN-071 QueryRun Evidence Materialization
+
+- QueryRun `executing` durumunda snapshot-local draft `EvidenceRecord` oluşturur;
+  `completed` veya `failed` olduğunda mevcut kalıcı canonical/audit verisinden
+  tool, explicit RuleVersion, deterministic summary ve RAG provenance child
+  kayıtları yazılarak immutable biçimde finalize edilir.
+- Yeni tool, retrieval, hesaplama veya RuleVersion seçimi yapılmaz. Raw payload,
+  token ve gizli alanlar saklanmaz; compensation `DecisionEvidence` otoriter
+  kaydı değişmeden kalır.
+- Replay finalized record'u yeniden kullanır; retry yeni QueryRun'a ayrı record
+  açar. Focused lifecycle/evidence testleri geçti. Sonraki görev: `MAIN-072`.
+
 ## 2026-08-14 — AI Analysis Scope ve Telafi Execution Düzeltmesi
 
 - Açık ama snapshot içinde çözülemeyen şehirler, `Çorum'da` gibi locative
