@@ -151,6 +151,39 @@ export type AnalysisStatus = {
   elapsed_ms: number
 }
 
+export type TopologyDevice = {
+  code: string
+  name: string
+  device_type: string
+  device_type_label: string
+  location: string
+}
+
+export type TopologyLink = {
+  code: string
+  source_device_code: string
+  target_device_code: string
+  status: string
+  capacity_mbps: number
+  link_layer?: string | null
+}
+
+export type TopologySummary = {
+  snapshot_key: string
+  root_device: TopologyDevice
+  upstream_devices: TopologyDevice[]
+  downstream_devices: TopologyDevice[]
+  downstream_total: number
+  links: TopologyLink[]
+  connection_roles: Record<string, number>
+  impact_scope?: {
+    potential_connection_count: number
+    verified_connection_count: number
+    verified_subscription_count: number
+    verified_customer_count: number
+  } | null
+}
+
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
 function csrfCookie() {
@@ -239,4 +272,22 @@ export async function getAnalysisStatus(idempotencyKey: string) {
   if (response.status === 404) return null
   if (!response.ok) throw new AnalysisRequestError(response.status, body as AnalysisResponse)
   return body as AnalysisStatus
+}
+
+export async function getTopologySummary({
+  snapshotIdentifier,
+  deviceCode,
+  causalEventCode,
+}: {
+  snapshotIdentifier: string
+  deviceCode: string
+  causalEventCode?: string
+}) {
+  const params = new URLSearchParams({
+    snapshot_identifier: snapshotIdentifier,
+    device_code: deviceCode,
+  })
+  if (causalEventCode) params.set('causal_event_code', causalEventCode)
+  const response = await request<{ data: TopologySummary }>(`/api/orchestration/topology-summary/?${params}`)
+  return response.data
 }

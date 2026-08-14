@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
 import { useAuth } from '../auth/AuthContext'
-import { AnalysisRequestError, getAnalysisStatus, submitAnalysis, type AnalysisStatus, type AnalyticsSummary, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type ViewMode } from '../auth/api'
+import { AnalysisRequestError, getAnalysisStatus, getTopologySummary, submitAnalysis, type AnalysisStatus, type AnalyticsSummary, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type TopologyDevice, type TopologySummary, type ViewMode } from '../auth/api'
 import './AIAnalysisPage.css'
 
 const SNAPSHOT_IDENTIFIER =
@@ -40,6 +40,32 @@ function correlationStatus(status: string) {
 function topologyRelationship(correlation: CrossIncidentCorrelationSummary) {
   const relation = correlation.topology_relation ?? correlation.resource_relation
   return ({ same_resource: 'Aynı doğrulanmış kaynak', direct_parent_child: 'Doğrudan üst/alt bağlantı', same_bng_branch: 'Aynı upstream BNG dalı', shared_failure_domain: 'Aynı doğrulanmış arıza alanı' } as Record<string, string>)[relation ?? '']
+}
+
+function TopologyDeviceList({ devices, emptyLabel }: { devices: TopologyDevice[]; emptyLabel: string }) {
+  if (!devices.length) return <span className="topology-summary__empty">{emptyLabel}</span>
+  return <div className="topology-summary__device-list">{devices.map((device) => <div className="topology-summary__device" key={device.code}><strong>{device.code}</strong><span>{device.device_type_label} · {device.location}</span></div>)}</div>
+}
+
+function TopologySummaryPanel({ summary }: { summary: TopologySummary }) {
+  const scope = summary.impact_scope
+  const primary = summary.connection_roles.primary ?? 0
+  const backup = summary.connection_roles.backup ?? 0
+  return <section className="topology-summary" aria-label="Ağ topoloji özeti">
+    <div className="topology-summary__heading"><div><p className="analysis-page__eyebrow">Snapshot-local ağ görünümü</p><h2>Topoloji özeti</h2></div><span>{summary.snapshot_key}</span></div>
+    <div className="topology-summary__flow">
+      <div className="topology-summary__lane"><p>Upstream</p><TopologyDeviceList devices={summary.upstream_devices} emptyLabel="Doğrulanmış upstream bağlantı yok" /></div>
+      <div className="topology-summary__root"><p>Seçili kök cihaz</p><strong>{summary.root_device.code}</strong><span>{summary.root_device.device_type_label} · {summary.root_device.location}</span></div>
+      <div className="topology-summary__lane"><p>Downstream erişim</p><TopologyDeviceList devices={summary.downstream_devices} emptyLabel="Doğrulanmış downstream bağlantı yok" />{summary.downstream_total > summary.downstream_devices.length ? <span className="topology-summary__more">+{summary.downstream_total - summary.downstream_devices.length} cihaz daha</span> : null}</div>
+    </div>
+    {summary.links.length ? <div className="topology-summary__links">{summary.links.map((link) => <span key={link.code}>{link.source_device_code} → {link.target_device_code}{link.link_layer ? ` · ${link.link_layer}` : ''}</span>)}</div> : null}
+    {(scope || primary || backup) ? <div className="topology-summary__facts">
+      {scope ? <><FactCard label="Potansiyel bağlantı kapsamı" value={scope.potential_connection_count} /><FactCard label="Doğrulanmış etki bağlantısı" value={scope.verified_connection_count} /><FactCard label="Doğrulanmış abonelik" value={scope.verified_subscription_count} /><FactCard label="Doğrulanmış müşteri" value={scope.verified_customer_count} /></> : null}
+      {primary ? <FactCard label="Aktif primary bağlantı" value={primary} /> : null}
+      {backup ? <FactCard label="Aktif backup bağlantı" value={backup} /> : null}
+    </div> : null}
+    <p className="topology-summary__note">Topoloji kapsamı, tek başına müşteri etkisi veya failover sonucu anlamına gelmez.</p>
+  </section>
 }
 
 function VerifiedResultCards({ result, technical }: { result: StructuredVerifiedResult; technical: boolean }) {
@@ -157,6 +183,7 @@ export function AIAnalysisPage() {
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [runStatus, setRunStatus] = useState<AnalysisStatus | null>(null)
+  const [topologySummary, setTopologySummary] = useState<TopologySummary | null>(null)
 
   useEffect(() => {
     if (!runKey) return
@@ -184,12 +211,33 @@ export function AIAnalysisPage() {
     return () => clearInterval(timer)
   }, [runStartedAt])
 
+  const causalSummary = result?.response?.structured_result?.causal_summary
+  useEffect(() => {
+    const deviceCode = causalSummary?.root_resource_type === 'device' ? causalSummary.root_resource_reference : undefined
+    if (!deviceCode) {
+      setTopologySummary(null)
+      return
+    }
+    let cancelled = false
+    void getTopologySummary({
+      snapshotIdentifier: SNAPSHOT_IDENTIFIER,
+      deviceCode,
+      causalEventCode: causalSummary?.causal_event_code,
+    }).then((summary) => {
+      if (!cancelled) setTopologySummary(summary)
+    }).catch(() => {
+      if (!cancelled) setTopologySummary(null)
+    })
+    return () => { cancelled = true }
+  }, [causalSummary?.causal_event_code, causalSummary?.root_resource_reference, causalSummary?.root_resource_type])
+
   async function submit() {
     const trimmed = query.trim()
     if (!trimmed || lifecycle === 'submitting') return
     setLifecycle('submitting')
     setError('')
     setResult(null)
+    setTopologySummary(null)
     const idempotencyKey = crypto.randomUUID()
     setRunKey(idempotencyKey)
     setRunStartedAt(Date.now())
@@ -270,7 +318,7 @@ export function AIAnalysisPage() {
         {runStatus?.failed_tool_count ? <p className="analysis-message analysis-message--error">İşlem güvenli şekilde başarısız oldu: {runStatus.error_code ?? 'tool_error'}</p> : null}
       </section>}
 
-      {result?.response && <section className="analysis-result" aria-live="polite"><div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>{viewMode === 'technical' ? 'Teknik görünüm' : 'Yönetim görünümü'}</span></div><div className="analysis-result__answer"><p className="analysis-page__eyebrow">Analiz yanıtı</p><h2>Yanıt</h2><p>{result.response.response_text}</p></div>{result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} technical={viewMode === 'technical'} /> : null}{result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}</section>}
+      {result?.response && <section className="analysis-result" aria-live="polite"><div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>{viewMode === 'technical' ? 'Teknik görünüm' : 'Yönetim görünümü'}</span></div><div className="analysis-result__answer"><p className="analysis-page__eyebrow">Analiz yanıtı</p><h2>Yanıt</h2><p>{result.response.response_text}</p></div>{result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} technical={viewMode === 'technical'} /> : null}{topologySummary ? <TopologySummaryPanel summary={topologySummary} /> : null}{result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}</section>}
       {result?.clarification && <section className="analysis-result analysis-result--clarification" aria-live="polite"><h2>Ek bilgi gerekiyor</h2><p>{result.clarification.message}</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
       {isUnsupported && <section className="analysis-result analysis-result--clarification" aria-live="polite"><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
     </section>

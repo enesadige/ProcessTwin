@@ -8,6 +8,13 @@ from django.views.decorators.http import require_GET, require_POST
 
 from apps.accounts.models import UserRole
 from apps.core.internal_api import resolve_correlation_id
+from apps.datasets.models import DataSnapshot
+from apps.network.models import NetworkDevice
+from apps.network.services.topology_summary import (
+    TopologySummaryInputError,
+    TopologySummaryService,
+)
+from apps.operations.models import CausalEvent
 from apps.orchestration.facade import OrchestrationFacade
 from apps.orchestration.models import QueryRun, QueryRunStatus
 
@@ -120,3 +127,69 @@ def analysis_status(request):
             status=404,
         )
     return JsonResponse(_status_payload(query_run))
+
+
+@require_GET
+def topology_summary(request):
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"error": {"code": "authentication_required", "message": "Authentication required."}},
+            status=401,
+        )
+    if request.user.role not in {UserRole.ANALYST, UserRole.ADMIN}:
+        return JsonResponse(
+            {"error": {"code": "permission_denied", "message": "Analysis access is not allowed."}},
+            status=403,
+        )
+
+    snapshot_identifier = request.GET.get("snapshot_identifier", "").strip()
+    device_code = request.GET.get("device_code", "").strip()
+    causal_event_code = request.GET.get("causal_event_code", "").strip()
+    if not snapshot_identifier or not device_code:
+        return JsonResponse(
+            {"error": {"code": "validation_error", "message": "Snapshot and device are required."}},
+            status=400,
+        )
+    snapshot = DataSnapshot.objects.filter(snapshot_key=snapshot_identifier).first()
+    if snapshot is None:
+        return JsonResponse(
+            {"error": {"code": "not_found", "message": "Snapshot was not found."}},
+            status=404,
+        )
+    device = NetworkDevice.objects.select_related("city", "district", "neighborhood").filter(
+        data_snapshot=snapshot,
+        code=device_code,
+    ).first()
+    if device is None:
+        return JsonResponse(
+            {"error": {"code": "not_found", "message": "Device was not found in the snapshot."}},
+            status=404,
+        )
+    causal_event = None
+    if causal_event_code:
+        causal_event = CausalEvent.objects.filter(
+            data_snapshot=snapshot,
+            event_code=causal_event_code,
+        ).first()
+        if causal_event is None:
+            return JsonResponse(
+                {
+                    "error": {
+                        "code": "not_found",
+                        "message": "Causal event was not found in the snapshot.",
+                    }
+                },
+                status=404,
+            )
+    try:
+        payload = TopologySummaryService().build(
+            snapshot=snapshot,
+            device=device,
+            causal_event=causal_event,
+        ).to_payload()
+    except TopologySummaryInputError as exc:
+        return JsonResponse(
+            {"error": {"code": "validation_error", "message": str(exc)}},
+            status=400,
+        )
+    return JsonResponse({"data": payload})
