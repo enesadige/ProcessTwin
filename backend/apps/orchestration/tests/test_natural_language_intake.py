@@ -229,6 +229,29 @@ def test_semantic_decomposition_provider_failure_preserves_deterministic_query()
     assert result.failure_code == "provider_unavailable"
 
 
+def test_network_investigation_drops_semantic_dimension_without_safe_tool_output():
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "network_investigation",
+            "requested_outputs": ["summary", "details", "root_cause", "evidence"],
+            "snapshot_identifier": "intake-network-safe-output",
+            "causal_event_code": "CE-INTAKE-001",
+        }
+    )
+
+    result = LLMSemanticDecomposer(
+        SemanticProvider(["alarm_correlation", "physical_root_cause"])
+    ).merge(
+        original_query="CE-INTAKE-001 alarmlarını kanıtlarıyla incele.",
+        deterministic_query=query,
+    )
+
+    assert result.accepted is True
+    assert SemanticDimension.ALARM_CORRELATION not in result.structured_query.semantic_dimensions
+    assert SemanticDimension.PHYSICAL_ROOT_CAUSE in result.structured_query.semantic_dimensions
+    assert RequestedOutput.CORRELATION not in result.structured_query.requested_outputs
+
+
 def test_semantic_decomposition_skips_fully_deterministic_analytics_contract():
     query = StructuredQuery.model_validate(
         {

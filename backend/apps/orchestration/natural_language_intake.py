@@ -190,6 +190,11 @@ class LLMSemanticDecomposer:
             dimensions = sorted(set(candidate.dimensions), key=lambda value: value.value)
             requested = set(deterministic_query.requested_outputs)
             allowed_outputs = self._allowed_outputs(deterministic_query)
+            dimensions = [
+                dimension
+                for dimension in dimensions
+                if set(self._DIMENSION_OUTPUTS[dimension]) & allowed_outputs
+            ]
             for dimension in dimensions:
                 requested.update(
                     output
@@ -226,6 +231,16 @@ class LLMSemanticDecomposer:
                 {
                     RequestedOutput.SUMMARY,
                     RequestedOutput.CORRELATION,
+                    RequestedOutput.EVIDENCE,
+                }
+            )
+        if query.intent == StructuredQueryIntent.NETWORK_INVESTIGATION:
+            return frozenset(
+                {
+                    RequestedOutput.SUMMARY,
+                    RequestedOutput.DETAILS,
+                    RequestedOutput.IMPACT,
+                    RequestedOutput.ROOT_CAUSE,
                     RequestedOutput.EVIDENCE,
                 }
             )
