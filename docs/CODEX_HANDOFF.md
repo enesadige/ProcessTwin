@@ -661,6 +661,21 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
 - Mevcut compensation `DecisionEvidence` endpointi değişmeden kaldı. Sonraki
   görev: `MAIN-073`.
 
+## MAIN-073 General Evidence Detail UI (2026-08-14)
+
+- `/evidence` parametreleri kesin ayrılır: yalnız exact
+  `evidence_hash + snapshot_identifier` mevcut compensation `DecisionEvidence`
+  detayını; yalnız exact `evidence_code + snapshot_identifier` finalized genel
+  QueryRun `EvidenceRecord` detayını açar. Eksik veya çelişkili parametreler
+  hiçbir kanıt türüne fallback yapmadan güvenli not-found yüzeyine gider.
+- Genel ekran safe tool timeline, deterministic calculation, explicit
+  RuleVersion, RAG retrieval provenance ve persisted warnings alanlarını
+  gösterir; raw payload, secret, token ve debug dump render edilmez. Mobil
+  yerleşim ve erişilebilir loading/error durumları eklendi.
+- AI Analysis response sözleşmesi henüz güvenilir `evidence_code` taşımadığı
+  için genel evidence linki uydurulmadı; mevcut compensation evidence linki
+  korunur. Sonraki görev: `MAIN-074`.
+
 ## AI Analysis Scope ve Telafi Execution Düzeltmesi (2026-08-14)
 
 - Çözülemeyen açık şehir ifadeleri, Türkçe locative yazımı (`Çorum'da`) dahil,

@@ -17,4 +17,19 @@
 .evidence-detail__section dl { display: grid; grid-template-columns: minmax(150px, .35fr) 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
 .evidence-detail__section dt { color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
 .evidence-detail__section dd { margin: 0; overflow-wrap: anywhere; }
-@media (max-width: 640px) { .evidence-detail__header { flex-direction: column; } .evidence-detail__section dl { grid-template-columns: 1fr; gap: 4px; } }
+.evidence-detail__pairs { display: grid; gap: var(--space-2); margin: 0; }
+.evidence-detail__pairs > div { display: grid; grid-template-columns: minmax(160px, .35fr) 1fr; gap: var(--space-2) var(--space-4); }
+.evidence-detail__pairs dt { color: var(--color-text-muted); font-size: 12px; font-weight: 700; overflow-wrap: anywhere; }
+.evidence-detail__pairs dd { margin: 0; overflow-wrap: anywhere; }
+.evidence-detail__timeline, .evidence-detail__record-list { display: grid; gap: var(--space-3); margin: 0; padding: 0; list-style: none; }
+.evidence-detail__timeline > li, .evidence-detail__record-list > article { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface-muted); }
+.evidence-detail__timeline-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
+.evidence-detail__timeline-header span { font-size: 12px; font-weight: 800; text-transform: uppercase; overflow-wrap: anywhere; }
+.evidence-detail__timeline dl { display: grid; grid-template-columns: minmax(150px, .35fr) 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
+.evidence-detail__timeline dt { color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
+.evidence-detail__timeline dd { margin: 0; overflow-wrap: anywhere; }
+.evidence-detail__record-list h3, .evidence-detail__record-list h4 { margin: 0; overflow-wrap: anywhere; }
+.evidence-detail__record-list h3 { font-size: 15px; }
+.evidence-detail__record-list h4 { color: var(--color-text-muted); font-size: 12px; }
+.evidence-detail__hint { margin: 0; color: var(--color-text-muted); line-height: 1.5; }
+@media (max-width: 640px) { .evidence-detail__header { flex-direction: column; } .evidence-detail__section dl, .evidence-detail__pairs > div, .evidence-detail__timeline dl { grid-template-columns: 1fr; gap: 4px; } .evidence-detail__timeline-header { align-items: flex-start; flex-direction: column; gap: 4px; } }

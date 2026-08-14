@@ -163,6 +163,50 @@ export type DecisionEvidenceDetail = {
   } | null
 }
 
+export type EvidenceRecordDetail = {
+  evidence_code: string
+  finalized: boolean
+  finalized_at: string | null
+  snapshot: { id: number; key: string }
+  query_run: {
+    code: string
+    terminal_status: 'completed' | 'failed'
+    started_at: string | null
+    completed_at: string | null
+  }
+  provenance: Record<string, unknown>
+  warnings: string[]
+  tool_timeline: Array<{
+    sequence: number
+    server: string
+    tool_name: string
+    status: string
+    attempt_count: number | null
+    duration_ms: number | null
+    result_summary: string | null
+    error_code: string | null
+  }>
+  calculations: Array<{
+    sequence: number
+    calculation_code: string
+    inputs: Record<string, unknown>
+    outputs: Record<string, unknown>
+  }>
+  rule_references: Array<{
+    rule_code: string
+    version: number
+    reference_role: string
+    metadata: Record<string, unknown>
+  }>
+  rag_references: Array<{
+    document_code: string
+    document_version: number
+    chunk_heading: string | null
+    section_path: string[]
+    retrieval_score: number | null
+  }>
+}
+
 export type AnalysisStatus = {
   query_run_code: string
   status: 'pending' | 'planned' | 'executing' | 'completed' | 'failed'
@@ -350,4 +394,21 @@ export async function getDecisionEvidence({
     data: { snapshot_key: string; decision_evidence: DecisionEvidenceDetail }
   }>(`/api/orchestration/decision-evidence/?${params}`)
   return response.data
+}
+
+export async function getEvidenceRecordDetail({
+  snapshotIdentifier,
+  evidenceCode,
+}: {
+  snapshotIdentifier: string
+  evidenceCode: string
+}) {
+  const params = new URLSearchParams({
+    snapshot_identifier: snapshotIdentifier,
+    evidence_code: evidenceCode,
+  })
+  const response = await request<{
+    data: { evidence_record: EvidenceRecordDetail }
+  }>(`/api/orchestration/evidence-records/detail/?${params}`)
+  return response.data.evidence_record
 }

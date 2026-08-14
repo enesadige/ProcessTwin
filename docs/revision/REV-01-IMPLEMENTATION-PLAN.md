@@ -328,6 +328,19 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 - Mevcut compensation `DecisionEvidence` endpointi değişmeden kaldı. Sonraki
   görev: `MAIN-073`.
 
+## 2026-08-14 — MAIN-073 General Evidence Detail UI
+
+- `/evidence`, parametre türüne göre snapshot-local iki ayrı kanıt yüzeyi
+  sunar: `evidence_hash` compensation `DecisionEvidence`; `evidence_code`
+  finalized genel QueryRun `EvidenceRecord` içindir. Eksik veya çelişkili
+  parametreler güvenli not-found olur; kanıt türleri birbirine fallback yapmaz.
+- Genel detayda safe tool timeline, deterministic calculation, explicit
+  RuleVersion, RAG retrieval provenance ve persisted warnings render edilir.
+  Raw payload, secret, token ve debug dump kullanıcıya açılmaz.
+- AI Analysis contract'ında genel evidence code bulunmadığından tahmini link
+  üretilmedi; mevcut compensation evidence yolu korundu. Sonraki görev:
+  `MAIN-074`.
+
 ## 2026-08-14 — AI Analysis Scope ve Telafi Execution Düzeltmesi
 
 - Açık ama snapshot içinde çözülemeyen şehirler, `Çorum'da` gibi locative
