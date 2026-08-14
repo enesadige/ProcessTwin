@@ -1470,6 +1470,65 @@ def test_free_text_narrative_rejects_unverified_independence_claim():
     assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
 
 
+def test_unverified_causality_uses_deterministic_response_without_provider_attempt():
+    statements = {
+        "S1": "Kök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi ayrıca doğrulanmadı.",
+        "S2": "Failover ile korunan: 0 bağlantı.",
+    }
+
+    assert ValidatedResponseBuilder._requires_deterministic_uncertainty_response(
+        "Backup neden devreye girmedi ve fiziksel arıza nedeni ne?",
+        statements,
+    )
+
+
+@pytest.mark.django_db
+def test_builder_skips_provider_for_only_unverified_requested_causality():
+    snapshot = create_snapshot("response-unverified-causality-skip")
+    result = valid_result(snapshot.snapshot_key)
+    result.causal_summary.root_cause_summary = "SCN-BNG-DOWN-001"
+    result.causal_summary.propagation_summary = (
+        "Candidate is retained as causal-chain evidence, not a confirmed root."
+    )
+    run = completed_run(
+        "response-unverified-causality-skip",
+        snapshot=snapshot,
+        result=result,
+        original_query="Backup neden devreye girmedi ve fiziksel arıza nedeni ne?",
+    )
+    run.structured_query = {
+        "intent": "outage_impact",
+        "requested_outputs": ["summary", "details", "root_cause"],
+    }
+    run.save(update_fields=["structured_query"])
+    provider = RecordingProvider()
+
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=provider,
+    )
+
+    assert provider.requests == []
+    assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC
+    assert response.warnings == []
+    assert response.narrative_synthesis_audit["status"] == "skipped"
+
+
+def test_free_text_narrative_rejects_positive_relation_and_time_proximity_without_relation():
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "İki olay arasında korelasyon olduğu ve yakın zamanda gerçekleştiği görülüyor.",
+        {
+            "S1": "Olaylar arasında doğrulanmış ilişki bulunmadı.",
+            "S2": "Olaylar arasındaki zaman farkı: 1161 saat 46 dakika.",
+        },
+        {},
+    )
+
+    assert narrative["sentences"] == []
+    assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
+
+
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
         "Müşteri memnuniyeti olumsuz etkilendi.",

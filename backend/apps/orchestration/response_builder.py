@@ -86,6 +86,12 @@ _NARRATIVE_UNSUPPORTED_NO_RELATION_RE = re.compile(
     r"\bbirbirini\s+etkilemedi\b",
     re.IGNORECASE,
 )
+_NARRATIVE_UNSUPPORTED_NO_RELATION_POSITIVE_RE = re.compile(
+    r"\b(?:korelasyon|ilişki|ilisk)\s+(?:olduğu|oldugu|bulunduğu|bulundugu|"
+    r"vardır|vardir|var)\b|\b(?:birbirine\s+)?yakın\s+zaman\b|"
+    r"\bzaman(?:\s+(?:farkı|farki|dilimi))?\s+[^.!?]{0,40}\byakın\b",
+    re.IGNORECASE,
+)
 _NARRATIVE_QUALITATIVE_IMPACT_RE = re.compile(
     r"\b(?:müşteri(?:ler(?:in)?|nin)?\s+(?:alternatif|başka)\s+(?:çözüm|çözümler)|"
     r"customer(?:s)?\s+(?:sought|seek|using)\s+alternative|"
@@ -313,14 +319,24 @@ class ValidatedResponseBuilder:
             response.semantic_concepts = selection["concepts"]
             response.grounded_relationships = selection["relationships"]
             response.statement_selection_audit = selection["audit"]
+            selected_statements = {
+                statement_id: contract[1]["statements"][statement_id]
+                for statement_id in selection["selected_statement_ids"]
+            }
+            if self._requires_deterministic_uncertainty_response(
+                query_run.original_query,
+                selected_statements,
+            ):
+                response.narrative_synthesis_audit = {
+                    "status": "skipped",
+                    "reason": "requested_causality_is_not_explicitly_verified",
+                }
+                return response
             if getattr(active_provider, "supports_grounded_narrative", False):
                 narrative, synthesis_audit = self._safe_grounded_narrative(
                     active_provider,
                     original_query=query_run.original_query,
-                    selected_statements={
-                        statement_id: contract[1]["statements"][statement_id]
-                        for statement_id in selection["selected_statement_ids"]
-                    },
+                    selected_statements=selected_statements,
                     statement_concepts={
                         statement_id: contract[1]
                         .get("statement_concepts", {})
@@ -334,10 +350,7 @@ class ValidatedResponseBuilder:
                 narrative, coverage_fill_count = self._ensure_requested_narrative_coverage(
                     narrative,
                     original_query=query_run.original_query,
-                    selected_statements={
-                        statement_id: contract[1]["statements"][statement_id]
-                        for statement_id in selection["selected_statement_ids"]
-                    },
+                    selected_statements=selected_statements,
                     statement_concepts={
                         statement_id: contract[1]
                         .get("statement_concepts", {})
@@ -2063,6 +2076,44 @@ class ValidatedResponseBuilder:
         }
         return cls._render_grounded_narrative(narrative), audit
 
+    @staticmethod
+    def _requires_deterministic_uncertainty_response(
+        original_query: str, selected_statements: Mapping[str, str]
+    ) -> bool:
+        query = original_query.casefold()
+        support_text = " ".join(selected_statements.values())
+        no_relation = "Olaylar arasında doğrulanmış ilişki bulunmadı." in support_text
+        asks_for_relation = any(
+            term in query
+            for term in ("korelasyon", "ilişki", "ilisk", "nedensel", "neden-sonuç", "causal")
+        )
+        if no_relation and asks_for_relation:
+            return True
+        asks_for_physical_causality = any(
+            term in query
+            for term in (
+                "fiziksel",
+                "device not active",
+                "backup neden",
+                "yedek neden",
+                "backup cihaz",
+                "yedek cihaz",
+            )
+        )
+        physical_cause_unverified = (
+            "fiziksel kök neden gerekçesi ayrıca doğrulanmadı" in support_text.casefold()
+            or "kök neden kesin olarak doğrulanmadı" in support_text.casefold()
+        )
+        has_confirmed_physical_cause = any(
+            statement.startswith("Doğrulanmış ana kök neden:")
+            for statement in selected_statements.values()
+        )
+        return (
+            asks_for_physical_causality
+            and physical_cause_unverified
+            and not has_confirmed_physical_cause
+        )
+
     @classmethod
     def _free_text_narrative(
         cls,
@@ -2176,6 +2227,11 @@ class ValidatedResponseBuilder:
         ):
             return True
         if _NARRATIVE_UNSUPPORTED_NO_RELATION_RE.search(text):
+            return True
+        if (
+            "olaylar arasında doğrulanmış ilişki bulunmadı" in support_text
+            and _NARRATIVE_UNSUPPORTED_NO_RELATION_POSITIVE_RE.search(text)
+        ):
             return True
         if _NARRATIVE_EXTREMUM_RE.search(text):
             extrema = [
