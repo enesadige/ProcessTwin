@@ -316,6 +316,18 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 - Replay finalized record'u yeniden kullanır; retry yeni QueryRun'a ayrı record
   açar. Focused lifecycle/evidence testleri geçti. Sonraki görev: `MAIN-072`.
 
+## 2026-08-14 — MAIN-072 General Evidence Detail API
+
+- Authenticated read-only `GET /api/orchestration/evidence-records/detail/`
+  endpointi, yalnız exact `snapshot_identifier + evidence_code` ile eşleşen
+  finalized ve terminal QueryRun'a bağlı genel EvidenceRecord'u döner.
+- Response, safe tool timeline, calculation, explicit RuleVersion, RAG
+  document/chunk/score, snapshot/query-run provenance ve warnings içerir.
+  Serializer persisted JSON'u da yeniden sanitize eder; raw payload/secret
+  açılmaz. Draft, missing ve cross-snapshot kayıtlar not-found döner.
+- Mevcut compensation `DecisionEvidence` endpointi değişmeden kaldı. Sonraki
+  görev: `MAIN-073`.
+
 ## 2026-08-14 — AI Analysis Scope ve Telafi Execution Düzeltmesi
 
 - Açık ama snapshot içinde çözülemeyen şehirler, `Çorum'da` gibi locative

@@ -16,8 +16,11 @@ from apps.network.services.topology_summary import (
     TopologySummaryService,
 )
 from apps.operations.models import CausalEvent
+from apps.orchestration.evidence_serializers import (
+    evidence_record_detail as serialize_evidence_record,
+)
 from apps.orchestration.facade import OrchestrationFacade
-from apps.orchestration.models import QueryRun, QueryRunStatus
+from apps.orchestration.models import EvidenceRecord, QueryRun, QueryRunStatus
 from apps.rules.internal_serializers import decision_evidence_summary
 
 
@@ -258,3 +261,54 @@ def decision_evidence_detail(request):
     return JsonResponse(
         {"data": {"snapshot_key": snapshot.snapshot_key, "decision_evidence": detail}}
     )
+
+
+@require_GET
+def evidence_record_detail(request):
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"error": {"code": "authentication_required", "message": "Authentication required."}},
+            status=401,
+        )
+    if request.user.role not in {UserRole.ANALYST, UserRole.ADMIN}:
+        return JsonResponse(
+            {"error": {"code": "permission_denied", "message": "Evidence access is not allowed."}},
+            status=403,
+        )
+
+    snapshot_identifier = request.GET.get("snapshot_identifier", "").strip()
+    evidence_code = request.GET.get("evidence_code", "").strip()
+    if not snapshot_identifier or not evidence_code:
+        return JsonResponse(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Snapshot and evidence reference are required.",
+                }
+            },
+            status=400,
+        )
+
+    evidence = (
+        EvidenceRecord.objects.filter(
+            data_snapshot__snapshot_key=snapshot_identifier,
+            evidence_code=evidence_code,
+            finalized=True,
+            query_run__status__in=(QueryRunStatus.COMPLETED, QueryRunStatus.FAILED),
+        )
+        .select_related("data_snapshot", "query_run")
+        .prefetch_related(
+            "evidencetoolcall_records",
+            "evidencecalculation_records",
+            "evidencerulereference_records__rule_version__rule",
+            "evidenceragreference_records__source_document",
+            "evidenceragreference_records__document_chunk",
+        )
+        .first()
+    )
+    if evidence is None:
+        return JsonResponse(
+            {"error": {"code": "not_found", "message": "Evidence record was not found."}},
+            status=404,
+        )
+    return JsonResponse({"data": {"evidence_record": serialize_evidence_record(evidence)}})
