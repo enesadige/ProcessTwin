@@ -97,6 +97,11 @@ _NARRATIVE_EXTREMUM_RE = re.compile(
     r"\ben\s+(?:çok|cok|yüksek)\s+(?:artan|azalan|artış|artis|azalış|azalis)\b",
     re.IGNORECASE,
 )
+_NARRATIVE_FAILOVER_ZERO_INFERENCE_RE = re.compile(
+    r"\b(?:yedek|backup|failover)\b.*\b(?:devreye girmedi|çalışmadı|calismadi|"
+    r"aktif değildi|aktif degildi)\b",
+    re.IGNORECASE,
+)
 _NARRATIVE_FACT_TOKEN_RE = re.compile(
     r"(?:\b\d+(?:[.,]\d+)?\b|\b[A-Z][A-Z0-9_:-]{3,}\b|\b[A-Z][A-Z0-9]+(?:-[A-Z0-9]+)+\b)"
 )
@@ -1878,6 +1883,10 @@ class ValidatedResponseBuilder:
             "root_cause:, impact: veya eligibility: gibi iç rol etiketleriyle başlama. "
             "root_cause_unverified, same_resource, temporal_propagation veya evidence_gap "
             "gibi iç reason code'larını da gösterme; desteklenen anlamı doğal Türkçeyle ifade et. "
+            "Failover ile korunan bağlantı sayısı 0 ise, açık yedek/failover kanıtı olmadan "
+            "yedek yolun devreye girmediği veya çalışmadığı sonucunu çıkarma. Kök kaynak "
+            "doğrulanmış ancak fiziksel kök neden doğrulanmamışsa, kök kaynağı fiziksel neden "
+            "olarak sunma veya ek teknik neden üretme. "
             "JSON, ID, madde imi veya debug ilişkisi üretme.\n"
             "Sorgunun aşağıdaki istenen çıktılarını ayrı ayrı yanıtla; mevcut bir "
             "doğrulanmış değer varsa atlama: REQUESTED_OUTPUTS="
@@ -1892,16 +1901,6 @@ class ValidatedResponseBuilder:
             + "\nVALID_RELATIONSHIPS="
             + json.dumps(relationship_map, ensure_ascii=False, sort_keys=True)
         )
-        if provider.provider_name == "gemini":
-            prompt += (
-                "\nKök kaynak doğrulanmış, fiziksel kök neden doğrulanmamışsa yalnızca "
-                "'kök kaynak X olarak doğrulanmıştır' de; X'in olaya neden olduğunu söyleme. "
-                "Failover başarısızlığı doğrulanmış ancak fiziksel nedeni doğrulanmamışsa bunu "
-                "'Failover başarısızlığı doğrulanmıştır; ancak başarısızlığın fiziksel nedeni "
-                "mevcut kanıtlarla kesin olarak doğrulanmamıştır.' çizgisinde ifade et. "
-                "Mevcut AnswerPlan'da açıkça desteklenmiyorsa path/source independence, "
-                "shared failure domain veya ortak kaynak iddiası kurma."
-            )
         request: dict[str, Any] = {"contents": prompt}
         if getattr(provider, "supports_request_unload", False):
             request["release_after"] = True
@@ -2100,6 +2099,11 @@ class ValidatedResponseBuilder:
         if (
             "doğrulanmış etki kanıtı olmadığı için hesaplamaya dahil edilmedi" in support_text
             and _NARRATIVE_UNKNOWN_AS_NO_IMPACT_RE.search(text)
+        ):
+            return True
+        if (
+            "failover ile korunan: 0 bağlantı" in support_text
+            and _NARRATIVE_FAILOVER_ZERO_INFERENCE_RE.search(text)
         ):
             return True
         if _NARRATIVE_EXTREMUM_RE.search(text):

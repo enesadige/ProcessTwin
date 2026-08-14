@@ -1359,6 +1359,17 @@ def test_free_text_narrative_rejects_unsupported_qualitative_impact_claim(claim)
     assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
 
 
+def test_free_text_narrative_rejects_backup_inference_from_zero_protected_count():
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "Failover ile korunan bağlantı sayısı 0 olduğu için yedek bağlantı devreye girmedi.",
+        {"S1": "Failover ile korunan: 0 bağlantı."},
+        {},
+    )
+
+    assert narrative["sentences"] == []
+    assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
+
+
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
         "Müşteri memnuniyeti olumsuz etkilendi.",
