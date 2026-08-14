@@ -596,6 +596,11 @@ def _operational_analytics(data: Mapping[str, Any]) -> _ExtractedToolResult:
             if not isinstance(change, (int, float, str)) or isinstance(change, bool):
                 raise ValueError("analytics absolute change is invalid")
             normalized["absolute_change"] = change
+        if row.get("signed_change") is not None:
+            signed_change = row.get("signed_change")
+            if not isinstance(signed_change, (int, float, str)) or isinstance(signed_change, bool):
+                raise ValueError("analytics signed change is invalid")
+            normalized["signed_change"] = signed_change
         period_values = row.get("period_values")
         if period_values is not None:
             if not isinstance(period_values, list) or not all(
@@ -609,6 +614,11 @@ def _operational_analytics(data: Mapping[str, Any]) -> _ExtractedToolResult:
                     "event_count": _non_negative_int(
                         item.get("event_count"), "analytics period event_count"
                     ),
+                    **{
+                        field: _non_negative_int(item.get(field), f"analytics period {field}")
+                        for field in ("included_event_count", "excluded_unknown_count")
+                        if item.get(field) is not None
+                    },
                 }
                 for item in period_values
             ]

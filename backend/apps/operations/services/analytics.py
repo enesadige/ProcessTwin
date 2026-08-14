@@ -120,6 +120,7 @@ class OperationalAnalyticsService:
         rows = [self._row(label, values, spec) for label, values in grouped.items()]
         if spec.group_by == "time_bucket":
             rows.sort(key=lambda row: row["label"])
+            self._add_period_evidence_counts(rows, records, spec.time_grain)
             self._add_period_changes(rows)
         else:
             rows.sort(
@@ -162,6 +163,12 @@ class OperationalAnalyticsService:
 
         rows: list[dict[str, Any]] = []
         for label, group_records in eligible_by_group.items():
+            # A city comparison must contain actual cities. Correlation/helper
+            # records with no resolvable city are not a geographic group.
+            if spec.group_by == "city" and not any(
+                record["city"] is not None for record in all_by_group[label]
+            ):
+                continue
             buckets: dict[str, list[dict[str, Any]]] = defaultdict(list)
             for record in group_records:
                 buckets[self._time_bucket_label(record, spec.time_grain)].append(record)
@@ -169,16 +176,19 @@ class OperationalAnalyticsService:
                 self._row(period_label, values, spec)
                 for period_label, values in sorted(buckets.items())
             ]
+            self._add_period_evidence_counts(periods, all_by_group[label], spec.time_grain)
             self._add_period_changes(periods)
             comparison = periods[-1] if len(periods) > 1 else None
             difference = comparison.get("absolute_change") if comparison else None
+            signed_change = comparison.get("signed_change") if comparison else None
             rows.append(
                 {
                     "label": label,
-                    "value": difference if difference is not None else periods[-1]["value"],
+                    "value": signed_change if signed_change is not None else periods[-1]["value"],
                     "event_count": len(group_records),
                     "period_values": periods,
                     "absolute_change": difference,
+                    "signed_change": signed_change,
                     "trend_direction": (
                         comparison.get("trend_direction") if comparison else "unchanged"
                     ),
@@ -188,7 +198,7 @@ class OperationalAnalyticsService:
             )
         rows.sort(
             key=lambda row: (
-                abs(Decimal(str(row["absolute_change"] or 0))),
+                abs(Decimal(str(row["signed_change"] or 0))),
                 row["label"],
             ),
             reverse=spec.direction == "desc",
@@ -220,13 +230,31 @@ class OperationalAnalyticsService:
             if previous is None:
                 row["trend_direction"] = "unchanged"
                 row["absolute_change"] = None
+                row["signed_change"] = None
             else:
                 difference = current - previous
-                row["absolute_change"] = str(difference) if difference % 1 else int(difference)
+                row["signed_change"] = str(difference) if difference % 1 else int(difference)
+                magnitude = abs(difference)
+                row["absolute_change"] = str(magnitude) if magnitude % 1 else int(magnitude)
                 row["trend_direction"] = (
                     "increase" if difference > 0 else "decrease" if difference < 0 else "unchanged"
                 )
             previous = current
+
+    def _add_period_evidence_counts(
+        self,
+        rows: list[dict[str, Any]],
+        records: list[dict[str, Any]],
+        time_grain: str | None = None,
+    ) -> None:
+        """Attach per-period known/unknown evidence counts without treating unknown as zero."""
+        all_by_period: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for record in records:
+            all_by_period[self._time_bucket_label(record, time_grain)].append(record)
+        for row in rows:
+            total = len(all_by_period[row["label"]])
+            row["included_event_count"] = row["event_count"]
+            row["excluded_unknown_count"] = total - row["event_count"]
 
     @staticmethod
     def _events(snapshot: DataSnapshot, spec: AnalyticsSpec):

@@ -304,4 +304,63 @@ def test_grouped_comparison_keeps_dimension_periods_and_unknown_exclusions():
     row = result["rows"][0]
     assert [period["label"] for period in row["period_values"]] == ["2026-06", "2026-07"]
     assert row["absolute_change"] == 0
+    assert row["signed_change"] == 0
+    assert row["period_values"] == [
+        {
+            "label": "2026-06",
+            "value": 1,
+            "event_count": 1,
+            "included_event_count": 1,
+            "excluded_unknown_count": 0,
+            "trend_direction": "unchanged",
+            "absolute_change": None,
+            "signed_change": None,
+        },
+        {
+            "label": "2026-07",
+            "value": 1,
+            "event_count": 1,
+            "included_event_count": 1,
+            "excluded_unknown_count": 1,
+            "trend_direction": "unchanged",
+            "absolute_change": 0,
+            "signed_change": 0,
+        },
+    ]
     assert row["excluded_unknown_count"] == 1
+
+    global_result = OperationalAnalyticsService().analyze(
+        snapshot=snapshot,
+        spec=AnalyticsSpec(
+            metric="affected_customers",
+            aggregation="sum",
+            group_by="time_bucket",
+            time_grain="month",
+            comparison=True,
+            from_time=june - timedelta(days=1),
+            to_time=july + timedelta(days=1),
+        ),
+    )
+
+    assert global_result["rows"] == [
+        {
+            "label": "2026-06",
+            "value": 1,
+            "event_count": 1,
+            "included_event_count": 1,
+            "excluded_unknown_count": 0,
+            "trend_direction": "unchanged",
+            "absolute_change": None,
+            "signed_change": None,
+        },
+        {
+            "label": "2026-07",
+            "value": 1,
+            "event_count": 1,
+            "included_event_count": 1,
+            "excluded_unknown_count": 1,
+            "trend_direction": "unchanged",
+            "absolute_change": 0,
+            "signed_change": 0,
+        },
+    ]

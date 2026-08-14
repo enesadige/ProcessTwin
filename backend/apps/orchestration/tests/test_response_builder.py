@@ -1208,6 +1208,55 @@ def test_analytics_included_event_count_is_first_class_verified_support():
     assert "Hesaba dahil edilen olay sayısı: 5." in contract["statements"].values()
 
 
+def test_global_comparison_contract_has_period_specific_evidence_counts():
+    result = valid_result("response-global-comparison-period-counts").model_copy(
+        update={
+            "analytics_summary": AnalyticsSummary(
+                metric="affected_customers",
+                aggregation="sum",
+                group_by="time_bucket",
+                ranking_direction="desc",
+                comparison=True,
+                rows=[
+                    {
+                        "label": "2026-06",
+                        "value": 11477,
+                        "event_count": 38,
+                        "included_event_count": 38,
+                        "excluded_unknown_count": 8,
+                    },
+                    {
+                        "label": "2026-07",
+                        "value": 10719,
+                        "event_count": 39,
+                        "included_event_count": 39,
+                        "excluded_unknown_count": 9,
+                        "absolute_change": 758,
+                        "signed_change": -758,
+                        "trend_direction": "decrease",
+                    },
+                ],
+                included_event_count=77,
+                excluded_unknown_count=17,
+                deduplication_grain="causal_event",
+            )
+        }
+    )
+
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(result)
+    statements = list(contract["statements"].values())
+
+    assert any(
+        "2026-06: 11477 doğrulanmış müşteri etkisi (38 dahil, 8 hariç)." in statement
+        for statement in statements
+    )
+    assert any(
+        "2026-07: 10719 doğrulanmış müşteri etkisi (39 dahil, 9 hariç)." in statement
+        for statement in statements
+    )
+    assert any("mutlak değişim 758; yön azalış" in statement for statement in statements)
+
+
 def test_free_text_narrative_preserves_colon_identifiers_and_natural_text():
     statements = {"S1": "RuleVersion BB-DEGRADATION-QUALITY:v1 uygulandı."}
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
@@ -1349,7 +1398,7 @@ def test_requested_comparison_coverage_adds_verified_periods_change_and_directio
         selected_statements={
             "S1": (
                 "Dönem karşılaştırması: 2026-06 11477, 2026-07 10719; "
-                "mutlak değişim -758; yön azalış."
+                "mutlak değişim 758; yön azalış."
             )
         },
         statement_concepts={"S1": ["analytics_comparison"]},
@@ -1358,7 +1407,7 @@ def test_requested_comparison_coverage_adds_verified_periods_change_and_directio
     assert fill_count == 1
     assert "2026-06 11477" in text
     assert "2026-07 10719" in text
-    assert "-758" in text
+    assert "758" in text
 
 
 def test_grouped_comparison_coverage_adds_each_missing_period_pair():
@@ -1366,7 +1415,7 @@ def test_grouped_comparison_coverage_adds_each_missing_period_pair():
         "İzmir -10, Ankara 5 değişim kaydetti.",
         original_query="Şehirleri iki dönem arasındaki değişime göre karşılaştır.",
         selected_statements={
-            "S1": "İzmir: 2026-06 30, 2026-07 20; mutlak değişim -10; yön azalış.",
+            "S1": "İzmir: 2026-06 30, 2026-07 20; mutlak değişim 10; yön azalış.",
             "S2": "Ankara: 2026-06 10, 2026-07 15; mutlak değişim 5; yön artış.",
         },
         statement_concepts={
@@ -1378,6 +1427,55 @@ def test_grouped_comparison_coverage_adds_each_missing_period_pair():
     assert fill_count == 2
     assert "2026-06 30" in text
     assert "2026-07 15" in text
+
+
+def test_grouped_comparison_contract_has_period_evidence_without_fake_global_summary():
+    result = valid_result("response-grouped-comparison").model_copy(
+        update={
+            "analytics_summary": AnalyticsSummary(
+                metric="affected_customers",
+                aggregation="sum",
+                group_by="city",
+                ranking_direction="desc",
+                comparison=True,
+                rows=[
+                    {
+                        "label": "İzmir",
+                        "value": -10,
+                        "absolute_change": 10,
+                        "signed_change": -10,
+                        "trend_direction": "decrease",
+                        "event_count": 3,
+                        "period_values": [
+                            {
+                                "label": "2026-06",
+                                "value": 30,
+                                "event_count": 2,
+                                "included_event_count": 2,
+                                "excluded_unknown_count": 1,
+                            },
+                            {
+                                "label": "2026-07",
+                                "value": 20,
+                                "event_count": 1,
+                                "included_event_count": 1,
+                                "excluded_unknown_count": 0,
+                            },
+                        ],
+                    }
+                ],
+                included_event_count=3,
+                excluded_unknown_count=1,
+                deduplication_grain="causal_event",
+            )
+        }
+    )
+
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(result)
+    statements = list(contract["statements"].values())
+
+    assert any("2026-06 30 (2 dahil, 1 hariç)" in statement for statement in statements)
+    assert not any(statement.startswith("Dönem karşılaştırması:") for statement in statements)
 
 
 def test_requested_unknown_exclusion_coverage_preserves_verified_zero():

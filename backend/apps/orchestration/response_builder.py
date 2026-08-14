@@ -1093,7 +1093,15 @@ class ValidatedResponseBuilder:
                     add(
                         f"{index}. {row['label']}: "
                         + ", ".join(
-                            f"{period['label']} {period['value']}" for period in periods
+                            f"{period['label']} {period['value']}"
+                            + (
+                                f" ({period['included_event_count']} dahil, "
+                                f"{period['excluded_unknown_count']} hariç)"
+                                if "included_event_count" in period
+                                and "excluded_unknown_count" in period
+                                else ""
+                            )
+                            for period in periods
                         )
                         + f"; mutlak değişim {row.get('absolute_change')}; yön "
                         + direction_labels.get(
@@ -1102,15 +1110,31 @@ class ValidatedResponseBuilder:
                         + "."
                     )
                 else:
+                    period_evidence = ""
+                    if (
+                        analytics.comparison
+                        and analytics.group_by == "time_bucket"
+                        and "included_event_count" in row
+                        and "excluded_unknown_count" in row
+                    ):
+                        period_evidence = (
+                            f" ({row['included_event_count']} dahil, "
+                            f"{row['excluded_unknown_count']} hariç)"
+                        )
                     add(
                         f"{index}. {row['label']}: {row['value']} "
-                        f"{metric_labels.get(analytics.metric, analytics.metric)}."
+                        f"{metric_labels.get(analytics.metric, analytics.metric)}"
+                        f"{period_evidence}."
                     )
             comparison_row = next(
                 (row for row in reversed(analytics.rows) if row.get("absolute_change") is not None),
                 None,
             )
-            if comparison_row is not None and len(analytics.rows) >= 2:
+            if (
+                analytics.group_by == "time_bucket"
+                and comparison_row is not None
+                and len(analytics.rows) >= 2
+            ):
                 direction_labels = {
                     "increase": "artış",
                     "decrease": "azalış",

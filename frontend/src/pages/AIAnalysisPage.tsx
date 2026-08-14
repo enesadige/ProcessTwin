@@ -100,9 +100,18 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
   const analyticsCards: ReactNode[] = []
   if (analytics) {
     analytics.rows.forEach((row, index) => {
-      const periods = row.period_values?.map((period) => `${period.label}: ${period.value}`).join(' | ')
+      const periods = row.period_values?.map((period) => {
+        const evidence = period.included_event_count !== undefined && period.excluded_unknown_count !== undefined
+          ? ` (dahil: ${period.included_event_count}, hariç: ${period.excluded_unknown_count})`
+          : ''
+        return `${period.label}: ${period.value}${evidence}`
+      }).join(' | ')
       const change = row.absolute_change !== undefined ? `Fark: ${row.absolute_change}` : ''
-      analyticsCards.push(<FactCard key={`analytics-${index}-${row.label}`} label={`${index + 1}. ${row.label}`} value={[periods, change].filter(Boolean).join(' | ') || row.value} />)
+      const rowEvidence = row.included_event_count !== undefined && row.excluded_unknown_count !== undefined
+        ? ` (dahil: ${row.included_event_count}, hariç: ${row.excluded_unknown_count})`
+        : ''
+      const primaryValue = periods || `${row.value}${rowEvidence}`
+      analyticsCards.push(<FactCard key={`analytics-${index}-${row.label}`} label={`${index + 1}. ${row.label}`} value={[primaryValue, change].filter(Boolean).join(' | ')} />)
     })
     analyticsCards.push(<FactCard key="analytics-included" label="Hesaba dahil edilen olay" value={analytics.included_event_count} />)
     if (analytics.excluded_unknown_count) analyticsCards.push(<FactCard key="analytics-excluded" label="Bilinmeyen etki nedeniyle hariç" value={analytics.excluded_unknown_count} tone="warning" />)

@@ -528,11 +528,24 @@ def test_analytics_normalizer_preserves_grouped_comparison_period_values():
                     "label": "İzmir",
                     "value": -10,
                     "event_count": 3,
-                    "absolute_change": -10,
+                    "absolute_change": 10,
+                    "signed_change": -10,
                     "trend_direction": "decrease",
                     "period_values": [
-                        {"label": "2026-06", "value": 30, "event_count": 2},
-                        {"label": "2026-07", "value": 20, "event_count": 1},
+                        {
+                            "label": "2026-06",
+                            "value": 30,
+                            "event_count": 2,
+                            "included_event_count": 2,
+                            "excluded_unknown_count": 0,
+                        },
+                        {
+                            "label": "2026-07",
+                            "value": 20,
+                            "event_count": 1,
+                            "included_event_count": 1,
+                            "excluded_unknown_count": 1,
+                        },
                     ],
                     "included_event_count": 3,
                     "excluded_unknown_count": 1,
@@ -546,6 +559,9 @@ def test_analytics_normalizer_preserves_grouped_comparison_period_values():
 
     assert extracted.analytics["comparison"] is True
     assert extracted.analytics["rows"][0]["period_values"][1]["value"] == 20
+    assert extracted.analytics["rows"][0]["absolute_change"] == 10
+    assert extracted.analytics["rows"][0]["signed_change"] == -10
+    assert extracted.analytics["rows"][0]["period_values"][1]["excluded_unknown_count"] == 1
     assert extracted.analytics["rows"][0]["excluded_unknown_count"] == 1
 
 
