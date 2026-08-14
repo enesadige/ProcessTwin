@@ -204,3 +204,18 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 3. Outage verification state'in additive alan mı, ayrı assessment mi olacağı; hedef öneri additive verification alanı + assessment'tır.
 4. GPON scenario weight'leri ve kaynak eşiklerinin örnek CSV/log geldikten sonra kalibrasyonu.
 5. Ticari policy, özellikle 24 saat ifadesi, bağımsız rule governance ile teyit edilmeden değişmeyecektir.
+
+## 2026-08-14 — V3 final acceptance ve güvenli activation
+
+- Validated V3 repair snapshot `74`, immutable V2 rollback snapshot `54` ve
+  original V3 candidate `73` korunarak AI Analysis varsayılanına alındı.
+  Authoritative seçim `is_active` değil, frontend'in backend'e gönderdiği exact
+  snapshot anahtarıdır.
+- Base-world fingerprint, failed/hitless failover, compensation persistence,
+  correlation, RAG/Local Qwen retrieval ve generic analytics kabulü doğrulandı.
+  Unknown impact sıfırlaştırılmaz; exhaustive ranking ve explicit top-N semantics korunur.
+- V3: 91 schedule + 3 helper event, 420 alarm, 77.125 SessionEvent, 49.996
+  assessment, 10.658 CompensationEvaluation, 10.716 DecisionEvidence.
+  Activation/integration commit: `60fa4fa`.
+- Rollback: frontend exact snapshot anahtarını snapshot 54'e geri çevir; eski
+  QueryRun replay'leri değişmez. Sonraki görev `MAIN-066`; bu görevde başlatılmadı.

@@ -515,3 +515,24 @@ Provider failures were 0; security and citation counters were zero. Details:
 
 Overall status is **PARTIAL_PROVIDER_LIMIT**. No production code changed;
 PRE-061 is not promoted to complete and MAIN-061 remains blocked.
+
+## V3 Dataset Activation (2026-08-14)
+
+- AI Analysis varsayılanı validated V3 repair snapshot `74` anahtarıdır:
+  `multi-city-realism-v3-repair-r1-multi-city-realism-snapshot-v3-repair-r1`.
+  V2 rollback snapshot `54` ve original V3 candidate `73` korunur.
+- Snapshot 74 base world fingerprint'i snapshot 54 ile eşittir: 14.400 müşteri,
+  16.200 abonelik, 238 cihaz ve external-ID/topology dünyası değişmedi. V3
+  operational veri 94 event (91+3), 420 alarm, 77.125 SessionEvent, 49.996
+  impact assessment, 10.658 CompensationEvaluation ve 10.716 DecisionEvidence içerir.
+- Failed failover `CE-MCR-0052`: potential 1.441, impacted 1.009, customer 924;
+  hitless `CE-MCR-0041/0044/0084`: impacted 0, protected/no-impact 1. Unknown
+  değerler sıfır sayılmaz. `OUT-MCR-0052` telafisi 984 evaluation ve
+  `58.850,16 TRY` aggregate'iyle snapshot-local evidence üzerinden sunulur.
+- RAG canonical corpus Local Qwen ile snapshot-74 metadata altında indekslendi;
+  retrieval operasyonel sayı hesaplamaz. Trend analytics internal MCP read
+  timeout'ı bounded stdio tool süresiyle 15 saniyede hizalandı.
+- Activation/integration commit: `60fa4fa`. Rollback: yalnız
+  `frontend/src/pages/AIAnalysisPage.tsx` snapshot anahtarını snapshot 54
+  anahtarına çevir; eski QueryRun replay'leri kendi snapshot provenance'ını korur.
+- Sonraki görev: `MAIN-066`. Başlatılmayacak.
