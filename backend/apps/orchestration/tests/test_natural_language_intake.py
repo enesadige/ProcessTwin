@@ -715,6 +715,9 @@ def test_deterministic_parser_preserves_unicode_device_and_parses_turkish_date()
     assert device_query.structured_query.device_code == "AGG-İZM-002"
     assert date_query.structured_query.time_window is not None
     assert date_query.structured_query.time_window.from_time.date().isoformat() == "2026-06-06"
+    assert date_query.structured_query.intent.value == "operational_analytics"
+    assert date_query.structured_query.analytics is not None
+    assert date_query.structured_query.analytics.metric == "outage_count"
 
 
 @pytest.mark.django_db

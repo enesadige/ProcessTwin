@@ -921,6 +921,12 @@ class DeterministicStructuredQueryParser:
             "goster",
             "ilk ",
             "son ",
+            "kaç kesinti",
+            "kac kesinti",
+            "kaç olay",
+            "kac olay",
+            "kaç alarm",
+            "kac alarm",
         )
         if not any(term in folded for term in analytic_terms):
             return None
@@ -943,11 +949,25 @@ class DeterministicStructuredQueryParser:
             ),
             (
                 "outage_count",
-                ("kesinti sayısı", "kesinti sayisi", "kesinti sayılarını", "kesinti sayilarini"),
+                (
+                    "kesinti sayısı",
+                    "kesinti sayisi",
+                    "kesinti sayılarını",
+                    "kesinti sayilarini",
+                    "kaç kesinti",
+                    "kac kesinti",
+                ),
             ),
             (
                 "event_count",
-                ("olay sayısı", "olay sayisi", "olay sayılarını", "olay sayilarini"),
+                (
+                    "olay sayısı",
+                    "olay sayisi",
+                    "olay sayılarını",
+                    "olay sayilarini",
+                    "kaç olay",
+                    "kac olay",
+                ),
             ),
         )
         metric = next(
