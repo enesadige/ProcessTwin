@@ -135,11 +135,12 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
     const evidenceLink = result.snapshot_identifier
       ? `/evidence?${new URLSearchParams({ evidence_hash: reference, snapshot_identifier: result.snapshot_identifier })}`
       : null
+    const evidenceLabel = reference.length > 12 ? reference.slice(0, 12) : reference
     provenanceCards.push(
       <FactCard
         key={`decision-evidence-${reference}`}
         label="DecisionEvidence"
-        value={evidenceLink ? <Link className="analysis-fact__link" to={evidenceLink}>{reference}</Link> : reference}
+        value={evidenceLink ? <Link className="analysis-fact__link" to={evidenceLink}>{evidenceLabel}</Link> : evidenceLabel}
       />,
     )
   })

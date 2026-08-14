@@ -1421,6 +1421,8 @@ def _compensation_evidence_summary(*, evaluations, evidence) -> dict[str, Any]:
         "total_amount": aggregate["total_amount"],
         "currency": currencies[0] if len(currencies) == 1 else None,
         "rule_versions": rule_versions,
-        "evidence_reference": first_evidence[:12] if first_evidence else None,
+        # The public read-only evidence detail endpoint is snapshot-local and
+        # requires the immutable full hash. Presentation layers may abbreviate it.
+        "evidence_reference": first_evidence,
         "evidence_count": summary_evidence.count(),
     }
