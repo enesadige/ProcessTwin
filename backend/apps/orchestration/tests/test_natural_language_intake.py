@@ -1013,7 +1013,7 @@ def test_exact_event_compensation_total_is_not_misclassified_as_dataset_analytic
 
     query = DeterministicStructuredQueryParser().parse(
         original_query=(
-            "CE-INTAKE-001 için toplam telafi tutarı nedir; uygulanan RuleVersion ve "
+            "CE-INTAKE-001 için telafi uygunluğu nedir; hangi kural sürümü uygulandı ve "
             "DecisionEvidence kaydını belirt."
         ),
         snapshot=snapshot,
@@ -1027,6 +1027,56 @@ def test_exact_event_compensation_total_is_not_misclassified_as_dataset_analytic
         "eligibility",
         "evidence",
     }
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Çorum'da bu ay kaç kesinti oldu?",
+        "Çorum şehrinde bu ay kaç kesinti oldu?",
+        "Çorum'da bu ay kaç kesinti oldu?",
+    ],
+)
+def test_unresolved_explicit_city_never_widens_an_analytics_scope(query):
+    snapshot = create_snapshot("analytics-unresolved-city")
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query=query,
+        snapshot=snapshot,
+    ).structured_query
+
+    assert parsed.clarification_required is True
+    assert [reason.value for reason in parsed.clarification_reasons] == ["missing_scope_filter"]
+
+
+@pytest.mark.django_db
+def test_known_city_with_locative_suffix_keeps_the_existing_analytics_scope():
+    snapshot = create_snapshot("analytics-known-locative-city")
+    city = City.objects.create(name="Ankara", plate_code="06")
+    district = District.objects.create(
+        city=city,
+        name="Çankaya",
+        profile_type=AreaProfileType.MIXED,
+    )
+    NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="AGG-ANK-LOCATIVE-001",
+        name="Known location device",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query="Ankara'da bu ay kaç kesinti oldu?",
+        snapshot=snapshot,
+    ).structured_query
+
+    assert parsed.clarification_required is False
+    assert [item.model_dump(exclude_none=True) for item in parsed.analytics_locations] == [
+        {"city": "Ankara"}
+    ]
 
 
 @pytest.mark.django_db

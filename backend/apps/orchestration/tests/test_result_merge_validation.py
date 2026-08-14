@@ -94,6 +94,26 @@ def create_executing_run(snapshot, plan: ToolPlan):
     return run
 
 
+def test_document_retrieval_accepts_existing_list_section_path_contract():
+    result = _document_retrieval(
+        {
+            "source_kind": "synthetic",
+            "results": [
+                {
+                    "document_code": "RULE-001",
+                    "document_version": 1,
+                    "heading": "Koşullar",
+                    "section_path": ["Kural", "Koşullar"],
+                    "hybrid_score": 0.9,
+                    "text": "Doğrulanmış kural metni.",
+                }
+            ],
+        }
+    )
+
+    assert result.retrieval_sources[0].section_path == "Kural > Koşullar"
+
+
 def success(call_id: str, server: str, tool_name: str, data: dict) -> ToolExecutionResult:
     return ToolExecutionResult(
         call_id=call_id,

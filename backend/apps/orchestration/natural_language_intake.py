@@ -795,6 +795,23 @@ class DeterministicStructuredQueryParser:
                 RequestedOutput.CORRELATION,
                 RequestedOutput.EVIDENCE,
             ]
+        compensation_requested = any(term in folded for term in ("tazminat", "telafi", "uygunluk"))
+        eligibility_requested = any(
+            term in folded
+            for term in (
+                "uygun",
+                "uygunluk",
+                "sonucu",
+                "karar",
+                "hesaplanan",
+            )
+        )
+        if compensation_requested:
+            return StructuredQueryIntent.COMPENSATION_EVALUATION, [
+                RequestedOutput.SUMMARY,
+                RequestedOutput.ELIGIBILITY,
+                RequestedOutput.EVIDENCE,
+            ]
         if any(
             term in folded
             for term in (
@@ -836,17 +853,6 @@ class DeterministicStructuredQueryParser:
                 "ana bağlantı",
             )
         )
-        compensation_requested = any(term in folded for term in ("tazminat", "telafi", "uygunluk"))
-        eligibility_requested = any(
-            term in folded
-            for term in (
-                "uygun",
-                "uygunluk",
-                "sonucu",
-                "karar",
-                "hesaplanan",
-            )
-        )
         root_requested = any(
             term in folded
             for term in (
@@ -872,12 +878,6 @@ class DeterministicStructuredQueryParser:
             return StructuredQueryIntent.OUTAGE_IMPACT, sorted(
                 set(outputs), key=lambda item: item.value
             )
-        if compensation_requested:
-            return StructuredQueryIntent.COMPENSATION_EVALUATION, [
-                RequestedOutput.SUMMARY,
-                RequestedOutput.ELIGIBILITY,
-                RequestedOutput.EVIDENCE,
-            ]
         if any(
             term in folded
             for term in ("yedek baglanti", "backup", "failover", "tam hizmet kesintisi")
@@ -1290,7 +1290,33 @@ class DeterministicStructuredQueryParser:
 
     @staticmethod
     def _location_requested(folded: str) -> bool:
-        return any(term in folded for term in ("ilcesinde", "ilçesinde", "sehrinde", "şehrinde"))
+        if any(term in folded for term in ("ilcesinde", "ilçesinde", "sehrinde", "şehrinde")):
+            return True
+
+        # Explicit Turkish locative suffixes also express a location scope.
+        # A month such as "Haziran'da" is temporal context, not an unresolved city.
+        temporal_stems = {
+            "ocak",
+            "subat",
+            "mart",
+            "nisan",
+            "mayis",
+            "haziran",
+            "temmuz",
+            "agustos",
+            "eylul",
+            "ekim",
+            "kasim",
+            "aralik",
+            "bugun",
+            "dun",
+            "yarin",
+            "sehir",
+            "ilce",
+            "bolge",
+        }
+        locative_stems = re.findall(r"\b([a-z]+)(?:['’])?(?:da|de|ta|te)\b", folded)
+        return any(stem not in temporal_stems for stem in locative_stems)
 
     @staticmethod
     def _exact_snapshot_value(folded: str, values) -> str | None:

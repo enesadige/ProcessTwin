@@ -291,3 +291,14 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   hatasında sessizce kaybolmaz.
 - Snapshot 74, analytics, RAG, provider ve backend hata semantiği değişmedi.
   Sonraki görev `MAIN-070`; başlatılmayacak.
+
+## 2026-08-14 — AI Analysis Scope ve Telafi Execution Düzeltmesi
+
+- Açık ama snapshot içinde çözülemeyen şehirler, `Çorum'da` gibi locative
+  yazımlarda da clarification'a gider; analytics filtresi sessizce global
+  scope'a genişlemez.
+- Telafi/uygunluk talepleri mevcut compensation evidence yoluna önceliklidir.
+  Retrieval result'ındaki liste section path değeri presentation için güvenli
+  biçimde normalize edilir; mevcut Rule/RAG verisi değiştirilmez.
+- Persisted karar yoksa pending/evidence yok sonucu korunur; sahte RuleVersion
+  veya DecisionEvidence gösterilmez.

@@ -624,3 +624,16 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
 - Yeni backend endpointi veya veri semantiği eklenmedi; Snapshot 74, topology,
   Rule/RAG provenance ve mevcut safe fallback davranışı korundu.
 - Sonraki görev: `MAIN-070`. Başlatılmayacak.
+
+## AI Analysis Scope ve Telafi Execution Düzeltmesi (2026-08-14)
+
+- Çözülemeyen açık şehir ifadeleri, Türkçe locative yazımı (`Çorum'da`) dahil,
+  global analytics'e düşmez ve güvenli clarification üretir. Bilinen şehir
+  scope davranışı korunur.
+- Exact event telafi/uygunluk sorguları doküman niyetine kaymak yerine mevcut
+  compensation evidence yolunu kullanır. RAG kaynak sözleşmesindeki liste
+  biçimli section path, read-only sunum metnine normalize edilir; merge hatası
+  üretmez.
+- CE-MCR-0010 için persisted compensation değerlendirmesi olmadığı doğrulandı:
+  sistem bunu pending/evidence yok olarak gösterecek, RuleVersion veya
+  DecisionEvidence uydurmayacaktır.

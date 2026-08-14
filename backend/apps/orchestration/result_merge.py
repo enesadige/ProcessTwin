@@ -580,12 +580,17 @@ def _document_retrieval(data: Mapping[str, Any]) -> _ExtractedToolResult:
         if item is None:
             raise ValueError("retrieval source is invalid")
         score, score_source = _retrieval_score(item)
+        section_path = item.get("section_path")
+        if isinstance(section_path, list):
+            if not all(isinstance(part, str) and part.strip() for part in section_path):
+                raise ValueError("section_path must contain non-empty strings")
+            section_path = " > ".join(part.strip() for part in section_path)
         sources.append(
             RetrievalSource(
                 source_code=_string(item.get("document_code"), "document_code", required=True),
                 version=_optional_non_negative(item, "document_version"),
                 section=_string(item.get("heading"), "heading"),
-                section_path=_string(item.get("section_path"), "section_path"),
+                section_path=_string(section_path, "section_path"),
                 source_kind=_string(data.get("source_kind"), "source_kind"),
                 score=score,
                 score_source=score_source,
