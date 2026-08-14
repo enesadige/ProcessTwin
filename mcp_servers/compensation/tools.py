@@ -213,6 +213,35 @@ class CompensationMCPTools:
         elif tool_name == "get_compensation_evidence":
             evaluations = data.get("evaluations", [])
             evidence_rows = data.get("decision_evidence", [])
+            summary = data.get("summary")
+            if isinstance(summary, dict):
+                data = {
+                    "status": summary.get("status", "pending"),
+                    "consideration_count": summary.get("consideration_count"),
+                    "eligible": summary.get("eligible"),
+                    "ineligible_pending": summary.get("ineligible_pending"),
+                    "total_amount": summary.get("total_amount"),
+                    "currency": summary.get("currency"),
+                    "rule_versions": summary.get("rule_versions", {}),
+                    "evidence": (
+                        {"reference": summary["evidence_reference"]}
+                        if summary.get("evidence_reference")
+                        else None
+                    ),
+                }
+                return MCPToolResponse[dict[str, Any]](
+                    success=True,
+                    data=data,
+                    metadata=metadata,
+                    warnings=[
+                        MCPWarning.model_validate(warning)
+                        for warning in payload.get("warnings", [])
+                    ],
+                    evidence=[
+                        MCPEvidence.model_validate(evidence)
+                        for evidence in payload.get("evidence", [])
+                    ],
+                )
             evaluation = evaluations[0] if isinstance(evaluations, list) and evaluations else {}
             evidence = evidence_rows[0] if isinstance(evidence_rows, list) and evidence_rows else {}
             data = {

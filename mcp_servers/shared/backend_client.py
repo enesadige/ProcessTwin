@@ -9,7 +9,10 @@ from mcp_servers.shared.contracts import MCPError, MCPErrorCode
 from mcp_servers.shared.correlation import is_valid_correlation_id
 
 DEFAULT_CONNECT_TIMEOUT_SECONDS = 2.0
-DEFAULT_READ_TIMEOUT_SECONDS = 5.0
+# The stdio orchestration runner already allows a bounded 15-second tool call.
+# Keep the internal read budget aligned so deterministic snapshot analytics can
+# return its persisted result instead of failing at a shorter transport layer.
+DEFAULT_READ_TIMEOUT_SECONDS = 15.0
 DEFAULT_WRITE_TIMEOUT_SECONDS = 5.0
 DEFAULT_POOL_TIMEOUT_SECONDS = 2.0
 

@@ -1,6 +1,7 @@
 import httpx
 import pytest
 from mcp_servers.shared.backend_client import (
+    DEFAULT_READ_TIMEOUT_SECONDS,
     InternalAPIClient,
     InternalAPIClientConfig,
     InternalAPIClientError,
@@ -26,6 +27,17 @@ def test_client_config_loads_from_environment_with_explicit_timeout():
     assert config.timeout.read == 4.0
     assert config.timeout.write == 5.0
     assert config.timeout.pool == 2.0
+
+
+def test_client_config_uses_bounded_default_read_timeout():
+    config = InternalAPIClientConfig.from_env(
+        {
+            "MCP_BACKEND_BASE_URL": "http://127.0.0.1:8000/",
+            "MCP_BACKEND_SERVICE_TOKEN": SERVICE_TOKEN,
+        }
+    )
+
+    assert config.timeout.read == DEFAULT_READ_TIMEOUT_SECONDS
 
 
 @pytest.mark.parametrize(

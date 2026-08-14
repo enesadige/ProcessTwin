@@ -1093,6 +1093,62 @@ def test_free_text_narrative_strips_only_known_internal_role_prefixes():
     ]
 
 
+def test_free_text_narrative_strips_markdown_role_prefix_and_internal_support_labels():
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "**Summary** (S2) Ana bağlantı down, yedek bağlantı active.",
+        {"S1": "Ana bağlantı down, yedek bağlantı active."},
+        {},
+    )
+
+    assert removed == []
+    assert narrative["sentences"][0]["text"] == (
+        "Ana bağlantı down, yedek bağlantı active."
+    )
+
+
+def test_free_text_narrative_strips_standalone_internal_support_labels():
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        (
+            "S3 bölümü ana bağlantının aktif olduğunu, S1’deki kayıt ise yedeğin aktif "
+            "olduğunu gösterir."
+        ),
+        {"S1": "Ana bağlantı down, yedek bağlantı active."},
+        {},
+    )
+
+    assert removed == []
+    assert "S3" not in narrative["sentences"][0]["text"]
+    assert "S1" not in narrative["sentences"][0]["text"]
+
+
+def test_free_text_narrative_normalizes_verified_thousands_separators():
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "Doğrulanmış müşteri etkisi 11\u202f477, toplam etki 5.921 müşteridir.",
+        {
+            "S1": "Doğrulanmış müşteri etkisi 11477.",
+            "S2": "Toplam doğrulanmış müşteri etkisi 5921.",
+        },
+        {},
+    )
+
+    assert removed == []
+    assert "11477" in narrative["sentences"][0]["text"]
+    assert "5921" in narrative["sentences"][0]["text"]
+
+
+def test_free_text_narrative_strips_turkish_markdown_role_prefix():
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "**Analiz** Doğrulanmış müşteri etkisi 5921 müşteridir.",
+        {"S1": "Doğrulanmış müşteri etkisi 5921 müşteridir."},
+        {},
+    )
+
+    assert removed == []
+    assert narrative["sentences"][0]["text"] == (
+        "Doğrulanmış müşteri etkisi 5921 müşteridir."
+    )
+
+
 def test_analytics_unknown_exclusion_and_failed_failover_filter_are_verified_support():
     result = valid_result("response-analytics-unknown").model_copy(
         update={
@@ -1212,6 +1268,7 @@ def test_deterministic_fallback_allows_second_verified_root_resource_identifier(
         "Kesinti müşteri memnuniyetini olumsuz etkiledi.",
         "Müşteriler alternatif çözümler aramak zorunda kaldı.",
         "Kesinti iş sürekliliğini olumsuz etkiledi.",
+        "Bu düşüş hizmet kalitesinde bir gerilemeye işaret edebilir.",
         "Olay ticari etki yarattı.",
     ],
 )
@@ -1254,6 +1311,43 @@ def test_requested_narrative_coverage_adds_only_missing_verified_fact():
     assert fill_count == 2
     assert "839.99" in text
     assert "ME-FAILED-FAILOVER:v1" in text
+
+
+def test_requested_comparison_coverage_adds_verified_periods_change_and_direction():
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "Haziran ayından Temmuz ayına azalış görülmüştür.",
+        original_query=(
+            "Haziran ile Temmuz değerlerini karşılaştır; iki değeri, farkı ve yönü yaz."
+        ),
+        selected_statements={
+            "S1": (
+                "Dönem karşılaştırması: 2026-06 11477, 2026-07 10719; "
+                "mutlak değişim -758; yön azalış."
+            )
+        },
+        statement_concepts={"S1": ["analytics_comparison"]},
+    )
+
+    assert fill_count == 1
+    assert "2026-06 11477" in text
+    assert "2026-07 10719" in text
+    assert "-758" in text
+
+
+def test_requested_unknown_exclusion_coverage_preserves_verified_zero():
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "Başarısız failover olaylarında doğrulanmış müşteri etkisi hesaplandı.",
+        original_query="Kaç olayın hariç kaldığını da belirt.",
+        selected_statements={
+            "S1": (
+                "0 olay, doğrulanmış etki kanıtı olmadığı için hesaplamaya dahil edilmedi."
+            )
+        },
+        statement_concepts={"S1": ["unknown_exclusion"]},
+    )
+
+    assert fill_count == 1
+    assert "0 olay" in text
 
 
 def test_correlation_temporal_coverage_adds_verified_minutes_only_when_requested():

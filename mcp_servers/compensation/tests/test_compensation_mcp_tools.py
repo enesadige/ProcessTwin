@@ -63,6 +63,36 @@ def test_empty_compensation_evidence_preserves_unknown_counts():
     assert response.data["ineligible_pending"] is None
 
 
+def test_compensation_evidence_uses_backend_aggregate_not_first_page_row():
+    client = FakeBackendClient(
+        data={
+            "evaluations": [{"proposed_amount": "1.00", "result_type": "eligible"}],
+            "decision_evidence": [],
+            "summary": {
+                "status": "calculated",
+                "consideration_count": 984,
+                "eligible": 984,
+                "ineligible_pending": 0,
+                "total_amount": "58850.16",
+                "currency": "TRY",
+                "rule_versions": {"BB-FULL-OUTAGE-TIERED:v1": 984},
+                "evidence_reference": "evidence123456",
+                "evidence_count": 984,
+            },
+        }
+    )
+
+    response = CompensationMCPTools(client).run(
+        "get_compensation_evidence",
+        {"snapshot_identifier": "snapshot-1", "outage_code": "OUT-001"},
+    )
+
+    assert response.success is True
+    assert response.data["consideration_count"] == 984
+    assert response.data["total_amount"] == "58850.16"
+    assert response.data["rule_versions"] == {"BB-FULL-OUTAGE-TIERED:v1": 984}
+
+
 @pytest.mark.parametrize(
     ("tool_name", "arguments", "method", "expected_path"),
     [

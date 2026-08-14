@@ -778,3 +778,82 @@ def test_analytics_parser_supports_generic_potential_scope_and_event_count_metri
     assert potential_scope.analytics.metric == "potential_subscriptions"
     assert event_count.analytics is not None
     assert event_count.analytics.metric == "event_count"
+
+
+@pytest.mark.django_db
+def test_filtered_total_impact_does_not_group_by_incidental_event_wording():
+    snapshot = create_snapshot("analytics-filtered-total")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "Failed failover olaylarında toplam kaç müşteri etkilendi? "
+            "Yalnızca doğrulanmış müşteri etkisini kullan; bilinmeyenleri sıfır sayma."
+        ),
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.analytics is not None
+    assert query.analytics.metric == "affected_customers"
+    assert query.analytics.aggregation == "sum"
+    assert query.analytics.group_by is None
+    assert query.analytics.failed_failover is True
+
+
+@pytest.mark.django_db
+def test_exact_event_compensation_total_is_not_misclassified_as_dataset_analytics():
+    snapshot = create_snapshot("anchored-compensation-total")
+    create_causal_event(snapshot, code="CE-INTAKE-001")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "CE-INTAKE-001 için toplam telafi tutarı nedir; uygulanan RuleVersion ve "
+            "DecisionEvidence kaydını belirt."
+        ),
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.intent.value == "compensation_evaluation"
+    assert query.analytics is None
+    assert query.clarification_required is False
+    assert {item.value for item in query.requested_outputs} >= {
+        "summary",
+        "eligibility",
+        "evidence",
+    }
+
+
+@pytest.mark.django_db
+def test_document_meaning_query_does_not_require_operational_anchor():
+    snapshot = create_snapshot("document-intent-without-anchor")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=(
+            "Dokümana göre FAILOVER_UNSUCCESSFUL ne anlama gelir? Kaynak ve bölüm belirt."
+        ),
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.intent.value == "rule_document_retrieval"
+    assert query.retrieval_query is not None
+    assert query.clarification_required is False
+
+
+@pytest.mark.django_db
+def test_document_semantic_dimensions_cannot_expand_into_operational_impact_output():
+    snapshot = create_snapshot("document-semantic-boundary")
+    query = DeterministicStructuredQueryParser().parse(
+        original_query="Dokümana göre FAILOVER_UNSUCCESSFUL ne anlama gelir?",
+        snapshot=snapshot,
+    ).structured_query
+
+    result = LLMSemanticDecomposer(
+        SemanticProvider(["failover_status", "source_version_section", "summary"])
+    ).merge(original_query="Dokümana göre anlamı nedir?", deterministic_query=query)
+
+    assert result.accepted is True
+    assert RequestedOutput.IMPACT not in result.structured_query.requested_outputs
+    assert set(result.structured_query.requested_outputs) == {
+        RequestedOutput.SUMMARY,
+        RequestedOutput.DETAILS,
+        RequestedOutput.EVIDENCE,
+    }

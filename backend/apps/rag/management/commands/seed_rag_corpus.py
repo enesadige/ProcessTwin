@@ -125,14 +125,32 @@ def validate_corpus(multicity_snapshot_identifier=None):
     manifest_alarms = {code for item in DOCUMENTS for code in item["alarm_refs"]}
     if actual_alarms != manifest_alarms:
         raise CommandError(format_difference("alarm", actual_alarms, manifest_alarms))
+    ground_truth_snapshot = resolve_ground_truth_snapshot(multicity)
     actual_cases = set(
-        GroundTruthCase.objects.filter(data_snapshot=multicity).values_list("case_code", flat=True)
+        GroundTruthCase.objects.filter(data_snapshot=ground_truth_snapshot).values_list(
+            "case_code", flat=True
+        )
     )
     manifest_cases = {code for item in DOCUMENTS for code in item["ground_truth_refs"]}
     if actual_cases != manifest_cases:
         raise CommandError(format_difference("ground-truth", actual_cases, manifest_cases))
     validate_refund_versions(maltepe)
-    return {"documents": resolved, "multicity": multicity, "maltepe": maltepe}
+    return {
+        "documents": resolved,
+        "multicity": multicity,
+        "maltepe": maltepe,
+        "ground_truth": ground_truth_snapshot,
+    }
+
+
+def resolve_ground_truth_snapshot(multicity):
+    if GroundTruthCase.objects.filter(data_snapshot=multicity).exists():
+        return multicity
+    source_snapshot_id = multicity.dataset_version.config.get("source_snapshot_id")
+    if not isinstance(source_snapshot_id, int):
+        return multicity
+    source = DataSnapshot.objects.filter(pk=source_snapshot_id).first()
+    return source or multicity
 
 
 def resolve_snapshot(snapshot_key):
@@ -183,6 +201,13 @@ def validate_refund_versions(maltepe):
 
 
 def document_fields(descriptor, content, digest, snapshot):
+    metadata = get_document_metadata(descriptor)
+    ground_truth_snapshot = descriptor.get("ground_truth_snapshot")
+    if ground_truth_snapshot is not None:
+        metadata = {
+            **metadata,
+            "ground_truth_reference_snapshot": ground_truth_snapshot.snapshot_key,
+        }
     return {
         "data_snapshot": snapshot,
         "document_code": descriptor["document_code"],
@@ -197,7 +222,7 @@ def document_fields(descriptor, content, digest, snapshot):
         "status": "active",
         "valid_from": parse_datetime(descriptor["valid_from"]),
         "valid_to": parse_datetime(descriptor["valid_to"]),
-        "metadata": get_document_metadata(descriptor),
+        "metadata": metadata,
     }
 
 
@@ -206,6 +231,7 @@ def seed_documents(resolved):
     unchanged = 0
     for descriptor, _path, content, digest in resolved["documents"]:
         snapshot = snapshot_for_descriptor(descriptor, resolved)
+        descriptor = descriptor_with_provenance(descriptor, snapshot, resolved)
         fields = document_fields(descriptor, content, digest, snapshot)
         existing = SourceDocument.objects.filter(
             data_snapshot=snapshot,
@@ -237,6 +263,7 @@ def seed_documents(resolved):
 def validate_existing_documents(resolved):
     for descriptor, _path, content, digest in resolved["documents"]:
         snapshot = snapshot_for_descriptor(descriptor, resolved)
+        descriptor = descriptor_with_provenance(descriptor, snapshot, resolved)
         existing = SourceDocument.objects.filter(
             data_snapshot=snapshot,
             document_code=descriptor["document_code"],
@@ -258,3 +285,12 @@ def snapshot_for_descriptor(descriptor, resolved):
     if descriptor["snapshot_identifier"]:
         return resolve_snapshot(descriptor["snapshot_identifier"])
     return None
+
+
+def descriptor_with_provenance(descriptor, snapshot, resolved):
+    if descriptor["scope_type"] != "multi_city":
+        return descriptor
+    ground_truth_snapshot = resolved["ground_truth"]
+    if ground_truth_snapshot.pk == snapshot.pk:
+        return descriptor
+    return {**descriptor, "ground_truth_snapshot": ground_truth_snapshot}

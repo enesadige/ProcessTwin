@@ -224,6 +224,22 @@ class LLMSemanticDecomposer:
                     RequestedOutput.EVIDENCE,
                 }
             )
+        if query.intent == StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL:
+            return frozenset(
+                {
+                    RequestedOutput.SUMMARY,
+                    RequestedOutput.DETAILS,
+                    RequestedOutput.EVIDENCE,
+                }
+            )
+        if query.intent == StructuredQueryIntent.COMPENSATION_EVALUATION:
+            return frozenset(
+                {
+                    RequestedOutput.SUMMARY,
+                    RequestedOutput.ELIGIBILITY,
+                    RequestedOutput.EVIDENCE,
+                }
+            )
         return frozenset(RequestedOutput)
 
     @staticmethod
@@ -315,6 +331,33 @@ class DeterministicStructuredQueryParser:
         outage_code = self._extract_code(_OUTAGE_CODE_RE, text)
         subscription_reference = self._extract_code(_SUBSCRIPTION_RE, text)
         device_code = self._extract_device_code(snapshot, text)
+        if (
+            analytics is not None
+            and analytics.metric == "compensation_amount"
+            and analytics.group_by is None
+            and (causal_event_code or outage_code)
+            and not any(
+                term in folded
+                for term in (
+                    "sırala",
+                    "sirala",
+                    "en çok",
+                    "en cok",
+                    "en yüksek",
+                    "en yuksek",
+                    "ortalama",
+                    "trend",
+                    "karşılaştır",
+                    "karsilastir",
+                    "aylara göre",
+                    "aylara gore",
+                )
+            )
+        ):
+            # An exact outage/event compensation request asks for that decision,
+            # even when the natural wording includes "toplam tutar". Dataset-wide
+            # aggregation requires an explicit grouping/ranking/trend signal.
+            analytics = None
         self._validate_references(
             snapshot,
             causal_event_code,
@@ -680,7 +723,17 @@ class DeterministicStructuredQueryParser:
             ]
         if any(
             term in folded
-            for term in ("hangi kural", "hangi kaynak", "source", "section", "citation")
+            for term in (
+                "hangi kural",
+                "hangi kaynak",
+                "dokümana göre",
+                "dokumana gore",
+                "kaynak ve bölüm",
+                "kaynak ve bolum",
+                "source",
+                "section",
+                "citation",
+            )
         ):
             return StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL, [
                 RequestedOutput.SUMMARY,
@@ -707,7 +760,6 @@ class DeterministicStructuredQueryParser:
                 "failover",
                 "yedek",
                 "ana bağlantı",
-                "karar",
             )
         )
         compensation_requested = any(term in folded for term in ("tazminat", "telafi", "uygunluk"))
@@ -892,6 +944,20 @@ class DeterministicStructuredQueryParser:
         group_by = next(
             (key for key, terms in groups if any(term in folded for term in terms)), None
         )
+        explicit_event_group = any(
+            term in folded
+            for term in (
+                "olayları sırala",
+                "olaylari sirala",
+                "olaylara göre",
+                "olaylara gore",
+                "olay bazında",
+                "olay bazinda",
+                "her olay",
+            )
+        ) or bool(re.search(r"\b(?:ilk|top|son)\s+\d{1,3}\b[^.?!]*\bolay", folded))
+        if group_by == "event" and "toplam" in folded and not explicit_event_group:
+            group_by = None
         month_mentions = re.findall(
             r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s+\d{4}\b", folded
         )
@@ -1082,12 +1148,12 @@ class DeterministicStructuredQueryParser:
             return []
         if intent == StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL and values["causal_event_code"]:
             return []
+        if intent == StructuredQueryIntent.RULE_DOCUMENT_RETRIEVAL:
+            return []
         if intent == StructuredQueryIntent.COMPENSATION_EVALUATION:
             missing = []
             if not (values["causal_event_code"] or values["outage_code"] or values["device_code"]):
                 missing.append(MissingField.COMPENSATION_ANCHOR)
-            if not values["subscription_reference"]:
-                missing.append(MissingField.SCOPE_FILTER)
             return missing
         if values["device_code"] and anchors:
             return []

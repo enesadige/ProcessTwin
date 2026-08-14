@@ -13,6 +13,7 @@ from apps.orchestration.services import (
     QueryRunService,
     QueryRunTransitionError,
     sanitize_json,
+    sanitize_text,
 )
 
 
@@ -35,6 +36,14 @@ def test_sanitize_json_preserves_aggregate_subscription_counts_and_removes_ip_fi
         "affected_subscription_count": 572,
         "affected_customer_count": 495,
     }
+
+
+def test_sanitize_text_preserves_decimal_money_but_redacts_phone_numbers():
+    text = sanitize_text("Toplam 204274.61 TRY; telefon +90 (555) 123 45 67.")
+
+    assert "204274.61 TRY" in text
+    assert "+90" not in text
+    assert "[REDACTED_PHONE]" in text
 
 
 @pytest.fixture

@@ -86,8 +86,6 @@ def requires_customer_impact_evidence(query: StructuredQuery) -> bool:
         return False
     if query.customer_impact_requested:
         return True
-    if query.intent == StructuredQueryIntent.COMPENSATION_EVALUATION:
-        return True
     if _CUSTOMER_IMPACT_DIMENSIONS.intersection(query.semantic_dimensions):
         return True
     # A deterministic outage-impact query with no semantic decomposition is

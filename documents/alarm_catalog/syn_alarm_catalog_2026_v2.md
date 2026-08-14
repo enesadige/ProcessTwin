@@ -13,3 +13,5 @@ Dying Gasp ve Device Not Active erişim ucuna yakın symptom kanıtlarıdır. Yo
 ## Producer ve Severity
 
 `ACA Korelasyon` correlation producer bilgisidir; fiziksel cihaz tipi değildir. Raw severity mevcutsa korunur. Katalog default severity yalnız raw severity eksik veya geçersizse fallback olarak kullanılır.
+
+`XREG_UPSTREAM_DOWN`, bölgeler arası deterministic korelasyon senaryolarında kullanılan sentetik upstream alarmıdır. Bu kod ancak zaman ve topoloji kanıtıyla birlikte ilişki desteği sağlar; tek başına ortak fiziksel kök neden oluşturmaz.

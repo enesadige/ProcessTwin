@@ -4,6 +4,7 @@ from dataclasses import asdict
 from typing import Any
 
 from django.db import transaction
+from django.db.models import Count, Sum
 from django.http import JsonResponse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -1290,6 +1291,7 @@ def get_compensation_evidence(request):
         cursor = _parse_cursor(payload)
         evaluations = _filter_evaluations(snapshot=snapshot, payload=payload)
         evidence = _filter_evidence(snapshot=snapshot, payload=payload)
+        summary = _compensation_evidence_summary(evaluations=evaluations, evidence=evidence)
         eval_page, eval_next = _page(list(evaluations), cursor=cursor, limit=limit)
         evidence_page, evidence_next = _page(list(evidence), cursor=cursor, limit=limit)
         return _ok(
@@ -1300,6 +1302,7 @@ def get_compensation_evidence(request):
                 "decision_evidence": [evidence_summary(item) for item in evidence_page],
                 "result_count": max(len(eval_page), len(evidence_page)),
                 "next_cursor": eval_next or evidence_next,
+                "summary": summary,
             },
         )
     except InternalCompensationAPIError as exc:
@@ -1370,3 +1373,54 @@ def _filter_evidence(*, snapshot: DataSnapshot, payload: dict[str, Any]):
     if payload.get("decision"):
         queryset = queryset.filter(decision=payload["decision"])
     return queryset
+
+
+def _compensation_evidence_summary(*, evaluations, evidence) -> dict[str, Any]:
+    """Summarize all persisted matches instead of treating a page row as the answer."""
+    # Pagination has a deterministic display order. It must not leak into GROUP BY
+    # queries, where PostgreSQL would otherwise split identical values per row.
+    summary_evaluations = evaluations.order_by()
+    summary_evidence = evidence.order_by()
+    aggregate = summary_evaluations.aggregate(
+        consideration_count=Count("id"),
+        total_amount=Sum("proposed_amount"),
+    )
+    consideration_count = aggregate["consideration_count"]
+    if not consideration_count:
+        return {
+            "status": "pending",
+            "consideration_count": None,
+            "eligible": None,
+            "ineligible_pending": None,
+            "total_amount": None,
+            "currency": None,
+            "rule_versions": {},
+            "evidence_reference": None,
+            "evidence_count": 0,
+        }
+
+    result_counts = {
+        row["result_type"]: row["count"]
+        for row in summary_evaluations.values("result_type").annotate(count=Count("id"))
+    }
+    statuses = list(summary_evaluations.values_list("status", flat=True).distinct()[:2])
+    currencies = list(summary_evaluations.values_list("currency", flat=True).distinct()[:2])
+    rule_versions = {
+        f"{row['rule_version__rule__code']}:v{row['rule_version__version']}": row["count"]
+        for row in summary_evaluations.values(
+            "rule_version__rule__code", "rule_version__version"
+        ).annotate(count=Count("id"))
+    }
+    first_evidence = summary_evidence.values_list("evidence_hash", flat=True).first()
+    return {
+        "status": statuses[0] if len(statuses) == 1 else "mixed",
+        "consideration_count": consideration_count,
+        "eligible": result_counts.get(CompensationResultType.ELIGIBLE, 0),
+        "ineligible_pending": consideration_count
+        - result_counts.get(CompensationResultType.ELIGIBLE, 0),
+        "total_amount": aggregate["total_amount"],
+        "currency": currencies[0] if len(currencies) == 1 else None,
+        "rule_versions": rule_versions,
+        "evidence_reference": first_evidence[:12] if first_evidence else None,
+        "evidence_count": summary_evidence.count(),
+    }

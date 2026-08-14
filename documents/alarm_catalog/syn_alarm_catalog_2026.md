@@ -4,7 +4,7 @@
 
 ## Amaç
 
-Multi-city realism snapshot içinde kullanılan 30 sentetik alarm tipinin kod, kaynak, önem ve korelasyon anlamını tanımlar.
+Multi-city realism snapshot içinde kullanılan 32 sentetik alarm tipinin kod, kaynak, önem ve korelasyon anlamını tanımlar.
 
 ## Katalog
 
@@ -16,7 +16,9 @@ Multi-city realism snapshot içinde kullanılan 30 sentetik alarm tipinin kod, k
 | `DSLAM_UNREACHABLE` | erişilebilirlik | DSLAM erişilemez; bağlı DSL hatlarında kesinti adayıdır. |
 | `ACCESS_NODE_UNREACHABLE` | erişilebilirlik | Erişim cihazına ulaşılamaz; etki cihaz alt ağında hesaplanır. |
 | `UPLINK_DOWN` | link | Üst bağlantı down durumunu gösterir. |
+| `XREG_UPSTREAM_DOWN` | korelasyon | Bölgeler arası korelasyon örneklerinde doğrulanmış upstream kesinti adayını gösterir; tek başına fiziksel kök neden kanıtı değildir. |
 | `FIBER_CUT_SUSPECTED` | fiber | Fiber rota kesintisi şüphesini ve ortak yol etkisini gösterir. |
+| `DISTRIBUTION_CABLE_DOWN` | fiber | Erişim dağıtım kablosunun down olduğunu ve bağlı alt kaynaklarda kesinti adayı oluştuğunu gösterir. |
 | `LINK_PACKET_LOSS_HIGH` | link | Paket kaybı yüksek; hizmet sürebilir ancak kalite düşer. |
 | `LINK_FLAPPING` | link | Link’in kısa aralıklarla tekrarlı down/up olduğunu gösterir. |
 | `BACKUP_LINK_UNAVAILABLE` | link | Primary çalışırken backup yolun kullanılamadığını gösterir. |

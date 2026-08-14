@@ -51,7 +51,14 @@ _NARRATIVE_SYNTHESIS_KEYS = frozenset({"sentences"})
 _NARRATIVE_SENTENCE_KEYS = frozenset({"text", "statement_ids", "relationship_ids"})
 _NARRATIVE_DEBUG_MARKERS = ("->", "Nedensel ilişki:", "Sonuç ilişkisi:", "Belirsizlik ilişkisi:")
 _NARRATIVE_ROLE_PREFIX_RE = re.compile(
-    r"^\s*(?:analytics|details|evidence|summary|root_cause|impact|eligibility|correlation)\s*:\s*",
+    r"^\s*(?:\*{1,2}|_{1,2})?"
+    r"(?:analytics|analiz|details|evidence|summary|özet|ozet|root_cause|impact|eligibility|correlation)"
+    r"(?:\*{1,2}|_{1,2})?\s*:?\s*",
+    re.IGNORECASE,
+)
+_NARRATIVE_INTERNAL_SUPPORT_REFERENCE_RE = re.compile(
+    r"\s*(?:\(\s*S\d+(?:\s*[,/]\s*S\d+)*\s*\)|\[\s*S\d+(?:\s*[,/]\s*S\d+)*\s*\]|"
+    r"(?<![A-Za-z0-9_-])S\d+(?:['’][A-Za-zÇĞİÖŞÜçğıöşü]+)?(?![A-Za-z0-9_-]))",
     re.IGNORECASE,
 )
 _NARRATIVE_INTERNAL_REASON_RE = re.compile(
@@ -74,7 +81,11 @@ _NARRATIVE_QUALITATIVE_IMPACT_RE = re.compile(
     r"customer(?:s)?\s+(?:sought|seek|using)\s+alternative|"
     r"müşteri memnuniyet\w*|customer satisfaction|iş süreklili\w*|business continuity|"
     r"ticari etki|financial impact|business impact|organizasyonel etki|"
-    r"organizational impact)\b",
+    r"organizational impact|hizmet kalites\w*|servis kalites\w*|"
+    r"iyileştirme çalış\w*|önleme çalış\w*|izleme ihtiyac\w*|"
+    r"tüm kullanıcı\w*|bütün kullanıcı\w*|mekanizma\w* yetersiz\w*|"
+    r"gözden geçiril\w*|güçlendiril\w*|müdahale gerektir\w*|"
+    r"hizmet dışı kalma süresi\w* uzat\w*)\b",
     re.IGNORECASE,
 )
 _NARRATIVE_FACT_TOKEN_RE = re.compile(
@@ -424,6 +435,13 @@ class ValidatedResponseBuilder:
             )
         ):
             requested_roles.add("correlation_temporal_evidence")
+        if any(
+            term in query
+            for term in ("karşılaştır", "karsilastir", "trend", "artış", "azalış")
+        ):
+            requested_roles.add("analytics_comparison")
+        if any(term in query for term in ("hariç", "haric", "dışında", "disinda")):
+            requested_roles.add("unknown_exclusion")
 
         text = narrative
         fill_count = 0
@@ -520,6 +538,8 @@ class ValidatedResponseBuilder:
             "decision_evidence",
             "physical_root_cause",
             "root_resource",
+            "analytics_comparison",
+            "unknown_exclusion",
         }
         relevant_roles = set()
         if not requested and not dimensions:
@@ -529,7 +549,7 @@ class ValidatedResponseBuilder:
             or dimensions & {"alarm_correlation"}
             or intent == "alarm_correlation"
         ):
-            relevant_roles |= {"alarm_correlation"}
+            relevant_roles |= {"alarm_correlation", "correlation_temporal_evidence"}
         if requested & {"impact", "summary", "details"} or dimensions & {
             "verified_customer_impact",
             "verified_subscription_impact",
@@ -541,6 +561,12 @@ class ValidatedResponseBuilder:
                 "verified_customer_impact",
                 "verified_no_impact",
                 "insufficient_evidence",
+            }
+        if intent == "operational_analytics" or "analytics" in requested:
+            relevant_roles |= {
+                "verified_customer_impact",
+                "analytics_comparison",
+                "unknown_exclusion",
             }
         if requested & {"root_cause"} or dimensions & {
             "root_resource",
@@ -1031,9 +1057,31 @@ class ValidatedResponseBuilder:
                     f"{index}. {row['label']}: {row['value']} "
                     f"{metric_labels.get(analytics.metric, analytics.metric)}."
                 )
+            comparison_row = next(
+                (row for row in reversed(analytics.rows) if row.get("absolute_change") is not None),
+                None,
+            )
+            if comparison_row is not None and len(analytics.rows) >= 2:
+                direction_labels = {
+                    "increase": "artış",
+                    "decrease": "azalış",
+                    "unchanged": "değişmedi",
+                }
+                add(
+                    "Dönem karşılaştırması: "
+                    + ", ".join(
+                        f"{row['label']} {row['value']}" for row in analytics.rows
+                    )
+                    + f"; mutlak değişim {comparison_row['absolute_change']}; yön "
+                    + direction_labels.get(
+                        str(comparison_row.get("trend_direction")),
+                        str(comparison_row.get("trend_direction")),
+                    )
+                    + "."
+                )
             if analytics.filters.get("failed_failover") is True:
                 add("Başarısız failover filtresi uygulandı.")
-            if analytics.excluded_unknown_count:
+            if analytics.metric in {"affected_customers", "affected_subscriptions"}:
                 add(
                     f"{analytics.excluded_unknown_count} olay, doğrulanmış etki kanıtı olmadığı "
                     "için hesaplamaya dahil edilmedi."
@@ -1190,6 +1238,11 @@ class ValidatedResponseBuilder:
                 version = f" v{source.version}" if source.version is not None else ""
                 section = f" / {source.section}" if source.section else ""
                 source_labels.append(f"{source.source_code}{version}{section}")
+                if source.excerpt:
+                    add(
+                        f"Belge içeriği ({source.source_code}{version}{section}): "
+                        f"{source.excerpt}"
+                    )
             add("Doğrulanmış kaynaklar: " + "; ".join(source_labels) + ".")
         if not statements:
             add(_UNCERTAINTY_STATEMENT)
@@ -1399,7 +1452,9 @@ class ValidatedResponseBuilder:
                 ("Karşılaştırılan olaylar", "operasyonel ilişki", "topoloji ilişkisi"),
             ),
             ("correlation_temporal_evidence", ("Zaman farkı:",)),
-            ("evidence", ("Kaynaklar", "DecisionEvidence", "RuleVersion")),
+            ("analytics_comparison", ("Dönem karşılaştırması:",)),
+            ("unknown_exclusion", ("hesaplamaya dahil edilmedi",)),
+            ("evidence", ("Kaynaklar", "Belge içeriği", "DecisionEvidence", "RuleVersion")),
         )
         lowered = text.casefold()
         for concept, needles in checks:
@@ -1893,6 +1948,8 @@ class ValidatedResponseBuilder:
     @staticmethod
     def _sanitize_narrative_text(text: str) -> str:
         text = _NARRATIVE_ROLE_PREFIX_RE.sub("", text, count=1).strip()
+        text = _NARRATIVE_INTERNAL_SUPPORT_REFERENCE_RE.sub("", text)
+        text = re.sub(r"(?<=\d)[\s\u00a0\u202f.,](?=\d{3}(?:\D|$))", "", text)
         if _NARRATIVE_INTERNAL_REASON_RE.search(text):
             text = _NARRATIVE_INTERNAL_REASON_SEQUENCE_RE.sub("doğrulanmamış teknik gerekçe", text)
             text = _NARRATIVE_INTERNAL_REASON_RE.sub("", text)

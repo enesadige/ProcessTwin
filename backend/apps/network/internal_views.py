@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import asdict, is_dataclass
 from typing import Any
 
@@ -755,39 +756,120 @@ def calculate_customer_impact(request, outage_code: str):
             field_name="evaluation_time",
         )
         outage = _get_outage(snapshot, outage_code)
-        result = CustomerImpactService().calculate_impact(
-            outage=outage,
-            snapshot=snapshot,
-            evaluation_time=evaluation_time,
+        assessments = CustomerImpactAssessment.objects.filter(
+            data_snapshot=snapshot,
+            causal_event=outage.causal_event,
+        ).select_related(
+            "subscription__customer",
+            "subscription__service_package",
         )
-        payload = _dataclass_payload(result)
-        data = {
-            "outage_code": payload["outage_code"],
-            "source_device_code": payload["source_device_code"],
-            "evaluation_window": payload["evaluation_window"],
-            "affected_subscription_count": payload["affected_subscription_count"],
-            "affected_customer_count": payload["affected_customer_count"],
-            "segment_distribution": payload["customer_segment_counts"],
-            "priority_distribution": payload["customer_priority_counts"],
-            "technology_distribution": payload["package_technology_counts"],
-            "primary_backup": {
-                "failover_protected_subscription_count": payload[
-                    "failover_protected_subscription_count"
-                ],
-            },
-            "protected_failover": {
-                "subscription_count": payload["failover_protected_subscription_count"],
-            },
-            "failover_path_diversity_counts": payload["failover_path_diversity_counts"],
-        }
-        warnings = [
-            {
-                "code": "failover_path_diversity_warning",
-                "message": "A protected subscription has incomplete path diversity evidence.",
-                "details": warning,
+        if outage.causal_event_id and assessments.exists():
+            rows = list(assessments)
+            impacted = [
+                assessment
+                for assessment in rows
+                if assessment.status == CustomerImpactStatus.VERIFIED_IMPACT.value
+            ]
+            impacted_subscriptions = {
+                assessment.subscription.subscription_number: assessment.subscription
+                for assessment in impacted
+                if assessment.subscription_id
             }
-            for warning in payload["failover_warnings"]
-        ]
+            impacted_customers = {
+                subscription.customer.customer_number: subscription.customer
+                for subscription in impacted_subscriptions.values()
+            }
+            status_counts = Counter(assessment.status for assessment in rows)
+            protected_count = sum(
+                ImpactReason.FAILOVER_PROTECTED.value in assessment.reasons
+                for assessment in rows
+            )
+            unknown_count = (
+                status_counts[CustomerImpactStatus.INSUFFICIENT_EVIDENCE.value]
+                + status_counts[CustomerImpactStatus.POTENTIAL_IMPACT.value]
+            )
+            data = {
+                "outage_code": outage.outage_code,
+                "source_device_code": outage.source_device.code,
+                "evaluation_window": {
+                    "started_at": outage.started_at.isoformat(),
+                    "ended_at": (outage.ended_at or evaluation_time).isoformat()
+                    if outage.ended_at or evaluation_time
+                    else None,
+                },
+                "potential_connection_count": len(rows),
+                "verified_impacted_count": len(impacted),
+                "verified_no_impact_count": status_counts[
+                    CustomerImpactStatus.VERIFIED_NO_IMPACT.value
+                ],
+                "insufficient_evidence_count": unknown_count,
+                "affected_subscription_count": len(impacted_subscriptions),
+                "affected_customer_count": len(impacted_customers),
+                "segment_distribution": dict(
+                    sorted(
+                        Counter(
+                            customer.segment for customer in impacted_customers.values()
+                        ).items()
+                    )
+                ),
+                "priority_distribution": dict(
+                    sorted(
+                        Counter(
+                            customer.priority_level for customer in impacted_customers.values()
+                        ).items()
+                    )
+                ),
+                "technology_distribution": dict(
+                    sorted(
+                        Counter(
+                            subscription.service_package.technology
+                            for subscription in impacted_subscriptions.values()
+                        ).items()
+                    )
+                ),
+                "primary_backup": {
+                    "failover_protected_subscription_count": protected_count,
+                },
+                "protected_failover": {"subscription_count": protected_count},
+                "failover_path_diversity_counts": {},
+                "impact_source": "customer_impact_assessment",
+            }
+            warnings = []
+        else:
+            result = CustomerImpactService().calculate_impact(
+                outage=outage,
+                snapshot=snapshot,
+                evaluation_time=evaluation_time,
+            )
+            payload = _dataclass_payload(result)
+            data = {
+                "outage_code": payload["outage_code"],
+                "source_device_code": payload["source_device_code"],
+                "evaluation_window": payload["evaluation_window"],
+                "affected_subscription_count": payload["affected_subscription_count"],
+                "affected_customer_count": payload["affected_customer_count"],
+                "segment_distribution": payload["customer_segment_counts"],
+                "priority_distribution": payload["customer_priority_counts"],
+                "technology_distribution": payload["package_technology_counts"],
+                "primary_backup": {
+                    "failover_protected_subscription_count": payload[
+                        "failover_protected_subscription_count"
+                    ],
+                },
+                "protected_failover": {
+                    "subscription_count": payload["failover_protected_subscription_count"],
+                },
+                "failover_path_diversity_counts": payload["failover_path_diversity_counts"],
+                "impact_source": "topology_fallback",
+            }
+            warnings = [
+                {
+                    "code": "failover_path_diversity_warning",
+                    "message": "A protected subscription has incomplete path diversity evidence.",
+                    "details": warning,
+                }
+                for warning in payload["failover_warnings"]
+            ]
         return _ok(request=request, snapshot=snapshot, data=data, warnings=warnings)
     except (CustomerImpactServiceError, OutageServiceError, InternalNetworkAPIError) as exc:
         if isinstance(exc, InternalNetworkAPIError):

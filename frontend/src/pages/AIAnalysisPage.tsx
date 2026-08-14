@@ -5,7 +5,7 @@ import { AnalysisRequestError, getAnalysisStatus, submitAnalysis, type AnalysisS
 import './AIAnalysisPage.css'
 
 const SNAPSHOT_IDENTIFIER =
-  'multi-city-realism-v2-causal-r1-multi-city-realism-snapshot-v1-multi-city-realism-v2-causal-r1'
+  'multi-city-realism-v3-repair-r1-multi-city-realism-snapshot-v3-repair-r1'
 const MAX_QUERY_LENGTH = 10000
 const EXAMPLES = [
   'AGG-ANK-002 cihazındaki kesintiden kaç müşteri ve kaç abonelik gerçekten etkilendi?',

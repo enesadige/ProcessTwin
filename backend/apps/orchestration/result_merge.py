@@ -153,6 +153,7 @@ class RetrievalSource(BaseModel):
     version: int | None = None
     section: str | None = None
     source_kind: str | None = None
+    excerpt: str | None = None
 
 
 class ProvenanceEntry(BaseModel):
@@ -402,10 +403,16 @@ def _network_outage_impact(data: Mapping[str, Any]) -> _ExtractedToolResult:
         else None
     )
     impact = {
-        "potential": (
+        "potential": _optional_non_negative(data, "potential_connection_count")
+        if data.get("potential_connection_count") is not None
+        else (
             affected_subscriptions + failover_protected if failover_protected is not None else None
         ),
-        "verified_impacted": affected_subscriptions,
+        "verified_impacted": _optional_non_negative(data, "verified_impacted_count")
+        if data.get("verified_impacted_count") is not None
+        else affected_subscriptions,
+        "verified_no_impact": _optional_non_negative(data, "verified_no_impact_count"),
+        "insufficient_evidence": _optional_non_negative(data, "insufficient_evidence_count"),
         "affected_subscription_count": affected_subscriptions,
         "affected_customer_count": _non_negative_int(
             data.get("affected_customer_count"), "affected_customer_count"
@@ -555,6 +562,7 @@ def _document_retrieval(data: Mapping[str, Any]) -> _ExtractedToolResult:
                 version=_optional_non_negative(item, "document_version"),
                 section=_string(item.get("heading"), "heading"),
                 source_kind=_string(data.get("source_kind"), "source_kind"),
+                excerpt=_string(item.get("text"), "text"),
             )
         )
     return _ExtractedToolResult(

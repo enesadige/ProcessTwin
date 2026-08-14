@@ -1,5 +1,8 @@
 from pathlib import Path
 
+import pytest
+
+from apps.datasets.models import DatasetVersion, DataSnapshot
 from apps.rag.corpus_manifest import (
     CORPUS_KEY,
     DOCUMENTS,
@@ -10,7 +13,10 @@ from apps.rag.corpus_manifest import (
     SYNTHETIC_NOTICE,
 )
 from apps.rag.corpus_utils import content_hash, normalize_markdown
-from apps.rag.management.commands.seed_rag_corpus import snapshot_for_descriptor
+from apps.rag.management.commands.seed_rag_corpus import (
+    resolve_ground_truth_snapshot,
+    snapshot_for_descriptor,
+)
 
 
 def test_manifest_has_versioned_thirteen_document_causal_corpus():
@@ -46,7 +52,7 @@ def test_manifest_files_are_canonical_synthetic_turkish_sources():
 
 def test_manifest_coverage_catalogs_are_non_empty_and_unique():
     assert len(set(MULTICITY_RULES)) == 25
-    assert len(set(MULTICITY_ALARMS)) == 31
+    assert len(set(MULTICITY_ALARMS)) == 32
     assert len(set(GROUND_TRUTH_CASES)) == 30
     assert all(code for code in MULTICITY_RULES + MULTICITY_ALARMS + GROUND_TRUTH_CASES)
     assert CORPUS_KEY == "processtwin-rag-corpus-v1"
@@ -83,3 +89,34 @@ def test_multicity_corpus_descriptors_use_the_explicit_versioned_snapshot():
         snapshot_for_descriptor(descriptor, {"multicity": selected_snapshot})
         is selected_snapshot
     )
+
+
+@pytest.mark.django_db
+def test_repair_snapshot_uses_declared_source_for_ground_truth_references():
+    source_dataset = DatasetVersion.objects.create(
+        name="RAG source",
+        generator_version="test-v1",
+        seed="source",
+    )
+    source = DataSnapshot.objects.create(dataset_version=source_dataset, name="Source")
+    repair_dataset = DatasetVersion.objects.create(
+        name="RAG repair",
+        generator_version="test-v2",
+        seed="repair",
+        config={"source_snapshot_id": source.pk},
+    )
+    repair = DataSnapshot.objects.create(dataset_version=repair_dataset, name="Repair")
+
+    assert resolve_ground_truth_snapshot(repair) == source
+
+
+@pytest.mark.django_db
+def test_snapshot_without_declared_source_keeps_its_own_ground_truth_scope():
+    dataset = DatasetVersion.objects.create(
+        name="RAG standalone",
+        generator_version="test-v1",
+        seed="standalone",
+    )
+    snapshot = DataSnapshot.objects.create(dataset_version=dataset, name="Standalone")
+
+    assert resolve_ground_truth_snapshot(snapshot) == snapshot

@@ -283,6 +283,9 @@ def test_evidence_endpoint_paginates_existing_records(client, settings):
     assert response.status_code == 200
     assert payload["result_count"] == 1
     assert payload["decision_evidence"][0]["evidence_hash"]
+    assert payload["summary"]["consideration_count"] == 1
+    assert payload["summary"]["eligible"] == 1
+    assert payload["summary"]["evidence_count"] == 1
 
 
 @pytest.mark.django_db

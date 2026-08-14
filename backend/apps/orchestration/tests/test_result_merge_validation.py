@@ -19,7 +19,10 @@ from apps.orchestration.result_merge import (
     _operational_analytics,
 )
 from apps.orchestration.services import QueryRunError, QueryRunService
-from apps.orchestration.structured_query import StructuredQuery
+from apps.orchestration.structured_query import (
+    StructuredQuery,
+    requires_customer_impact_evidence,
+)
 from apps.orchestration.tool_plan import ToolPlan
 
 
@@ -559,3 +562,19 @@ def test_analytics_requires_only_its_backend_owned_evidence_category():
     )
 
     assert ResultMergerValidator.required_categories(query) == {EvidenceCategory.ANALYTICS}
+
+
+def test_compensation_evaluation_uses_its_authoritative_evidence_without_impact_tool():
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "compensation_evaluation",
+            "requested_outputs": ["summary", "eligibility", "evidence"],
+            "snapshot_identifier": "multi-city-realism-v3-repair-r1",
+            "outage_code": "OUT-MCR-0052",
+            "decision_type": "compensation",
+            "semantic_dimensions": ["compensation_result", "rule_version"],
+        }
+    )
+
+    assert requires_customer_impact_evidence(query) is False
+    assert ResultMergerValidator.required_categories(query) == {EvidenceCategory.COMPENSATION}
