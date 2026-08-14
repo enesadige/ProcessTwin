@@ -337,7 +337,8 @@ class DeterministicStructuredQueryParser:
             raise NaturalLanguageQueryParseError("invalid_structured_query")
         text = original_query.strip()
         folded = _fold(text)
-        analytics = self._analytics_spec(folded, snapshot)
+        analytics_specs = self._analytics_specs(folded, snapshot)
+        analytics = analytics_specs[0] if analytics_specs else None
         causal_event_codes = self._extract_codes(_CAUSAL_CODE_RE, text)
         if not causal_event_codes:
             causal_event_codes = self._causal_events_for_alarm_codes(
@@ -378,6 +379,7 @@ class DeterministicStructuredQueryParser:
             # even when the natural wording includes "toplam tutar". Dataset-wide
             # aggregation requires an explicit grouping/ranking/trend signal.
             analytics = None
+            analytics_specs = []
         self._validate_references(
             snapshot,
             causal_event_code,
@@ -390,6 +392,9 @@ class DeterministicStructuredQueryParser:
         if device_code and causal_event_code is None and outage_code is None:
             outage_code = self._outage_for_device(snapshot, device_code, dates=dates)
         location, ambiguous_location = self._resolve_location(snapshot, folded)
+        analytics_locations = (
+            self._resolve_analytics_locations(snapshot, folded) if analytics else []
+        )
         intent, requested_outputs = self._intent_and_outputs(folded)
         if comparison_causal_event_code and any(
             term in folded
@@ -460,6 +465,9 @@ class DeterministicStructuredQueryParser:
         analytics_time_window = (
             self._analytics_time_window(text, dates, snapshot=snapshot) if analytics else None
         )
+        unresolved_location = (
+            analytics and self._location_requested(folded) and not analytics_locations
+        )
         missing = (
             [MissingField.SCOPE_FILTER]
             if analytics and self._analytics_comparison_requires_period(
@@ -479,6 +487,8 @@ class DeterministicStructuredQueryParser:
                 requested_outputs=requested_outputs,
             )
         )
+        if unresolved_location:
+            missing = [*missing, MissingField.SCOPE_FILTER]
         reasons = {
             MissingField.OPERATIONAL_REFERENCE: ClarificationReason.MISSING_OPERATIONAL_ANCHOR,
             MissingField.SCOPE_FILTER: ClarificationReason.MISSING_SCOPE_FILTER,
@@ -490,6 +500,8 @@ class DeterministicStructuredQueryParser:
                 "intent": intent,
                 "requested_outputs": requested_outputs,
                 "analytics": analytics.model_dump() if analytics else None,
+                "analytics_specs": [item.model_dump() for item in analytics_specs],
+                "analytics_locations": analytics_locations,
                 "customer_impact_requested": query_requests_customer_impact(folded),
                 "snapshot_identifier": snapshot.snapshot_key,
                 "causal_event_code": causal_event_code,
@@ -949,7 +961,10 @@ class DeterministicStructuredQueryParser:
             ("full_outage_count", ("tam hizmet kesintisi", "full outage", "tam kesinti")),
             (
                 "alarm_count",
-                ("alarm sayısı", "alarm sayisi", "alarm sayılarını", "alarm sayilarini"),
+                (
+                    "alarm sayısı", "alarm sayisi", "alarm sayılarını", "alarm sayilarini",
+                    "kac alarm", "alarm olustu", "alarm oluştu",
+                ),
             ),
             (
                 "outage_count",
@@ -1015,8 +1030,11 @@ class DeterministicStructuredQueryParser:
                 "root_alarm_type",
                 (
                     "alarm tipi",
+                    "alarm tiplerine",
                     "alarm türü",
+                    "alarm türlerine",
                     "alarm turu",
+                    "alarm turlerine",
                     "alarm tipine göre",
                     "alarm türüne göre",
                 ),
@@ -1056,12 +1074,24 @@ class DeterministicStructuredQueryParser:
                     "hangi ilce",
                 ),
             ),
-            ("event", ("olay",)),
-            ("time_bucket", ("aylara göre", "haftalara göre", "günlere göre", "gunlere göre")),
+            ("event", ("listele", "listesi")),
+            (
+                "time_bucket",
+                (
+                    "aylara göre",
+                    "aylarına göre",
+                    "aylarina göre",
+                    "haftalara göre",
+                    "günlere göre",
+                    "gunlere göre",
+                ),
+            ),
         )
         group_by = next(
             (key for key, terms in groups if any(term in folded for term in terms)), None
         )
+        if group_by is None and "aylar" in folded and "gore" in folded:
+            group_by = "time_bucket"
         explicit_event_group = any(
             term in folded
             for term in (
@@ -1080,7 +1110,21 @@ class DeterministicStructuredQueryParser:
             r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s+\d{4}\b", folded
         )
         named_months = re.findall(r"\b(" + "|".join(_TURKISH_MONTHS) + r")\b", folded)
-        comparison = len(month_mentions) > 1 or len(set(named_months)) > 1
+        comparison = (
+            (len(month_mentions) > 1 or len(set(named_months)) > 1)
+            and any(
+                term in folded
+                for term in (
+                    "karşılaştır",
+                    "karsilastir",
+                    "karsılastır",
+                    "degisim",
+                    "değişim",
+                    "degisen",
+                    "değişen",
+                )
+            )
+        )
         if comparison and group_by == "event" and not explicit_event_group:
             group_by = None
         if comparison and group_by is None:
@@ -1170,6 +1214,75 @@ class DeterministicStructuredQueryParser:
         )
 
     @staticmethod
+    def _analytics_specs(folded: str, snapshot: DataSnapshot) -> list[AnalyticsSpecification]:
+        """Preserve every requested metric while sharing one parsed scope."""
+        primary = DeterministicStructuredQueryParser._analytics_spec(folded, snapshot)
+        if primary is None:
+            return []
+        metric_terms = (
+            ("outage_count", ("kesinti say", "kac kesinti")),
+            ("alarm_count", ("alarm say", "kac alarm", "alarm olustu")),
+            ("affected_customers", ("musteri",)),
+            ("affected_subscriptions", ("abonelik", "abone")),
+            ("full_outage_count", ("tam hizmet kesintisi say", "tam kesinti say")),
+        )
+        metrics = [
+            metric for metric, terms in metric_terms if any(term in folded for term in terms)
+        ]
+        if not metrics:
+            metrics = [primary.metric]
+        if primary.metric == "potential_subscriptions":
+            metrics = [primary.metric]
+        specs: list[AnalyticsSpecification] = []
+        for metric in metrics:
+            # "tam hizmet kesintisi sayısı" is a metric, not a filter on all
+            # other requested metrics in the same sentence.
+            full_outage = (
+                primary.full_outage
+                if metric not in {"full_outage_count", "outage_count", "alarm_count"}
+                else None
+            )
+            specs.append(
+                primary.model_copy(
+                    update={
+                        "metric": metric,
+                        "aggregation": (
+                            "sum"
+                            if metric in {"affected_customers", "affected_subscriptions"}
+                            else "count"
+                        ),
+                        "full_outage": full_outage,
+                    }
+                )
+            )
+        return specs
+
+    @staticmethod
+    def _resolve_analytics_locations(snapshot: DataSnapshot, folded: str) -> list[dict[str, str]]:
+        """Return all explicit known cities/districts, never silently widen scope."""
+        pairs = {
+            (_fold(device.city.name), _fold(device.district.name)): (
+                device.city.name,
+                device.district.name,
+            )
+            for device in NetworkDevice.objects.filter(
+                data_snapshot=snapshot, city__isnull=False, district__isnull=False
+            ).select_related("city", "district")
+        }
+        found: list[dict[str, str]] = []
+        for city, district in sorted(set(pairs.values())):
+            if _fold(district) in folded:
+                found.append({"city": city, "district": district})
+        for city in sorted({city for city, _district in pairs.values()}):
+            if _fold(city) in folded and not any(item["city"] == city for item in found):
+                found.append({"city": city})
+        return found
+
+    @staticmethod
+    def _location_requested(folded: str) -> bool:
+        return any(term in folded for term in ("ilcesinde", "ilçesinde", "sehrinde", "şehrinde"))
+
+    @staticmethod
     def _exact_snapshot_value(folded: str, values) -> str | None:
         """Resolve only an exact current-snapshot analytic filter, never a model guess."""
         matches = sorted(
@@ -1195,6 +1308,18 @@ class DeterministicStructuredQueryParser:
         if window:
             return window
         matches = re.findall(r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s+(\d{4})\b", _fold(text))
+        # Turkish commonly supplies one year after a pair: "Haziran ve Temmuz
+        # 2026". Apply that explicit year to each named month.
+        named_with_shared_year = re.search(
+            r"\b(" + "|".join(_TURKISH_MONTHS) + r")\s*(?:ve|ile|-)\s*("
+            + "|".join(_TURKISH_MONTHS) + r")\s+(\d{4})\b",
+            _fold(text),
+        )
+        if named_with_shared_year:
+            matches = [
+                (named_with_shared_year.group(1), named_with_shared_year.group(3)),
+                (named_with_shared_year.group(2), named_with_shared_year.group(3)),
+            ]
         if matches:
             months = sorted((int(year), _TURKISH_MONTHS[month]) for month, year in matches)
         else:

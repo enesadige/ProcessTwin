@@ -127,6 +127,7 @@ export type StructuredVerifiedResult = {
   causal_summary?: CausalSummary
   cross_incident_correlation_summary?: CrossIncidentCorrelationSummary
   analytics_summary?: AnalyticsSummary
+  analytics_summaries?: AnalyticsSummary[]
   impact_summary?: ImpactSummary
   rule_summary?: RuleSummary
   compensation_summary?: CompensationSummary

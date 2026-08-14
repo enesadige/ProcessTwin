@@ -178,6 +178,7 @@ class ValidatedExecutionResult(BaseModel):
     causal_summary: CausalSummary | None = None
     cross_incident_correlation_summary: CrossIncidentCorrelationSummary | None = None
     analytics_summary: AnalyticsSummary | None = None
+    analytics_summaries: list[AnalyticsSummary] = Field(default_factory=list)
     impact_summary: ImpactSummary | None = None
     rule_summary: RuleSummary | None = None
     compensation_summary: CompensationSummary | None = None
@@ -762,6 +763,11 @@ class ResultMergerValidator:
         causal, correlation, impact, rule, compensation, analytics, sources, merge_errors = (
             self._merge_sections(category_results)
         )
+        analytics_items = [
+            extracted.analytics
+            for extracted in category_results.get(EvidenceCategory.ANALYTICS, [])
+            if extracted.analytics
+        ]
         errors.extend(merge_errors)
         errors.extend(
             self._validate_cross_tool(tool_plan, causal, correlation, impact, compensation)
@@ -775,6 +781,7 @@ class ResultMergerValidator:
                 CrossIncidentCorrelationSummary(**correlation) if correlation else None
             ),
             analytics_summary=AnalyticsSummary(**analytics) if analytics else None,
+            analytics_summaries=[AnalyticsSummary(**item) for item in analytics_items],
             impact_summary=ImpactSummary(**impact) if impact else None,
             rule_summary=RuleSummary(**rule) if rule else None,
             compensation_summary=CompensationSummary(**compensation) if compensation else None,
@@ -927,13 +934,15 @@ class ResultMergerValidator:
         errors: list[ValidationErrorItem] = []
         for results in category_results.values():
             for extracted in results:
+                if extracted.analytics and not analytics:
+                    analytics.update(extracted.analytics)
                 for target, incoming in (
                     (causal, extracted.causal),
                     (correlation, extracted.cross_incident_correlation),
                     (impact, extracted.impact),
                     (rule, extracted.rule),
                     (compensation, extracted.compensation),
-                    (analytics, extracted.analytics),
+                    (analytics, {}),
                 ):
                     for key, value in incoming.items():
                         if value in (None, [], {}):

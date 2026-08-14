@@ -49,6 +49,7 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
   const rule: RuleSummary | undefined = result.rule_summary
   const correlation: CrossIncidentCorrelationSummary | undefined = result.cross_incident_correlation_summary
   const analytics: AnalyticsSummary | undefined = result.analytics_summary
+  const analyticsSummaries = result.analytics_summaries?.length ? result.analytics_summaries : (analytics ? [analytics] : [])
   const impactCards: ReactNode[] = []
   if (impact) {
     if (impact.outage_count !== undefined) impactCards.push(<FactCard key="outage-count" label="Kesinti sayısı" value={impact.outage_count} />)
@@ -98,8 +99,8 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
     if (correlation.root_symptom_status) correlationCards.push(<FactCard key="root-symptom" label="Kök/belirti yönü" value={correlation.root_symptom_status === 'not_verified' ? 'Doğrulanmadı' : 'Doğrulandı'} />)
   }
   const analyticsCards: ReactNode[] = []
-  if (analytics) {
-    analytics.rows.forEach((row, index) => {
+  if (analyticsSummaries.length) {
+    analyticsSummaries.forEach((summary, summaryIndex) => summary.rows.forEach((row, index) => {
       const periods = row.period_values?.map((period) => {
         const evidence = period.included_event_count !== undefined && period.excluded_unknown_count !== undefined
           ? ` (dahil: ${period.included_event_count}, hariç: ${period.excluded_unknown_count})`
@@ -111,10 +112,14 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
         ? ` (dahil: ${row.included_event_count}, hariç: ${row.excluded_unknown_count})`
         : ''
       const primaryValue = periods || `${row.value}${rowEvidence}`
-      analyticsCards.push(<FactCard key={`analytics-${index}-${row.label}`} label={`${index + 1}. ${row.label}`} value={[primaryValue, change].filter(Boolean).join(' | ')} />)
+      analyticsCards.push(<FactCard key={`analytics-${summaryIndex}-${index}-${row.label}`} label={`${metricLabelsForTitle(summary.metric)}: ${index + 1}. ${row.label}`} value={[primaryValue, change].filter(Boolean).join(' | ')} />)
+    }))
+    analyticsSummaries.forEach((summary, index) => {
+      if (summary.metric === 'affected_customers' || summary.metric === 'affected_subscriptions') {
+        analyticsCards.push(<FactCard key={`analytics-included-${index}`} label={`${metricLabelsForTitle(summary.metric)} dahil`} value={summary.included_event_count} />)
+        if (summary.excluded_unknown_count) analyticsCards.push(<FactCard key={`analytics-excluded-${index}`} label={`${metricLabelsForTitle(summary.metric)} bilinmeyen nedeniyle hariç`} value={summary.excluded_unknown_count} tone="warning" />)
+      }
     })
-    analyticsCards.push(<FactCard key="analytics-included" label="Hesaba dahil edilen olay" value={analytics.included_event_count} />)
-    if (analytics.excluded_unknown_count) analyticsCards.push(<FactCard key="analytics-excluded" label="Bilinmeyen etki nedeniyle hariç" value={analytics.excluded_unknown_count} tone="warning" />)
   }
   return <div className="analysis-facts" aria-label="Doğrulanmış sonuç kartları">
     <div className="analysis-facts__heading"><div><p className="analysis-page__eyebrow">Doğrulanmış veri</p><h2>Operasyon özeti</h2></div><span>Kaynak: backend</span></div>
@@ -123,7 +128,7 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
     {technical && rootCards.length ? <FactGroup title="Kök neden">{rootCards}</FactGroup> : null}
     {decisionCards.length ? <FactGroup title="Telafi ve karar">{decisionCards}</FactGroup> : null}
     {correlationCards.length ? <FactGroup title="Korelasyon kanıtı">{correlationCards}</FactGroup> : null}
-    {analyticsCards.length ? <FactGroup title={analytics ? `${metricLabelsForTitle(analytics.metric)} analitiği` : 'Analitik'}>{analyticsCards}</FactGroup> : null}
+    {analyticsCards.length ? <FactGroup title={analyticsSummaries.length > 1 ? 'Operasyon analitiği' : analytics ? `${metricLabelsForTitle(analytics.metric)} analitiği` : 'Analitik'}>{analyticsCards}</FactGroup> : null}
     {technical && result.retrieval_sources?.length ? <FactGroup title="Kanıt referansları">{result.retrieval_sources.map((source) => <FactCard key={`${source.source_code}-${source.version ?? ''}-${source.section ?? ''}`} label={source.section ?? 'Kaynak'} value={`${source.source_code}${source.version !== undefined ? ` v${source.version}` : ''}`} />)}</FactGroup> : null}
     {!impactCards.length && !outageCards.length && !rootCards.length && !decisionCards.length && !correlationCards.length && !analyticsCards.length ? <p className="analysis-message">Bu sorgu için yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}
   </div>

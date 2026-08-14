@@ -158,22 +158,29 @@ class DeterministicToolPlanner:
 
     def _calls_for_intent(self, query: StructuredQuery) -> list[dict[str, object]] | PlannerResult:
         if query.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS:
-            analytics_arguments = query.analytics.model_dump(exclude_none=True)
-            if not query.analytics.comparison:
-                analytics_arguments.pop("comparison", None)
-            return [
-                self._call(
-                    "operational_analytics",
-                    "network",
-                    "analyze_operational_analytics",
-                    self._snapshot_args(
-                        query,
-                        **analytics_arguments,
-                        **self._analytics_scope_args(query),
-                    ),
-                    1,
-                )
-            ]
+            calls: list[dict[str, object]] = []
+            scopes = query.analytics_locations or ([query.location] if query.location else [None])
+            total_calls = len(query.analytics_specs or [query.analytics]) * len(scopes)
+            for spec_index, spec in enumerate(query.analytics_specs or [query.analytics]):
+                analytics_arguments = spec.model_dump(exclude_none=True)
+                if not spec.comparison:
+                    analytics_arguments.pop("comparison", None)
+                for scope_index, scope in enumerate(scopes):
+                    scope_args = self._analytics_scope_args(query, location=scope)
+                    calls.append(
+                        self._call(
+                            (
+                                "operational_analytics"
+                                if total_calls == 1
+                                else f"operational_analytics_{spec_index}_{scope_index}"
+                            ),
+                            "network",
+                            "analyze_operational_analytics",
+                            self._snapshot_args(query, **analytics_arguments, **scope_args),
+                            len(calls) + 1,
+                        )
+                    )
+            return calls
         if query.intent == StructuredQueryIntent.ALARM_CORRELATION:
             return self._cross_incident_correlation_calls(query)
         if query.intent == StructuredQueryIntent.NETWORK_INVESTIGATION:
@@ -248,13 +255,14 @@ class DeterministicToolPlanner:
         return PlannerResult.unplannable(PlannerReasonCode.NO_SAFE_TOOL_MAPPING.value)
 
     @staticmethod
-    def _analytics_scope_args(query: StructuredQuery) -> dict[str, object]:
+    def _analytics_scope_args(query: StructuredQuery, *, location=None) -> dict[str, object]:
         result: dict[str, object] = {}
-        if query.location:
-            if query.location.city:
-                result["city"] = query.location.city
-            if query.location.district:
-                result["district"] = query.location.district
+        scope = location if location is not None else query.location
+        if scope:
+            if scope.city:
+                result["city"] = scope.city
+            if scope.district:
+                result["district"] = scope.district
         if query.time_window:
             if query.time_window.from_time:
                 result["from_time"] = query.time_window.from_time

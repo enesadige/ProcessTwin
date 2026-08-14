@@ -343,7 +343,9 @@ class OperationalAnalyticsService:
             "potential_subscriptions": len(assessments) if assessments else None,
             "outage_count": len(outages),
             "event_count": 1,
-            "alarm_count": 1 if root_alarm else 0,
+            # Alarm count is a raw persisted alarm aggregate. Root alarm type
+            # remains only the grouping/filter representative for an event.
+            "alarm_count": len(alarms),
             "compensation_amount": amount,
             "failed_failover_count": int(failed_failover),
             "full_outage_count": int(full_outage),

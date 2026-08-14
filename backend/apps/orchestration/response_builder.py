@@ -244,6 +244,7 @@ class StructuredVerifiedResult(BaseModel):
     causal_summary: CausalSummary | None = None
     cross_incident_correlation_summary: CrossIncidentCorrelationSummary | None = None
     analytics_summary: AnalyticsSummary | None = None
+    analytics_summaries: list[AnalyticsSummary] = Field(default_factory=list)
     impact_summary: ImpactSummary | None = None
     rule_summary: RuleSummary | None = None
     compensation_summary: CompensationSummary | None = None
@@ -298,6 +299,10 @@ class ValidatedResponseBuilder:
             validation_status=result.validation_status,
             structured_result=self._public_structured_result(result),
         )
+        # Compound analytics facts are already complete and deterministic. Do
+        # not ask a narrative provider to choose or omit one of the metrics.
+        if len(result.analytics_summaries) > 1:
+            return response
         if requested_mode == ResponseGenerationMode.DETERMINISTIC:
             return response
 
@@ -785,6 +790,7 @@ class ValidatedResponseBuilder:
             causal_summary=result.causal_summary,
             cross_incident_correlation_summary=result.cross_incident_correlation_summary,
             analytics_summary=result.analytics_summary,
+            analytics_summaries=result.analytics_summaries,
             impact_summary=result.impact_summary,
             rule_summary=result.rule_summary,
             compensation_summary=result.compensation_summary,
@@ -858,6 +864,24 @@ class ValidatedResponseBuilder:
         result: ValidatedExecutionResult, structured_query: Mapping[str, Any] | None = None
     ) -> str:
         sections = ["Genel sonuç"]
+        if len(result.analytics_summaries) > 1:
+            labels = {
+                "affected_customers": "Doğrulanmış müşteri etkisi",
+                "affected_subscriptions": "Doğrulanmış abonelik etkisi",
+                "outage_count": "Kesinti sayısı",
+                "alarm_count": "Alarm sayısı",
+                "full_outage_count": "Tam hizmet kesintisi sayısı",
+            }
+            for analytics in result.analytics_summaries:
+                value = ", ".join(f"{row['label']}: {row['value']}" for row in analytics.rows)
+                label = labels.get(analytics.metric, analytics.metric)
+                sections.append(f"{label}: {value or 'Eşleşen kayıt yok'}.")
+                if analytics.metric in {"affected_customers", "affected_subscriptions"}:
+                    sections.append(
+                        f"{analytics.included_event_count} dahil, "
+                        f"{analytics.excluded_unknown_count} bilinmeyen etki nedeniyle hariç."
+                    )
+            return "\n".join(sections)
         analytics = result.analytics_summary
         if analytics:
             metric_labels = {

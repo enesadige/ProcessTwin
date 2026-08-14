@@ -247,6 +247,11 @@ class StructuredQuery(BaseModel):
     intent: StructuredQueryIntent
     requested_outputs: list[RequestedOutput] = Field(default_factory=list)
     analytics: AnalyticsSpecification | None = None
+    # The first specification remains the backwards-compatible primary view.
+    # Additional specifications preserve compound user requests without asking
+    # the planner or an LLM to infer omitted metrics.
+    analytics_specs: list[AnalyticsSpecification] = Field(default_factory=list, max_length=8)
+    analytics_locations: list[StructuredQueryLocation] = Field(default_factory=list, max_length=8)
     semantic_dimensions: list[SemanticDimension] = Field(default_factory=list)
     customer_impact_requested: bool = False
     semantic_decomposition_status: Literal["not_attempted", "accepted", "fallback"] = (
@@ -274,13 +279,19 @@ class StructuredQuery(BaseModel):
 
     @model_validator(mode="after")
     def validate_analytics_intent(self):
-        if self.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS and self.analytics is None:
+        if self.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS and not (
+            self.analytics or self.analytics_specs
+        ):
             raise ValueError("analytics intent requires analytics specification")
         if (
             self.intent != StructuredQueryIntent.OPERATIONAL_ANALYTICS
-            and self.analytics is not None
+            and (self.analytics is not None or self.analytics_specs)
         ):
             raise ValueError("analytics specification requires analytics intent")
+        if self.analytics is None and self.analytics_specs:
+            self.analytics = self.analytics_specs[0]
+        if self.analytics is not None and not self.analytics_specs:
+            self.analytics_specs = [self.analytics]
         return self
 
     @field_validator("snapshot_identifier")
