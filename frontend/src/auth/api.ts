@@ -221,15 +221,28 @@ function csrfCookie() {
     ?.split('=')[1]
 }
 
+type RequestErrorPayload = { detail?: string; error?: { code?: string; message?: string } }
+
+export class ApiRequestError extends Error {
+  readonly status: number
+  readonly code: string | undefined
+
+  constructor(status: number, payload: RequestErrorPayload) {
+    super(payload.error?.message || payload.detail || 'İstek tamamlanamadı.')
+    this.status = status
+    this.code = payload.error?.code
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
     ...init,
     credentials: 'include',
     headers: { Accept: 'application/json', ...init.headers },
   })
-  const body = (await response.json().catch(() => ({}))) as { detail?: string }
+  const body = (await response.json().catch(() => ({}))) as RequestErrorPayload
   if (!response.ok) {
-    throw new Error(body.detail || 'The request could not be completed.')
+    throw new ApiRequestError(response.status, body)
   }
   return body as T
 }
@@ -266,11 +279,13 @@ export async function logout() {
 export class AnalysisRequestError extends Error {
   readonly status: number
   readonly payload: AnalysisResponse
+  readonly code: string | undefined
 
   constructor(status: number, payload: AnalysisResponse) {
     super(payload.error?.message || 'Analiz isteği tamamlanamadı.')
     this.status = status
     this.payload = payload
+    this.code = payload.error?.code
   }
 }
 

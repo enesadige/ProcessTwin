@@ -15,6 +15,15 @@ const EXAMPLES = [
 ]
 
 type Lifecycle = 'idle' | 'submitting' | 'success' | 'clarification' | 'failed'
+type FailureKind = 'retryable' | 'access' | 'not-found' | 'other' | null
+type TopologyState = 'idle' | 'loading' | 'ready' | 'unavailable'
+
+function failureKind(status?: number, code?: string): Exclude<FailureKind, null> {
+  if (status === 401 || status === 403 || code === 'authentication_required' || code === 'permission_denied') return 'access'
+  if (status === 404 || code === 'not_found' || code === 'reference_not_found' || code === 'snapshot_not_found') return 'not-found'
+  if ([408, 429, 502, 503, 504].includes(status ?? 0) || ['timeout', 'network_error', 'rate_limited', 'provider_unavailable', 'executor_transport_error', 'mcp_tool_failed'].includes(code ?? '')) return 'retryable'
+  return 'other'
+}
 
 function FactCard({ label, value, tone = '' }: { label: string; value: ReactNode; tone?: string }) {
   return <div className={`analysis-fact ${tone ? `analysis-fact--${tone}` : ''}`}><span>{label}</span><strong>{value}</strong></div>
@@ -207,11 +216,13 @@ export function AIAnalysisPage() {
   const [lifecycle, setLifecycle] = useState<Lifecycle>('idle')
   const [result, setResult] = useState<Awaited<ReturnType<typeof submitAnalysis>> | null>(null)
   const [error, setError] = useState('')
+  const [failure, setFailure] = useState<FailureKind>(null)
   const [runKey, setRunKey] = useState<string | null>(null)
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [runStatus, setRunStatus] = useState<AnalysisStatus | null>(null)
   const [topologySummary, setTopologySummary] = useState<TopologySummary | null>(null)
+  const [topologyState, setTopologyState] = useState<TopologyState>('idle')
 
   useEffect(() => {
     if (!runKey) return
@@ -244,28 +255,38 @@ export function AIAnalysisPage() {
     const deviceCode = causalSummary?.root_resource_type === 'device' ? causalSummary.root_resource_reference : undefined
     if (!deviceCode) {
       setTopologySummary(null)
+      setTopologyState('idle')
       return
     }
     let cancelled = false
+    setTopologyState('loading')
     void getTopologySummary({
-      snapshotIdentifier: SNAPSHOT_IDENTIFIER,
+      snapshotIdentifier: result?.response?.structured_result?.snapshot_identifier ?? SNAPSHOT_IDENTIFIER,
       deviceCode,
       causalEventCode: causalSummary?.causal_event_code,
     }).then((summary) => {
-      if (!cancelled) setTopologySummary(summary)
+      if (!cancelled) {
+        setTopologySummary(summary)
+        setTopologyState('ready')
+      }
     }).catch(() => {
-      if (!cancelled) setTopologySummary(null)
+      if (!cancelled) {
+        setTopologySummary(null)
+        setTopologyState('unavailable')
+      }
     })
     return () => { cancelled = true }
-  }, [causalSummary?.causal_event_code, causalSummary?.root_resource_reference, causalSummary?.root_resource_type])
+  }, [causalSummary?.causal_event_code, causalSummary?.root_resource_reference, causalSummary?.root_resource_type, result?.response?.structured_result?.snapshot_identifier])
 
   async function submit() {
     const trimmed = query.trim()
     if (!trimmed || lifecycle === 'submitting') return
     setLifecycle('submitting')
     setError('')
+    setFailure(null)
     setResult(null)
     setTopologySummary(null)
+    setTopologyState('idle')
     const idempotencyKey = crypto.randomUUID()
     setRunKey(idempotencyKey)
     setRunStartedAt(Date.now())
@@ -283,7 +304,13 @@ export function AIAnalysisPage() {
       setLifecycle(response.clarification ? 'clarification' : 'success')
     } catch (reason: unknown) {
       setLifecycle('failed')
-      setError(reason instanceof AnalysisRequestError ? reason.message : 'Sunucuya ulaşılamadı.')
+      if (reason instanceof AnalysisRequestError) {
+        setError(reason.message)
+        setFailure(failureKind(reason.status, reason.code))
+      } else {
+        setError('Sunucuya ulaşılamadı.')
+        setFailure('retryable')
+      }
     }
     setRunKey(null)
     setRunStartedAt(null)
@@ -328,7 +355,6 @@ export function AIAnalysisPage() {
             <fieldset><legend>Görünüm</legend><label><input type="radio" checked={viewMode === 'management'} onChange={() => setViewMode('management')} /> Yönetim</label><label><input type="radio" checked={viewMode === 'technical'} onChange={() => setViewMode('technical')} /> Teknik</label></fieldset>
           </div>
           <button className="analysis-submit" type="submit" disabled={!query.trim() || lifecycle === 'submitting'}>{lifecycle === 'submitting' ? 'Analiz çalışıyor...' : 'Analizi çalıştır'}</button>
-          {lifecycle === 'failed' && <p className="analysis-message analysis-message--error" role="alert">{error}</p>}
         </form>
 
         <aside className="analysis-examples" aria-label="Örnek sorular">
@@ -346,9 +372,11 @@ export function AIAnalysisPage() {
         {runStatus?.failed_tool_count ? <p className="analysis-message analysis-message--error">İşlem güvenli şekilde başarısız oldu: {runStatus.error_code ?? 'tool_error'}</p> : null}
       </section>}
 
-      {result?.response && <section className="analysis-result" aria-live="polite"><div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>{viewMode === 'technical' ? 'Teknik görünüm' : 'Yönetim görünümü'}</span></div><div className="analysis-result__answer"><p className="analysis-page__eyebrow">Analiz yanıtı</p><h2>Yanıt</h2><p>{result.response.response_text}</p></div>{result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} technical={viewMode === 'technical'} /> : null}{topologySummary ? <TopologySummaryPanel summary={topologySummary} /> : null}{result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}</section>}
+      {lifecycle === 'failed' && <section className="analysis-state" role="alert" aria-live="assertive"><h2>{failure === 'access' ? 'Erişim gerekiyor' : failure === 'not-found' ? 'Kayıt bulunamadı' : failure === 'retryable' ? 'İşlem geçici olarak tamamlanamadı' : 'Analiz isteği tamamlanamadı'}</h2><p>{error}</p>{failure === 'retryable' ? <button type="button" onClick={() => void submit()}>Tekrar dene</button> : null}{failure === 'not-found' ? <button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button> : null}{failure === 'access' ? <Link to="/login">Oturuma git</Link> : null}</section>}
+
+      {result?.response && <section className="analysis-result" aria-live="polite"><div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>{viewMode === 'technical' ? 'Teknik görünüm' : 'Yönetim görünümü'}</span></div><div className="analysis-result__answer"><p className="analysis-page__eyebrow">Analiz yanıtı</p><h2>Yanıt</h2><p>{result.response.response_text}</p></div>{result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} technical={viewMode === 'technical'} /> : !isUnsupported ? <p className="analysis-message">Bu yanıtta yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}{topologyState === 'loading' ? <section className="topology-summary__state" aria-live="polite">Topoloji özeti yükleniyor.</section> : null}{topologySummary ? <TopologySummaryPanel summary={topologySummary} /> : null}{topologyState === 'unavailable' ? <section className="topology-summary__state" role="status">Topoloji özeti bu doğrulanmış kaynak için şu anda gösterilemiyor.</section> : null}{result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}</section>}
       {result?.clarification && <section className="analysis-result analysis-result--clarification" aria-live="polite"><h2>Ek bilgi gerekiyor</h2><p>{result.clarification.message}</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
-      {isUnsupported && <section className="analysis-result analysis-result--clarification" aria-live="polite"><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
+      {isUnsupported && <section className="analysis-result analysis-result--clarification" aria-live="polite"><h2>Desteklenmeyen istek</h2><p>Bu istek mevcut analiz kapsamı dışında kalıyor.</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
     </section>
   )
 }

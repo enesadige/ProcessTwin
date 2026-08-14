@@ -279,3 +279,15 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   dışında fallback yapmaz; missing/mismatch güvenli not-found döner.
 - Detail ekranı selected RuleVersion, decision/finalized, evaluation/outage,
   tutar ve mevcut koşul/inceleme kanıtlarını gösterir. Sonraki görev `MAIN-069`dur.
+
+## 2026-08-14 — MAIN-069 Frontend Hata ve Boş Durumları
+
+- AI Analysis'te mevcut backend response ayrımları korunarak clarification,
+  unsupported, retryable failure, access ve not-found durumları görünür ve
+  erişilebilir hale getirildi. Stale sonuç/progress temizlenir; retry yalnız
+  geçici hatalarda kullanılabilir.
+- Evidence detail ekranı eksik parametre, snapshot mismatch/not-found, erişim
+  ve geçici hata için ayrı durumlar sunar. Topology summary veri yok/yükleme
+  hatasında sessizce kaybolmaz.
+- Snapshot 74, analytics, RAG, provider ve backend hata semantiği değişmedi.
+  Sonraki görev `MAIN-070`; başlatılmayacak.

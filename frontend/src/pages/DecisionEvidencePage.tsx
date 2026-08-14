@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 
-import { getDecisionEvidence, type DecisionEvidenceDetail } from '../auth/api'
+import { ApiRequestError, getDecisionEvidence, type DecisionEvidenceDetail } from '../auth/api'
 import './DecisionEvidencePage.css'
 
 function DetailList({ title, values }: { title: string; values: unknown[] }) {
@@ -15,24 +15,33 @@ export function DecisionEvidencePage() {
   const snapshotIdentifier = searchParams.get('snapshot_identifier')?.trim() ?? ''
   const [detail, setDetail] = useState<DecisionEvidenceDetail | null>(null)
   const [snapshotKey, setSnapshotKey] = useState('')
-  const [state, setState] = useState<'loading' | 'ready' | 'missing'>('loading')
+  const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'access' | 'retryable'>('loading')
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!evidenceHash || !snapshotIdentifier) {
       setState('missing')
       return
     }
     setState('loading')
-    getDecisionEvidence({ snapshotIdentifier, evidenceHash })
-      .then(({ snapshot_key, decision_evidence }) => {
-        setSnapshotKey(snapshot_key)
-        setDetail(decision_evidence)
-        setState('ready')
-      })
-      .catch(() => setState('missing'))
+    try {
+      const { snapshot_key, decision_evidence } = await getDecisionEvidence({ snapshotIdentifier, evidenceHash })
+      setSnapshotKey(snapshot_key)
+      setDetail(decision_evidence)
+      setState('ready')
+    } catch (reason) {
+      if (reason instanceof ApiRequestError && (reason.status === 401 || reason.status === 403)) setState('access')
+      else if (reason instanceof ApiRequestError && reason.status === 404) setState('missing')
+      else setState('retryable')
+    }
   }, [evidenceHash, snapshotIdentifier])
 
+  useEffect(() => {
+    void load()
+  }, [load])
+
   if (state === 'loading') return <section className="evidence-detail"><p className="evidence-detail__eyebrow">Governance</p><h1>Decision Evidence</h1><p className="evidence-detail__message">Kanıt kaydı yükleniyor.</p></section>
+  if (state === 'access') return <section className="evidence-detail"><p className="evidence-detail__eyebrow">Governance</p><h1>Decision Evidence</h1><p className="evidence-detail__message" role="alert">Bu kanıt kaydını görüntüleme yetkiniz yok.</p><Link to="/login">Oturuma git</Link></section>
+  if (state === 'retryable') return <section className="evidence-detail"><p className="evidence-detail__eyebrow">Governance</p><h1>Decision Evidence</h1><p className="evidence-detail__message" role="alert">Kanıt kaydı geçici olarak yüklenemedi.</p><button type="button" onClick={() => void load()}>Tekrar dene</button><Link to="/ai-analysis">AI Analysis’e dön</Link></section>
   if (state === 'missing' || !detail) return <section className="evidence-detail"><p className="evidence-detail__eyebrow">Governance</p><h1>Decision Evidence</h1><p className="evidence-detail__message">Kanıt kaydı bulunamadı veya seçili snapshot’a ait değil.</p><Link to="/ai-analysis">AI Analysis’e dön</Link></section>
 
   const evaluation = detail.compensation_evaluation

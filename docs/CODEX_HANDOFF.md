@@ -611,3 +611,16 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   referansı, tutar ve koşul/modifier/manual-review kanıtlarını gösterir.
   Topology summary ve RAG provenance bağımsız kalır.
 - Sonraki görev: `MAIN-069`. Başlatılmayacak.
+
+## MAIN-069 Frontend Hata ve Boş Durumları (2026-08-14)
+
+- AI Analysis mevcut backend hata semantiğini koruyarak clarification,
+  unsupported, retry edilebilir hata, erişim ve not-found durumlarını ayrı
+  yüzeylerde gösterir. Yeni sorgu önceki progress/sonuç/hata durumunu temizler;
+  yalnız geçici hatalar aynı sorguyla tekrar denenebilir.
+- Evidence detail eksik parametre, snapshot-local not-found/mismatch, erişim ve
+  retry edilebilir hata durumlarını ayrıştırır. Topology summary yüklenemezse
+  sessizce kaybolmak yerine güvenli bir durum bilgisi gösterir.
+- Yeni backend endpointi veya veri semantiği eklenmedi; Snapshot 74, topology,
+  Rule/RAG provenance ve mevcut safe fallback davranışı korundu.
+- Sonraki görev: `MAIN-070`. Başlatılmayacak.
