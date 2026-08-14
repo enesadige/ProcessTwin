@@ -21,7 +21,12 @@ from apps.orchestration.natural_language_intake import (
 from apps.orchestration.planner import DeterministicToolPlanner
 from apps.orchestration.providers.base import LLMProvider
 from apps.orchestration.providers.gemini import GeminiLLMProviderError
-from apps.orchestration.structured_query import RequestedOutput, SemanticDimension, StructuredQuery
+from apps.orchestration.structured_query import (
+    AnalyticsSpecification,
+    RequestedOutput,
+    SemanticDimension,
+    StructuredQuery,
+)
 
 
 @pytest.mark.parametrize(
@@ -222,6 +227,34 @@ def test_semantic_decomposition_provider_failure_preserves_deterministic_query()
     assert result.structured_query.requested_outputs == query.requested_outputs
     assert result.structured_query.semantic_dimensions == []
     assert result.failure_code == "provider_unavailable"
+
+
+def test_semantic_decomposition_skips_fully_deterministic_analytics_contract():
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "operational_analytics",
+            "requested_outputs": ["summary", "impact"],
+            "snapshot_identifier": "intake-analytics-contract",
+            "analytics": AnalyticsSpecification(
+                metric="affected_customers",
+                aggregation="sum",
+                group_by="city",
+                comparison=True,
+            ).model_dump(mode="json"),
+        }
+    )
+    provider = SemanticProvider(["manual_review_reason"])
+
+    result = LLMSemanticDecomposer(provider).merge(
+        original_query="Haziran ve Temmuz arasında şehirleri müşteri etkisine göre sırala.",
+        deterministic_query=query,
+    )
+
+    assert result.accepted is False
+    assert result.failure_code is None
+    assert result.structured_query == query
+    assert result.structured_query.semantic_decomposition_status == "not_attempted"
+    assert provider.requests == []
 
 
 @pytest.mark.django_db

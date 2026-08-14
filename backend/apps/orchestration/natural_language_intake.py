@@ -167,6 +167,11 @@ class LLMSemanticDecomposer:
     def merge(
         self, *, original_query: str, deterministic_query: StructuredQuery
     ) -> SemanticDecompositionResult:
+        if deterministic_query.intent == StructuredQueryIntent.OPERATIONAL_ANALYTICS:
+            # The typed analytics contract already owns metric, filters, grouping,
+            # comparison and ranking. The current allowlist cannot add a trusted
+            # analytics output, so a Phase 2 model call is pure latency.
+            return SemanticDecompositionResult(deterministic_query, accepted=False)
         try:
             response = self._provider.generate(
                 request={
