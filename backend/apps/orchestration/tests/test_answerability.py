@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from apps.orchestration.answerability import (
     AnswerabilityStatus,
     classify_completed_answerability,
@@ -7,8 +9,19 @@ from apps.orchestration.answerability import (
 )
 
 
-def test_prediction_is_classified_as_unsupported_capability():
-    result = classify_unsupported_capability("Bu müşterinin gelecek ay kullanımını tahmin et.")
+@pytest.mark.parametrize(
+    "query",
+    [
+        "Bu müşterinin gelecek ay kullanımını tahmin et.",
+        "AGG-ANK-002 arızasını düzeltmek için cihaz üzerinde hangi komutları çalıştırmalıyım?",
+        (
+            "CE-MCR-0023 olayında hangi parçanın değiştirilmesi gerektiğini "
+            "ve tam müdahale prosedürünü söyle."
+        ),
+    ],
+)
+def test_unsupported_capabilities_are_classified_before_operational_analysis(query):
+    result = classify_unsupported_capability(query)
 
     assert result is not None
     assert result.status == AnswerabilityStatus.UNSUPPORTED_CAPABILITY

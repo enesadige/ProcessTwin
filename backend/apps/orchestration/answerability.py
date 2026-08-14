@@ -40,12 +40,38 @@ _FORECAST_TERMS = (
     "forecast",
     "prediction",
 )
+_REMEDIATION_TERMS = (
+    "hangi komut",
+    "komutları çalıştır",
+    "komutlari calistir",
+    "cli komut",
+    "runbook",
+    "remediation",
+    "arızasını düzelt",
+    "arizasini duzelt",
+    "nasıl düzelt",
+    "nasil duzelt",
+    "hangi parça",
+    "hangi parca",
+    "parçanın değiştiril",
+    "parcanin degistiril",
+    "teknisyen",
+    "saha müdahale",
+    "saha mudahale",
+    "müdahale prosedür",
+    "mudahale prosedur",
+    "tam prosedür",
+    "tam prosedur",
+)
 
 
 def classify_unsupported_capability(query: str) -> PreflightAnswerability | None:
-    """Classify only explicitly future-looking requests outside current analysis scope."""
+    """Classify requests outside deterministic operational-analysis capabilities."""
     folded = query.casefold()
-    if any(term in folded for term in _FORECAST_TERMS):
+    if any(
+        term in folded
+        for term in (*_FORECAST_TERMS, *_REMEDIATION_TERMS)
+    ):
         return PreflightAnswerability(
             status=AnswerabilityStatus.UNSUPPORTED_CAPABILITY,
             response_text="Bu sorgu mevcut analiz kapsamı tarafından desteklenmiyor.",

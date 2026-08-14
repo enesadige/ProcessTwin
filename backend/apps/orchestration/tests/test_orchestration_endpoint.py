@@ -233,6 +233,19 @@ def test_authenticated_analysis_endpoint_requires_analyst_role_and_uses_session(
             "unsupported_capability",
             "Bu sorgu mevcut analiz kapsamı tarafından desteklenmiyor.",
         ),
+        (
+            "AGG-ANK-002 arızasını düzeltmek için cihaz üzerinde hangi komutları çalıştırmalıyım?",
+            "unsupported_capability",
+            "Bu sorgu mevcut analiz kapsamı tarafından desteklenmiyor.",
+        ),
+        (
+            (
+                "CE-MCR-0023 olayında hangi parçanın değiştirilmesi gerektiğini "
+                "ve tam müdahale prosedürünü söyle."
+            ),
+            "unsupported_capability",
+            "Bu sorgu mevcut analiz kapsamı tarafından desteklenmiyor.",
+        ),
     ],
 )
 def test_preflight_answerability_completes_without_provider_or_tools(

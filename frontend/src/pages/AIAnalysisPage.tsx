@@ -210,6 +210,7 @@ export function AIAnalysisPage() {
     tools_executing: 'Operasyon verileri işleniyor',
     completed: 'Tamamlandı',
   }
+  const isUnsupported = result?.response?.response_text === 'Bu sorgu mevcut analiz kapsamı tarafından desteklenmiyor.'
 
   return (
     <section className="analysis-page" aria-labelledby="analysis-title">
@@ -260,6 +261,7 @@ export function AIAnalysisPage() {
 
       {result?.response && <section className="analysis-result" aria-live="polite"><div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>{viewMode === 'technical' ? 'Teknik görünüm' : 'Yönetim görünümü'}</span></div><div className="analysis-result__answer"><p className="analysis-page__eyebrow">Analiz yanıtı</p><h2>Yanıt</h2><p>{result.response.response_text}</p></div>{result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} technical={viewMode === 'technical'} /> : null}{result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}</section>}
       {result?.clarification && <section className="analysis-result analysis-result--clarification" aria-live="polite"><h2>Ek bilgi gerekiyor</h2><p>{result.clarification.message}</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
+      {isUnsupported && <section className="analysis-result analysis-result--clarification" aria-live="polite"><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
     </section>
   )
 }
