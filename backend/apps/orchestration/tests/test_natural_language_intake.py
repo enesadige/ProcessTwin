@@ -597,6 +597,48 @@ def test_device_impact_query_with_related_event_wording_is_not_alarm_correlation
 
 
 @pytest.mark.django_db
+def test_device_impact_query_resolves_the_latest_equally_direct_outage():
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.operations.models import (
+        Outage,
+        OutageStatus,
+        OutageType,
+        RootCauseCategory,
+        ServiceImpactClass,
+    )
+    from apps.operations.tests.test_operations_models import create_maltepe_bng
+
+    snapshot = create_snapshot("deterministic-device-latest-outage")
+    device = create_maltepe_bng(snapshot, code="AGG-ANK-002")
+    started_at = timezone.now() - timedelta(days=2)
+    for outage_code, offset in (("OUT-DEVICE-OLD", 0), ("OUT-DEVICE-LATEST", 1)):
+        Outage.objects.create(
+            data_snapshot=snapshot,
+            outage_code=outage_code,
+            source_device=device,
+            outage_type=OutageType.DEVICE,
+            impact_type=ServiceImpactClass.FULL_OUTAGE,
+            status=OutageStatus.RESOLVED,
+            root_cause_category=RootCauseCategory.UNKNOWN,
+            detected_at=started_at + timedelta(days=offset),
+            started_at=started_at + timedelta(days=offset),
+            ended_at=started_at + timedelta(days=offset, minutes=10),
+            resolved_at=started_at + timedelta(days=offset, minutes=10),
+        )
+
+    parsed = DeterministicStructuredQueryParser().parse(
+        original_query="AGG-ANK-002 için ilişkili olayı ve doğrulanmış müşteri etkisini söyle.",
+        snapshot=snapshot,
+    )
+
+    assert parsed.structured_query.outage_code == "OUT-DEVICE-LATEST"
+    assert parsed.structured_query.clarification_required is False
+
+
+@pytest.mark.django_db
 def test_deterministic_parser_does_not_match_a_device_code_prefix():
     snapshot = create_snapshot("deterministic-device-prefix")
     from apps.operations.tests.test_operations_models import create_maltepe_bng

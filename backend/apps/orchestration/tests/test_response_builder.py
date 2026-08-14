@@ -213,7 +213,7 @@ def test_deterministic_response_renders_validated_sections_and_keeps_run_unchang
     assert "Doğrulanmış ana kök neden: OLT_UNREACHABLE." in response.response_text
     assert "Dying Gasp alarmı kök neden değil, belirtidir." in response.response_text
     assert "Tam hizmet kesintisi: Hayır." in response.response_text
-    assert "CustomerImpactAssessment kanıtı yok." in response.response_text
+    assert "doğrulanmış müşteri etkisi değerlendirme kaydı yok." in response.response_text
     assert "Toplam telafi tutarı: 10.00 TRY." in response.response_text
     assert "Doküman sonuçları karar değil" in response.response_text
     assert {citation.reference_kind for citation in response.citations} >= {

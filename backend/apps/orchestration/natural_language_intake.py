@@ -533,8 +533,9 @@ class DeterministicStructuredQueryParser:
         """Resolve a unique operational outage through the resource graph.
 
         Direct source/root relations outrank supporting resource relations and
-        topology metadata.  Equal-ranked candidates remain ambiguous; selecting
-        the first database row would make the answer dependent on insertion order.
+        topology metadata. When a device has repeated equally direct historical
+        outages, choose the uniquely most recent record instead of depending on
+        insertion order; an explicit date still narrows the candidate set first.
         """
         from django.db.models import Q
 
@@ -571,9 +572,10 @@ class DeterministicStructuredQueryParser:
                 "causal_event__root_access_segment__serving_device__code",
                 "causal_event__metadata",
                 "metadata",
+                "started_at",
             )
         )
-        ranked: list[tuple[int, str]] = []
+        ranked: list[tuple[int, object, str]] = []
         for candidate in candidates:
             if candidate["metadata"].get("ground_truth_reconciled"):
                 score = 120
@@ -597,11 +599,15 @@ class DeterministicStructuredQueryParser:
                 score = 80
             else:
                 score = 70
-            ranked.append((score, candidate["outage_code"]))
+            ranked.append((score, candidate["started_at"], candidate["outage_code"]))
         if not ranked:
             return None
-        highest = max(score for score, _code in ranked)
-        winners = sorted(code for score, code in ranked if score == highest)
+        highest = max(score for score, _started_at, _code in ranked)
+        candidates = [
+            (started_at, code) for score, started_at, code in ranked if score == highest
+        ]
+        latest = max(started_at for started_at, _code in candidates)
+        winners = sorted(code for started_at, code in candidates if started_at == latest)
         return winners[0] if len(winners) == 1 else None
 
     @staticmethod

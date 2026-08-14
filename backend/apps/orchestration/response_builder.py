@@ -958,7 +958,8 @@ class ValidatedResponseBuilder:
                 impact.missing_evidence_categories
             ):
                 sections.append(
-                    "Gerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok."
+                    "Gerçek müşteri etkisi kesin doğrulanmadı; doğrulanmış müşteri etkisi "
+                    "değerlendirme kaydı yok."
                 )
                 if impact.failover_protected is None:
                     sections.append(
@@ -1314,7 +1315,8 @@ class ValidatedResponseBuilder:
                 impact.missing_evidence_categories
             ):
                 add(
-                    "Gerçek müşteri etkisi kesin doğrulanmadı; CustomerImpactAssessment kanıtı yok."
+                    "Gerçek müşteri etkisi kesin doğrulanmadı; doğrulanmış müşteri etkisi "
+                    "değerlendirme kaydı yok."
                 )
                 if impact.failover_protected is None:
                     add("Failover ile korunan bağlantı sayısı için doğrulanmış sayısal kayıt yok.")
