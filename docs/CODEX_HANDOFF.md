@@ -587,3 +587,14 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   cihaz, potential 572, verified connection/subscription 429 ve customer 393.
 - Focused testler (3), Ruff, Django check, migration dry-run ve frontend
   typecheck geçti. Sonraki görev: `MAIN-067`.
+
+## MAIN-067 Kural ve Kaynak Kanıtları (2026-08-14)
+
+- AI Analysis doğrulanmış sonuç kartlarına, mevcut deterministic provenance'tan
+  beslenen `Kural ve kaynak kanıtları` bölümü eklendi. Seçilmiş RuleVersion,
+  DecisionEvidence ve mevcut RAG doküman kodu/sürümü/başlığı/bölümü gösterilir.
+- RAG arama tekrar çalıştırılmaz: sonuçtan gelen mevcut `hybrid_score`, yoksa
+  `semantic_score`, yoksa `full_text_score` aynı kaynak kaydıyla taşınır.
+  RAG kaynakları karar veya operasyonel sayı hesabının kaynağı olarak sunulmaz.
+- Boş provenance için kart üretilmez. MAIN-066 topology summary bağımsız kalır.
+- Sonraki görev: `MAIN-068`. Başlatılmayacak.

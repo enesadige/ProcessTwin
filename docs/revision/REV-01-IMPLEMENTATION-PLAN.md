@@ -258,3 +258,14 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 - Snapshot 74 değişmedi; yeni customer impact/failover hesabı yapılmadı.
   Snapshot smoke ve focused backend/frontend kontrolleri PASS. Sonraki görev
   `MAIN-067`dir.
+
+## 2026-08-14 — MAIN-067 rule ve RAG provenance görünümü
+
+- AI Analysis sonucu, mevcut validated execution provenance'ından seçilmiş
+  RuleVersion, DecisionEvidence ve RAG document code/version/heading/section
+  bilgisini kullanıcıya görünür taşır.
+- Retrieval skoru yeni arama çalıştırılmadan mevcut sonuçtan alınır: öncelik
+  `hybrid_score`, ardından `semantic_score`, sonra `full_text_score`dur.
+  RAG yalnız citation/retrieval kaynağıdır; karar ve operasyonel sayı hesaplamaz.
+- Boş kaynakta sahte kart yoktur; topology summary ile bağımsız bölümler birlikte
+  çalışır. Sonraki görev `MAIN-068`dir.

@@ -94,7 +94,10 @@ export type RetrievalSource = {
   source_code: string
   version?: number
   section?: string
+  section_path?: string
   source_kind?: string
+  score?: number
+  score_source?: string
 }
 
 export type CrossIncidentCorrelationSummary = {

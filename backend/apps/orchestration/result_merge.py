@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 from collections.abc import Callable, Mapping
 from enum import StrEnum
 from typing import Any
@@ -154,7 +155,10 @@ class RetrievalSource(BaseModel):
     source_code: str
     version: int | None = None
     section: str | None = None
+    section_path: str | None = None
     source_kind: str | None = None
+    score: float | None = None
+    score_source: str | None = None
     excerpt: str | None = None
 
 
@@ -223,6 +227,22 @@ def _optional_non_negative(data: Mapping[str, Any], field: str) -> int | None:
     if field not in data or data[field] is None:
         return None
     return _non_negative_int(data[field], field)
+
+
+def _retrieval_score(data: Mapping[str, Any]) -> tuple[float | None, str | None]:
+    """Keep the existing retrieval score and its source field together."""
+    for field in ("hybrid_score", "semantic_score", "full_text_score"):
+        value = data.get(field)
+        if value is None:
+            continue
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not math.isfinite(value)
+        ):
+            raise ValueError(f"{field} must be a finite number")
+        return float(value), field
+    return None, None
 
 
 def _string(value: object, field: str, *, required: bool = False) -> str | None:
@@ -559,12 +579,16 @@ def _document_retrieval(data: Mapping[str, Any]) -> _ExtractedToolResult:
         item = _mapping(row)
         if item is None:
             raise ValueError("retrieval source is invalid")
+        score, score_source = _retrieval_score(item)
         sources.append(
             RetrievalSource(
                 source_code=_string(item.get("document_code"), "document_code", required=True),
                 version=_optional_non_negative(item, "document_version"),
                 section=_string(item.get("heading"), "heading"),
+                section_path=_string(item.get("section_path"), "section_path"),
                 source_kind=_string(data.get("source_kind"), "source_kind"),
+                score=score,
+                score_source=score_source,
                 excerpt=_string(item.get("text"), "text"),
             )
         )

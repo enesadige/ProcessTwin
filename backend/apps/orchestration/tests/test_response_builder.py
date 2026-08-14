@@ -153,7 +153,14 @@ def valid_result(snapshot_identifier: str, *, warnings: list[str] | None = None)
             scope="verified_impact",
         ),
         retrieval_sources=[
-            RetrievalSource(source_code="SYN-COMP-2026", version=2, section="Uygunluk koşulları")
+            RetrievalSource(
+                source_code="SYN-COMP-2026",
+                version=2,
+                section="Uygunluk koşulları",
+                section_path="Telafi / Uygunluk koşulları",
+                score=0.812,
+                score_source="hybrid_score",
+            )
         ],
         provenance=[
             ProvenanceEntry(
@@ -203,6 +210,13 @@ def test_deterministic_response_renders_validated_sections_and_keeps_run_unchang
     assert response.structured_result.impact_summary.potential == 5
     assert response.structured_result.compensation_summary is not None
     assert response.structured_result.compensation_summary.total_amount == "10.00"
+    assert response.structured_result.retrieval_sources[0].source_code == "SYN-COMP-2026"
+    assert (
+        response.structured_result.retrieval_sources[0].section_path
+        == "Telafi / Uygunluk koşulları"
+    )
+    assert response.structured_result.retrieval_sources[0].score == pytest.approx(0.812)
+    assert response.structured_result.retrieval_sources[0].score_source == "hybrid_score"
     assert "Potansiyel etki: 5 bağlantı." in response.response_text
     assert "Doğrulanmış etki: 2 bağlantı." in response.response_text
     assert "Etkilenmediği doğrulanan: 1 bağlantı." in response.response_text
@@ -1240,7 +1254,10 @@ def test_compositional_analytics_contract_keeps_scope_and_total_projections():
     assert "Alarm sayısı: Çankaya: 11." in deterministic
     assert "UPLINK_DOWN: 6" in deterministic
     assert any("Çankaya: 11 alarm." in statement for statement in contract["statements"].values())
-    assert any("UPLINK_DOWN: 6 alarm." in statement for statement in contract["statements"].values())
+    assert any(
+        "UPLINK_DOWN: 6 alarm." in statement
+        for statement in contract["statements"].values()
+    )
 
 
 def test_global_comparison_contract_has_period_specific_evidence_counts():

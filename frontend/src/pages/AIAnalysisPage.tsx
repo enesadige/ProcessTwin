@@ -37,6 +37,10 @@ function correlationStatus(status: string) {
   return ({ verified_relation: 'Doğrulandı', insufficient_evidence: 'Kanıt yetersiz', no_relation: 'İlişki bulunmadı' } as Record<string, string>)[status] ?? 'Doğrulanmış durum yok'
 }
 
+function formatRetrievalScore(score: number) {
+  return new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 3 }).format(score)
+}
+
 function topologyRelationship(correlation: CrossIncidentCorrelationSummary) {
   const relation = correlation.topology_relation ?? correlation.resource_relation
   return ({ same_resource: 'Aynı doğrulanmış kaynak', direct_parent_child: 'Doğrudan üst/alt bağlantı', same_bng_branch: 'Aynı upstream BNG dalı', shared_failure_domain: 'Aynı doğrulanmış arıza alanı' } as Record<string, string>)[relation ?? '']
@@ -107,14 +111,26 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
   if (compensation) {
     if (compensation.status) decisionCards.push(<FactCard key="status" label="Telafi sonucu" value={compensation.status} />)
     if (compensation.total_amount && compensation.currency) decisionCards.push(<FactCard key="amount" label="Toplam tutar" value={`${compensation.total_amount} ${compensation.currency}`} />)
-    if (compensation.rule_versions && Object.keys(compensation.rule_versions).length) decisionCards.push(<FactCard key="comp-rules" label="Uygulanan RuleVersion" value={Object.keys(compensation.rule_versions).join(', ')} />)
-    if (compensation.evidence_references?.length) decisionCards.push(<FactCard key="comp-evidence" label="DecisionEvidence" value={compensation.evidence_references.join(', ')} />)
   }
   if (rule) {
-    if (rule.rule_versions?.length) decisionCards.push(<FactCard key="rules" label="Kural sürümü" value={rule.rule_versions.join(', ')} />)
-    if (rule.evidence_references?.length) decisionCards.push(<FactCard key="evidence" label="Karar kanıtı" value={rule.evidence_references.join(', ')} />)
     if (!compensation?.status && rule.eligibility_status) decisionCards.push(<FactCard key="eligibility" label="Uygunluk" value={rule.eligibility_status} />)
   }
+  const provenanceCards: ReactNode[] = []
+  const ruleCodes = [...new Set(rule?.rule_codes ?? [])]
+  const ruleVersions = [...new Set([...(rule?.rule_versions ?? []), ...Object.keys(compensation?.rule_versions ?? {})])]
+  const evidenceReferences = [...new Set([...(rule?.evidence_references ?? []), ...(compensation?.evidence_references ?? [])])]
+  if (ruleCodes.length) provenanceCards.push(<FactCard key="rule-codes" label="Kural kodu" value={ruleCodes.join(', ')} />)
+  if (ruleVersions.length) provenanceCards.push(<FactCard key="rule-versions" label="Seçilmiş RuleVersion" value={ruleVersions.join(', ')} />)
+  if (evidenceReferences.length) provenanceCards.push(<FactCard key="decision-evidence" label="DecisionEvidence" value={evidenceReferences.join(', ')} />)
+  result.retrieval_sources?.forEach((source) => {
+    const reference = [
+      `${source.source_code}${source.version !== undefined ? ` v${source.version}` : ''}`,
+      source.section ? `Başlık: ${source.section}` : '',
+      source.section_path ? `Bölüm: ${source.section_path}` : '',
+      source.score !== undefined ? `Skor${source.score_source ? ` (${source.score_source})` : ''}: ${formatRetrievalScore(source.score)}` : '',
+    ].filter(Boolean).join(' · ')
+    provenanceCards.push(<FactCard key={`retrieval-${source.source_code}-${source.version ?? ''}-${source.section ?? ''}-${source.section_path ?? ''}`} label="RAG kaynağı" value={reference} />)
+  })
   const correlationCards: ReactNode[] = []
   if (correlation) {
     correlationCards.push(<FactCard key="correlation-status" label="Korelasyon" value={correlationStatus(correlation.correlation_status)} />)
@@ -159,10 +175,10 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
     {outageCards.length ? <FactGroup title="Kesinti ve ağ">{outageCards}</FactGroup> : null}
     {technical && rootCards.length ? <FactGroup title="Kök neden">{rootCards}</FactGroup> : null}
     {decisionCards.length ? <FactGroup title="Telafi ve karar">{decisionCards}</FactGroup> : null}
+    {provenanceCards.length ? <FactGroup title="Kural ve kaynak kanıtları">{provenanceCards}</FactGroup> : null}
     {correlationCards.length ? <FactGroup title="Korelasyon kanıtı">{correlationCards}</FactGroup> : null}
     {analyticsCards.length ? <FactGroup title={analyticsSummaries.length > 1 ? 'Operasyon analitiği' : analytics ? `${metricLabelsForTitle(analytics.metric)} analitiği` : 'Analitik'}>{analyticsCards}</FactGroup> : null}
-    {technical && result.retrieval_sources?.length ? <FactGroup title="Kanıt referansları">{result.retrieval_sources.map((source) => <FactCard key={`${source.source_code}-${source.version ?? ''}-${source.section ?? ''}`} label={source.section ?? 'Kaynak'} value={`${source.source_code}${source.version !== undefined ? ` v${source.version}` : ''}`} />)}</FactGroup> : null}
-    {!impactCards.length && !outageCards.length && !rootCards.length && !decisionCards.length && !correlationCards.length && !analyticsCards.length ? <p className="analysis-message">Bu sorgu için yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}
+    {!impactCards.length && !outageCards.length && !rootCards.length && !decisionCards.length && !provenanceCards.length && !correlationCards.length && !analyticsCards.length ? <p className="analysis-message">Bu sorgu için yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}
   </div>
 }
 

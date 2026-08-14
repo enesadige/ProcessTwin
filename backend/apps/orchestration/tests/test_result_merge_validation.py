@@ -15,6 +15,7 @@ from apps.orchestration.result_merge import (
     ResultMergerValidator,
     ValidationStatus,
     _customer_causal_impact,
+    _document_retrieval,
     _network_outage_impact,
     _operational_analytics,
 )
@@ -468,6 +469,33 @@ def test_rule_document_retrieval_requires_only_document_retrieval_evidence():
     categories = ResultMergerValidator.required_categories(query)
 
     assert {category.value for category in categories} == {"document_retrieval"}
+
+
+def test_document_retrieval_preserves_existing_score_with_source_metadata():
+    extracted = _document_retrieval(
+        {
+            "source_kind": "rule_document",
+            "results": [
+                {
+                    "document_code": "RULE-DOC-001",
+                    "document_version": 3,
+                    "heading": "Uygunluk",
+                    "section_path": "Telafi / Uygunluk",
+                    "hybrid_score": 0.81234,
+                    "semantic_score": 0.71,
+                    "text": "Doğrulanmış kural metni.",
+                }
+            ],
+        }
+    )
+
+    source = extracted.retrieval_sources[0]
+    assert source.source_code == "RULE-DOC-001"
+    assert source.version == 3
+    assert source.section == "Uygunluk"
+    assert source.section_path == "Telafi / Uygunluk"
+    assert source.score == pytest.approx(0.81234)
+    assert source.score_source == "hybrid_score"
 
 
 def test_rule_document_retrieval_with_public_event_requires_rule_evidence_too():
