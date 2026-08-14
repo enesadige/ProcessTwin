@@ -341,6 +341,20 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   üretilmedi; mevcut compensation evidence yolu korundu. Sonraki görev:
   `MAIN-074`.
 
+## 2026-08-14 — MAIN-074 Evidence/Governance Acceptance
+
+- Completed QueryRun'dan finalized genel EvidenceRecord'a ve exact
+  snapshot-local detail API'sine uzanan integration zinciri doğrulandı.
+  Tool timeline, deterministic calculation, explicit RuleVersion, RAG
+  provenance ve warnings yalnız persisted güvenli veriden gelir.
+- Failure/answerability, draft/missing/cross-snapshot, replay/idempotency,
+  finalized immutability ve compensation DecisionEvidence endpoint ayrımı
+  focused testlerle korundu. İki evidence türü fallback yapmaz.
+- Genel evidence code AI Analysis response contract'ında henüz yoktur; doğrudan
+  genel evidence linki bu nedenle eklenmedi. Bu non-blocking bağlantı ayrı
+  ele alınmalıdır. Evidence/governance paketi tamamlandı; sonraki görev
+  `MAIN-075`.
+
 ## 2026-08-14 — AI Analysis Scope ve Telafi Execution Düzeltmesi
 
 - Açık ama snapshot içinde çözülemeyen şehirler, `Çorum'da` gibi locative

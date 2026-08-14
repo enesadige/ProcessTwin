@@ -676,6 +676,21 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   için genel evidence linki uydurulmadı; mevcut compensation evidence linki
   korunur. Sonraki görev: `MAIN-074`.
 
+## MAIN-074 Evidence/Governance Acceptance (2026-08-14)
+
+- Completed QueryRun -> finalized `EvidenceRecord` -> exact snapshot-local API
+  detail zinciri focused integration testiyle doğrulandı. Tool sırası/denemesi/
+  süresi, deterministic calculation, explicit RuleVersion, RAG provenance ve
+  warnings persisted kayıttan gelir; replay child kayıtları çoğaltmaz.
+- Failure/answerability, draft/missing/cross-snapshot, finalized immutability
+  ve compensation `DecisionEvidence` endpoint ayrımı ilgili focused testlerle
+  geçti. Genel `evidence_code` ve compensation `evidence_hash` rotaları
+  birbirine fallback yapmaz.
+- Genel evidence code henüz AI Analysis response contract'ında taşınmadığı
+  için doğrudan sonuçtan genel evidence linki yoktur; bu non-blocking ürün
+  bağlantısı ayrı ele alınmalıdır. Evidence/governance paketi kapanmıştır.
+  Sonraki görev: `MAIN-075`.
+
 ## AI Analysis Scope ve Telafi Execution Düzeltmesi (2026-08-14)
 
 - Çözülemeyen açık şehir ifadeleri, Türkçe locative yazımı (`Çorum'da`) dahil,
