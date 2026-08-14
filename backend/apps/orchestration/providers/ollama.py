@@ -158,7 +158,9 @@ class OllamaLLMProvider(LLMProvider):
 
     @staticmethod
     def _max_attempts() -> int:
-        max_attempts = getattr(settings, "OLLAMA_LLM_MAX_ATTEMPTS", 2)
+        # Ollama serves one local inference at a time. Retrying a timed-out
+        # request can queue behind the still-cancelling first inference.
+        max_attempts = getattr(settings, "OLLAMA_LLM_MAX_ATTEMPTS", 1)
         if not isinstance(max_attempts, int) or not 1 <= max_attempts <= 3:
             raise OllamaLLMProviderError(
                 message="Ollama retry configuration is invalid.", code="configuration_error"
