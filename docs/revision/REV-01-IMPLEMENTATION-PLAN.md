@@ -219,3 +219,12 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   Activation/integration commit: `60fa4fa`.
 - Rollback: frontend exact snapshot anahtarını snapshot 54'e geri çevir; eski
   QueryRun replay'leri değişmez. Sonraki görev `MAIN-066`; bu görevde başlatılmadı.
+
+## 2026-08-14 — V3 trend/grouping regression fix
+
+- `1986ac2` generic comparison contract'ını grouping ile compose edecek şekilde
+  düzeltti. City ve root alarm type comparison sonuçları dönem bazlı değer,
+  signed fark, yön ve unknown-exclusion metadata'sını taşır; explicit top-N
+  korunur.
+- Canonical analytics `included_event_count` AnswerPlan'a eklendi. Snapshot 74,
+  RAG, provider ve activation mekanizması değiştirilmedi.

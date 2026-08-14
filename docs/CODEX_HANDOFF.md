@@ -536,3 +536,15 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   `frontend/src/pages/AIAnalysisPage.tsx` snapshot anahtarını snapshot 54
   anahtarına çevir; eski QueryRun replay'leri kendi snapshot provenance'ını korur.
 - Sonraki görev: `MAIN-066`. Başlatılmayacak.
+
+## V3 Trend/Comparison Contract Fix (2026-08-14)
+
+- Commit `1986ac2` comparison ile grouping boyutunun birlikte taşınmasını sağladı:
+  global comparison zaman kovalarını, city/alarm-type comparison ise her grup için
+  dönem değerleri, fark ve yön bilgisini döndürür. Explicit top-N korunur;
+  "şehirleri sırala" exhaustive kalır.
+- Analytics AnswerPlan artık `included_event_count` değerini de first-class
+  verified fact olarak sunar. Unknown exclusion tekrar edilmez ve unknown `0`
+  olarak yorumlanmaz.
+- Snapshot 74 verisi, RAG, provider konfigürasyonu ve activation seçimi bu
+  düzeltmede değiştirilmedi. Sonraki görev hâlâ `MAIN-066`dır.
