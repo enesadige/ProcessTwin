@@ -113,7 +113,11 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
         : ''
       const primaryValue = periods || `${row.value}${rowEvidence}`
       const rowLabel = row.label === 'Toplam' ? (summary.scope_label ?? 'Toplam') : row.label
-      const prefix = row.label === 'Toplam' ? metricLabelsForTitle(summary.metric) : `${metricLabelsForTitle(summary.metric)}: ${index + 1}. ${rowLabel}`
+      const prefix = row.label === 'Toplam'
+        ? (summary.scope_label
+          ? `${summary.scope_label} — ${metricLabelsForTitle(summary.metric)}`
+          : metricLabelsForTitle(summary.metric))
+        : `${metricLabelsForTitle(summary.metric)}: ${index + 1}. ${rowLabel}`
       analyticsCards.push(<FactCard key={`analytics-${summaryIndex}-${index}-${row.label}`} label={prefix} value={[primaryValue, change].filter(Boolean).join(' | ')} />)
     }))
     analyticsSummaries.forEach((summary, index) => {
