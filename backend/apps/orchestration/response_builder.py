@@ -88,6 +88,15 @@ _NARRATIVE_QUALITATIVE_IMPACT_RE = re.compile(
     r"hizmet dışı kalma süresi\w* uzat\w*)\b",
     re.IGNORECASE,
 )
+_NARRATIVE_UNKNOWN_AS_NO_IMPACT_RE = re.compile(
+    r"\betkisiz\b.*\b(?:hariç|haric|dışarıda|disarida|dahil edilme)|"
+    r"\b(?:hariç|haric|dışarıda|disarida|dahil edilme).*\betkisiz\b",
+    re.IGNORECASE,
+)
+_NARRATIVE_EXTREMUM_RE = re.compile(
+    r"\ben\s+(?:çok|cok|yüksek)\s+(?:artan|azalan|artış|artis|azalış|azalis)\b",
+    re.IGNORECASE,
+)
 _NARRATIVE_FACT_TOKEN_RE = re.compile(
     r"(?:\b\d+(?:[.,]\d+)?\b|\b[A-Z][A-Z0-9_:-]{3,}\b|\b[A-Z][A-Z0-9]+(?:-[A-Z0-9]+)+\b)"
 )
@@ -440,6 +449,12 @@ class ValidatedResponseBuilder:
             for term in ("karşılaştır", "karsilastir", "trend", "artış", "azalış")
         ):
             requested_roles.add("analytics_comparison")
+        if (
+            "analytics_comparison" in requested_roles
+            and any(term in query for term in ("her iki dönem", "iki dönemde", "her ay"))
+            and any(term in query for term in ("hariç", "haric", "dışında", "disinda"))
+        ):
+            requested_roles.add("analytics_period_evidence")
         if any(term in query for term in ("hariç", "haric", "dışında", "disinda")):
             requested_roles.add("unknown_exclusion")
         if any(term in query for term in ("hesaba dahil", "dahil edilen")):
@@ -455,7 +470,7 @@ class ValidatedResponseBuilder:
             ]
             if not candidates:
                 continue
-            if role == "analytics_comparison":
+            if role in {"analytics_comparison", "analytics_period_evidence"}:
                 missing = [
                     statement_text
                     for _, statement_text in candidates
@@ -1126,6 +1141,31 @@ class ValidatedResponseBuilder:
                         f"{metric_labels.get(analytics.metric, analytics.metric)}"
                         f"{period_evidence}."
                     )
+            if analytics.comparison and analytics.group_by not in {None, "time_bucket"}:
+                signed_rows = [
+                    row
+                    for row in analytics.rows
+                    if isinstance(row.get("signed_change"), (int, float))
+                    and not isinstance(row.get("signed_change"), bool)
+                ]
+                increases = [row for row in signed_rows if row["signed_change"] > 0]
+                decreases = [row for row in signed_rows if row["signed_change"] < 0]
+                if increases:
+                    highest_increase = max(
+                        increases, key=lambda row: (row["signed_change"], row["label"])
+                    )
+                    add(
+                        f"En yüksek artış: {highest_increase['label']}, "
+                        f"{highest_increase['absolute_change']} müşteri."
+                    )
+                if decreases:
+                    highest_decrease = min(
+                        decreases, key=lambda row: (row["signed_change"], row["label"])
+                    )
+                    add(
+                        f"En yüksek azalış: {highest_decrease['label']}, "
+                        f"{highest_decrease['absolute_change']} müşteri."
+                    )
             comparison_row = next(
                 (row for row in reversed(analytics.rows) if row.get("absolute_change") is not None),
                 None,
@@ -1526,7 +1566,16 @@ class ValidatedResponseBuilder:
                 ("Karşılaştırılan olaylar", "operasyonel ilişki", "topoloji ilişkisi"),
             ),
             ("correlation_temporal_evidence", ("Zaman farkı:",)),
-            ("analytics_comparison", ("Dönem karşılaştırması:", "mutlak değişim")),
+            (
+                "analytics_comparison",
+                (
+                    "Dönem karşılaştırması:",
+                    "mutlak değişim",
+                    "En yüksek artış:",
+                    "En yüksek azalış:",
+                ),
+            ),
+            ("analytics_period_evidence", ("dahil,", "hariç)")),
             ("analytics_included_count", ("Hesaba dahil edilen olay sayısı:",)),
             ("unknown_exclusion", ("hesaplamaya dahil edilmedi",)),
             ("evidence", ("Kaynaklar", "Belge içeriği", "DecisionEvidence", "RuleVersion")),
@@ -2045,6 +2094,25 @@ class ValidatedResponseBuilder:
         if qualitative_match:
             matched_concept = qualitative_match.group(0).casefold()
             if matched_concept not in support_text:
+                return True
+        if (
+            "doğrulanmış etki kanıtı olmadığı için hesaplamaya dahil edilmedi" in support_text
+            and _NARRATIVE_UNKNOWN_AS_NO_IMPACT_RE.search(text)
+        ):
+            return True
+        if _NARRATIVE_EXTREMUM_RE.search(text):
+            extrema = [
+                statement
+                for statement in statements.values()
+                if statement.startswith(("En yüksek artış:", "En yüksek azalış:"))
+            ]
+            if not extrema or not any(
+                all(
+                    token.casefold() in text.casefold()
+                    for token in _NARRATIVE_FACT_TOKEN_RE.findall(statement)
+                )
+                for statement in extrema
+            ):
                 return True
         if not _NARRATIVE_DOMAIN_INTERPRETATION_RE.search(text):
             return False

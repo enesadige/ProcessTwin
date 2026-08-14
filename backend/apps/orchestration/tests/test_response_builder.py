@@ -1478,6 +1478,75 @@ def test_grouped_comparison_contract_has_period_evidence_without_fake_global_sum
     assert not any(statement.startswith("Dönem karşılaştırması:") for statement in statements)
 
 
+def test_city_comparison_contract_grounds_extrema_and_rejects_unknown_as_no_impact():
+    result = valid_result("response-city-comparison-extrema").model_copy(
+        update={
+            "analytics_summary": AnalyticsSummary(
+                metric="affected_customers",
+                aggregation="sum",
+                group_by="city",
+                ranking_direction="desc",
+                comparison=True,
+                rows=[
+                    {
+                        "label": "İstanbul",
+                        "value": 664,
+                        "signed_change": 664,
+                        "absolute_change": 664,
+                        "trend_direction": "increase",
+                        "event_count": 11,
+                        "period_values": [
+                            {
+                                "label": "2026-06",
+                                "value": 435,
+                                "event_count": 4,
+                                "included_event_count": 4,
+                                "excluded_unknown_count": 2,
+                            },
+                            {
+                                "label": "2026-07",
+                                "value": 1099,
+                                "event_count": 7,
+                                "included_event_count": 7,
+                                "excluded_unknown_count": 2,
+                            },
+                        ],
+                    },
+                    {
+                        "label": "Ankara",
+                        "value": 13,
+                        "signed_change": 13,
+                        "absolute_change": 13,
+                        "trend_direction": "increase",
+                        "event_count": 13,
+                    },
+                ],
+                included_event_count=24,
+                excluded_unknown_count=4,
+                deduplication_grain="causal_event",
+            )
+        }
+    )
+
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(result)
+    statements = contract["statements"]
+    assert "En yüksek artış: İstanbul, 664 müşteri." in statements.values()
+    assert any("2026-06 435 (4 dahil, 2 hariç)" in statement for statement in statements.values())
+    assert any(
+        "analytics_period_evidence" in concepts
+        for concepts in contract["statement_concepts"].values()
+    )
+
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "4 olay etkisiz olarak dışarıda bırakıldı. En çok artan şehir Ankara oldu.",
+        statements,
+        {},
+    )
+
+    assert narrative["sentences"] == []
+    assert len(removed) == 2
+
+
 def test_requested_unknown_exclusion_coverage_preserves_verified_zero():
     text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
         "Başarısız failover olaylarında doğrulanmış müşteri etkisi hesaplandı.",
