@@ -1392,6 +1392,42 @@ def test_free_text_narrative_rejects_backup_inference_from_zero_protected_count(
     assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
 
 
+def test_same_event_alarm_query_requires_root_and_symptom_evidence():
+    statements = {
+        "S1": "Kök neden alarmı: DISTRIBUTION_CABLE_DOWN.",
+        "S2": "Dying Gasp alarmı kök neden değil, belirtidir.",
+    }
+    concepts = {
+        statement_id: ValidatedResponseBuilder._statement_concepts(statement)
+        for statement_id, statement in statements.items()
+    }
+
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "Olaydaki alarmlar incelendi.",
+        original_query=(
+            "CE-MCR-0023 olayındaki alarmları incele. Hangisi root cause, "
+            "hangileri semptom?"
+        ),
+        selected_statements=statements,
+        statement_concepts=concepts,
+    )
+
+    assert "Kök neden alarmı: DISTRIBUTION_CABLE_DOWN." in text
+    assert "Dying Gasp alarmı kök neden değil, belirtidir." in text
+    assert fill_count == 2
+
+
+def test_free_text_narrative_rejects_unverified_independence_claim():
+    narrative, removed = ValidatedResponseBuilder._free_text_narrative(
+        "Alarmlar kesin bağımsızdır ve birbirini etkilemedi.",
+        {"S1": "Olaylar arasında doğrulanmış ilişki bulunmadı."},
+        {},
+    )
+
+    assert narrative["sentences"] == []
+    assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
+
+
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
         "Müşteri memnuniyeti olumsuz etkilendi.",

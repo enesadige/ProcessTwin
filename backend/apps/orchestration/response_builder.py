@@ -76,6 +76,11 @@ _NARRATIVE_DOMAIN_INTERPRETATION_RE = re.compile(
     r"shared[- ](?:source|failure|risk)|common[- ](?:cause|source|failure))\b",
     re.IGNORECASE,
 )
+_NARRATIVE_UNSUPPORTED_NO_RELATION_RE = re.compile(
+    r"\b(?:kesin(?:likle)?\s+)?(?:bağımsız|bagimsiz|ilişkisiz|iliskisiz)\b|"
+    r"\bbirbirini\s+etkilemedi\b",
+    re.IGNORECASE,
+)
 _NARRATIVE_QUALITATIVE_IMPACT_RE = re.compile(
     r"\b(?:müşteri(?:ler(?:in)?|nin)?\s+(?:alternatif|başka)\s+(?:çözüm|çözümler)|"
     r"customer(?:s)?\s+(?:sought|seek|using)\s+alternative|"
@@ -431,6 +436,19 @@ class ValidatedResponseBuilder:
         if any(term in query for term in ("kök kaynak", "kok kaynak", "root resource")):
             requested_roles.add("root_resource")
         if any(
+            term in query
+            for term in (
+                "kök neden",
+                "kok neden",
+                "root cause",
+                "semptom",
+                "symptom",
+                "dying gasp",
+                "device not active",
+            )
+        ):
+            requested_roles.update({"root_cause", "alarm_role_evidence"})
+        if any(
             term in query for term in ("detaylı analiz", "detayli analiz", "analiz et", "analyze")
         ):
             requested_roles.add("root_resource")
@@ -523,6 +541,13 @@ class ValidatedResponseBuilder:
                     and ("kök neden" in lower_text or "fiziksel" in lower_text)
                 )
                 or (
+                    role == "alarm_role_evidence"
+                    and any(
+                        statement_text.casefold() in lower_text
+                        for _, statement_text in candidates
+                    )
+                )
+                or (
                     role in {"compensation_amount", "rule_version", "decision_evidence"}
                     and any(token in lower_text for token in supported_tokens)
                 )
@@ -545,7 +570,7 @@ class ValidatedResponseBuilder:
                 )
                 or (combined_candidate_text and combined_candidate_text in lower_text)
             )
-            if supported_tokens and not role_present:
+            if (supported_tokens or role == "alarm_role_evidence") and not role_present:
                 appended = _NARRATIVE_ROLE_PREFIX_RE.sub("", candidates[0][1], count=1).strip()
                 appended = _NARRATIVE_INTERNAL_REASON_RE.sub(
                     "doğrulanmamış teknik gerekçe", appended
@@ -912,7 +937,7 @@ class ValidatedResponseBuilder:
             elif correlation.correlation_status == "insufficient_evidence":
                 sections.append("Olaylar arasında ilişkiyi doğrulamak için mevcut kanıt yetersiz.")
             else:
-                sections.append("Olaylar arasında doğrulanmış operasyonel ilişki bulunmuyor.")
+                sections.append("Olaylar arasında doğrulanmış ilişki bulunmadı.")
             if correlation.time_difference_seconds is not None:
                 sections.append(
                     "Olaylar arasındaki zaman farkı: "
@@ -1281,7 +1306,7 @@ class ValidatedResponseBuilder:
             elif correlation.correlation_status == "insufficient_evidence":
                 add("Olaylar arasında ilişkiyi doğrulamak için mevcut kanıt yetersiz.")
             else:
-                add("Olaylar arasında doğrulanmış operasyonel ilişki bulunmuyor.")
+                add("Olaylar arasında doğrulanmış ilişki bulunmadı.")
             if correlation.time_difference_seconds is not None:
                 add(
                     "Olaylar arasındaki zaman farkı: "
@@ -1584,6 +1609,7 @@ class ValidatedResponseBuilder:
             ("compensation_amount", ("tazminat tutarı", "telafi tutarı")),
             ("compensation_reason", ("kararı", "doğrulanmış etki üzerinden")),
             ("root_cause", ("kök neden", "Kök kaynak")),
+            ("alarm_role_evidence", ("belirtidir",)),
             (
                 "alarm_correlation",
                 ("Karşılaştırılan olaylar", "operasyonel ilişki", "topoloji ilişkisi"),
@@ -2122,6 +2148,8 @@ class ValidatedResponseBuilder:
             "failover ile korunan: 0 bağlantı" in support_text
             and _NARRATIVE_FAILOVER_ZERO_INFERENCE_RE.search(text)
         ):
+            return True
+        if _NARRATIVE_UNSUPPORTED_NO_RELATION_RE.search(text):
             return True
         if _NARRATIVE_EXTREMUM_RE.search(text):
             extrema = [
