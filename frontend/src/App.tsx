@@ -6,6 +6,7 @@ import { ProtectedRoutes, RoleRoute } from './auth/RouteGuards'
 import { AppErrorPage, AppLayout, AppLoading } from './components/layout/AppLayout'
 import { LoginPage } from './pages/LoginPage'
 import { AIAnalysisPage } from './pages/AIAnalysisPage'
+import { DecisionEvidencePage } from './pages/DecisionEvidencePage'
 import { OperationsPage } from './pages/OperationsPage'
 import { ProcessTwinPage } from './pages/ProcessTwinPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
@@ -40,7 +41,7 @@ const router = createBrowserRouter([
               { path: '/settings', element: <PlaceholderPage title="Settings" section="Workspace" /> },
             ],
           },
-          { path: '/evidence', element: <PlaceholderPage title="Decision Evidence" section="Governance" /> },
+          { path: '/evidence', element: <DecisionEvidencePage /> },
         ],
       },
     ],

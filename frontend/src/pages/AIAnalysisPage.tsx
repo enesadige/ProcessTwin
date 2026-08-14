@@ -1,4 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 
 import { useAuth } from '../auth/AuthContext'
 import { AnalysisRequestError, getAnalysisStatus, getTopologySummary, submitAnalysis, type AnalysisStatus, type AnalyticsSummary, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type TopologyDevice, type TopologySummary, type ViewMode } from '../auth/api'
@@ -15,7 +16,7 @@ const EXAMPLES = [
 
 type Lifecycle = 'idle' | 'submitting' | 'success' | 'clarification' | 'failed'
 
-function FactCard({ label, value, tone = '' }: { label: string; value: string | number; tone?: string }) {
+function FactCard({ label, value, tone = '' }: { label: string; value: ReactNode; tone?: string }) {
   return <div className={`analysis-fact ${tone ? `analysis-fact--${tone}` : ''}`}><span>{label}</span><strong>{value}</strong></div>
 }
 
@@ -121,7 +122,18 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
   const evidenceReferences = [...new Set([...(rule?.evidence_references ?? []), ...(compensation?.evidence_references ?? [])])]
   if (ruleCodes.length) provenanceCards.push(<FactCard key="rule-codes" label="Kural kodu" value={ruleCodes.join(', ')} />)
   if (ruleVersions.length) provenanceCards.push(<FactCard key="rule-versions" label="Seçilmiş RuleVersion" value={ruleVersions.join(', ')} />)
-  if (evidenceReferences.length) provenanceCards.push(<FactCard key="decision-evidence" label="DecisionEvidence" value={evidenceReferences.join(', ')} />)
+  evidenceReferences.forEach((reference) => {
+    const evidenceLink = result.snapshot_identifier
+      ? `/evidence?${new URLSearchParams({ evidence_hash: reference, snapshot_identifier: result.snapshot_identifier })}`
+      : null
+    provenanceCards.push(
+      <FactCard
+        key={`decision-evidence-${reference}`}
+        label="DecisionEvidence"
+        value={evidenceLink ? <Link className="analysis-fact__link" to={evidenceLink}>{reference}</Link> : reference}
+      />,
+    )
+  })
   result.retrieval_sources?.forEach((source) => {
     const reference = [
       `${source.source_code}${source.version !== undefined ? ` v${source.version}` : ''}`,

@@ -269,3 +269,13 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   RAG yalnız citation/retrieval kaynağıdır; karar ve operasyonel sayı hesaplamaz.
 - Boş kaynakta sahte kart yoktur; topology summary ile bağımsız bölümler birlikte
   çalışır. Sonraki görev `MAIN-068`dir.
+
+## 2026-08-14 — MAIN-068 DecisionEvidence linki
+
+- AI Analysis provenance kartındaki gerçek DecisionEvidence referansı,
+  snapshot identifier ve evidence hash ile `/evidence` detay görünümüne bağlandı.
+- Browser yalnız authenticated public read endpointini kullanır. Endpoint mevcut
+  immutable evidence serializer'ını reuse eder ve `snapshot + evidence_hash`
+  dışında fallback yapmaz; missing/mismatch güvenli not-found döner.
+- Detail ekranı selected RuleVersion, decision/finalized, evaluation/outage,
+  tutar ve mevcut koşul/inceleme kanıtlarını gösterir. Sonraki görev `MAIN-069`dur.

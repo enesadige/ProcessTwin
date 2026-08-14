@@ -128,6 +128,7 @@ export type AnalyticsSummary = {
 
 export type StructuredVerifiedResult = {
   schema_version: string
+  snapshot_identifier: string
   causal_summary?: CausalSummary
   cross_incident_correlation_summary?: CrossIncidentCorrelationSummary
   analytics_summary?: AnalyticsSummary
@@ -136,6 +137,30 @@ export type StructuredVerifiedResult = {
   rule_summary?: RuleSummary
   compensation_summary?: CompensationSummary
   retrieval_sources?: RetrievalSource[]
+}
+
+export type DecisionEvidenceDetail = {
+  evidence_hash: string
+  decision: string
+  finalized: boolean
+  rule_set?: { code?: string; name?: string } | null
+  selected_rule_version?: { rule_code?: string; version?: number } | null
+  price_basis?: string
+  selected_price?: string | null
+  unrounded_amount?: string | null
+  final_amount: string
+  currency: string
+  matched_conditions: unknown[]
+  failed_conditions: unknown[]
+  excluded_rules: unknown[]
+  applied_modifiers: unknown[]
+  manual_review_reasons: unknown[]
+  compensation_evaluation?: {
+    evaluation_code: string
+    result_type: string
+    status: string
+    outage_code: string
+  } | null
 }
 
 export type AnalysisStatus = {
@@ -292,5 +317,22 @@ export async function getTopologySummary({
   })
   if (causalEventCode) params.set('causal_event_code', causalEventCode)
   const response = await request<{ data: TopologySummary }>(`/api/orchestration/topology-summary/?${params}`)
+  return response.data
+}
+
+export async function getDecisionEvidence({
+  snapshotIdentifier,
+  evidenceHash,
+}: {
+  snapshotIdentifier: string
+  evidenceHash: string
+}) {
+  const params = new URLSearchParams({
+    snapshot_identifier: snapshotIdentifier,
+    evidence_hash: evidenceHash,
+  })
+  const response = await request<{
+    data: { snapshot_key: string; decision_evidence: DecisionEvidenceDetail }
+  }>(`/api/orchestration/decision-evidence/?${params}`)
   return response.data
 }

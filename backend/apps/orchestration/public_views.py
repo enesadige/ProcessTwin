@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from apps.accounts.models import UserRole
+from apps.compensation.models import DecisionEvidence
 from apps.core.internal_api import resolve_correlation_id
 from apps.datasets.models import DataSnapshot
 from apps.network.models import NetworkDevice
@@ -17,6 +18,7 @@ from apps.network.services.topology_summary import (
 from apps.operations.models import CausalEvent
 from apps.orchestration.facade import OrchestrationFacade
 from apps.orchestration.models import QueryRun, QueryRunStatus
+from apps.rules.internal_serializers import decision_evidence_summary
 
 
 def get_orchestration_facade() -> OrchestrationFacade:
@@ -193,3 +195,66 @@ def topology_summary(request):
             status=400,
         )
     return JsonResponse({"data": payload})
+
+
+@require_GET
+def decision_evidence_detail(request):
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"error": {"code": "authentication_required", "message": "Authentication required."}},
+            status=401,
+        )
+    if request.user.role not in {UserRole.ANALYST, UserRole.ADMIN}:
+        return JsonResponse(
+            {"error": {"code": "permission_denied", "message": "Evidence access is not allowed."}},
+            status=403,
+        )
+
+    snapshot_identifier = request.GET.get("snapshot_identifier", "").strip()
+    evidence_hash = request.GET.get("evidence_hash", "").strip()
+    if not snapshot_identifier or not evidence_hash:
+        return JsonResponse(
+            {
+                "error": {
+                    "code": "validation_error",
+                    "message": "Snapshot and evidence reference are required.",
+                }
+            },
+            status=400,
+        )
+
+    snapshot = DataSnapshot.objects.filter(snapshot_key=snapshot_identifier).first()
+    if snapshot is None:
+        return JsonResponse(
+            {"error": {"code": "not_found", "message": "Evidence record was not found."}},
+            status=404,
+        )
+    evidence = (
+        DecisionEvidence.objects.filter(data_snapshot=snapshot, evidence_hash=evidence_hash)
+        .select_related(
+            "rule_set",
+            "selected_rule_version",
+            "selected_rule_version__rule",
+            "selected_rule_version__rule__rule_set",
+            "compensation_evaluation",
+            "compensation_evaluation__outage",
+            "compensation_evaluation__subscription",
+            "compensation_evaluation__customer",
+        )
+        .first()
+    )
+    if evidence is None:
+        return JsonResponse(
+            {"error": {"code": "not_found", "message": "Evidence record was not found."}},
+            status=404,
+        )
+    detail = decision_evidence_summary(evidence)
+    evaluation = detail.get("compensation_evaluation")
+    if evaluation:
+        detail["compensation_evaluation"] = {
+            key: evaluation[key]
+            for key in ("evaluation_code", "result_type", "status", "outage_code")
+        }
+    return JsonResponse(
+        {"data": {"snapshot_key": snapshot.snapshot_key, "decision_evidence": detail}}
+    )

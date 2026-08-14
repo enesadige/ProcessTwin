@@ -598,3 +598,16 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   RAG kaynakları karar veya operasyonel sayı hesabının kaynağı olarak sunulmaz.
 - Boş provenance için kart üretilmez. MAIN-066 topology summary bağımsız kalır.
 - Sonraki görev: `MAIN-068`. Başlatılmayacak.
+
+## MAIN-068 DecisionEvidence Detayı (2026-08-14)
+
+- AI Analysis içindeki gerçek DecisionEvidence referansları artık exact snapshot
+  identifier ve evidence hash taşıyan `/evidence` bağlantılarıdır.
+- Yeni authenticated read-only public endpoint aynı immutable serializer'ı
+  kullanır; lookup yalnız `snapshot_key + evidence_hash` eşleşmesiyle yapılır.
+  Cross-snapshot ve missing kayıtlar `not_found` döner; latest-rule fallback,
+  yeni evidence veya hesaplama yoktur.
+- Evidence ekranı karar/finalized durumu, selected RuleVersion, evaluation/outage
+  referansı, tutar ve koşul/modifier/manual-review kanıtlarını gösterir.
+  Topology summary ve RAG provenance bağımsız kalır.
+- Sonraki görev: `MAIN-069`. Başlatılmayacak.

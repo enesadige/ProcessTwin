@@ -1,0 +1,19 @@
+.evidence-detail { display: grid; gap: var(--space-5); max-width: 1080px; }
+.evidence-detail__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.evidence-detail__header h1 { margin: 0; font-size: 30px; }
+.evidence-detail__header p:not(.evidence-detail__eyebrow) { margin: var(--space-2) 0 0; color: var(--color-text-muted); overflow-wrap: anywhere; }
+.evidence-detail__header > a, .evidence-detail > a { color: var(--color-primary-strong); font-weight: 700; }
+.evidence-detail__eyebrow { margin: 0 0 var(--space-2); color: var(--color-primary); font-size: 11px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.evidence-detail__message { margin: 0; color: var(--color-text-muted); }
+.evidence-detail__summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-2); }
+.evidence-detail__summary > div, .evidence-detail__section { padding: var(--space-4); border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); box-shadow: var(--shadow-panel); }
+.evidence-detail__summary span { display: block; margin-bottom: 5px; color: var(--color-text-muted); font-size: 11px; font-weight: 700; }
+.evidence-detail__summary strong { overflow-wrap: anywhere; font-size: 15px; }
+.evidence-detail__section { display: grid; gap: var(--space-3); }
+.evidence-detail__section h2 { margin: 0; font-size: 17px; }
+.evidence-detail__section ul { display: grid; gap: var(--space-2); margin: 0; padding-left: 20px; }
+.evidence-detail__section li { overflow-wrap: anywhere; color: var(--color-text-muted); line-height: 1.5; }
+.evidence-detail__section dl { display: grid; grid-template-columns: minmax(150px, .35fr) 1fr; gap: var(--space-2) var(--space-4); margin: 0; }
+.evidence-detail__section dt { color: var(--color-text-muted); font-size: 12px; font-weight: 700; }
+.evidence-detail__section dd { margin: 0; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .evidence-detail__header { flex-direction: column; } .evidence-detail__section dl { grid-template-columns: 1fr; gap: 4px; } }
