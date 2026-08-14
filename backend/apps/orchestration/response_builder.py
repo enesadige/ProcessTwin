@@ -323,13 +323,16 @@ class ValidatedResponseBuilder:
                 statement_id: contract[1]["statements"][statement_id]
                 for statement_id in selection["selected_statement_ids"]
             }
-            if self._requires_deterministic_uncertainty_response(
+            if (
+                result.cross_incident_correlation_summary
+                and result.cross_incident_correlation_summary.correlation_status == "no_relation"
+            ) or self._requires_deterministic_uncertainty_response(
                 query_run.original_query,
                 selected_statements,
             ):
                 response.narrative_synthesis_audit = {
                     "status": "skipped",
-                    "reason": "requested_causality_is_not_explicitly_verified",
+                    "reason": "canonical_causality_is_not_explicitly_verified",
                 }
                 return response
             if getattr(active_provider, "supports_grounded_narrative", False):
