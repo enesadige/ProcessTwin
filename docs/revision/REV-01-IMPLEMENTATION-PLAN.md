@@ -238,3 +238,13 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   korunur. Son commit: `9d7dbca`.
 - Sonraki görev `MAIN-066`: BNG'den alt cihazlara ve müşteri etkisine uzanan
   topoloji özet görünümü; bu kayıtta başlatılmadı.
+
+## 2026-08-14 — AI Analysis general reliability hardening
+
+- `be6cb7c` analytics sorgularında filter/grouping ayrımını, persisted
+  outage/alarm count toplamını ve empty-scope sonucunun zero sayılmaması
+  sözleşmesini düzeltti.
+- Predictive probability intentleri unsupported kapsamına alındı; supported
+  event/impact/correlation/analytics yolları korunur.
+- Snapshot 74 üzerinde gerçek backend/MCP ile 15 representative case çalıştı:
+  12 completed, 3 unsupported deterministic early exit. Sonraki görev MAIN-066.

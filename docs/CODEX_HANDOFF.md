@@ -562,3 +562,15 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   gösterilir.
 - Son güvenlik commitleri: `460eac9` ve `9d7dbca`. Küçük provider anlatım üslubu
   kusurları blocker değildir. Sonraki görev `MAIN-066`: topoloji özet görünümü.
+
+## AI Analysis General Reliability Hardening (2026-08-14)
+
+- Commit `be6cb7c` generic analytics sözleşmesini güçlendirdi: location filtresi
+  grouping değildir; outage/alarm count event sayısına çökmeden persisted count
+  üzerinden toplanır; boş scoped sonuç doğrulanmış sıfır olarak yorumlanmaz.
+- Olasılık yüzdesi isteyen predictive sorgular da remediation/forecast ile aynı
+  early unsupported contract'a girer. Boş scoped analytics sonucu LLM'e
+  yorumlatılmaz; deterministic kayıt-yok cevabı kullanılır.
+- Snapshot `74`, V3 verisi, RAG ve provider registry değişmedi. Gerçek backend/MCP
+  acceptance matrisi: 12 supported QueryRun completed, 3 unsupported intent
+  doğru erken reddedildi. Bilinen blocker yoktur. Sonraki görev `MAIN-066`dır.
