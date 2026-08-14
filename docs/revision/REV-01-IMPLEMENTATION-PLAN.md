@@ -248,3 +248,13 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   event/impact/correlation/analytics yolları korunur.
 - Snapshot 74 üzerinde gerçek backend/MCP ile 15 representative case çalıştı:
   12 completed, 3 unsupported deterministic early exit. Sonraki görev MAIN-066.
+
+## 2026-08-14 — MAIN-066 topology summary
+
+- `f2a4e48` AI Analysis'e full graph olmayan, read-only ve snapshot-local bir
+  topology summary ekledi. Doğrulanmış device root için upstream/kök/sınırlı
+  downstream erişim zinciri, mevcut connection role metadata'sı ve persisted
+  scope gösterilir.
+- Snapshot 74 değişmedi; yeni customer impact/failover hesabı yapılmadı.
+  Snapshot smoke ve focused backend/frontend kontrolleri PASS. Sonraki görev
+  `MAIN-067`dir.

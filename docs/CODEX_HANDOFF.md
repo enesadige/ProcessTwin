@@ -574,3 +574,16 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
 - Snapshot `74`, V3 verisi, RAG ve provider registry değişmedi. Gerçek backend/MCP
   acceptance matrisi: 12 supported QueryRun completed, 3 unsupported intent
   doğru erken reddedildi. Bilinen blocker yoktur. Sonraki görev `MAIN-066`dır.
+
+## MAIN-066 Topoloji Özet Görünümü (2026-08-14)
+
+- Commit `f2a4e48` AI Analysis sonuçlarında, doğrulanmış cihaz kökü varsa
+  snapshot-local topology summary gösterir: upstream, seçili root ve sınırlı
+  downstream access zinciri.
+- Payload yalnız mevcut NetworkDevice/NetworkLink ilişkilerini, aktif
+  primary/backup connection role sayılarını ve persisted assessment scope'unu
+  okur. Yeni impact hesabı veya failover sonucu türetmez.
+- Snapshot 74 smoke: `AGG-ANK-002` upstream `BNG-ANK-001`, 15 downstream
+  cihaz, potential 572, verified connection/subscription 429 ve customer 393.
+- Focused testler (3), Ruff, Django check, migration dry-run ve frontend
+  typecheck geçti. Sonraki görev: `MAIN-067`.
