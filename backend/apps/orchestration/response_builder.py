@@ -2082,7 +2082,14 @@ class ValidatedResponseBuilder:
     ) -> bool:
         query = original_query.casefold()
         support_text = " ".join(selected_statements.values())
-        no_relation = "Olaylar arasında doğrulanmış ilişki bulunmadı." in support_text
+        no_relation = any(
+            marker in support_text
+            for marker in (
+                "İlişki bulunmadı",
+                "ilişki bulunmadı",
+                "doğrulanmış ilişki bulunmadı",
+            )
+        )
         asks_for_relation = any(
             term in query
             for term in ("korelasyon", "ilişki", "ilisk", "nedensel", "neden-sonuç", "causal")

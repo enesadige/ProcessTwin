@@ -1529,6 +1529,17 @@ def test_free_text_narrative_rejects_positive_relation_and_time_proximity_withou
     assert removed[0]["failure_code"] == "unsupported_domain_interpretation"
 
 
+def test_no_relation_card_fact_skips_provider_narrative_synthesis():
+    assert ValidatedResponseBuilder._requires_deterministic_uncertainty_response(
+        "İki olay arasındaki nedensel zincirin yönünü söyle.",
+        {
+            "S1": "Korelasyon: İlişki bulunmadı.",
+            "S2": "Olaylar arasındaki zaman farkı: 1161 saat 46 dakika.",
+            "S3": "Olaylar arasında kök/belirti yönü kesin olarak doğrulanmadı.",
+        },
+    )
+
+
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
         "Müşteri memnuniyeti olumsuz etkilendi.",
