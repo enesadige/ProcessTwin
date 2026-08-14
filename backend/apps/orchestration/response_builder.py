@@ -242,6 +242,7 @@ class StructuredVerifiedResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     schema_version: str = "structured-verified-result.v1"
+    snapshot_identifier: str
     causal_summary: CausalSummary | None = None
     cross_incident_correlation_summary: CrossIncidentCorrelationSummary | None = None
     analytics_summary: AnalyticsSummary | None = None
@@ -784,6 +785,7 @@ class ValidatedResponseBuilder:
     ) -> StructuredVerifiedResult:
         """Expose validated summaries without raw calls, prompts, or internal IDs."""
         return StructuredVerifiedResult(
+            snapshot_identifier=result.snapshot_identifier,
             causal_summary=result.causal_summary,
             cross_incident_correlation_summary=result.cross_incident_correlation_summary,
             analytics_summary=result.analytics_summary,

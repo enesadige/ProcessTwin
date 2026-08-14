@@ -1936,6 +1936,7 @@ def test_structured_result_exposes_verified_correlation_summary():
     )
 
     structured = ValidatedResponseBuilder._public_structured_result(result)
+    assert structured.snapshot_identifier == result.snapshot_identifier
 
     assert structured.cross_incident_correlation_summary is not None
     assert structured.cross_incident_correlation_summary.time_difference_seconds == 2220
