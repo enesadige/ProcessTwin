@@ -183,7 +183,7 @@ export type EvidenceRecordDetail = {
     status: string
     attempt_count: number | null
     duration_ms: number | null
-    result_summary: string | null
+    result_summary: unknown | null
     error_code: string | null
   }>
   calculations: Array<{
