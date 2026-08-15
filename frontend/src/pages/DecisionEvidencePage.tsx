@@ -5,8 +5,10 @@ import {
   ApiRequestError,
   getDecisionEvidence,
   getEvidenceRecordDetail,
+  getEvidenceRecordList,
   type DecisionEvidenceDetail,
   type EvidenceRecordDetail,
+  type EvidenceRecordListItem,
 } from '../auth/api'
 import './DecisionEvidencePage.css'
 
@@ -47,6 +49,16 @@ function GeneralEvidenceDetailView({ detail }: { detail: EvidenceRecordDetail })
   </>
 }
 
+function GeneralEvidenceListView({ records }: { records: EvidenceRecordListItem[] }) {
+  if (!records.length) {
+    return <section className="evidence-detail__section"><h2>Henüz finalized genel kanıt kaydı yok</h2><p className="evidence-detail__message">Tamamlanan analiz çalıştırmalarının kanıt kayıtları burada görünür.</p></section>
+  }
+  return <section className="evidence-detail__section"><h2>Son finalized execution evidence kayıtları</h2><ul className="evidence-detail__index">{records.map((record) => {
+    const params = new URLSearchParams({ evidence_code: record.evidence_code, snapshot_identifier: record.snapshot.key })
+    return <li key={record.evidence_code}><Link to={`/evidence?${params}`}><strong>{record.evidence_code}</strong><span>QueryRun: {record.query_run.code}</span><span>Durum: {record.query_run.terminal_status}</span><span>Snapshot: {record.snapshot.key}</span><span>Finalized: {record.finalized_at ?? 'Belirtilmedi'}</span></Link></li>
+  })}</ul></section>
+}
+
 export function DecisionEvidencePage() {
   const [searchParams] = useSearchParams()
   const evidenceHash = searchParams.get('evidence_hash')?.trim() ?? ''
@@ -54,11 +66,26 @@ export function DecisionEvidencePage() {
   const snapshotIdentifier = searchParams.get('snapshot_identifier')?.trim() ?? ''
   const [decisionDetail, setDecisionDetail] = useState<DecisionEvidenceDetail | null>(null)
   const [generalDetail, setGeneralDetail] = useState<EvidenceRecordDetail | null>(null)
+  const [generalRecords, setGeneralRecords] = useState<EvidenceRecordListItem[]>([])
   const [snapshotKey, setSnapshotKey] = useState('')
   const [state, setState] = useState<'loading' | 'ready' | 'missing' | 'access' | 'retryable'>('loading')
   const evidenceKind = evidenceHash && !evidenceCode ? 'compensation' : evidenceCode && !evidenceHash ? 'general' : null
+  const isGeneralIndex = !evidenceHash && !evidenceCode && !snapshotIdentifier
 
   const load = useCallback(async () => {
+    if (isGeneralIndex) {
+      setState('loading')
+      setDecisionDetail(null)
+      setGeneralDetail(null)
+      try {
+        setGeneralRecords(await getEvidenceRecordList())
+        setState('ready')
+      } catch (reason) {
+        if (reason instanceof ApiRequestError && (reason.status === 401 || reason.status === 403)) setState('access')
+        else setState('retryable')
+      }
+      return
+    }
     if (!evidenceKind || !snapshotIdentifier) {
       setState('missing')
       return
@@ -66,6 +93,7 @@ export function DecisionEvidencePage() {
     setState('loading')
     setDecisionDetail(null)
     setGeneralDetail(null)
+    setGeneralRecords([])
     try {
       if (evidenceKind === 'compensation') {
         const { snapshot_key, decision_evidence } = await getDecisionEvidence({ snapshotIdentifier, evidenceHash })
@@ -82,23 +110,23 @@ export function DecisionEvidencePage() {
       else if (reason instanceof ApiRequestError && reason.status === 404) setState('missing')
       else setState('retryable')
     }
-  }, [evidenceCode, evidenceHash, evidenceKind, snapshotIdentifier])
+  }, [evidenceCode, evidenceHash, evidenceKind, isGeneralIndex, snapshotIdentifier])
 
   useEffect(() => {
     void load()
   }, [load])
 
-  const title = evidenceKind === 'general' ? 'Execution Evidence' : 'Decision Evidence'
+  const title = isGeneralIndex ? 'Decision Evidence' : evidenceKind === 'general' ? 'Execution Evidence' : 'Decision Evidence'
   if (state === 'loading') return <section className="evidence-detail"><p className="evidence-detail__eyebrow">Governance</p><h1>{title}</h1><p className="evidence-detail__message" aria-live="polite">Kanıt kaydı yükleniyor.</p></section>
   if (state === 'access') return <section className="evidence-detail"><p className="evidence-detail__eyebrow">Governance</p><h1>{title}</h1><p className="evidence-detail__message" role="alert">Bu kanıt kaydını görüntüleme yetkiniz yok.</p><Link to="/login">Oturuma git</Link></section>
   if (state === 'retryable') return <section className="evidence-detail"><p className="evidence-detail__eyebrow">Governance</p><h1>{title}</h1><p className="evidence-detail__message" role="alert">Kanıt kaydı geçici olarak yüklenemedi.</p><button type="button" onClick={() => void load()}>Tekrar dene</button><Link to="/ai-analysis">AI Analysis’e dön</Link></section>
-  if (state === 'missing' || (!decisionDetail && !generalDetail)) return <section className="evidence-detail"><p className="evidence-detail__eyebrow">Governance</p><h1>{title}</h1><p className="evidence-detail__message" role="alert">Kanıt kaydı bulunamadı veya seçili snapshot’a ait değil.</p><Link to="/ai-analysis">AI Analysis’e dön</Link></section>
+  if (state === 'missing' || (!isGeneralIndex && !decisionDetail && !generalDetail)) return <section className="evidence-detail"><p className="evidence-detail__eyebrow">Governance</p><h1>{title}</h1><p className="evidence-detail__message" role="alert">Kanıt kaydı bulunamadı veya seçili snapshot’a ait değil.</p><Link to="/ai-analysis">AI Analysis’e dön</Link></section>
 
   const evaluation = decisionDetail?.compensation_evaluation
   const selectedRule = decisionDetail?.selected_rule_version
   return <section className="evidence-detail" aria-labelledby="decision-evidence-title">
     <header className="evidence-detail__header"><div><p className="evidence-detail__eyebrow">Snapshot-local governance kaydı</p><h1 id="decision-evidence-title">{title}</h1><p>{snapshotKey}</p></div><Link to="/ai-analysis">AI Analysis’e dön</Link></header>
-    {generalDetail ? <GeneralEvidenceDetailView detail={generalDetail} /> : <>
+    {isGeneralIndex ? <GeneralEvidenceListView records={generalRecords} /> : generalDetail ? <GeneralEvidenceDetailView detail={generalDetail} /> : <>
       <section className="evidence-detail__summary">
         <div><span>Evidence hash</span><strong>{decisionDetail?.evidence_hash}</strong></div>
         <div><span>Karar</span><strong>{decisionDetail?.decision}</strong></div>

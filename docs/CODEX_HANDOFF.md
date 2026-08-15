@@ -703,3 +703,11 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
 - CE-MCR-0010 için persisted compensation değerlendirmesi olmadığı doğrulandı:
   sistem bunu pending/evidence yok olarak gösterecek, RuleVersion veya
   DecisionEvidence uydurmayacaktır.
+
+## Decision Evidence Index Completion (2026-08-15)
+
+- Parametresiz `/evidence` artık not-found yerine son finalized, terminal
+  QueryRun EvidenceRecord kayıtlarının kısa read-only listesini gösterir.
+- Her satır exact snapshot anahtarıyla kendi genel evidence detayına gider;
+  draft/non-terminal kayıtlar listelenmez. Compensation `evidence_hash`
+  detay akışı değişmeden kalır. Sonraki ana görev: `MAIN-075`.

@@ -32,4 +32,8 @@
 .evidence-detail__record-list h3 { font-size: 15px; }
 .evidence-detail__record-list h4 { color: var(--color-text-muted); font-size: 12px; }
 .evidence-detail__hint { margin: 0; color: var(--color-text-muted); line-height: 1.5; }
+.evidence-detail__index { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.evidence-detail__index a { display: grid; gap: 4px; padding: var(--space-3); border: 1px solid var(--color-border); border-radius: 6px; color: var(--color-text); background: var(--color-surface-muted); text-decoration: none; overflow-wrap: anywhere; }
+.evidence-detail__index a:hover { border-color: var(--color-primary); }
+.evidence-detail__index span { color: var(--color-text-muted); font-size: 13px; }
 @media (max-width: 640px) { .evidence-detail__header { flex-direction: column; } .evidence-detail__section dl, .evidence-detail__pairs > div, .evidence-detail__timeline dl { grid-template-columns: 1fr; gap: 4px; } .evidence-detail__timeline-header { align-items: flex-start; flex-direction: column; gap: 4px; } }

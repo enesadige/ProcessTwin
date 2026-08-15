@@ -22,6 +22,7 @@ from apps.rag.models import DocumentChunk, DocumentStatus, DocumentType, SourceD
 from apps.rules.models import Rule, RuleType, RuleVersion
 
 ENDPOINT = "/api/orchestration/evidence-records/detail/"
+LIST_ENDPOINT = "/api/orchestration/evidence-records/"
 
 
 def _hash(value: str) -> str:
@@ -204,3 +205,29 @@ def test_evidence_record_endpoint_rejects_draft_missing_and_cross_snapshot_recor
         response.json()["error"]["code"] == "not_found"
         for response in (draft_response, mismatch_response, missing_response)
     )
+
+
+@pytest.mark.django_db
+def test_evidence_record_list_returns_only_finalized_terminal_records_with_snapshot_provenance():
+    snapshot = create_snapshot("evidence-record-list-source")
+    listed = _complete_record(snapshot)
+    draft = _record(snapshot, "list-draft", finalized=False)
+    pending = _record(snapshot, "list-pending", finalized=True)
+
+    response = _client().get(LIST_ENDPOINT)
+
+    assert response.status_code == 200
+    records = response.json()["data"]["evidence_records"]
+    item = next(record for record in records if record["evidence_code"] == listed.evidence_code)
+    assert item == {
+        "evidence_code": listed.evidence_code,
+        "snapshot": {"id": snapshot.id, "key": snapshot.snapshot_key},
+        "query_run": {
+            "code": listed.query_run.query_run_code,
+            "terminal_status": QueryRunStatus.COMPLETED,
+        },
+        "finalized_at": listed.finalized_at.isoformat(),
+    }
+    evidence_codes = {record["evidence_code"] for record in records}
+    assert draft.evidence_code not in evidence_codes
+    assert pending.evidence_code not in evidence_codes

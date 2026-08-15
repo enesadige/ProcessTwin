@@ -207,6 +207,16 @@ export type EvidenceRecordDetail = {
   }>
 }
 
+export type EvidenceRecordListItem = {
+  evidence_code: string
+  snapshot: { id: number; key: string }
+  query_run: {
+    code: string
+    terminal_status: 'completed' | 'failed'
+  }
+  finalized_at: string | null
+}
+
 export type AnalysisStatus = {
   query_run_code: string
   status: 'pending' | 'planned' | 'executing' | 'completed' | 'failed'
@@ -411,4 +421,11 @@ export async function getEvidenceRecordDetail({
     data: { evidence_record: EvidenceRecordDetail }
   }>(`/api/orchestration/evidence-records/detail/?${params}`)
   return response.data.evidence_record
+}
+
+export async function getEvidenceRecordList() {
+  const response = await request<{
+    data: { evidence_records: EvidenceRecordListItem[] }
+  }>('/api/orchestration/evidence-records/')
+  return response.data.evidence_records
 }

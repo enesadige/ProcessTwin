@@ -6,6 +6,22 @@ from apps.orchestration.models import EvidenceRecord
 from apps.orchestration.services import sanitize_json
 
 
+def evidence_record_list_item(record: EvidenceRecord) -> dict[str, Any]:
+    """Return the small, safe summary used by the general evidence index."""
+    return {
+        "evidence_code": record.evidence_code,
+        "snapshot": {
+            "id": record.data_snapshot_id,
+            "key": record.data_snapshot.snapshot_key,
+        },
+        "query_run": {
+            "code": record.query_run.query_run_code,
+            "terminal_status": record.query_run.status,
+        },
+        "finalized_at": record.finalized_at.isoformat() if record.finalized_at else None,
+    }
+
+
 def evidence_record_detail(record: EvidenceRecord) -> dict[str, Any]:
     """Return the safe, persisted evidence detail for a finalized record."""
     return {

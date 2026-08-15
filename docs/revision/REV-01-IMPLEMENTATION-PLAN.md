@@ -365,3 +365,12 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   biçimde normalize edilir; mevcut Rule/RAG verisi değiştirilmez.
 - Persisted karar yoksa pending/evidence yok sonucu korunur; sahte RuleVersion
   veya DecisionEvidence gösterilmez.
+
+## 2026-08-15 — Decision Evidence Index Completion
+
+- `/evidence` parametresiz açılışında son finalized genel EvidenceRecord
+  kayıtlarını listeler; satırlar exact `evidence_code + snapshot_identifier`
+  ile detay ekranına gider.
+- Yalnız terminal QueryRun'a bağlı finalized genel kayıtlar görünür. Draft
+  kayıtlar ve compensation DecisionEvidence akışı bu küçük completion dışında
+  bırakılmıştır. Sonraki görev: `MAIN-075`.

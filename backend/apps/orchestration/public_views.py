@@ -19,6 +19,9 @@ from apps.operations.models import CausalEvent
 from apps.orchestration.evidence_serializers import (
     evidence_record_detail as serialize_evidence_record,
 )
+from apps.orchestration.evidence_serializers import (
+    evidence_record_list_item as serialize_evidence_record_list_item,
+)
 from apps.orchestration.facade import OrchestrationFacade
 from apps.orchestration.models import EvidenceRecord, QueryRun, QueryRunStatus
 from apps.rules.internal_serializers import decision_evidence_summary
@@ -312,3 +315,35 @@ def evidence_record_detail(request):
             status=404,
         )
     return JsonResponse({"data": {"evidence_record": serialize_evidence_record(evidence)}})
+
+
+@require_GET
+def evidence_record_list(request):
+    if not request.user.is_authenticated:
+        return JsonResponse(
+            {"error": {"code": "authentication_required", "message": "Authentication required."}},
+            status=401,
+        )
+    if request.user.role not in {UserRole.ANALYST, UserRole.ADMIN}:
+        return JsonResponse(
+            {"error": {"code": "permission_denied", "message": "Evidence access is not allowed."}},
+            status=403,
+        )
+
+    evidence_records = (
+        EvidenceRecord.objects.filter(
+            finalized=True,
+            query_run__status__in=(QueryRunStatus.COMPLETED, QueryRunStatus.FAILED),
+        )
+        .select_related("data_snapshot", "query_run")
+        .order_by("-finalized_at", "-evidence_code")[:20]
+    )
+    return JsonResponse(
+        {
+            "data": {
+                "evidence_records": [
+                    serialize_evidence_record_list_item(record) for record in evidence_records
+                ]
+            }
+        }
+    )
