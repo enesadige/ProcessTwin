@@ -179,4 +179,4 @@ Port override:
 .venv/bin/python scripts/dev.py --services backend frontend --backend-port 8010 --frontend-port 5174
 ```
 
-Backend portu override edilirse frontend process'ine `VITE_API_BASE_URL` otomatik olarak ayni backend portuna gore verilir.
+Baslatici varsayilan olarak frontend'in `/api` isteklerini Vite proxy uzerinden secilen backend portuna yonlendirir. Bu, local browser oturumunun ayni-origin kalmasini ve CORS gerektirmemesini saglar. Farkli bir dogrudan API adresi gerekiyorsa `--api-base-url` ile acikca verilebilir.

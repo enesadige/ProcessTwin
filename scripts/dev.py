@@ -205,10 +205,25 @@ def apply_cli_overrides(args: argparse.Namespace, env: dict[str, str]) -> None:
         env["FRONTEND_PORT"] = str(args.frontend_port)
 
     backend_port = env.get("BACKEND_PORT", "8000")
+    frontend_port = env.get("FRONTEND_PORT", "5173")
     if args.api_base_url:
         env["VITE_API_BASE_URL"] = args.api_base_url
-    elif args.backend_port is not None or not env.get("VITE_API_BASE_URL"):
-        env["VITE_API_BASE_URL"] = f"http://127.0.0.1:{backend_port}"
+    else:
+        # Keep browser requests same-origin so Vite proxies /api to Django.
+        # Direct cross-origin requests require a CORS policy that this local stack
+        # intentionally does not expose.
+        env.pop("VITE_API_BASE_URL", None)
+        env["VITE_API_PROXY_TARGET"] = f"http://127.0.0.1:{backend_port}"
+
+        trusted_origins = [
+            origin.strip()
+            for origin in env.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+            if origin.strip()
+        ]
+        frontend_origin = f"http://127.0.0.1:{frontend_port}"
+        if frontend_origin not in trusted_origins:
+            trusted_origins.append(frontend_origin)
+        env["DJANGO_CSRF_TRUSTED_ORIGINS"] = ",".join(trusted_origins)
 
 
 def main() -> int:
