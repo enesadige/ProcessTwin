@@ -345,6 +345,19 @@ class ValidatedResponseBuilder:
                     ),
                 }
                 return response
+            concise_count_response = self._single_direct_analytics_count_response(
+                result,
+                query_run.structured_query,
+            )
+            if concise_count_response:
+                response.response_text = concise_count_response
+                response.provider = None
+                response.model = None
+                response.narrative_synthesis_audit = {
+                    "status": "skipped",
+                    "reason": "single_direct_analytics_count",
+                }
+                return response
             if getattr(active_provider, "supports_grounded_narrative", False):
                 narrative, synthesis_audit = self._safe_grounded_narrative(
                     active_provider,
@@ -654,6 +667,58 @@ class ValidatedResponseBuilder:
             and not specification.get("comparison")
             for specification in specifications
         )
+
+    @classmethod
+    def _single_direct_analytics_count_response(
+        cls,
+        result: ValidatedExecutionResult,
+        structured_query: Mapping[str, Any] | None,
+    ) -> str | None:
+        """Render a simple canonical count without asking a narrative provider."""
+        analytics = result.analytics_summary
+        if not analytics or not cls._requires_direct_analytics_count_coverage(structured_query):
+            return None
+        if analytics.group_by is not None or analytics.comparison or len(analytics.rows) != 1:
+            return None
+        if len(result.analytics_summaries) > 1:
+            return None
+        row = analytics.rows[0]
+        if row.get("label") != "Toplam" or not isinstance(row.get("value"), int):
+            return None
+        metric_phrases = {
+            "outage_count": ("kesinti", "yaşandı"),
+            "alarm_count": ("alarm", "oluştu"),
+            "event_count": ("olay", "oluştu"),
+            "full_outage_count": ("tam hizmet kesintisi", "yaşandı"),
+            "failed_failover_count": ("başarısız failover olayı", "kaydedildi"),
+        }
+        phrase = metric_phrases.get(analytics.metric)
+        if phrase is None:
+            return None
+
+        scope_parts: list[str] = []
+        time_window = (
+            structured_query.get("time_window") if isinstance(structured_query, Mapping) else None
+        )
+        if isinstance(time_window, Mapping):
+            from_time = str(time_window.get("from_time") or "")
+            to_time = str(time_window.get("to_time") or "")
+            if (
+                re.fullmatch(r"(?:19|20)\d{2}-01-01T00:00:00(?:Z|\+00:00)", from_time)
+                and re.fullmatch(
+                    rf"{re.escape(from_time[:4])}-12-31T23:59:59(?:Z|\+00:00)", to_time
+                )
+            ):
+                scope_parts.append(f"{from_time[:4]} yılında")
+        city = analytics.filters.get("city")
+        if isinstance(city, str) and city:
+            scope_parts.append(f"{city} şehrinde")
+        elif analytics.scope_label:
+            scope_parts.append(f"{analytics.scope_label} kapsamında")
+        prefix = " ".join(scope_parts)
+        if prefix:
+            prefix += " "
+        return f"{prefix}{row['value']} {phrase[0]} {phrase[1]}."
 
     @staticmethod
     def _deterministic_answer_plan(

@@ -1679,10 +1679,40 @@ def test_builder_skips_provider_when_scoped_analytics_has_no_matching_records():
         ("alarm_count", 21, "alarm"),
     ],
 )
-def test_direct_analytics_count_is_restored_after_unsupported_provider_sentence(
-    metric, value, label
+def test_direct_analytics_count_coverage_restores_selected_canonical_fact(metric, value, label):
+    text, fill_count = ValidatedResponseBuilder._ensure_requested_narrative_coverage(
+        "Kayıtlar değerlendirildi.",
+        original_query=f"2026 yılında İzmir şehrinde kaç {label} yaşandı?",
+        selected_statements={"S1": f"1. İzmir: {value} {label}."},
+        statement_concepts={"S1": ["analytics_direct_count"]},
+        structured_query={
+            "intent": "operational_analytics",
+            "requested_outputs": ["summary", "analytics"],
+            "analytics": {
+                "metric": metric,
+                "aggregation": "count",
+                "group_by": None,
+                "comparison": False,
+            },
+        },
+    )
+
+    assert f"İzmir: {value} {label}." in text
+    assert fill_count == 1
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("metric", "value", "expected"),
+    [
+        ("outage_count", 13, "2026 yılında İzmir şehrinde 13 kesinti yaşandı."),
+        ("alarm_count", 88, "2026 yılında İzmir şehrinde 88 alarm oluştu."),
+    ],
+)
+def test_single_direct_analytics_count_uses_concise_deterministic_presentation(
+    metric, value, expected
 ):
-    snapshot = create_snapshot(f"response-direct-count-{metric}")
+    snapshot = create_snapshot(f"response-concise-count-{metric}")
     result = valid_result(snapshot.snapshot_key).model_copy(
         update={
             "analytics_summary": AnalyticsSummary(
@@ -1699,10 +1729,10 @@ def test_direct_analytics_count_is_restored_after_unsupported_provider_sentence(
         }
     )
     run = completed_run(
-        f"response-direct-count-{metric}",
+        f"response-concise-count-{metric}",
         snapshot=snapshot,
         result=result,
-        original_query=f"2026 yılında İzmir şehrinde kaç {label} yaşandı?",
+        original_query="2026 yılında İzmir şehrinde kaç kayıt oluştu?",
     )
     run.structured_query = {
         "intent": "operational_analytics",
@@ -1713,22 +1743,33 @@ def test_direct_analytics_count_is_restored_after_unsupported_provider_sentence(
             "group_by": None,
             "comparison": False,
         },
+        "analytics_specs": [
+            {
+                "metric": metric,
+                "aggregation": "count",
+                "group_by": None,
+                "comparison": False,
+            }
+        ],
+        "time_window": {
+            "from_time": "2026-01-01T00:00:00+00:00",
+            "to_time": "2026-12-31T23:59:59+00:00",
+        },
     }
     run.save(update_fields=["structured_query"])
-    provider = GroundedNarrativeProvider(
-        f"2027 yılında İzmir'de {value} {label} yaşandı. Kayıtlar değerlendirildi."
-    )
+    provider = RecordingProvider("Bu prose kullanılmamalı.")
 
     response = ValidatedResponseBuilder().build(
         run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
     )
 
-    assert f"İzmir: {value} {label}." in response.response_text
-    assert "2027 yılında" not in response.response_text
-    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 1
-    assert response.narrative_synthesis_audit["removed_sentence_reasons"][0]["failure_code"] == (
-        "unsupported_number"
-    )
+    assert response.response_text == expected
+    assert response.generation_mode == ResponseGenerationMode.DETERMINISTIC
+    assert provider.requests == []
+    assert response.narrative_synthesis_audit == {
+        "status": "skipped",
+        "reason": "single_direct_analytics_count",
+    }
 
 
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
