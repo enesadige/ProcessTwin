@@ -461,3 +461,21 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   V3 data mutation gerekçesi değildir. BNG/OLT/link live what-if çalışmaları,
   replay, cross-snapshot rejection ve operational write isolation focused
   testlerle geçti. Sonraki görev: `MAIN-078`.
+
+## MAIN-078 — ProcessTwin REST API and cursor event stream (2026-08-17)
+
+- **Completed:** authenticated public simulation API under `/api/simulation/`.
+  It exposes generic scenario validation/creation, baseline/candidate run
+  creation, synchronous start, lifecycle actions, replay, lightweight status,
+  persisted canonical result reads, and cursor-based event polling.
+- **Safety:** scenario anchors are snapshot-local and limited to the existing
+  `network_device`, `network_link`, and `line_connection` core families.
+  Candidate runs retain the baseline snapshot and only accept explicit valid
+  overrides. Analyst/Admin authorization is enforced server-side; invalid
+  anchors, lifecycle transitions, snapshot references, speeds and overrides use
+  controlled public errors.
+- **Performance/isolation:** result/status/events do not re-execute the
+  canonical runtime. Events use `sequence > cursor` with bounded pages, without
+  offset pagination or complete timeline reloads. No simulation API path writes
+  operational source tables; migration unchanged. Focused API/runtime suite:
+  22 passed. Next: MAIN-079 ProcessTwin frontend.

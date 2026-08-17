@@ -817,3 +817,22 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   kapsamı taşır; güvenli yönlü link projection bu ek semantiği varsayarak scope
   genişletmez. Operasyon tabloları ve Snapshot 74 değişmedi. Sonraki görev:
   `MAIN-078`.
+
+## MAIN-078 ProcessTwin Public API (2026-08-17)
+
+- Authenticated `/api/simulation/` namespace eklendi. Analyst/Admin; generic
+  `network_device`, `network_link` ve `line_connection` scenario validate/create,
+  baseline/candidate run create, synchronous start, status, pause/resume/stop,
+  replay, persisted-result ve cursor event endpoints'lerine erişebilir.
+- Result endpointi canonical runtime'ı tekrar çalıştırmaz: persisted typed result
+  okunur; historical evidence ve hypothetical projection, unknown/protected ve
+  compensation/strict RuleVersion alanları ayrı taşınır. Eski BNG device inputu
+  `source_device_code` alias'ı ile backward-compatible kalır.
+- Event polling `sequence ASC`, `sequence > cursor`, bounded limit ve
+  `next_cursor`/`has_more` kullanır; raw event payload veya topology/impact
+  yeniden hesaplaması yapılmaz. Invalid anchor, snapshot, override ve lifecycle
+  geçişleri kontrollü public error contract ile döner.
+- Focused API/runtime testleri 22 passed; Django check, Ruff, migration dry-run
+  ve diff check geçti. Migration yoktur. API simulation-local kayıtlar dışında
+  CausalEvent, Alarm, Incident, Outage, CustomerImpactAssessment veya
+  CompensationEvaluation yazmaz. Sonraki görev: `MAIN-079` frontend.
