@@ -301,6 +301,16 @@ export function AIAnalysisPage() {
         llm_provider: llmProvider,
         embedding_provider: embeddingProvider,
       })
+      // The execution response is terminal, but the last poll can still reflect an in-flight tool.
+      // Read the persisted terminal status once before stopping polling so progress remains accurate.
+      if (response.query_run_code) {
+        try {
+          const terminalStatus = await getAnalysisStatus(idempotencyKey)
+          if (terminalStatus) setRunStatus(terminalStatus)
+        } catch {
+          // A completed response remains usable when this presentation-only refresh fails.
+        }
+      }
       setResult(response)
       setLifecycle(response.clarification ? 'clarification' : 'success')
     } catch (reason: unknown) {
