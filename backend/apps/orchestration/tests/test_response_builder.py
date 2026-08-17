@@ -97,6 +97,23 @@ class GroundedNarrativeProvider(RecordingProvider):
         }
 
 
+class StructuredAnalyticsClaimPlanProvider(RecordingProvider):
+    def __init__(self, claims: list[dict[str, str]] | None = None) -> None:
+        super().__init__()
+        self.claims = claims or []
+
+    def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
+        self.requests.append(dict(request))
+        return {
+            "content": json.dumps({"claims": self.claims}),
+            "provider": self.provider_name,
+            "model": self.model_name,
+            "retry": {},
+            "finish_reason": "stop",
+            "usage": {"input_tokens": 1, "output_tokens": 1, "total_tokens": 2},
+        }
+
+
 class NarrativeFailureProvider(GroundedNarrativeProvider):
     def generate(self, *, request: Mapping[str, Any]) -> Mapping[str, Any]:
         call_number = len(self.requests) + 1
@@ -1845,9 +1862,8 @@ def test_ranking_uses_requested_canonical_support_before_provider_synthesis():
     assert "17 alarm" in support_statement[1]
     assert support[support_statement_id]["kind"] == "canonical"
 
-    provider = GroundedNarrativeProvider(
-        "2026 yılında İzmir'de en yüksek alarm tipi FAILOVER_UNSUCCESSFUL oldu "
-        "ve 17 alarm kaydedildi."
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": support_statement_id, "role": "primary"}]
     )
     response = ValidatedResponseBuilder().build(
         run,
@@ -1858,6 +1874,9 @@ def test_ranking_uses_requested_canonical_support_before_provider_synthesis():
     assert len(provider.requests) == 1
     assert response.narrative_synthesis_audit["status"] == "accepted"
     assert response.narrative_synthesis_audit["status"] != "skipped"
+    assert response.narrative_synthesis_audit["mode"] == "structured_claim_plan"
+    assert "FAILOVER_UNSUCCESSFUL" in response.response_text
+    assert "17 alarm" in response.response_text
 
 
 @pytest.mark.django_db
@@ -1929,8 +1948,11 @@ def test_requested_total_supports_constituents_and_derived_total_before_provider
         "analytics_summary[1].rows[0]",
     ]
 
-    provider = GroundedNarrativeProvider(
-        "2026 yılında İstanbul'da 72, İzmir'de 88 alarm oluştu; toplam 160 alarm kaydedildi."
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [
+            {"statement_id": statement_id, "role": "primary" if index == 2 else "support"}
+            for index, statement_id in enumerate(contract["analytics_requested_statement_ids"])
+        ]
     )
     response = ValidatedResponseBuilder().build(
         run,
@@ -1945,6 +1967,7 @@ def test_requested_total_supports_constituents_and_derived_total_before_provider
     assert "160" in provider_facts
     assert "Ankara" not in provider_facts
     assert response.narrative_synthesis_audit["status"] == "accepted"
+    assert response.narrative_synthesis_audit["mode"] == "structured_claim_plan"
 
 
 def test_unknown_typed_analytics_fact_does_not_expose_zero_as_provider_support():
@@ -2045,7 +2068,17 @@ def test_multi_metric_provider_support_excludes_unrequested_sibling_metric():
     )
     run.structured_query = query
     run.save(update_fields=["structured_query"])
-    provider = GroundedNarrativeProvider("2026 yılında İzmir'de 88 alarm ve 13 kesinti kaydedildi.")
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=query,
+    )
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [
+            {"statement_id": statement_id, "role": "primary" if index == 0 else "support"}
+            for index, statement_id in enumerate(contract["analytics_requested_statement_ids"])
+        ]
+    )
 
     response = ValidatedResponseBuilder().build(
         run,
@@ -2105,7 +2138,17 @@ def test_supported_comparison_uses_provider_without_derived_delta():
     )
     run.structured_query = query
     run.save(update_fields=["structured_query"])
-    provider = GroundedNarrativeProvider("Haziran döneminde 13, Temmuz döneminde 11 kesinti vardı.")
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=query,
+    )
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [
+            {"statement_id": statement_id, "role": "primary" if index == 0 else "support"}
+            for index, statement_id in enumerate(contract["analytics_requested_statement_ids"])
+        ]
+    )
 
     response = ValidatedResponseBuilder().build(
         run,
@@ -2116,6 +2159,101 @@ def test_supported_comparison_uses_provider_without_derived_delta():
     assert len(provider.requests) == 1
     assert response.narrative_synthesis_audit["status"] == "accepted"
     assert response.narrative_synthesis_audit["deterministic_fill_count"] == 0
+
+
+def test_structured_analytics_claim_plan_rejects_unknown_ids_without_rendering_them():
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": "S999", "role": "primary"}]
+    )
+
+    text, audit = ValidatedResponseBuilder._structured_analytics_claim_narrative(
+        provider,
+        original_query="En çok görülen alarm tipi nedir?",
+        selected_statements={
+            "S1": "2026 yılında İzmir'de en yüksek alarm tipi: FAILOVER_UNSUCCESSFUL (17 alarm)."
+        },
+        analytics_support={"S1": {"requirement_kind": "ranking_winner"}},
+    )
+
+    assert len(provider.requests) == 1
+    assert text == "2026 yılında İzmir'de en yüksek alarm tipi: FAILOVER_UNSUCCESSFUL (17 alarm)."
+    assert audit["status"] == "fallback"
+    assert audit["rejected_statement_ids"] == ["S999"]
+    assert audit["backend_effective_statement_ids"] == ["S1"]
+    assert "failover mekanizması" not in text.casefold()
+    assert "diğer alarm tipleri" not in text.casefold()
+
+
+def test_structured_analytics_claim_plan_rejects_provider_fact_channels_outside_ids():
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": "S1", "role": "primary", "value": 999}]
+    )
+
+    text, audit = ValidatedResponseBuilder._structured_analytics_claim_narrative(
+        provider,
+        original_query="En çok görülen alarm tipi nedir?",
+        selected_statements={"S1": "FAILOVER_UNSUCCESSFUL alarmı 17 kez görüldü."},
+        analytics_support={"S1": {"requirement_kind": "ranking_winner"}},
+    )
+
+    assert len(provider.requests) == 1
+    assert text == "FAILOVER_UNSUCCESSFUL alarmı 17 kez görüldü."
+    assert audit["status"] == "fallback"
+    assert audit["fallback_reason"] == "invalid_structured_claim_plan"
+    assert "999" not in text
+
+
+def test_structured_analytics_claim_plan_renders_only_provider_selected_fact_order():
+    selected_statements = {
+        "S1": "2026 yılında İstanbul'de 72 alarm.",
+        "S2": "2026 yılında İzmir'de 88 alarm.",
+        "S3": "2026 yılında İstanbul ve İzmir toplam alarm: 160.",
+    }
+    support = {
+        "S1": {"requirement_kind": "aggregate_total_request"},
+        "S2": {"requirement_kind": "aggregate_total_request"},
+        "S3": {"requirement_kind": "aggregate_total_request"},
+    }
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [
+            {"statement_id": "S3", "role": "primary"},
+            {"statement_id": "S2", "role": "support"},
+            {"statement_id": "S1", "role": "support"},
+        ]
+    )
+
+    text, audit = ValidatedResponseBuilder._structured_analytics_claim_narrative(
+        provider,
+        original_query="İzmir ve İstanbul'da toplam kaç alarm oluştu?",
+        selected_statements=selected_statements,
+        analytics_support=support,
+    )
+
+    assert len(provider.requests) == 1
+    assert text == " ".join(
+        (selected_statements["S3"], selected_statements["S2"], selected_statements["S1"])
+    )
+    assert audit["status"] == "accepted"
+    assert audit["backend_effective_statement_ids"] == ["S3", "S2", "S1"]
+    assert audit["rendered_fact_types"] == ["aggregate_total_request"] * 3
+    assert "veri bütünlüğü" not in text.casefold()
+    assert "yoğunluk" not in text.casefold()
+
+
+def test_structured_analytics_claim_plan_preserves_unknown_without_zero_rendering():
+    provider = StructuredAnalyticsClaimPlanProvider([])
+
+    text, audit = ValidatedResponseBuilder._structured_analytics_claim_narrative(
+        provider,
+        original_query="İzmir'de kaç alarm oluştu?",
+        selected_statements={},
+        analytics_support={},
+    )
+
+    assert provider.requests == []
+    assert text == "Yeterli doğrulanmış bilgi yok."
+    assert audit["fallback_reason"] == "no_supported_analytics_claims"
+    assert "0" not in text
 
 
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():

@@ -9,7 +9,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from apps.core.exceptions import ProcessTwinError
 from apps.orchestration.analytics_answer_support import AnalyticsAnswerSupportBuilder
@@ -222,6 +222,30 @@ class NarrativeGroundingValidationError(ValueError):
         super().__init__(message)
 
 
+class AnalyticsClaimPlanRole(StrEnum):
+    """Presentation role only; it never creates an operational assertion."""
+
+    PRIMARY = "primary"
+    SUPPORT = "support"
+
+
+class AnalyticsClaimPlanItem(BaseModel):
+    """A provider-selected fact identifier from the closed analytics universe."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    statement_id: str
+    role: AnalyticsClaimPlanRole
+
+
+class AnalyticsClaimPlan(BaseModel):
+    """Structured complex-analytics presentation plan with no prose channel."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    claims: tuple[AnalyticsClaimPlanItem, ...] = Field(min_length=1, max_length=16)
+
+
 class ResponseGenerationMode(StrEnum):
     DETERMINISTIC = "deterministic"
     LLM_ASSISTED = "llm_assisted"
@@ -359,48 +383,65 @@ class ValidatedResponseBuilder:
                     "reason": "single_direct_analytics_count",
                 }
                 return response
-            if getattr(active_provider, "supports_grounded_narrative", False):
-                narrative, synthesis_audit = self._safe_grounded_narrative(
+            structured_analytics_claim_plan = self._uses_structured_analytics_claim_plan(
+                contract[1],
+                query_run.structured_query,
+            )
+            if structured_analytics_claim_plan:
+                narrative, synthesis_audit = self._structured_analytics_claim_narrative(
                     active_provider,
                     original_query=query_run.original_query,
                     selected_statements=selected_statements,
-                    statement_concepts={
-                        statement_id: contract[1]
-                        .get("statement_concepts", {})
-                        .get(statement_id, [])
-                        for statement_id in selection["selected_statement_ids"]
-                    },
-                    relationships=selection["relationships"],
-                    verified_anchors=verified_anchors,
-                    requested_outputs=selection["audit"]["selection_reason"]["requested_outputs"],
+                    analytics_support=contract[1].get("analytics_answer_support", {}),
                 )
-                narrative, coverage_fill_count = self._ensure_requested_narrative_coverage(
-                    narrative,
-                    original_query=query_run.original_query,
-                    selected_statements=selected_statements,
-                    statement_concepts={
-                        statement_id: contract[1]
-                        .get("statement_concepts", {})
-                        .get(statement_id, [])
-                        for statement_id in selection["selected_statement_ids"]
-                    },
-                    structured_query=query_run.structured_query,
-                )
-                synthesis_audit["deterministic_fill_count"] = coverage_fill_count
+                synthesis_audit["deterministic_fill_count"] = 0
                 response.narrative_synthesis_audit = synthesis_audit
+            if getattr(active_provider, "supports_grounded_narrative", False):
+                if not structured_analytics_claim_plan:
+                    narrative, synthesis_audit = self._safe_grounded_narrative(
+                        active_provider,
+                        original_query=query_run.original_query,
+                        selected_statements=selected_statements,
+                        statement_concepts={
+                            statement_id: contract[1]
+                            .get("statement_concepts", {})
+                            .get(statement_id, [])
+                            for statement_id in selection["selected_statement_ids"]
+                        },
+                        relationships=selection["relationships"],
+                        verified_anchors=verified_anchors,
+                        requested_outputs=selection["audit"]["selection_reason"][
+                            "requested_outputs"
+                        ],
+                    )
+                    narrative, coverage_fill_count = self._ensure_requested_narrative_coverage(
+                        narrative,
+                        original_query=query_run.original_query,
+                        selected_statements=selected_statements,
+                        statement_concepts={
+                            statement_id: contract[1]
+                            .get("statement_concepts", {})
+                            .get(statement_id, [])
+                            for statement_id in selection["selected_statement_ids"]
+                        },
+                        structured_query=query_run.structured_query,
+                    )
+                    synthesis_audit["deterministic_fill_count"] = coverage_fill_count
+                    response.narrative_synthesis_audit = synthesis_audit
             else:
-                response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
-                response.warnings = sorted(
-                    {
-                        *response.warnings,
-                        "llm_narrative_fallback",
-                        "llm_narrative_synthesis_not_supported",
+                if not structured_analytics_claim_plan:
+                    response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
+                    response.warnings = sorted(
+                        {
+                            *response.warnings,
+                            "llm_narrative_fallback",
+                            "llm_narrative_synthesis_not_supported",
+                        }
+                    )
+                    response.narrative_synthesis_audit = {
+                        "status": "skipped",
+                        "reason": "provider_does_not_advertise_grounded_narrative",
                     }
-                )
-                response.narrative_synthesis_audit = {
-                    "status": "skipped",
-                    "reason": "provider_does_not_advertise_grounded_narrative",
-                }
         except Exception as exc:
             response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
             synthesis_failure = isinstance(exc, NarrativeSynthesisError)
@@ -720,6 +761,128 @@ class ValidatedResponseBuilder:
         if prefix:
             prefix += " "
         return f"{prefix}{row['value']} {phrase[0]} {phrase[1]}."
+
+    @staticmethod
+    def _uses_structured_analytics_claim_plan(
+        statement_contract: Mapping[str, Any],
+        structured_query: Mapping[str, Any] | None,
+    ) -> bool:
+        """Restrict complex analytics synthesis to typed fact selection, never prose."""
+        return bool(
+            isinstance(structured_query, Mapping)
+            and structured_query.get("intent") == "operational_analytics"
+            and statement_contract.get("analytics_has_typed_requirements")
+        )
+
+    @classmethod
+    def _structured_analytics_claim_narrative(
+        cls,
+        provider: LLMProvider,
+        *,
+        original_query: str,
+        selected_statements: Mapping[str, str],
+        analytics_support: Mapping[str, Mapping[str, object]],
+    ) -> tuple[str, dict[str, Any]]:
+        """Ask the provider for ordering only, then render typed facts locally."""
+        allowed_ids = list(selected_statements)
+        if not allowed_ids:
+            return _UNCERTAINTY_STATEMENT, {
+                "status": "fallback",
+                "mode": "structured_claim_plan",
+                "provider": provider.provider_name,
+                "model": provider.model_name,
+                "provider_invoked": False,
+                "provider_selected_statement_ids": [],
+                "backend_effective_statement_ids": [],
+                "rejected_statement_ids": [],
+                "fallback_used": True,
+                "fallback_reason": "no_supported_analytics_claims",
+                "rendered_fact_types": [],
+                "validation_status": "valid",
+            }
+
+        prompt = (
+            "Bir operasyonel analytics cevap planı seç. Serbest metin, açıklama, sayı, "
+            "kimlik, ilişki veya ek alan üretme. Yalnız aşağıdaki JSON nesnesini döndür: "
+            '{"claims":[{"statement_id":"S1","role":"primary"}]}. '
+            "role yalnız primary veya support olabilir. Yalnız ALLOWED_CLAIMS içindeki "
+            "statement_id değerlerini kullan; seçilmeyen bir fact hakkında iddia üretme.\n"
+            "USER_QUERY="
+            + original_query.strip()
+            + "\nALLOWED_CLAIMS="
+            + json.dumps(selected_statements, ensure_ascii=False, sort_keys=True)
+        )
+        request: dict[str, Any] = {"contents": prompt}
+        if getattr(provider, "supports_request_unload", False):
+            request["release_after"] = True
+        try:
+            response = provider.generate(request=request)
+        except Exception as exc:
+            provider_code = exc.code if isinstance(exc, LLMProviderError) else None
+            raise NarrativeSynthesisError(
+                (
+                    "provider_call_failed"
+                    if not provider_code
+                    else f"provider_call_failed:{provider_code}"
+                ),
+                "analytics claim-plan provider request failed",
+                details={"failure_detail": type(exc).__name__},
+            ) from exc
+        if not isinstance(response, Mapping) or response.get("provider") != provider.provider_name:
+            raise NarrativeSynthesisError(
+                "provider_response_invalid", "analytics claim-plan provider response is invalid"
+            )
+        if response.get("model") != provider.model_name:
+            raise NarrativeSynthesisError(
+                "provider_response_invalid", "analytics claim-plan provider metadata is invalid"
+            )
+
+        provider_selected_ids: list[str] = []
+        rejected_ids: list[str] = []
+        fallback_reason: str | None = None
+        try:
+            content = response.get("content")
+            raw_plan = json.loads(content) if isinstance(content, str) else None
+            plan = AnalyticsClaimPlan.model_validate(raw_plan)
+            provider_selected_ids = [item.statement_id for item in plan.claims]
+            unknown_ids = [
+                item for item in provider_selected_ids if item not in selected_statements
+            ]
+            duplicate_ids = [
+                item
+                for index, item in enumerate(provider_selected_ids)
+                if item in provider_selected_ids[:index]
+            ]
+            if unknown_ids or duplicate_ids:
+                rejected_ids = list(dict.fromkeys([*unknown_ids, *duplicate_ids]))
+                fallback_reason = "unknown_or_duplicate_statement_id"
+                effective_ids = allowed_ids
+            else:
+                effective_ids = provider_selected_ids
+        except (json.JSONDecodeError, TypeError, ValidationError, ValueError):
+            fallback_reason = "invalid_structured_claim_plan"
+            effective_ids = allowed_ids
+
+        rendered_fact_types = [
+            str(analytics_support.get(statement_id, {}).get("requirement_kind", "canonical"))
+            for statement_id in effective_ids
+        ]
+        audit = {
+            "status": "fallback" if fallback_reason else "accepted",
+            "mode": "structured_claim_plan",
+            "provider": provider.provider_name,
+            "model": provider.model_name,
+            "provider_invoked": True,
+            "provider_selected_statement_ids": provider_selected_ids,
+            "backend_effective_statement_ids": effective_ids,
+            "rejected_statement_ids": rejected_ids,
+            "fallback_used": bool(fallback_reason),
+            "rendered_fact_types": rendered_fact_types,
+            "validation_status": "valid",
+        }
+        if fallback_reason:
+            audit["fallback_reason"] = fallback_reason
+        return " ".join(selected_statements[statement_id] for statement_id in effective_ids), audit
 
     @staticmethod
     def _deterministic_answer_plan(
