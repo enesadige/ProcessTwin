@@ -103,13 +103,18 @@ class AnalyticsAnswerSupportBuilder:
 
     @classmethod
     def _canonical_statement(cls, fact: AnalyticsAnswerFact) -> AnalyticsAnswerSupportStatement:
-        scope = cls._scope_prefix(fact.time_window, fact.scope)
+        time_window = (
+            None if fact.group_by == "time_bucket" and fact.group_label else fact.time_window
+        )
+        scope = cls._scope_prefix(time_window, fact.scope)
         metric = cls._metric_label(fact.metric)
         if fact.requirement_kind == AnalyticsAnswerRequirementKind.RANKING_WINNER:
             text = (
                 f"{scope}en yüksek {cls._group_label(fact.group_by)}: "
                 f"{fact.group_label} ({fact.value} {metric})."
             )
+        elif fact.group_by is not None and fact.group_label:
+            text = f"{scope}{fact.group_label}: {fact.value} {metric}."
         else:
             text = f"{scope}{fact.value} {metric}."
         return AnalyticsAnswerSupportStatement(

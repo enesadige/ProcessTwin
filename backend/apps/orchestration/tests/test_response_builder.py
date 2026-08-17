@@ -2166,6 +2166,7 @@ def test_supported_comparison_uses_provider_without_derived_delta():
     assert len(provider.requests) == 1
     assert response.narrative_synthesis_audit["status"] == "accepted"
     assert response.narrative_synthesis_audit["deterministic_fill_count"] == 0
+    assert response.response_text == "2026-06: 13 kesinti. 2026-07: 11 kesinti."
 
 
 def test_structured_analytics_claim_plan_rejects_unknown_ids_without_rendering_them():
