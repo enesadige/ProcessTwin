@@ -405,14 +405,17 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 
 ## 2026-08-17 — MAIN-077 Canonical BNG Baseline/Candidate
 
-- `CanonicalBNGSimulationService`, source snapshot'taki canonical CausalEvent
-  ve SessionEvent kanıtlarını read-only değerlendirerek simulation-local BNG
-  failure → alarm → incident → outage/degradation → impact → compensation
-  timeline'ı üretir.
+- `CanonicalBNGSimulationService`, simulation-local BNG failure → alarm →
+  incident → outage/degradation → impact → compensation timeline'ı üretir.
+- Historical evidence ve ProcessTwin projection ayrıdır: production impact
+  yalnız persisted SessionEvent ile verified kalır; hypothetical BNG failure
+  topology/aktif connection/full-diverse backup kanıtından `projection`
+  alanında projected etki üretir ve hiçbir zaman verified olarak etiketlenmez.
 - Baseline/candidate yalnız scenario defaults ve explicit candidate override ile
-  ayrışır. Typed result contract; scope, verified/protected/unknown impact,
-  strict virtual-time RuleVersion seçimi, compensation ve SLA metadata'sını
-  run context'inde saklar; karşılaştırma delta'larını deterministik üretir.
+  ayrışır. Typed result contract; potential/projection basis, projected
+  affected/protected/unknown, strict virtual-time RuleVersion seçimi,
+  compensation ve SLA metadata'sını run context'inde saklar; karşılaştırma
+  delta'larını deterministik üretir.
 - Focused testler replay, candidate isolation ve gerçek operasyon tablolarına
   sıfır yazımı doğruladı. Sonraki görev: `MAIN-078`.
 
@@ -421,13 +424,19 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 - Yalnız simulation migration'ı development PostgreSQL'e uygulandı. Live
   acceptance anchor'ı, Snapshot 74'te 2.930 subscription scope ve 2.539
   customer scope taşıyan `BNG-İZM-002` oldu.
-- Simulation-local `source_device_code` anchor'ı, mevcut topology/validity
-  resolver'ını reuse eder. Persisted SessionEvent yokken verified impact veya
-  failover sonucu uydurulmaz; 2.930 potential scope `unknown/insufficient`
-  olarak saklanır.
-- Baseline 600 sn ve candidate 1.200 sn completed; delta yalnız +600 sn
-  duration'dır. Her iki run strict `BB-FULL-OUTAGE-TIERED:v1` ile değerlendirilip
-  0.00 TRY not-eligible compensation üretti. Replay deterministiktir.
+- `source_device_code` anchor'ı mevcut topology/validity resolver'ını reuse
+  eder. Persisted SessionEvent yokluğu historical verified impact üretmez;
+  hypothetical sonuç bunun yerine ayrı simulation projection'ıdır.
+- Baseline 600 sn, candidate 1.200 sn ve candidate replayi tamamlandı. Her
+  koşul: 2.930 potential subscription, 2.539 potential customer, 2.882
+  projected affected subscription, 2.491 projected affected customer, 48
+  projected protected-no-impact ve 0 projected unknown üretti. Koruma yalnız
+  scope dışındaki aktif fully-diverse backup path'lerinden gelir; 15 primary
+  path zaten BNG scope dışındadır. Delta yalnız +600 sn duration'dır.
+- Strict `BB-FULL-OUTAGE-TIERED:v1` seçildi; rule evaluation manual-review /
+  not-eligible ile 0.00 TRY üretti, fallback rule yoktur. Ölçümlü replay
+  baseline 2.322 sn / 719 SQL, candidate 2.251 sn / 725 SQL tamamlandı;
+  subscription başına sorgu yoktur. Replay deterministiktir.
 - Runtime PostgreSQL locking, nullable baseline join'i lock sorgusundan
   çıkarılarak düzeltildi. Operasyon countları acceptance öncesi/sonrası eşit
   kaldı. Sonraki görev: `MAIN-078`.

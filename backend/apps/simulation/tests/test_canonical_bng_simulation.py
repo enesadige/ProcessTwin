@@ -133,8 +133,10 @@ def test_canonical_bng_baseline_candidate_chain_delta_and_operational_isolation(
     baseline.refresh_from_db()
     candidate.refresh_from_db()
     assert baseline.status == candidate.status == SimulationRunStatus.COMPLETED
-    assert baseline_result.impact["verified_affected_subscriptions"] == 1
-    assert baseline_result.impact["unknown_or_insufficient_subscriptions"] == 0
+    assert baseline_result.projection["basis"] == "simulation_projection"
+    assert baseline_result.projection["projected_affected_subscriptions"] == 1
+    assert baseline_result.projection["projected_unknown_subscriptions"] == 0
+    assert baseline_result.historical_evidence["verified_affected_subscriptions"] == 1
     assert baseline_result.compensation["eligibility"] == "eligible"
     assert baseline_result.compensation["amount"] == "39.99"
     assert candidate_result.event["duration_seconds"] == 1200
@@ -217,7 +219,26 @@ def test_canonical_bng_device_anchor_resolves_scope_without_inventing_session_im
 
     assert result.event["source_event_code"] is None
     assert result.event["source_device_code"] == bng.code
-    assert result.impact["potential_subscription_scope"] == 1
-    assert result.impact["verified_affected_subscriptions"] == 0
-    assert result.impact["unknown_or_insufficient_subscriptions"] == 1
-    assert result.impact["evidence_state"] == "no_persisted_session_evidence"
+    assert result.projection["potential_subscription_scope"] == 1
+    assert result.projection["projected_affected_subscriptions"] == 1
+    assert result.projection["projected_unknown_subscriptions"] == 0
+    assert result.historical_evidence == {"basis": "not_used_for_device_anchor"}
+
+
+@pytest.mark.django_db
+def test_projection_does_not_turn_missing_historical_evidence_into_unknown_scope():
+    snapshot, scenario = setup_bng_scenario()
+    SessionEvent.objects.filter(data_snapshot=snapshot).delete()
+    run = SimulationService().create_run(
+        scenario=scenario,
+        comparison_role=SimulationComparisonRole.BASELINE,
+        deterministic_seed="historical-evidence-boundary-seed",
+        virtual_clock=clock(),
+    )
+
+    result = CanonicalBNGSimulationService().execute(run)
+
+    assert result.historical_evidence["verified_affected_subscriptions"] == 0
+    assert result.historical_evidence["unknown_or_insufficient_subscriptions"] == 1
+    assert result.projection["projected_affected_subscriptions"] == 1
+    assert result.projection["projected_unknown_subscriptions"] == 0

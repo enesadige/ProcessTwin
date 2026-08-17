@@ -34,7 +34,8 @@ class CanonicalBNGResult:
     run: dict[str, Any]
     effective_input: dict[str, Any]
     event: dict[str, Any]
-    impact: dict[str, Any]
+    projection: dict[str, Any]
+    historical_evidence: dict[str, Any]
     compensation: dict[str, Any]
     operational: dict[str, Any]
 
@@ -42,12 +43,13 @@ class CanonicalBNGResult:
         if self.run["comparison_role"] not in SimulationComparisonRole.values:
             raise CanonicalBNGSimulationError("Invalid comparison role in canonical result.")
         for section, fields in {
-            "impact": (
+            "projection": (
                 "potential_subscription_scope",
-                "verified_affected_subscriptions",
-                "verified_affected_customers",
-                "verified_protected_subscriptions",
-                "unknown_or_insufficient_subscriptions",
+                "potential_customer_scope",
+                "projected_affected_subscriptions",
+                "projected_affected_customers",
+                "projected_protected_no_impact_subscriptions",
+                "projected_unknown_subscriptions",
             ),
             "compensation": ("eligible_subscription_count",),
         }.items():
@@ -59,10 +61,10 @@ class CanonicalBNGResult:
         if Decimal(self.compensation["amount"]) < Decimal("0.00"):
             raise CanonicalBNGSimulationError("Canonical compensation.amount cannot be negative.")
         if (
-            self.impact["verified_affected_subscriptions"]
-            > self.impact["potential_subscription_scope"]
+            self.projection["projected_affected_subscriptions"]
+            > self.projection["potential_subscription_scope"]
         ):
-            raise CanonicalBNGSimulationError("Verified impact cannot exceed potential scope.")
+            raise CanonicalBNGSimulationError("Projected impact cannot exceed potential scope.")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -130,17 +132,18 @@ class CanonicalBNGSimulationService:
             source_event=source_event,
             source_device=source_device,
         )
-        impact = self._impact(
+        projection = self._projection(
             source_event=source_event,
             source_device=source_device,
             snapshot=run.source_snapshot,
             window_start=started_at,
             window_end=ended_at,
         )
+        historical_evidence = self._historical_evidence(source_event, run.source_snapshot)
         rule = self._select_rule(run, rule_code, started_at)
         compensation = self._compensation(
             snapshot=run.source_snapshot,
-            impact=impact,
+            projection=projection,
             rule=rule,
             event_datetime=started_at,
             duration_seconds=duration_seconds,
@@ -165,10 +168,11 @@ class CanonicalBNGSimulationService:
                 "ended_at": ended_at.isoformat(),
                 "duration_seconds": duration_seconds,
                 "classification": classification,
-                "failover_classification": impact["failover_classification"],
+                "failover_classification": projection["failover_classification"],
                 "selected_rule_version": rule,
             },
-            impact=impact,
+            projection=projection,
+            historical_evidence=historical_evidence,
             compensation=compensation,
             operational={
                 "sla_target_seconds": inputs.get("sla_target_seconds"),
@@ -188,7 +192,7 @@ class CanonicalBNGSimulationService:
             run,
             event_type="simulation_result",
             occurred_at=ended_at,
-            context={"contract": "canonical_bng_v1", "result": result.to_dict()},
+            context={"contract": "canonical_bng_projection_v1", "result": result.to_dict()},
         )
         self.runtime.complete(run, completed_at=ended_at)
         return result
@@ -205,14 +209,20 @@ class CanonicalBNGSimulationService:
         return {
             "baseline_run_code": baseline_run.run_code,
             "candidate_run_code": candidate_run.run_code,
-            "affected_customer_delta": candidate["impact"]["verified_affected_customers"]
-            - baseline["impact"]["verified_affected_customers"],
-            "affected_subscription_delta": candidate["impact"]["verified_affected_subscriptions"]
-            - baseline["impact"]["verified_affected_subscriptions"],
-            "unknown_impact_delta": candidate["impact"]["unknown_or_insufficient_subscriptions"]
-            - baseline["impact"]["unknown_or_insufficient_subscriptions"],
-            "protected_subscription_delta": candidate["impact"]["verified_protected_subscriptions"]
-            - baseline["impact"]["verified_protected_subscriptions"],
+            "projected_affected_customer_delta": candidate["projection"][
+                "projected_affected_customers"
+            ]
+            - baseline["projection"]["projected_affected_customers"],
+            "projected_affected_subscription_delta": candidate["projection"][
+                "projected_affected_subscriptions"
+            ]
+            - baseline["projection"]["projected_affected_subscriptions"],
+            "projected_unknown_delta": candidate["projection"]["projected_unknown_subscriptions"]
+            - baseline["projection"]["projected_unknown_subscriptions"],
+            "projected_protected_no_impact_delta": candidate["projection"][
+                "projected_protected_no_impact_subscriptions"
+            ]
+            - baseline["projection"]["projected_protected_no_impact_subscriptions"],
             "compensation_amount_delta": str(
                 Decimal(candidate["compensation"]["amount"])
                 - Decimal(baseline["compensation"]["amount"])
@@ -288,27 +298,49 @@ class CanonicalBNGSimulationService:
                 },
             )
 
-    def _impact(
+    def _projection(
         self, *, source_event, source_device, snapshot, window_start, window_end
     ) -> dict[str, Any]:
+        projection = self.impact_service.project_bng_failure(
+            snapshot=snapshot,
+            source_device=source_device,
+            window_start=window_start,
+            window_end=window_end,
+        )
+        potential_subscription_ids = projection["potential_subscription_ids"]
+        affected_subscription_ids = projection["projected_affected_subscription_ids"]
+        protected_subscription_ids = projection[
+            "projected_protected_no_impact_subscription_ids"
+        ]
+        unknown_subscription_ids = projection["projected_unknown_subscription_ids"]
+        from apps.customers.models import Subscription
+
+        potential_customer_scope = Subscription.objects.filter(
+            id__in=potential_subscription_ids
+        ).values("customer_id").distinct().count()
+        return {
+            "basis": "simulation_projection",
+            "connection_basis": "snapshot_topology_active_connections",
+            "assumptions": {
+                "failure_mode": "bng_full_failure",
+                "protection_policy": projection["failover_basis"]["protection_policy"],
+            },
+            "potential_subscription_scope": len(potential_subscription_ids),
+            "potential_customer_scope": potential_customer_scope,
+            "projected_affected_subscriptions": len(affected_subscription_ids),
+            "projected_affected_customers": len(
+                projection["projected_affected_customer_ids"]
+            ),
+            "projected_protected_no_impact_subscriptions": len(protected_subscription_ids),
+            "projected_unknown_subscriptions": len(unknown_subscription_ids),
+            "failover_classification": projection["failover_basis"]["classification"],
+            "failover_basis": projection["failover_basis"],
+            "projected_affected_subscription_ids": affected_subscription_ids,
+        }
+
+    def _historical_evidence(self, source_event, snapshot) -> dict[str, Any]:
         if source_event is None:
-            connections = self.impact_service.resolve_potential_connections_for_device(
-                snapshot=snapshot,
-                source_device=source_device,
-                window_start=window_start,
-                window_end=window_end,
-            )
-            potential_subscriptions = {connection.subscription_id for connection in connections}
-            return {
-                "potential_subscription_scope": len(potential_subscriptions),
-                "verified_affected_subscriptions": 0,
-                "verified_affected_customers": 0,
-                "verified_protected_subscriptions": 0,
-                "unknown_or_insufficient_subscriptions": len(potential_subscriptions),
-                "failover_classification": "not_verified",
-                "affected_subscription_ids": [],
-                "evidence_state": "no_persisted_session_evidence",
-            }
+            return {"basis": "not_used_for_device_anchor"}
         assessments = self.impact_service.evaluate_read_only(
             causal_event=source_event, snapshot=snapshot, evaluation_time=source_event.ended_at
         )
@@ -339,6 +371,7 @@ class CanonicalBNGSimulationService:
             }
         }
         return {
+            "basis": "persisted_session_evidence",
             "potential_subscription_scope": len(potential_subscriptions),
             "verified_affected_subscriptions": len(impacted_subscriptions),
             "verified_affected_customers": len(impacted_customers),
@@ -347,7 +380,6 @@ class CanonicalBNGSimulationService:
             "failover_classification": (
                 "verified_protected" if protected_subscriptions else "not_verified"
             ),
-            "affected_subscription_ids": sorted(impacted_subscriptions),
         }
 
     def _select_rule(self, run, rule_code, event_datetime) -> dict[str, Any] | None:
@@ -365,7 +397,7 @@ class CanonicalBNGSimulationService:
         self,
         *,
         snapshot,
-        impact,
+        projection,
         rule,
         event_datetime,
         duration_seconds,
@@ -410,7 +442,7 @@ class CanonicalBNGSimulationService:
         total = Decimal("0.00")
         count = 0
         subscriptions = Subscription.objects.filter(
-            id__in=impact["affected_subscription_ids"]
+            id__in=projection["projected_affected_subscription_ids"]
         ).order_by("id")
         for subscription in subscriptions:
             policy = self.compensation_service.calculate_policy_amount(

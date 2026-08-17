@@ -324,6 +324,27 @@ class CustomerImpactAssessmentService:
             lightweight=True,
         )
 
+    def project_bng_failure(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_device,
+        window_start,
+        window_end,
+    ) -> dict:
+        """Return a topology-based hypothetical BNG projection without writes.
+
+        Unlike ``evaluate_read_only``, this simulation helper deliberately has
+        no dependency on persisted SessionEvent evidence and cannot verify a
+        production impact.
+        """
+        return self._potential_service.project_bng_failure(
+            snapshot=snapshot,
+            source_device=source_device,
+            window_start=window_start,
+            window_end=window_end,
+        )
+
     def _root_device(self, causal_event):
         root = causal_event.get_root_resource()
         if hasattr(root, "device_type"):

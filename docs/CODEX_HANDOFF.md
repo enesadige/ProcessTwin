@@ -746,14 +746,18 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
 
 ## MAIN-077 Canonical BNG Baseline/Candidate (2026-08-17)
 
-- `apps.simulation.services.CanonicalBNGSimulationService`, snapshot-local
-  source CausalEvent/SessionEvent kanıtını `evaluate_read_only()` ile üretim
-  impact semantiğinden sapmadan sınıflandırır. Simulation yalnız
-  `SimulationRun`/`SimulationRunEvent` kayıtlarını yazar.
+- `apps.simulation.services.CanonicalBNGSimulationService`, simulation-local
+  BNG failure → alarm → incident → outage/degradation → impact → compensation
+  timeline'ını yalnız `SimulationRun`/`SimulationRunEvent` üzerinde üretir.
+- Historical ve hypothetical impact ayrıdır: production `evaluate_read_only()`
+  persisted SessionEvent olmadan verified etki üretmez; ProcessTwin ise
+  snapshot topology, aktif connection ve full-diverse backup kanıtıyla açıkça
+  `projection` alanında projected affected/protected/unknown sonucu üretir.
 - Baseline ile candidate aynı snapshot/scenario/seed/başlangıç clock'tan
   başlar; candidate yalnız deep-merged explicit override kullanır. Canonical
-  result, virtual-time strict RuleVersion, impact/protection/unknown sayıları,
-  compensation cost ve SLA bilgisini taşıyıp deterministic delta üretir.
+  result, virtual-time strict RuleVersion, projection basis/assumptions,
+  projected impact/protection/unknown sayıları, compensation cost ve SLA
+  bilgisini taşıyıp deterministic delta üretir.
 - MAIN-078 API/event-stream, MAIN-079 UI ve MAIN-080 evidence entegrasyonu
   kapsam dışıdır. Focused tests passed; sonraki görev: `MAIN-078`.
 
@@ -763,14 +767,23 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   operasyon tablolarına migration DDL'i uygulanmadı. Gerçek Snapshot 74 için
   `BNG-İZM-002` anchor'ı seçildi: 26 downstream cihaz, 2.930 valid
   subscription connection/subscription ve 2.539 müşteri scope'u.
-- Canonical service artık `source_event_code` yanında simulation-local
-  `source_device_code` anchor'ını da destekler. Bu yol mevcut topology/validity
-  resolver'ını reuse eder; persisted SessionEvent yoksa scope'u doğrulanmış
-  impact saymaz ve tamamını unknown/insufficient olarak taşır.
-- Live baseline (600 sn), candidate (1.200 sn) ve replay completed oldu.
-  Her iki run 2.930 potential / 0 verified impact / 2.930 unknown döndürdü;
-  strict `BB-FULL-OUTAGE-TIERED:v1` seçildi, compensation 0.00 TRY ve
-  not-eligible kaldı. Replay payloadı run kimliği hariç aynıydı.
+- Canonical service `source_device_code` anchor'ını mevcut topology/validity
+  resolver'ıyla kullanır. Persisted SessionEvent yokluğu historical sonucu
+  unknown bırakır; hypothetical ProcessTwin sonucu ise bunu verified diye
+  sunmadan topology projection üretir.
+- R2 live baseline (600 sn), candidate (1.200 sn) ve candidate replayi
+  completed oldu. Her iki koşul: 2.930 potential subscription / 2.539
+  potential customer / 2.882 projected affected subscription / 2.491
+  projected affected customer / 48 projected protected-no-impact / 0 projected
+  unknown üretti. Koruma yalnız BNG subgraph dışındaki aktif ve fully-diverse
+  backup path'lerden gelir; 15 subscription'ın primary path'i zaten BNG scope
+  dışında kalır. Delta yalnız +600 sn duration'dır.
+- Strict `BB-FULL-OUTAGE-TIERED:v1` seçildi; mevcut rule evaluation bu virtual
+  contextte manual-review/not-eligible ile 0.00 TRY döndürdü, fall-back rule
+  seçilmedi. Replay payloadı run kimliği hariç aynıdır. Ölçümlü replay:
+  baseline 2.322 sn / 719 SQL, candidate 2.251 sn / 725 SQL; subscription
+  başına sorgu yoktur, path-diversity sorguları gerçek backup path çiftleriyle
+  sınırlıdır.
 - PostgreSQL lock yolundaki nullable `baseline_run` outer-join hatası düzeltildi:
   runtime yalnız mutable SimulationRun satırını locklar. CausalEvent (94), Alarm
   (420), Incident (87), Outage (58), CustomerImpactAssessment (49,996) ve

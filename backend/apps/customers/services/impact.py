@@ -10,7 +10,7 @@ from apps.customers.models import (
     SubscriptionStatus,
 )
 from apps.datasets.models import DataSnapshot
-from apps.network.models import LineConnectionStatus, NetworkPortStatus
+from apps.network.models import LineConnectionStatus, NetworkDevice, NetworkPortStatus
 from apps.network.services.path_diversity import (
     PathDiversityClassification,
     PathDiversityService,
@@ -242,6 +242,119 @@ class CustomerImpactService:
                 lightweight=lightweight,
             ).filter(line_connection__port__device_id__in=device_ids)
         )
+
+    def project_bng_failure(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_device: NetworkDevice,
+        window_start,
+        window_end,
+    ) -> dict[str, Any]:
+        """Project a BNG failure from snapshot topology, without operational writes.
+
+        The result is a simulation projection, not an evidence-verified impact.
+        Protection is credited only when an active backup is outside the affected
+        BNG subgraph and the existing path-diversity service proves full diversity.
+        """
+        scoped_connections = self.resolve_valid_connections_for_device(
+            snapshot=snapshot,
+            source_device=source_device,
+            window_start=window_start,
+            window_end=window_end,
+            lightweight=True,
+        )
+        scoped_connection_ids = {connection.id for connection in scoped_connections}
+        scoped_subscription_ids = {connection.subscription_id for connection in scoped_connections}
+        related_connections = list(
+            self._get_valid_connections(
+                snapshot=snapshot,
+                window_start=window_start,
+                window_end=window_end,
+                lightweight=True,
+            ).filter(subscription_id__in=scoped_subscription_ids)
+        )
+        connections_by_subscription: dict[int, list[SubscriptionConnection]] = {}
+        for connection in related_connections:
+            connections_by_subscription.setdefault(connection.subscription_id, []).append(
+                connection
+            )
+
+        affected: set[int] = set()
+        protected: set[int] = set()
+        unknown: set[int] = set()
+        unaffected_primary: set[int] = set()
+        affected_customer_ids: set[int] = set()
+        diversity_cache: dict[tuple[int, int], str] = {}
+        protected_by_diverse_backup = 0
+
+        for subscription_id in sorted(scoped_subscription_ids):
+            connections = connections_by_subscription.get(subscription_id, [])
+            primary = next(
+                (
+                    connection
+                    for connection in connections
+                    if connection.connection_role == SubscriptionConnectionRole.PRIMARY
+                ),
+                None,
+            )
+            if primary is None:
+                unknown.add(subscription_id)
+                continue
+            if primary.id not in scoped_connection_ids:
+                unaffected_primary.add(subscription_id)
+                continue
+
+            backup_candidates = sorted(
+                (
+                    connection
+                    for connection in connections
+                    if connection.connection_role == SubscriptionConnectionRole.BACKUP
+                    and connection.id not in scoped_connection_ids
+                ),
+                key=lambda connection: connection.id,
+            )
+            has_diverse_backup = False
+            for backup in backup_candidates:
+                key = (primary.line_connection_id, backup.line_connection_id)
+                diversity = diversity_cache.get(key)
+                if diversity is None:
+                    diversity = self.path_diversity_service.evaluate(
+                        primary_line=primary.line_connection,
+                        backup_line=backup.line_connection,
+                        snapshot=snapshot,
+                    ).classification
+                    diversity_cache[key] = diversity
+                if diversity == PathDiversityClassification.FULLY_DIVERSE:
+                    has_diverse_backup = True
+                    break
+            if has_diverse_backup:
+                protected.add(subscription_id)
+                protected_by_diverse_backup += 1
+                continue
+
+            affected.add(subscription_id)
+            affected_customer_ids.add(primary.subscription.customer_id)
+
+        return {
+            "potential_subscription_ids": sorted(scoped_subscription_ids),
+            "projected_affected_subscription_ids": sorted(affected),
+            "projected_affected_customer_ids": sorted(affected_customer_ids),
+            "projected_protected_no_impact_subscription_ids": sorted(
+                protected | unaffected_primary
+            ),
+            "projected_unknown_subscription_ids": sorted(unknown),
+            "failover_basis": {
+                "classification": (
+                    "projected_topology_protected"
+                    if protected_by_diverse_backup
+                    else "not_projected_protected"
+                ),
+                "protection_policy": "active_backup_outside_affected_bng_and_fully_diverse",
+                "protected_by_diverse_backup_count": protected_by_diverse_backup,
+                "unaffected_primary_count": len(unaffected_primary),
+            },
+        }
 
     def _resolve_connection_impact(
         self,
