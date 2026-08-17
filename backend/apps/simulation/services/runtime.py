@@ -381,7 +381,10 @@ class SimulationService:
             raise SimulationRuntimeError("A persisted simulation run is required.")
         return (
             SimulationRun.objects.select_for_update()
-            .select_related("source_snapshot", "scenario", "baseline_run")
+            # ``baseline_run`` is nullable.  Joining it here turns the lock
+            # query into an outer join, which PostgreSQL correctly rejects.
+            # The run row itself is the mutable runtime state that must lock.
+            .select_related("source_snapshot", "scenario")
             .get(pk=simulation_run.pk)
         )
 

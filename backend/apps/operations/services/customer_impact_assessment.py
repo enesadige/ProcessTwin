@@ -295,11 +295,34 @@ class CustomerImpactAssessmentService:
         root_device = self._root_device(causal_event)
         if root_device is None:
             return []
-        subgraph = self.topology_service.get_subgraph(
-            device=root_device, snapshot=snapshot, evaluation_time=window_end
+        return self._potential_service.resolve_valid_connections_for_device(
+            snapshot=snapshot,
+            source_device=root_device,
+            window_start=causal_event.started_at,
+            window_end=window_end,
+            lightweight=True,
         )
-        device_ids = {device.id for device in subgraph.devices}
-        return list(valid_connections.filter(line_connection__port__device_id__in=device_ids))
+
+    def resolve_potential_connections_for_device(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_device,
+        window_start,
+        window_end,
+    ) -> list[SubscriptionConnection]:
+        """Resolve potential scope for a simulation-local device anchor.
+
+        This shares the operational topology and validity rules but returns no
+        customer-impact conclusion by itself.
+        """
+        return self._potential_service.resolve_valid_connections_for_device(
+            snapshot=snapshot,
+            source_device=source_device,
+            window_start=window_start,
+            window_end=window_end,
+            lightweight=True,
+        )
 
     def _root_device(self, causal_event):
         root = causal_event.get_root_resource()

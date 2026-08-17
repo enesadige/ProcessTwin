@@ -209,6 +209,40 @@ class CustomerImpactService:
             related_fields.extend(["subscription__customer", "subscription__service_package"])
         return queryset.select_related(*related_fields)
 
+    def resolve_valid_connections_for_device(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_device,
+        window_start,
+        window_end,
+        lightweight: bool = True,
+    ) -> list[SubscriptionConnection]:
+        """Resolve snapshot-local valid connections below one device without writes.
+
+        This is shared by operational read-only evaluation and ProcessTwin.  It
+        deliberately returns potential topology scope only; callers must not
+        treat it as verified customer impact without independent evidence.
+        """
+        if source_device.data_snapshot_id != snapshot.id:
+            raise CustomerImpactInputError(
+                "Source device must belong to the supplied snapshot."
+            )
+        subgraph = self.topology_service.get_subgraph(
+            device=source_device,
+            snapshot=snapshot,
+            evaluation_time=window_end,
+        )
+        device_ids = {device.id for device in subgraph.devices}
+        return list(
+            self._get_valid_connections(
+                snapshot=snapshot,
+                window_start=window_start,
+                window_end=window_end,
+                lightweight=lightweight,
+            ).filter(line_connection__port__device_id__in=device_ids)
+        )
+
     def _resolve_connection_impact(
         self,
         *,

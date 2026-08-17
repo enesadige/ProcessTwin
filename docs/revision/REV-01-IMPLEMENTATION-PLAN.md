@@ -415,3 +415,19 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   run context'inde saklar; karşılaştırma delta'larını deterministik üretir.
 - Focused testler replay, candidate isolation ve gerçek operasyon tablolarına
   sıfır yazımı doğruladı. Sonraki görev: `MAIN-078`.
+
+## 2026-08-17 — MAIN-077 Snapshot 74 Live Acceptance
+
+- Yalnız simulation migration'ı development PostgreSQL'e uygulandı. Live
+  acceptance anchor'ı, Snapshot 74'te 2.930 subscription scope ve 2.539
+  customer scope taşıyan `BNG-İZM-002` oldu.
+- Simulation-local `source_device_code` anchor'ı, mevcut topology/validity
+  resolver'ını reuse eder. Persisted SessionEvent yokken verified impact veya
+  failover sonucu uydurulmaz; 2.930 potential scope `unknown/insufficient`
+  olarak saklanır.
+- Baseline 600 sn ve candidate 1.200 sn completed; delta yalnız +600 sn
+  duration'dır. Her iki run strict `BB-FULL-OUTAGE-TIERED:v1` ile değerlendirilip
+  0.00 TRY not-eligible compensation üretti. Replay deterministiktir.
+- Runtime PostgreSQL locking, nullable baseline join'i lock sorgusundan
+  çıkarılarak düzeltildi. Operasyon countları acceptance öncesi/sonrası eşit
+  kaldı. Sonraki görev: `MAIN-078`.

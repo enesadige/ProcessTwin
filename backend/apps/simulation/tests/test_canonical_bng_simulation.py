@@ -189,3 +189,35 @@ def test_canonical_bng_replay_is_deterministic_and_rule_selection_has_no_fallbac
     assert list(original.events.values_list(*event_fields)) == list(
         replay.events.values_list(*event_fields)
     )
+
+
+@pytest.mark.django_db
+def test_canonical_bng_device_anchor_resolves_scope_without_inventing_session_impact():
+    snapshot = create_snapshot("canonical-bng-device")
+    bng, _access, _link, _port, line = create_access_line(snapshot, code_suffix="DEVICE")
+    line.valid_from = clock() - timedelta(days=1)
+    line.save(update_fields=["valid_from"])
+    create_subscription_connection(snapshot, line)
+    scenario = SimulationScenario.objects.create(
+        source_snapshot=snapshot,
+        scenario_code="SIM-CANONICAL-BNG-DEVICE-001",
+        name="Canonical BNG device anchor",
+        scenario_type="bng_failure",
+        definition={"source_device_code": bng.code},
+        default_parameters={"duration_seconds": 600, "outage_classification": "full_outage"},
+    )
+    run = SimulationService().create_run(
+        scenario=scenario,
+        comparison_role=SimulationComparisonRole.BASELINE,
+        deterministic_seed="device-anchor-seed",
+        virtual_clock=clock(),
+    )
+
+    result = CanonicalBNGSimulationService().execute(run)
+
+    assert result.event["source_event_code"] is None
+    assert result.event["source_device_code"] == bng.code
+    assert result.impact["potential_subscription_scope"] == 1
+    assert result.impact["verified_affected_subscriptions"] == 0
+    assert result.impact["unknown_or_insufficient_subscriptions"] == 1
+    assert result.impact["evidence_state"] == "no_persisted_session_evidence"

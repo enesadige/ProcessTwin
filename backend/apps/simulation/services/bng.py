@@ -13,6 +13,7 @@ from decimal import Decimal
 from typing import Any
 
 from apps.compensation.services.calculation import CompensationService
+from apps.network.models import NetworkDevice, NetworkDeviceType
 from apps.operations.contracts import CustomerImpactStatus, ImpactReason
 from apps.operations.models import CausalEvent
 from apps.operations.services.customer_impact_assessment import CustomerImpactAssessmentService
@@ -70,7 +71,8 @@ class CanonicalBNGResult:
 class CanonicalBNGSimulationService:
     """Runs one deterministic BNG failure against a source snapshot read-only."""
 
-    REQUIRED_DEFINITION = frozenset({"source_event_code"})
+    SOURCE_EVENT_KEY = "source_event_code"
+    SOURCE_DEVICE_KEY = "source_device_code"
 
     def __init__(
         self,
@@ -94,13 +96,20 @@ class CanonicalBNGSimulationService:
         if run.scenario.scenario_type != "bng_failure":
             raise CanonicalBNGSimulationError("Scenario must be a canonical bng_failure scenario.")
         definition = copy.deepcopy(run.scenario.definition)
-        missing = self.REQUIRED_DEFINITION - definition.keys()
-        if missing:
+        if bool(definition.get(self.SOURCE_EVENT_KEY)) == bool(
+            definition.get(self.SOURCE_DEVICE_KEY)
+        ):
             raise CanonicalBNGSimulationError(
-                f"Scenario definition is missing: {', '.join(sorted(missing))}."
+                "Scenario requires exactly one of source_event_code or source_device_code."
             )
         inputs = self.runtime.effective_inputs(run)
-        source_event = self._source_event(run, definition["source_event_code"])
+        source_event = None
+        source_device = None
+        if definition.get(self.SOURCE_EVENT_KEY):
+            source_event = self._source_event(run, definition[self.SOURCE_EVENT_KEY])
+            source_device = source_event.root_device
+        else:
+            source_device = self._source_device(run, definition[self.SOURCE_DEVICE_KEY])
         duration_seconds = self._duration_seconds(inputs, source_event)
         classification = inputs.get("outage_classification", "full_outage")
         if classification not in {"full_outage", "degradation"}:
@@ -113,12 +122,23 @@ class CanonicalBNGSimulationService:
 
         run = self.runtime.start(run)
         self._record_chain(
-            run, started_at, ended_at, duration_seconds, classification, source_event
+            run,
+            started_at,
+            ended_at,
+            duration_seconds,
+            classification,
+            source_event=source_event,
+            source_device=source_device,
         )
-        impact = self._impact(source_event, run.source_snapshot)
+        impact = self._impact(
+            source_event=source_event,
+            source_device=source_device,
+            snapshot=run.source_snapshot,
+            window_start=started_at,
+            window_end=ended_at,
+        )
         rule = self._select_rule(run, rule_code, started_at)
         compensation = self._compensation(
-            source_event=source_event,
             snapshot=run.source_snapshot,
             impact=impact,
             rule=rule,
@@ -139,7 +159,8 @@ class CanonicalBNGSimulationService:
             },
             effective_input=inputs,
             event={
-                "source_event_code": source_event.event_code,
+                "source_event_code": source_event.event_code if source_event else None,
+                "source_device_code": source_device.code,
                 "started_at": started_at.isoformat(),
                 "ended_at": ended_at.isoformat(),
                 "duration_seconds": duration_seconds,
@@ -211,16 +232,37 @@ class CanonicalBNGSimulationService:
             ) from exc
 
     @staticmethod
-    def _duration_seconds(inputs: dict[str, Any], source_event: CausalEvent) -> int:
+    def _source_device(run: SimulationRun, device_code: str) -> NetworkDevice:
+        try:
+            return NetworkDevice.objects.get(
+                data_snapshot=run.source_snapshot,
+                code=device_code,
+                device_type=NetworkDeviceType.BNG,
+            )
+        except NetworkDevice.DoesNotExist as exc:
+            raise CanonicalBNGSimulationError(
+                "Canonical source BNG device is not in the source snapshot."
+            ) from exc
+
+    @staticmethod
+    def _duration_seconds(inputs: dict[str, Any], source_event: CausalEvent | None) -> int:
         value = inputs.get("duration_seconds")
-        if value is None and source_event.ended_at:
+        if value is None and source_event and source_event.ended_at:
             value = int((source_event.ended_at - source_event.started_at).total_seconds())
         if not isinstance(value, int) or value <= 0:
             raise CanonicalBNGSimulationError("A positive duration_seconds value is required.")
         return value
 
     def _record_chain(
-        self, run, started_at, ended_at, duration, classification, source_event
+        self,
+        run,
+        started_at,
+        ended_at,
+        duration,
+        classification,
+        *,
+        source_event,
+        source_device,
     ) -> None:
         chain = (
             ("bng_failure", started_at),
@@ -240,12 +282,33 @@ class CanonicalBNGSimulationService:
                 occurred_at=occurred_at,
                 context={
                     "simulation_local": True,
-                    "source_event_code": source_event.event_code,
+                    "source_event_code": source_event.event_code if source_event else None,
+                    "source_device_code": source_device.code,
                     "duration_seconds": duration,
                 },
             )
 
-    def _impact(self, source_event, snapshot) -> dict[str, Any]:
+    def _impact(
+        self, *, source_event, source_device, snapshot, window_start, window_end
+    ) -> dict[str, Any]:
+        if source_event is None:
+            connections = self.impact_service.resolve_potential_connections_for_device(
+                snapshot=snapshot,
+                source_device=source_device,
+                window_start=window_start,
+                window_end=window_end,
+            )
+            potential_subscriptions = {connection.subscription_id for connection in connections}
+            return {
+                "potential_subscription_scope": len(potential_subscriptions),
+                "verified_affected_subscriptions": 0,
+                "verified_affected_customers": 0,
+                "verified_protected_subscriptions": 0,
+                "unknown_or_insufficient_subscriptions": len(potential_subscriptions),
+                "failover_classification": "not_verified",
+                "affected_subscription_ids": [],
+                "evidence_state": "no_persisted_session_evidence",
+            }
         assessments = self.impact_service.evaluate_read_only(
             causal_event=source_event, snapshot=snapshot, evaluation_time=source_event.ended_at
         )
@@ -301,7 +364,6 @@ class CanonicalBNGSimulationService:
     def _compensation(
         self,
         *,
-        source_event,
         snapshot,
         impact,
         rule,

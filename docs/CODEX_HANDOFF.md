@@ -756,3 +756,23 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   compensation cost ve SLA bilgisini taşıyıp deterministic delta üretir.
 - MAIN-078 API/event-stream, MAIN-079 UI ve MAIN-080 evidence entegrasyonu
   kapsam dışıdır. Focused tests passed; sonraki görev: `MAIN-078`.
+
+## MAIN-077 Snapshot 74 Live Acceptance (2026-08-17)
+
+- Development PostgreSQL'e yalnız `simulation.0001_initial` uygulandı; mevcut
+  operasyon tablolarına migration DDL'i uygulanmadı. Gerçek Snapshot 74 için
+  `BNG-İZM-002` anchor'ı seçildi: 26 downstream cihaz, 2.930 valid
+  subscription connection/subscription ve 2.539 müşteri scope'u.
+- Canonical service artık `source_event_code` yanında simulation-local
+  `source_device_code` anchor'ını da destekler. Bu yol mevcut topology/validity
+  resolver'ını reuse eder; persisted SessionEvent yoksa scope'u doğrulanmış
+  impact saymaz ve tamamını unknown/insufficient olarak taşır.
+- Live baseline (600 sn), candidate (1.200 sn) ve replay completed oldu.
+  Her iki run 2.930 potential / 0 verified impact / 2.930 unknown döndürdü;
+  strict `BB-FULL-OUTAGE-TIERED:v1` seçildi, compensation 0.00 TRY ve
+  not-eligible kaldı. Replay payloadı run kimliği hariç aynıydı.
+- PostgreSQL lock yolundaki nullable `baseline_run` outer-join hatası düzeltildi:
+  runtime yalnız mutable SimulationRun satırını locklar. CausalEvent (94), Alarm
+  (420), Incident (87), Outage (58), CustomerImpactAssessment (49,996) ve
+  CompensationEvaluation (10,658) before/after aynıdır. Sonraki görev:
+  `MAIN-078`.
