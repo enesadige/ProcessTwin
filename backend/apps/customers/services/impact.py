@@ -10,7 +10,13 @@ from apps.customers.models import (
     SubscriptionStatus,
 )
 from apps.datasets.models import DataSnapshot
-from apps.network.models import LineConnectionStatus, NetworkDevice, NetworkPortStatus
+from apps.network.models import (
+    LineConnection,
+    LineConnectionStatus,
+    NetworkDevice,
+    NetworkLink,
+    NetworkPortStatus,
+)
 from apps.network.services.path_diversity import (
     PathDiversityClassification,
     PathDiversityService,
@@ -225,9 +231,7 @@ class CustomerImpactService:
         treat it as verified customer impact without independent evidence.
         """
         if source_device.data_snapshot_id != snapshot.id:
-            raise CustomerImpactInputError(
-                "Source device must belong to the supplied snapshot."
-            )
+            raise CustomerImpactInputError("Source device must belong to the supplied snapshot.")
         subgraph = self.topology_service.get_subgraph(
             device=source_device,
             snapshot=snapshot,
@@ -251,11 +255,27 @@ class CustomerImpactService:
         window_start,
         window_end,
     ) -> dict[str, Any]:
-        """Project a BNG failure from snapshot topology, without operational writes.
+        """Compatibility wrapper for the generic device-failure projection."""
+        return self.project_device_failure(
+            snapshot=snapshot,
+            source_device=source_device,
+            window_start=window_start,
+            window_end=window_end,
+        )
+
+    def project_device_failure(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_device: NetworkDevice,
+        window_start,
+        window_end,
+    ) -> dict[str, Any]:
+        """Project a device failure from snapshot topology, without operational writes.
 
         The result is a simulation projection, not an evidence-verified impact.
         Protection is credited only when an active backup is outside the affected
-        BNG subgraph and the existing path-diversity service proves full diversity.
+        device subgraph and the existing path-diversity service proves full diversity.
         """
         scoped_connections = self.resolve_valid_connections_for_device(
             snapshot=snapshot,
@@ -264,6 +284,77 @@ class CustomerImpactService:
             window_end=window_end,
             lightweight=True,
         )
+        return self._project_connection_scope_failure(
+            snapshot=snapshot,
+            scoped_connections=scoped_connections,
+            window_start=window_start,
+            window_end=window_end,
+            protection_policy="active_backup_outside_affected_device_and_fully_diverse",
+        )
+
+    def project_network_link_failure(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_link: NetworkLink,
+        window_start,
+        window_end,
+    ) -> dict[str, Any]:
+        """Project a directional link failure through its target-device subgraph."""
+        if source_link.data_snapshot_id != snapshot.id:
+            raise CustomerImpactInputError("Source link must belong to the supplied snapshot.")
+        scoped_connections = self.resolve_valid_connections_for_device(
+            snapshot=snapshot,
+            source_device=source_link.target_device,
+            window_start=window_start,
+            window_end=window_end,
+            lightweight=True,
+        )
+        return self._project_connection_scope_failure(
+            snapshot=snapshot,
+            scoped_connections=scoped_connections,
+            window_start=window_start,
+            window_end=window_end,
+            protection_policy="active_backup_outside_failed_link_target_subgraph_and_fully_diverse",
+        )
+
+    def project_line_connection_failure(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_line: LineConnection,
+        window_start,
+        window_end,
+    ) -> dict[str, Any]:
+        """Project a line failure from active connections bound to that exact line."""
+        if source_line.data_snapshot_id != snapshot.id:
+            raise CustomerImpactInputError("Source line must belong to the supplied snapshot.")
+        scoped_connections = list(
+            self._get_valid_connections(
+                snapshot=snapshot,
+                window_start=window_start,
+                window_end=window_end,
+                lightweight=True,
+            ).filter(line_connection=source_line)
+        )
+        return self._project_connection_scope_failure(
+            snapshot=snapshot,
+            scoped_connections=scoped_connections,
+            window_start=window_start,
+            window_end=window_end,
+            protection_policy="active_backup_outside_failed_line_and_fully_diverse",
+        )
+
+    def _project_connection_scope_failure(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        scoped_connections: list[SubscriptionConnection],
+        window_start,
+        window_end,
+        protection_policy: str,
+    ) -> dict[str, Any]:
+        """Classify a simulation-local connection scope using existing diversity rules."""
         scoped_connection_ids = {connection.id for connection in scoped_connections}
         scoped_subscription_ids = {connection.subscription_id for connection in scoped_connections}
         related_connections = list(
@@ -350,7 +441,7 @@ class CustomerImpactService:
                     if protected_by_diverse_backup
                     else "not_projected_protected"
                 ),
-                "protection_policy": "active_backup_outside_affected_bng_and_fully_diverse",
+                "protection_policy": protection_policy,
                 "protected_by_diverse_backup_count": protected_by_diverse_backup,
                 "unaffected_primary_count": len(unaffected_primary),
             },

@@ -789,3 +789,31 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   (420), Incident (87), Outage (58), CustomerImpactAssessment (49,996) ve
   CompensationEvaluation (10,658) before/after aynıdır. Sonraki görev:
   `MAIN-078`.
+
+## MAIN-077 Generic ProcessTwin Core Expansion (2026-08-17)
+
+- Canonical failure contract artık `anchor_type + anchor_code + failure_type`
+  ile çalışır. `BNG`, `OLT`, metro aggregation ve access-node cihazları ortak
+  `network_device` yolu üzerinden; yönlü `network_link` ve exact
+  `line_connection` anchor'ları ayrı, snapshot-local projection yollarından
+  çözülür. Eski BNG service adı geriye uyumlu alias olarak korunur.
+- Her failure family aynı typed simulation result'ı üretir: potential scope,
+  projected affected/protected/unknown, failover basis, strict virtual-time
+  RuleVersion, simulated compensation ve SLA. Historical verified evidence
+  hiçbir noktada projected sonuca karışmaz. Port, failure-domain ve
+  subscription-connection aileleri yeni büyük domain semantiği gerektirdiği
+  için bilinçli olarak deferred kaldı.
+- Snapshot 74 representative live acceptance: `BNG-İZM-002` (2,930 potential
+  subscription, 2,882 projected affected, 48 protected), `OLT-ESE-004` (384 /
+  384 / 0) ve `LNK-AGG-İST-003-OLT-ESE-003` (384 / 384 / 0). Candidate yalnız
+  explicit SLA target override ile her üçünde `sla_breached` değerini true'dan
+  false'a değiştirdi; müşteri kapsamı uydurulmadı. Strict selected
+  `BB-FULL-OUTAGE-TIERED:v1` compensation evaluation bağlamında manual-review,
+  0.00 TRY döndürdü; fallback rule seçilmedi.
+- 91 ana CE-MCR olayının 68'i artık projectable: 52 device, 9 link ve 7 line.
+  Bounded backtest 68 olayı 27.6 sn'de çalıştırdı: 5 exact, 57 acceptable, 6
+  mismatch. Altı mismatch link-only runtime bug'ı değildir: historical
+  kayıtların scope metadata'sı link yanında cihaz/line/port propagation
+  kapsamı taşır; güvenli yönlü link projection bu ek semantiği varsayarak scope
+  genişletmez. Operasyon tabloları ve Snapshot 74 değişmedi. Sonraki görev:
+  `MAIN-078`.

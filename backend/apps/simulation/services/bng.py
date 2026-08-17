@@ -13,7 +13,7 @@ from decimal import Decimal
 from typing import Any
 
 from apps.compensation.services.calculation import CompensationService
-from apps.network.models import NetworkDevice, NetworkDeviceType
+from apps.network.models import LineConnection, NetworkDevice, NetworkDeviceType, NetworkLink
 from apps.operations.contracts import CustomerImpactStatus, ImpactReason
 from apps.operations.models import CausalEvent
 from apps.operations.services.customer_impact_assessment import CustomerImpactAssessmentService
@@ -23,12 +23,12 @@ from apps.simulation.models import SimulationComparisonRole, SimulationRun, Simu
 from apps.simulation.services.runtime import SimulationRuntimeError, SimulationService
 
 
-class CanonicalBNGSimulationError(SimulationRuntimeError):
-    """Raised for invalid canonical BNG scenario inputs."""
+class CanonicalFailureSimulationError(SimulationRuntimeError):
+    """Raised for invalid generic failure scenario inputs."""
 
 
 @dataclass(frozen=True)
-class CanonicalBNGResult:
+class CanonicalFailureResult:
     source_snapshot: dict[str, Any]
     scenario: dict[str, Any]
     run: dict[str, Any]
@@ -41,7 +41,7 @@ class CanonicalBNGResult:
 
     def validate(self) -> None:
         if self.run["comparison_role"] not in SimulationComparisonRole.values:
-            raise CanonicalBNGSimulationError("Invalid comparison role in canonical result.")
+            raise CanonicalFailureSimulationError("Invalid comparison role in canonical result.")
         for section, fields in {
             "projection": (
                 "potential_subscription_scope",
@@ -55,26 +55,38 @@ class CanonicalBNGResult:
         }.items():
             for field in fields:
                 if self.__dict__[section][field] < 0:
-                    raise CanonicalBNGSimulationError(
+                    raise CanonicalFailureSimulationError(
                         f"Canonical {section}.{field} cannot be negative."
                     )
         if Decimal(self.compensation["amount"]) < Decimal("0.00"):
-            raise CanonicalBNGSimulationError("Canonical compensation.amount cannot be negative.")
+            raise CanonicalFailureSimulationError(
+                "Canonical compensation.amount cannot be negative."
+            )
         if (
             self.projection["projected_affected_subscriptions"]
             > self.projection["potential_subscription_scope"]
         ):
-            raise CanonicalBNGSimulationError("Projected impact cannot exceed potential scope.")
+            raise CanonicalFailureSimulationError("Projected impact cannot exceed potential scope.")
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
 
-class CanonicalBNGSimulationService:
-    """Runs one deterministic BNG failure against a source snapshot read-only."""
+class CanonicalFailureSimulationService:
+    """Runs one deterministic, simulation-local failure against a source snapshot."""
 
     SOURCE_EVENT_KEY = "source_event_code"
     SOURCE_DEVICE_KEY = "source_device_code"
+    ANCHOR_TYPE_KEY = "anchor_type"
+    ANCHOR_CODE_KEY = "anchor_code"
+    FAILURE_TYPE_KEY = "failure_type"
+    SUPPORTED_ANCHOR_TYPES = {"network_device", "network_link", "line_connection"}
+    SUPPORTED_DEVICE_TYPES = {
+        NetworkDeviceType.BNG,
+        NetworkDeviceType.OLT,
+        NetworkDeviceType.METRO_AGGREGATION,
+        NetworkDeviceType.ACCESS_NODE,
+    }
 
     def __init__(
         self,
@@ -91,31 +103,28 @@ class CanonicalBNGSimulationService:
             rule_evaluation_service=self.rule_service
         )
 
-    def execute(self, simulation_run: SimulationRun) -> CanonicalBNGResult:
+    def execute(self, simulation_run: SimulationRun) -> CanonicalFailureResult:
         run = self.runtime._load_run(simulation_run)
         if run.status not in {SimulationRunStatus.DRAFT, SimulationRunStatus.READY}:
-            raise CanonicalBNGSimulationError("Canonical execution requires a draft or ready run.")
-        if run.scenario.scenario_type != "bng_failure":
-            raise CanonicalBNGSimulationError("Scenario must be a canonical bng_failure scenario.")
-        definition = copy.deepcopy(run.scenario.definition)
-        if bool(definition.get(self.SOURCE_EVENT_KEY)) == bool(
-            definition.get(self.SOURCE_DEVICE_KEY)
-        ):
-            raise CanonicalBNGSimulationError(
-                "Scenario requires exactly one of source_event_code or source_device_code."
+            raise CanonicalFailureSimulationError(
+                "Canonical execution requires a draft or ready run."
             )
+        if run.scenario.scenario_type not in {
+            "bng_failure",
+            "network_device_failure",
+            "network_link_failure",
+            "line_connection_failure",
+        }:
+            raise CanonicalFailureSimulationError(
+                "Scenario must be a supported canonical failure scenario."
+            )
+        definition = copy.deepcopy(run.scenario.definition)
         inputs = self.runtime.effective_inputs(run)
-        source_event = None
-        source_device = None
-        if definition.get(self.SOURCE_EVENT_KEY):
-            source_event = self._source_event(run, definition[self.SOURCE_EVENT_KEY])
-            source_device = source_event.root_device
-        else:
-            source_device = self._source_device(run, definition[self.SOURCE_DEVICE_KEY])
+        source_event, anchor_type, anchor = self._resolve_anchor(run, definition)
         duration_seconds = self._duration_seconds(inputs, source_event)
         classification = inputs.get("outage_classification", "full_outage")
         if classification not in {"full_outage", "degradation"}:
-            raise CanonicalBNGSimulationError(
+            raise CanonicalFailureSimulationError(
                 "outage_classification must be full_outage or degradation."
             )
         rule_code = inputs.get("rule_code")
@@ -130,11 +139,13 @@ class CanonicalBNGSimulationService:
             duration_seconds,
             classification,
             source_event=source_event,
-            source_device=source_device,
+            anchor_type=anchor_type,
+            anchor=anchor,
         )
         projection = self._projection(
             source_event=source_event,
-            source_device=source_device,
+            anchor_type=anchor_type,
+            anchor=anchor,
             snapshot=run.source_snapshot,
             window_start=started_at,
             window_end=ended_at,
@@ -149,7 +160,7 @@ class CanonicalBNGSimulationService:
             duration_seconds=duration_seconds,
             classification=classification,
         )
-        result = CanonicalBNGResult(
+        result = CanonicalFailureResult(
             source_snapshot={
                 "id": run.source_snapshot_id,
                 "snapshot_key": run.source_snapshot.snapshot_key,
@@ -163,7 +174,10 @@ class CanonicalBNGSimulationService:
             effective_input=inputs,
             event={
                 "source_event_code": source_event.event_code if source_event else None,
-                "source_device_code": source_device.code,
+                "anchor_type": anchor_type,
+                "anchor_code": self._anchor_code(anchor),
+                "source_device_code": anchor.code if anchor_type == "network_device" else None,
+                "failure_type": inputs.get(self.FAILURE_TYPE_KEY, f"{anchor_type}_failure"),
                 "started_at": started_at.isoformat(),
                 "ended_at": ended_at.isoformat(),
                 "duration_seconds": duration_seconds,
@@ -185,6 +199,8 @@ class CanonicalBNGSimulationService:
         )
         result.validate()
         context = copy.deepcopy(run.lifecycle_context)
+        context["canonical_failure_result"] = result.to_dict()
+        # Kept for the existing BNG caller contract during the transition.
         context["canonical_bng_result"] = result.to_dict()
         run.lifecycle_context = context
         run.save(update_fields=["lifecycle_context", "updated_at"])
@@ -192,7 +208,7 @@ class CanonicalBNGSimulationService:
             run,
             event_type="simulation_result",
             occurred_at=ended_at,
-            context={"contract": "canonical_bng_projection_v1", "result": result.to_dict()},
+            context={"contract": "canonical_failure_projection_v1", "result": result.to_dict()},
         )
         self.runtime.complete(run, completed_at=ended_at)
         return result
@@ -203,9 +219,11 @@ class CanonicalBNGSimulationService:
         baseline = self._result_for(baseline_run)
         candidate = self._result_for(candidate_run)
         if candidate_run.baseline_run_id != baseline_run.id:
-            raise CanonicalBNGSimulationError("Candidate must reference the supplied baseline run.")
+            raise CanonicalFailureSimulationError(
+                "Candidate must reference the supplied baseline run."
+            )
         if baseline["source_snapshot"] != candidate["source_snapshot"]:
-            raise CanonicalBNGSimulationError("Comparison crosses a snapshot boundary.")
+            raise CanonicalFailureSimulationError("Comparison crosses a snapshot boundary.")
         baseline_sla_target = baseline["operational"].get("sla_target_seconds")
         candidate_sla_target = candidate["operational"].get("sla_target_seconds")
         return {
@@ -233,8 +251,7 @@ class CanonicalBNGSimulationService:
             - baseline["event"]["duration_seconds"],
             "sla_target_seconds_delta": (
                 candidate_sla_target - baseline_sla_target
-                if isinstance(baseline_sla_target, int)
-                and isinstance(candidate_sla_target, int)
+                if isinstance(baseline_sla_target, int) and isinstance(candidate_sla_target, int)
                 else None
             ),
             "sla_breached": {
@@ -247,26 +264,102 @@ class CanonicalBNGSimulationService:
 
     def _source_event(self, run: SimulationRun, event_code: str) -> CausalEvent:
         try:
-            return CausalEvent.objects.select_related("root_device").get(
-                data_snapshot=run.source_snapshot, event_code=event_code
-            )
+            return CausalEvent.objects.select_related(
+                "root_device", "root_network_link", "root_line_connection"
+            ).get(data_snapshot=run.source_snapshot, event_code=event_code)
         except CausalEvent.DoesNotExist as exc:
-            raise CanonicalBNGSimulationError(
+            raise CanonicalFailureSimulationError(
                 "Canonical source event is not in the source snapshot."
             ) from exc
 
-    @staticmethod
-    def _source_device(run: SimulationRun, device_code: str) -> NetworkDevice:
+    def _resolve_anchor(self, run, definition):
+        source_event = None
+        if definition.get(self.SOURCE_EVENT_KEY):
+            if any(
+                definition.get(key)
+                for key in (self.SOURCE_DEVICE_KEY, self.ANCHOR_TYPE_KEY, self.ANCHOR_CODE_KEY)
+            ):
+                raise CanonicalFailureSimulationError(
+                    "Source event and explicit anchor cannot be combined."
+                )
+            source_event = self._source_event(run, definition[self.SOURCE_EVENT_KEY])
+            for anchor_type, field in (
+                ("network_device", "root_device"),
+                ("network_link", "root_network_link"),
+                ("line_connection", "root_line_connection"),
+            ):
+                anchor = getattr(source_event, field)
+                if anchor is not None:
+                    return source_event, anchor_type, anchor
+            raise CanonicalFailureSimulationError(
+                "Source event has no supported simulation anchor."
+            )
+        if definition.get(self.SOURCE_DEVICE_KEY):
+            if definition.get(self.ANCHOR_TYPE_KEY) or definition.get(self.ANCHOR_CODE_KEY):
+                raise CanonicalFailureSimulationError(
+                    "Legacy source device and generic anchor cannot be combined."
+                )
+            return (
+                None,
+                "network_device",
+                self._source_device(run, definition[self.SOURCE_DEVICE_KEY]),
+            )
+        anchor_type = definition.get(self.ANCHOR_TYPE_KEY)
+        anchor_code = definition.get(self.ANCHOR_CODE_KEY)
+        if (
+            anchor_type not in self.SUPPORTED_ANCHOR_TYPES
+            or not isinstance(anchor_code, str)
+            or not anchor_code
+        ):
+            raise CanonicalFailureSimulationError(
+                "Scenario requires a source event, source device, or supported "
+                "anchor_type/anchor_code."
+            )
+        return None, anchor_type, self._anchor_by_code(run, anchor_type, anchor_code)
+
+    def _source_device(self, run: SimulationRun, device_code: str) -> NetworkDevice:
         try:
-            return NetworkDevice.objects.get(
+            device = NetworkDevice.objects.get(
                 data_snapshot=run.source_snapshot,
                 code=device_code,
-                device_type=NetworkDeviceType.BNG,
             )
+            if device.device_type not in self.SUPPORTED_DEVICE_TYPES:
+                raise NetworkDevice.DoesNotExist
+            return device
         except NetworkDevice.DoesNotExist as exc:
-            raise CanonicalBNGSimulationError(
-                "Canonical source BNG device is not in the source snapshot."
+            raise CanonicalFailureSimulationError(
+                "Canonical source network device is unsupported or not in the source snapshot."
             ) from exc
+
+    def _anchor_by_code(self, run, anchor_type: str, anchor_code: str):
+        lookup = {
+            "network_device": (NetworkDevice, "code"),
+            "network_link": (NetworkLink, "link_code"),
+            "line_connection": (LineConnection, "line_code"),
+        }[anchor_type]
+        model, code_field = lookup
+        try:
+            anchor = model.objects.select_related(
+                *("target_device",) if anchor_type == "network_link" else ()
+            ).get(data_snapshot=run.source_snapshot, **{code_field: anchor_code})
+        except model.DoesNotExist as exc:
+            raise CanonicalFailureSimulationError(
+                "Canonical anchor is not in the source snapshot."
+            ) from exc
+        if (
+            anchor_type == "network_device"
+            and anchor.device_type not in self.SUPPORTED_DEVICE_TYPES
+        ):
+            raise CanonicalFailureSimulationError(
+                "Network device type is not supported by the canonical runtime."
+            )
+        return anchor
+
+    @staticmethod
+    def _anchor_code(anchor) -> str:
+        return (
+            getattr(anchor, "code", None) or getattr(anchor, "link_code", None) or anchor.line_code
+        )
 
     @staticmethod
     def _duration_seconds(inputs: dict[str, Any], source_event: CausalEvent | None) -> int:
@@ -274,7 +367,7 @@ class CanonicalBNGSimulationService:
         if value is None and source_event and source_event.ended_at:
             value = int((source_event.ended_at - source_event.started_at).total_seconds())
         if not isinstance(value, int) or value <= 0:
-            raise CanonicalBNGSimulationError("A positive duration_seconds value is required.")
+            raise CanonicalFailureSimulationError("A positive duration_seconds value is required.")
         return value
 
     def _record_chain(
@@ -286,10 +379,16 @@ class CanonicalBNGSimulationService:
         classification,
         *,
         source_event,
-        source_device,
+        anchor_type,
+        anchor,
     ) -> None:
+        failure_event_type = (
+            "bng_failure"
+            if anchor_type == "network_device" and anchor.device_type == NetworkDeviceType.BNG
+            else f"{anchor_type}_failure"
+        )
         chain = (
-            ("bng_failure", started_at),
+            (failure_event_type, started_at),
             ("alarm", started_at + timedelta(seconds=30)),
             ("incident", started_at + timedelta(seconds=60)),
             (
@@ -307,44 +406,62 @@ class CanonicalBNGSimulationService:
                 context={
                     "simulation_local": True,
                     "source_event_code": source_event.event_code if source_event else None,
-                    "source_device_code": source_device.code,
+                    "anchor_type": anchor_type,
+                    "anchor_code": self._anchor_code(anchor),
                     "duration_seconds": duration,
                 },
             )
 
     def _projection(
-        self, *, source_event, source_device, snapshot, window_start, window_end
+        self, *, source_event, anchor_type, anchor, snapshot, window_start, window_end
     ) -> dict[str, Any]:
-        projection = self.impact_service.project_bng_failure(
-            snapshot=snapshot,
-            source_device=source_device,
-            window_start=window_start,
-            window_end=window_end,
-        )
+        if anchor_type == "network_device":
+            projection = self.impact_service.project_device_failure(
+                snapshot=snapshot,
+                source_device=anchor,
+                window_start=window_start,
+                window_end=window_end,
+            )
+            connection_basis = "snapshot_topology_active_connections"
+        elif anchor_type == "network_link":
+            projection = self.impact_service.project_network_link_failure(
+                snapshot=snapshot,
+                source_link=anchor,
+                window_start=window_start,
+                window_end=window_end,
+            )
+            connection_basis = "snapshot_link_target_subgraph_active_connections"
+        else:
+            projection = self.impact_service.project_line_connection_failure(
+                snapshot=snapshot,
+                source_line=anchor,
+                window_start=window_start,
+                window_end=window_end,
+            )
+            connection_basis = "snapshot_line_active_connections"
         potential_subscription_ids = projection["potential_subscription_ids"]
         affected_subscription_ids = projection["projected_affected_subscription_ids"]
-        protected_subscription_ids = projection[
-            "projected_protected_no_impact_subscription_ids"
-        ]
+        protected_subscription_ids = projection["projected_protected_no_impact_subscription_ids"]
         unknown_subscription_ids = projection["projected_unknown_subscription_ids"]
         from apps.customers.models import Subscription
 
-        potential_customer_scope = Subscription.objects.filter(
-            id__in=potential_subscription_ids
-        ).values("customer_id").distinct().count()
+        potential_customer_scope = (
+            Subscription.objects.filter(id__in=potential_subscription_ids)
+            .values("customer_id")
+            .distinct()
+            .count()
+        )
         return {
             "basis": "simulation_projection",
-            "connection_basis": "snapshot_topology_active_connections",
+            "connection_basis": connection_basis,
             "assumptions": {
-                "failure_mode": "bng_full_failure",
+                "failure_mode": f"{anchor_type}_failure",
                 "protection_policy": projection["failover_basis"]["protection_policy"],
             },
             "potential_subscription_scope": len(potential_subscription_ids),
             "potential_customer_scope": potential_customer_scope,
             "projected_affected_subscriptions": len(affected_subscription_ids),
-            "projected_affected_customers": len(
-                projection["projected_affected_customer_ids"]
-            ),
+            "projected_affected_customers": len(projection["projected_affected_customer_ids"]),
             "projected_protected_no_impact_subscriptions": len(protected_subscription_ids),
             "projected_unknown_subscriptions": len(unknown_subscription_ids),
             "failover_classification": projection["failover_basis"]["classification"],
@@ -482,5 +599,13 @@ class CanonicalBNGSimulationService:
         run.refresh_from_db()
         result = run.lifecycle_context.get("canonical_bng_result")
         if not isinstance(result, dict):
-            raise CanonicalBNGSimulationError("Run has no canonical BNG result.")
+            result = run.lifecycle_context.get("canonical_failure_result")
+        if not isinstance(result, dict):
+            raise CanonicalFailureSimulationError("Run has no canonical failure result.")
         return result
+
+
+# Backward-compatible public names. BNG is now a network-device anchor subtype.
+CanonicalBNGSimulationService = CanonicalFailureSimulationService
+CanonicalBNGSimulationError = CanonicalFailureSimulationError
+CanonicalBNGResult = CanonicalFailureResult

@@ -440,3 +440,24 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 - Runtime PostgreSQL locking, nullable baseline join'i lock sorgusundan
   çıkarılarak düzeltildi. Operasyon countları acceptance öncesi/sonrası eşit
   kaldı. Sonraki görev: `MAIN-078`.
+
+## 2026-08-17 — MAIN-077 Generic ProcessTwin Core Expansion
+
+- BNG-specialized contract, snapshot-local `anchor_type`, `anchor_code` ve
+  `failure_type` üzerinden generic canonical failure runtime'a genişletildi.
+  BNG/OLT/metro aggregation/access-node device anchor'ları, yönlü network-link
+  ve exact line-connection anchor'ları aynı typed projection/result contract'ını
+  kullanır. BNG public service adı backward-compatible kaldı.
+- Historical verified evidence ile hypothetical projection ayrımı korunur.
+  Runtime yalnız source topology, active connection, primary/backup diversity
+  ve explicit simulation inputundan projected affected/protected/unknown üretir;
+  strict virtual-time RuleVersion seçimi ile simulated compensation/SLA
+  hesaplar. Port, failure-domain ve subscription-connection family'leri
+  deferred'dır; API/UI/evidence eklenmedi.
+- Snapshot 74'te 52 device + 9 link + 7 line olmak üzere 68/91 ana olay
+  projectable oldu. Bounded backtest: 5 exact, 57 acceptable, 6 link mismatch.
+  Altı fark, link-only yönlü projection'ın historical device/line/port
+  propagation scope'unu kanıtsız genişletmemesinden gelir; runtime defect veya
+  V3 data mutation gerekçesi değildir. BNG/OLT/link live what-if çalışmaları,
+  replay, cross-snapshot rejection ve operational write isolation focused
+  testlerle geçti. Sonraki görev: `MAIN-078`.

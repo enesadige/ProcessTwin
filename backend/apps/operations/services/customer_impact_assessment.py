@@ -345,6 +345,52 @@ class CustomerImpactAssessmentService:
             window_end=window_end,
         )
 
+    def project_device_failure(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_device,
+        window_start,
+        window_end,
+    ) -> dict:
+        """Return a topology-based hypothetical device projection without writes."""
+        return self._potential_service.project_device_failure(
+            snapshot=snapshot,
+            source_device=source_device,
+            window_start=window_start,
+            window_end=window_end,
+        )
+
+    def project_network_link_failure(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_link,
+        window_start,
+        window_end,
+    ) -> dict:
+        return self._potential_service.project_network_link_failure(
+            snapshot=snapshot,
+            source_link=source_link,
+            window_start=window_start,
+            window_end=window_end,
+        )
+
+    def project_line_connection_failure(
+        self,
+        *,
+        snapshot: DataSnapshot,
+        source_line,
+        window_start,
+        window_end,
+    ) -> dict:
+        return self._potential_service.project_line_connection_failure(
+            snapshot=snapshot,
+            source_line=source_line,
+            window_start=window_start,
+            window_end=window_end,
+        )
+
     def _root_device(self, causal_event):
         root = causal_event.get_root_resource()
         if hasattr(root, "device_type"):

@@ -24,7 +24,12 @@ from apps.operations.tests.test_operations_models import (
 )
 from apps.rules.models import Rule, RuleStatus, RuleType, RuleVersion, RuleVersionStatus
 from apps.simulation.models import SimulationComparisonRole, SimulationRunStatus, SimulationScenario
-from apps.simulation.services import CanonicalBNGSimulationService, SimulationService
+from apps.simulation.services import (
+    CanonicalBNGSimulationService,
+    CanonicalFailureSimulationError,
+    CanonicalFailureSimulationService,
+    SimulationService,
+)
 
 
 def clock():
@@ -270,3 +275,117 @@ def test_projection_does_not_turn_missing_historical_evidence_into_unknown_scope
     assert result.historical_evidence["unknown_or_insufficient_subscriptions"] == 1
     assert result.projection["projected_affected_subscriptions"] == 1
     assert result.projection["projected_unknown_subscriptions"] == 0
+
+
+@pytest.mark.django_db
+def test_generic_device_link_and_line_anchors_reuse_the_same_projection_contract():
+    snapshot = create_snapshot("canonical-generic-failure")
+    device, _access, link, _port, line = create_access_line(snapshot, code_suffix="GENERIC")
+    device.device_type = "olt"
+    device.save(update_fields=["device_type"])
+    line.valid_from = clock() - timedelta(days=1)
+    line.save(update_fields=["valid_from"])
+    create_subscription_connection(snapshot, line)
+    runtime = SimulationService()
+    service = CanonicalFailureSimulationService(runtime=runtime)
+
+    results = {}
+    for anchor_type, anchor_code in (
+        ("network_device", device.code),
+        ("network_link", link.link_code),
+        ("line_connection", line.line_code),
+    ):
+        scenario = SimulationScenario.objects.create(
+            source_snapshot=snapshot,
+            scenario_code=f"SIM-{anchor_type}-001",
+            name=f"Generic {anchor_type}",
+            scenario_type=f"{anchor_type}_failure",
+            definition={"anchor_type": anchor_type, "anchor_code": anchor_code},
+            default_parameters={"duration_seconds": 600, "outage_classification": "full_outage"},
+        )
+        run = runtime.create_run(
+            scenario=scenario,
+            comparison_role=SimulationComparisonRole.BASELINE,
+            deterministic_seed=f"generic-{anchor_type}",
+            virtual_clock=clock(),
+        )
+        results[anchor_type] = service.execute(run)
+
+    assert results["network_device"].event["anchor_code"] == device.code
+    assert results["network_link"].event["anchor_code"] == link.link_code
+    assert results["line_connection"].event["anchor_code"] == line.line_code
+    assert all(
+        result.projection["projected_affected_subscriptions"] == 1 for result in results.values()
+    )
+    assert all(
+        result.historical_evidence == {"basis": "not_used_for_device_anchor"}
+        for result in results.values()
+    )
+
+
+@pytest.mark.django_db
+def test_generic_failure_rejects_unsupported_port_anchor_without_fallback():
+    snapshot, scenario = setup_bng_scenario()
+    scenario.definition = {"anchor_type": "network_port", "anchor_code": "unused"}
+    scenario.save(update_fields=["definition"])
+    run = SimulationService().create_run(
+        scenario=scenario,
+        comparison_role=SimulationComparisonRole.BASELINE,
+        deterministic_seed="unsupported-anchor",
+        virtual_clock=clock(),
+    )
+
+    with pytest.raises(CanonicalFailureSimulationError, match="supported anchor"):
+        CanonicalFailureSimulationService().execute(run)
+
+
+@pytest.mark.django_db
+def test_generic_link_replay_is_deterministic_and_anchor_is_snapshot_local():
+    snapshot = create_snapshot("canonical-generic-link-replay")
+    _device, _access, link, _port, line = create_access_line(snapshot, code_suffix="REPLAY")
+    line.valid_from = clock() - timedelta(days=1)
+    line.save(update_fields=["valid_from"])
+    create_subscription_connection(snapshot, line)
+    scenario = SimulationScenario.objects.create(
+        source_snapshot=snapshot,
+        scenario_code="SIM-GENERIC-LINK-REPLAY-001",
+        name="Generic link replay",
+        scenario_type="network_link_failure",
+        definition={"anchor_type": "network_link", "anchor_code": link.link_code},
+        default_parameters={"duration_seconds": 600, "outage_classification": "full_outage"},
+    )
+    runtime = SimulationService()
+    original = runtime.create_run(
+        scenario=scenario,
+        comparison_role=SimulationComparisonRole.BASELINE,
+        deterministic_seed="generic-link-replay",
+        virtual_clock=clock(),
+    )
+    service = CanonicalFailureSimulationService(runtime=runtime)
+
+    first = service.execute(original)
+    replay = runtime.replay(original)
+    repeated = service.execute(replay)
+    first_payload = first.to_dict()
+    repeated_payload = repeated.to_dict()
+    first_payload["run"].pop("code")
+    repeated_payload["run"].pop("code")
+    assert first_payload == repeated_payload
+
+    other_snapshot = create_snapshot("canonical-generic-link-other")
+    foreign_scenario = SimulationScenario.objects.create(
+        source_snapshot=other_snapshot,
+        scenario_code="SIM-GENERIC-LINK-FOREIGN-001",
+        name="Foreign link must not resolve",
+        scenario_type="network_link_failure",
+        definition={"anchor_type": "network_link", "anchor_code": link.link_code},
+        default_parameters={"duration_seconds": 600, "outage_classification": "full_outage"},
+    )
+    foreign_run = runtime.create_run(
+        scenario=foreign_scenario,
+        comparison_role=SimulationComparisonRole.BASELINE,
+        deterministic_seed="foreign-link",
+        virtual_clock=clock(),
+    )
+    with pytest.raises(CanonicalFailureSimulationError, match="not in the source snapshot"):
+        service.execute(foreign_run)
