@@ -33,10 +33,14 @@ def _analytics_snapshot(slug: str, *cities: tuple[str, str]):
 
 
 def _plan(question: str, snapshot):
-    query = DeterministicStructuredQueryParser().parse(
-        original_query=question,
-        snapshot=snapshot,
-    ).structured_query
+    query = (
+        DeterministicStructuredQueryParser()
+        .parse(
+            original_query=question,
+            snapshot=snapshot,
+        )
+        .structured_query
+    )
     return query, AnalyticsAnswerRequirementPlanner.build(query, original_query=question)
 
 
@@ -90,10 +94,9 @@ def test_multi_city_total_request_has_typed_scope_requirements_without_total_val
     )
 
     assert [item.kind for item in plan.requirements] == [
-        AnalyticsAnswerRequirementKind.DIRECT_VALUE,
         AnalyticsAnswerRequirementKind.AGGREGATE_TOTAL_REQUEST,
     ]
-    total = plan.requirements[1]
+    total = plan.requirements[0]
     assert total.metric == "alarm_count"
     assert [item.city for item in total.locations] == ["İstanbul", "İzmir"]
     assert total.time_window is not None
@@ -129,9 +132,7 @@ def test_comparison_requirement_uses_existing_typed_comparison_semantics():
         snapshot,
     )
 
-    assert [item.kind for item in plan.requirements] == [
-        AnalyticsAnswerRequirementKind.COMPARISON
-    ]
+    assert [item.kind for item in plan.requirements] == [AnalyticsAnswerRequirementKind.COMPARISON]
     requirement = plan.requirements[0]
     assert requirement.metric == "outage_count"
     assert requirement.group_by == "time_bucket"

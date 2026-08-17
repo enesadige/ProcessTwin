@@ -68,21 +68,25 @@ class AnalyticsAnswerRequirementPlanner:
             return AnalyticsAnswerRequirements()
 
         locations = tuple(structured_query.analytics_locations)
+        aggregate_total_requested = (
+            cls._aggregate_total_requested(original_query) and len(locations) > 1
+        )
         requirements: list[AnalyticsAnswerRequirement] = []
         for specification in specifications:
-            requirements.extend(
-                cls._requirements_for_specification(
-                    specification,
-                    locations=locations,
-                    time_window=structured_query.time_window,
-                )
-            )
-
-        if cls._aggregate_total_requested(original_query) and len(locations) > 1:
-            for specification in specifications:
+            if aggregate_total_requested:
+                # The total requirement owns its explicitly requested constituents.
+                # A separate direct-value requirement would bind each row twice.
                 requirements.append(
                     cls._requirement(
                         AnalyticsAnswerRequirementKind.AGGREGATE_TOTAL_REQUEST,
+                        specification,
+                        locations=locations,
+                        time_window=structured_query.time_window,
+                    )
+                )
+            else:
+                requirements.extend(
+                    cls._requirements_for_specification(
                         specification,
                         locations=locations,
                         time_window=structured_query.time_window,
