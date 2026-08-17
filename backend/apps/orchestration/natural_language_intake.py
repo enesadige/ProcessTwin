@@ -1359,6 +1359,16 @@ class DeterministicStructuredQueryParser:
         if matches:
             months = sorted((int(year), _TURKISH_MONTHS[month]) for month, year in matches)
         else:
+            year_only = re.search(
+                r"\b((?:19|20)\d{2})\s*(?:yıl(?:ı|ında)?|yil(?:i|inda)?)\b",
+                _fold(text),
+            )
+            if year_only:
+                year = int(year_only.group(1))
+                return {
+                    "from_time": f"{year}-01-01T00:00:00+00:00",
+                    "to_time": f"{year}-12-31T23:59:59+00:00",
+                }
             mentioned = sorted(
                 {
                     _TURKISH_MONTHS[month]

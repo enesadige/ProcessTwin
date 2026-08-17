@@ -722,6 +722,39 @@ def test_deterministic_parser_preserves_unicode_device_and_parses_turkish_date()
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize("year_expression", ["2026 yılında", "2026 yılı", "2026 yilinda"])
+def test_analytics_parser_converts_year_only_scope_to_calendar_window(year_expression):
+    snapshot = create_snapshot("analytics-year-only")
+    city = City.objects.create(name="İzmir", plate_code="35")
+    district = District.objects.create(
+        city=city,
+        name="Konak",
+        profile_type=AreaProfileType.MIXED,
+    )
+    NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code="AGG-IZM-YEAR-001",
+        name="Annual analytics scope device",
+        device_type=NetworkDeviceType.BNG,
+        city=city,
+        district=district,
+    )
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=f"{year_expression} İzmir şehrinde kaç kesinti yaşandı?",
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.time_window is not None
+    assert query.time_window.from_time.isoformat() == "2026-01-01T00:00:00+00:00"
+    assert query.time_window.to_time.isoformat() == "2026-12-31T23:59:59+00:00"
+    assert query.location is not None
+    assert query.location.city == "İzmir"
+    assert query.analytics is not None
+    assert query.analytics.metric == "outage_count"
+
+
+@pytest.mark.django_db
 def test_device_resolution_prefers_reconciled_canonical_chain_over_history():
     from datetime import timedelta
 

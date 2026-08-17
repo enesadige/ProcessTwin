@@ -1671,6 +1671,66 @@ def test_builder_skips_provider_when_scoped_analytics_has_no_matching_records():
     assert response.narrative_synthesis_audit["reason"] == "no_matching_analytics_records"
 
 
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("metric", "value", "label"),
+    [
+        ("outage_count", 13, "kesinti"),
+        ("alarm_count", 21, "alarm"),
+    ],
+)
+def test_direct_analytics_count_is_restored_after_unsupported_provider_sentence(
+    metric, value, label
+):
+    snapshot = create_snapshot(f"response-direct-count-{metric}")
+    result = valid_result(snapshot.snapshot_key).model_copy(
+        update={
+            "analytics_summary": AnalyticsSummary(
+                metric=metric,
+                aggregation="count",
+                ranking_direction="desc",
+                filters={"city": "İzmir"},
+                scope_label="İzmir",
+                rows=[{"label": "Toplam", "value": value, "event_count": value}],
+                included_event_count=value,
+                excluded_unknown_count=0,
+                deduplication_grain="causal_event",
+            )
+        }
+    )
+    run = completed_run(
+        f"response-direct-count-{metric}",
+        snapshot=snapshot,
+        result=result,
+        original_query=f"2026 yılında İzmir şehrinde kaç {label} yaşandı?",
+    )
+    run.structured_query = {
+        "intent": "operational_analytics",
+        "requested_outputs": ["summary", "analytics"],
+        "analytics": {
+            "metric": metric,
+            "aggregation": "count",
+            "group_by": None,
+            "comparison": False,
+        },
+    }
+    run.save(update_fields=["structured_query"])
+    provider = GroundedNarrativeProvider(
+        f"2027 yılında İzmir'de {value} {label} yaşandı. Kayıtlar değerlendirildi."
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert f"İzmir: {value} {label}." in response.response_text
+    assert "2027 yılında" not in response.response_text
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 1
+    assert response.narrative_synthesis_audit["removed_sentence_reasons"][0]["failure_code"] == (
+        "unsupported_number"
+    )
+
+
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
         "Müşteri memnuniyeti olumsuz etkilendi.",

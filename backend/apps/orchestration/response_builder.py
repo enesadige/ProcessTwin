@@ -370,6 +370,7 @@ class ValidatedResponseBuilder:
                         .get(statement_id, [])
                         for statement_id in selection["selected_statement_ids"]
                     },
+                    structured_query=query_run.structured_query,
                 )
                 synthesis_audit["deterministic_fill_count"] = coverage_fill_count
                 response.narrative_synthesis_audit = synthesis_audit
@@ -453,6 +454,7 @@ class ValidatedResponseBuilder:
         original_query: str,
         selected_statements: Mapping[str, str],
         statement_concepts: Mapping[str, list[str]],
+        structured_query: Mapping[str, Any] | None = None,
     ) -> tuple[str, int]:
         """Add only explicitly requested verified facts omitted by the provider."""
         query = original_query.casefold()
@@ -531,6 +533,8 @@ class ValidatedResponseBuilder:
             requested_roles.add("unknown_exclusion")
         if any(term in query for term in ("hesaba dahil", "dahil edilen")):
             requested_roles.add("analytics_included_count")
+        if cls._requires_direct_analytics_count_coverage(structured_query):
+            requested_roles.add("analytics_direct_count")
 
         text = narrative
         fill_count = 0
@@ -623,6 +627,35 @@ class ValidatedResponseBuilder:
         return text, fill_count
 
     @staticmethod
+    def _requires_direct_analytics_count_coverage(
+        structured_query: Mapping[str, Any] | None,
+    ) -> bool:
+        """Require the selected canonical fact for a simple requested count."""
+        if not isinstance(structured_query, Mapping):
+            return False
+        if structured_query.get("intent") != "operational_analytics":
+            return False
+        specifications = [structured_query.get("analytics")]
+        extra_specs = structured_query.get("analytics_specs", [])
+        if isinstance(extra_specs, list):
+            specifications.extend(extra_specs)
+        direct_metrics = {
+            "outage_count",
+            "event_count",
+            "alarm_count",
+            "full_outage_count",
+            "failed_failover_count",
+        }
+        return any(
+            isinstance(specification, Mapping)
+            and specification.get("metric") in direct_metrics
+            and specification.get("aggregation") == "count"
+            and not specification.get("group_by")
+            and not specification.get("comparison")
+            for specification in specifications
+        )
+
+    @staticmethod
     def _deterministic_answer_plan(
         data: Mapping[str, Any], structured_query: Mapping[str, Any] | None
     ) -> dict[str, Any]:
@@ -662,6 +695,7 @@ class ValidatedResponseBuilder:
             "root_resource",
             "analytics_comparison",
             "analytics_included_count",
+            "analytics_direct_count",
             "unknown_exclusion",
             "operational_reference",
         }
@@ -692,6 +726,7 @@ class ValidatedResponseBuilder:
                 "verified_customer_impact",
                 "analytics_comparison",
                 "analytics_included_count",
+                "analytics_direct_count",
                 "unknown_exclusion",
             }
         if requested & {"root_cause"} or dimensions & {
@@ -1196,9 +1231,12 @@ class ValidatedResponseBuilder:
     ) -> tuple[str, dict[str, object]]:
         """Build a closed-world contract for decomposition, relations and ordering."""
         statements: dict[str, str] = {}
+        analytics_direct_count_statement_ids: set[str] = set()
 
-        def add(text: str) -> None:
-            statements[f"S{len(statements) + 1}"] = text
+        def add(text: str) -> str:
+            statement_id = f"S{len(statements) + 1}"
+            statements[statement_id] = text
+            return statement_id
 
         analytics = result.analytics_summary
         if analytics:
@@ -1256,11 +1294,25 @@ class ValidatedResponseBuilder:
                         if row["label"] == "Toplam"
                         else row["label"]
                     )
-                    add(
+                    statement_id = add(
                         f"{index}. {row_label}: {row['value']} "
                         f"{metric_labels.get(analytics.metric, analytics.metric)}"
                         f"{period_evidence}."
                     )
+                    if (
+                        analytics.metric
+                        in {
+                            "outage_count",
+                            "event_count",
+                            "alarm_count",
+                            "full_outage_count",
+                            "failed_failover_count",
+                        }
+                        and analytics.aggregation == "count"
+                        and analytics.group_by is None
+                        and not analytics.comparison
+                    ):
+                        analytics_direct_count_statement_ids.add(statement_id)
             if analytics.comparison and analytics.group_by not in {None, "time_bucket"}:
                 signed_rows = [
                     row
@@ -1334,10 +1386,24 @@ class ValidatedResponseBuilder:
             }
             for row in extra.rows:
                 label = extra.scope_label if row.get("label") == "Toplam" else row.get("label")
-                add(
+                statement_id = add(
                     f"{label or 'Toplam'}: {row.get('value')} "
                     f"{metric_labels.get(extra.metric, extra.metric)}."
                 )
+                if (
+                    extra.metric
+                    in {
+                        "outage_count",
+                        "event_count",
+                        "alarm_count",
+                        "full_outage_count",
+                        "failed_failover_count",
+                    }
+                    and extra.aggregation == "count"
+                    and extra.group_by is None
+                    and not extra.comparison
+                ):
+                    analytics_direct_count_statement_ids.add(statement_id)
             if extra.metric in {"affected_customers", "affected_subscriptions"}:
                 scope = extra.scope_label or "Bu kapsam"
                 add(
@@ -1534,6 +1600,11 @@ class ValidatedResponseBuilder:
             statement_id: ValidatedResponseBuilder._statement_concepts(text)
             for statement_id, text in statements.items()
         }
+        for statement_id in analytics_direct_count_statement_ids:
+            statement_concepts[statement_id] = [
+                *statement_concepts[statement_id],
+                "analytics_direct_count",
+            ]
         schema = {
             "type": "object",
             "properties": {
