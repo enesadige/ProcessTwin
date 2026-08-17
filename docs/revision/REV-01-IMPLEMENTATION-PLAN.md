@@ -374,3 +374,17 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 - Yalnız terminal QueryRun'a bağlı finalized genel kayıtlar görünür. Draft
   kayıtlar ve compensation DecisionEvidence akışı bu küçük completion dışında
   bırakılmıştır. Sonraki görev: `MAIN-075`.
+
+## 2026-08-17 — MAIN-075 ProcessTwin Simulation Veri Omurgası
+
+- Snapshot-local `SimulationScenario`, `SimulationRun` ve
+  `SimulationRunEvent` modelleri ile ilk ProcessTwin kalıcı veri omurgası
+  eklendi. Run; source snapshot, deterministic seed, virtual clock, destekli
+  hızlar (`1x`, `10x`, `60x`), lifecycle durumu, baseline/candidate bağı ve
+  replay context'ini taşır.
+- Candidate/replay validation'ları snapshot, scenario, seed, virtual clock ve
+  replay kimliği sınırlarını korur. Run event sequence/code tekildir ve virtual
+  zaman sırası model validation ile korunur.
+- Bu görev simulation execution, override, metric/delta, API veya UI eklemez;
+  operasyon tablolarına yazım yapılmadığı focused isolation testiyle doğrulandı.
+  Sonraki görev: `MAIN-076`.

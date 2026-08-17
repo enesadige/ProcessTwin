@@ -711,3 +711,19 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
 - Her satır exact snapshot anahtarıyla kendi genel evidence detayına gider;
   draft/non-terminal kayıtlar listelenmez. Compensation `evidence_hash`
   detay akışı değişmeden kalır. Sonraki ana görev: `MAIN-075`.
+
+## MAIN-075 ProcessTwin Simulation Veri Omurgası (2026-08-17)
+
+- Yeni `simulation` Django uygulaması snapshot-local `SimulationScenario`,
+  `SimulationRun` ve sıralı `SimulationRunEvent` modellerini ekler. Run; exact
+  source snapshot, deterministic seed, virtual clock, yalnız `1x`/`10x`/`60x`
+  hızları, lifecycle durumu, baseline/candidate bağı ve replay kimliğini taşır.
+- Candidate yalnız aynı snapshot, scenario, seed ve virtual clock kullanan bir
+  baseline'a bağlanabilir; replay aynı source/seed/scenario ve replay kimliğini
+  korur. Event'ler yalnız kendi run'ına bağlı, benzersiz sequence/code ile
+  zaman sıralı tutulur.
+- Bu yalnız veri omurgasıdır: SimulationService, override/execution, metric,
+  API, frontend, rule/compensation uygulaması veya operasyon tablolarına yazım
+  yoktur. Focused isolation testi CausalEvent, Alarm, Outage,
+  CustomerImpactAssessment ve CompensationEvaluation sayılarının değişmediğini
+  doğruladı. Sonraki görev: `MAIN-076`.
