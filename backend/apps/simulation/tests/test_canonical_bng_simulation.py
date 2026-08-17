@@ -167,6 +167,34 @@ def test_canonical_bng_baseline_candidate_chain_delta_and_operational_isolation(
 
 
 @pytest.mark.django_db
+def test_canonical_bng_comparison_reports_explicit_sla_state_change():
+    snapshot, scenario = setup_bng_scenario()
+    runtime = SimulationService()
+    baseline = runtime.create_run(
+        scenario=scenario,
+        comparison_role=SimulationComparisonRole.BASELINE,
+        deterministic_seed="sla-delta-seed",
+        virtual_clock=clock(),
+    )
+    candidate = runtime.create_candidate(
+        baseline_run=baseline,
+        input_overrides={"sla_target_seconds": 900},
+    )
+    service = CanonicalBNGSimulationService(runtime=runtime)
+
+    service.execute(baseline)
+    service.execute(candidate)
+    comparison = service.compare(baseline_run=baseline, candidate_run=candidate)
+
+    assert comparison["sla_target_seconds_delta"] == 600
+    assert comparison["sla_breached"] == {
+        "baseline": True,
+        "candidate": False,
+        "changed": True,
+    }
+
+
+@pytest.mark.django_db
 def test_canonical_bng_replay_is_deterministic_and_rule_selection_has_no_fallback():
     _snapshot, scenario = setup_bng_scenario()
     runtime = SimulationService()

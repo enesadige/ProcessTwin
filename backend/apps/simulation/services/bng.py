@@ -206,6 +206,8 @@ class CanonicalBNGSimulationService:
             raise CanonicalBNGSimulationError("Candidate must reference the supplied baseline run.")
         if baseline["source_snapshot"] != candidate["source_snapshot"]:
             raise CanonicalBNGSimulationError("Comparison crosses a snapshot boundary.")
+        baseline_sla_target = baseline["operational"].get("sla_target_seconds")
+        candidate_sla_target = candidate["operational"].get("sla_target_seconds")
         return {
             "baseline_run_code": baseline_run.run_code,
             "candidate_run_code": candidate_run.run_code,
@@ -229,6 +231,18 @@ class CanonicalBNGSimulationService:
             ),
             "duration_seconds_delta": candidate["event"]["duration_seconds"]
             - baseline["event"]["duration_seconds"],
+            "sla_target_seconds_delta": (
+                candidate_sla_target - baseline_sla_target
+                if isinstance(baseline_sla_target, int)
+                and isinstance(candidate_sla_target, int)
+                else None
+            ),
+            "sla_breached": {
+                "baseline": baseline["operational"].get("sla_breached"),
+                "candidate": candidate["operational"].get("sla_breached"),
+                "changed": baseline["operational"].get("sla_breached")
+                != candidate["operational"].get("sla_breached"),
+            },
         }
 
     def _source_event(self, run: SimulationRun, event_code: str) -> CausalEvent:

@@ -57,6 +57,13 @@ class PathDiversityService:
         FailureDomainType.FIBER_ROUTE,
     }
 
+    def __init__(self) -> None:
+        # A single impact evaluation can inspect many connections that share the
+        # same upstream path and failure-domain memberships. These caches keep
+        # the calculation snapshot-local while avoiding repeated topology reads.
+        self._upstream_links_cache: dict[tuple[int, int], set[NetworkLink]] = {}
+        self._failure_domain_cache: dict[tuple[str, int], dict[str, set[str]]] = {}
+
     def evaluate(
         self,
         *,
@@ -166,6 +173,11 @@ class PathDiversityService:
         *,
         snapshot: DataSnapshot,
     ) -> set[NetworkLink]:
+        cache_key = (snapshot.id, device.id)
+        cached_links = self._upstream_links_cache.get(cache_key)
+        if cached_links is not None:
+            return set(cached_links)
+
         links_by_id: dict[int, NetworkLink] = {}
         visited_device_ids: set[int] = set()
         visiting_device_ids: set[int] = set()
@@ -188,7 +200,9 @@ class PathDiversityService:
             visited_device_ids.add(current.id)
 
         walk(device)
-        return set(links_by_id.values())
+        resolved_links = set(links_by_id.values())
+        self._upstream_links_cache[cache_key] = resolved_links
+        return set(resolved_links)
 
     def _collect_upstream_devices(self, links: set[NetworkLink]) -> set[NetworkDevice]:
         devices: set[NetworkDevice] = set()
@@ -208,27 +222,62 @@ class PathDiversityService:
             FailureDomainType.POWER_ZONE: set(),
             FailureDomainType.FIBER_ROUTE: set(),
         }
-        for membership in line.failure_domain_memberships.select_related(
-            "failure_domain"
-        ):
-            domains_by_type.setdefault(membership.failure_domain.domain_type, set()).add(
+        self._merge_domains(
+            domains_by_type,
+            self._resource_failure_domains(
+                resource_kind="line",
+                resource_id=line.id,
+                memberships=line.failure_domain_memberships,
+            ),
+        )
+        for device in devices:
+            self._merge_domains(
+                domains_by_type,
+                self._resource_failure_domains(
+                    resource_kind="device",
+                    resource_id=device.id,
+                    memberships=device.failure_domain_memberships,
+                ),
+            )
+        for link in links:
+            self._merge_domains(
+                domains_by_type,
+                self._resource_failure_domains(
+                    resource_kind="link",
+                    resource_id=link.id,
+                    memberships=link.failure_domain_memberships,
+                ),
+            )
+        return domains_by_type
+
+    def _resource_failure_domains(
+        self,
+        *,
+        resource_kind: str,
+        resource_id: int,
+        memberships,
+    ) -> dict[str, set[str]]:
+        cache_key = (resource_kind, resource_id)
+        cached_domains = self._failure_domain_cache.get(cache_key)
+        if cached_domains is not None:
+            return {domain_type: set(codes) for domain_type, codes in cached_domains.items()}
+
+        domains: dict[str, set[str]] = {}
+        for membership in memberships.select_related("failure_domain"):
+            domains.setdefault(membership.failure_domain.domain_type, set()).add(
                 membership.failure_domain.code
             )
-        for device in devices:
-            for membership in device.failure_domain_memberships.select_related(
-                "failure_domain"
-            ):
-                domains_by_type.setdefault(membership.failure_domain.domain_type, set()).add(
-                    membership.failure_domain.code
-                )
-        for link in links:
-            for membership in link.failure_domain_memberships.select_related(
-                "failure_domain"
-            ):
-                domains_by_type.setdefault(membership.failure_domain.domain_type, set()).add(
-                    membership.failure_domain.code
-                )
-        return domains_by_type
+        self._failure_domain_cache[cache_key] = {
+            domain_type: set(codes) for domain_type, codes in domains.items()
+        }
+        return domains
+
+    @staticmethod
+    def _merge_domains(
+        target: dict[str, set[str]], source: dict[str, set[str]]
+    ) -> None:
+        for domain_type, codes in source.items():
+            target.setdefault(domain_type, set()).update(codes)
 
     def _collect_shared_failure_domains(
         self,
