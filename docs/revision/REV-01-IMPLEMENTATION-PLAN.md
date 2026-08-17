@@ -491,3 +491,11 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   persisted cursor timeline pages, and follows baseline-first candidate replay.
   Synchronous execution is represented as request loading only; it is not
   presented as live background simulation. Next: MAIN-080 simulation evidence.
+
+### MAIN-079 manual lifecycle correction (2026-08-17)
+
+- UI orchestration now creates the candidate while its baseline is still in
+  draft/ready state, then starts baseline and candidate in order. This keeps the
+  existing runtime lifecycle contract unchanged. Focused Snapshot 74 smoke
+  passed with SLA 300 -> 900, true -> false breach state, and non-overlapping
+  cursor timeline pages. Next: MAIN-080.

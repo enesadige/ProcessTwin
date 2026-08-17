@@ -281,15 +281,15 @@ export function ProcessTwinPage() {
         speed: form.speed,
       })
       setBaselineRun(baseline)
-      const startedBaseline = await startSimulationRun(baseline.run_code)
-      setBaselineRun(startedBaseline.run)
-      setBaselineResult(startedBaseline.result)
       const candidate = await createCandidateSimulationRun({
         source_snapshot_identifier: form.snapshotIdentifier.trim(),
         baseline_run_code: baseline.run_code,
         candidate_overrides: candidateOverrides,
       })
       setCandidateRun(candidate)
+      const startedBaseline = await startSimulationRun(baseline.run_code)
+      setBaselineRun(startedBaseline.run)
+      setBaselineResult(startedBaseline.result)
       const startedCandidate = await startSimulationRun(candidate.run_code)
       setCandidateRun(startedCandidate.run)
       setCandidateResult(await getSimulationRunResult(startedCandidate.run.run_code))

@@ -853,3 +853,15 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   start nedeniyle sahte canlı clock/progress/stream yoktur. Device topology
   summary yalnız read-only bağlam olarak opsiyoneldir; yeni graph/backend
   endpointi eklenmedi. Sonraki görev: `MAIN-080` simulation evidence.
+
+### MAIN-079 manual lifecycle correction (2026-08-17)
+
+- Manual UI smoke found that the frontend started a baseline before creating
+  its candidate. The runtime correctly rejects that transition. The workspace
+  now creates baseline and candidate contexts first, then starts baseline and
+  candidate in order. No simulation core, API, schema, or evidence behavior
+  changed.
+- Snapshot 74 focused smoke passed with `BNG-İZM-002`: both runs completed,
+  projected scope stayed unchanged, SLA target changed 300 to 900,
+  `sla_breached` changed true to false, and cursor pages continued `1,2,3`
+  then `4,5,6` without overlap. Next: `MAIN-080`.
