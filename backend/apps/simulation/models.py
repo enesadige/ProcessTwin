@@ -5,6 +5,7 @@ from uuid import uuid4
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
+from django.utils.dateparse import parse_datetime
 
 from apps.core.models import TimeStampedModel
 from apps.datasets.models import DataSnapshot
@@ -218,8 +219,10 @@ class SimulationRun(TimeStampedModel):
                         errors["baseline_run"] = (
                             "Baseline run must use the same deterministic seed."
                         )
-                    if baseline.virtual_clock != self.virtual_clock:
-                        errors["baseline_run"] = "Baseline run must use the same virtual clock."
+                    if self._initial_virtual_clock(baseline) != self._initial_virtual_clock(self):
+                        errors["baseline_run"] = (
+                            "Baseline run must use the same initial virtual clock."
+                        )
         if self.replay_of_id is not None:
             replay_source = self.replay_of
             if replay_source.pk == self.pk:
@@ -235,6 +238,16 @@ class SimulationRun(TimeStampedModel):
                     errors["replay_identity"] = "Replay must keep the originating replay identity."
         if errors:
             raise ValidationError(errors)
+
+    @staticmethod
+    def _initial_virtual_clock(run: SimulationRun):
+        context = run.lifecycle_context if isinstance(run.lifecycle_context, dict) else {}
+        value = context.get("initial_virtual_clock")
+        if isinstance(value, str):
+            parsed = parse_datetime(value)
+            if parsed is not None:
+                return parsed
+        return run.virtual_clock
 
     def save(self, *args, **kwargs):
         self.full_clean(validate_unique=False, validate_constraints=False)

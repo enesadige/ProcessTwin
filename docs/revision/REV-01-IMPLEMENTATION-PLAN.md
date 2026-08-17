@@ -388,3 +388,17 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
 - Bu görev simulation execution, override, metric/delta, API veya UI eklemez;
   operasyon tablolarına yazım yapılmadığı focused isolation testiyle doğrulandı.
   Sonraki görev: `MAIN-076`.
+
+## 2026-08-17 — MAIN-076 Deterministik Simulation Runtime
+
+- `SimulationService`, scenario default parametrelerini run override'larıyla
+  derin kopya/kararlı merge üzerinden effective input'a dönüştürür. Candidate
+  override'ı baseline'a veya scenario tanımına sızmaz.
+- Start/pause/resume/stop, reset ve replay lifecycle'ı eklendi. Virtual clock
+  gerçek wall-clock kullanmaz; verilen `timedelta`, destekli hız çarpanı ile
+  deterministik uygulanır. Terminal run geçmişi reset ile silinmez; replay yeni
+  bağlı run üretir.
+- Simulation-local eventler sequence + hash tabanlı deterministic kodla
+  sıralanır. Focused testler lifecycle, speed, replay, reset, input/snapshot
+  isolation ve CausalEvent/Alarm/Outage/impact/compensation tablolarına yazım
+  yapılmadığını doğruladı. Sonraki görev: `MAIN-077`.

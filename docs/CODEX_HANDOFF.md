@@ -727,3 +727,19 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   yoktur. Focused isolation testi CausalEvent, Alarm, Outage,
   CustomerImpactAssessment ve CompensationEvaluation sayılarının değişmediğini
   doğruladı. Sonraki görev: `MAIN-076`.
+
+## MAIN-076 Deterministik Simulation Runtime (2026-08-17)
+
+- `SimulationService`, scenario defaults ile run-local override'ları derin kopya
+  ve kararlı merge ile effective input'a dönüştürür; baseline ve candidate
+  parametreleri birbirini veya scenario varsayılanlarını değiştirmez.
+- Start/pause/resume/stop, reset ve replay yalnız simulation-local lifecycle
+  durumunu değiştirir. Virtual clock, gerçek zamandan bağımsız olarak çağrının
+  verdiği adım x `1x`/`10x`/`60x` ile ilerler; replay kaynak bağlamını yeni,
+  izlenebilir bir run'a taşır.
+- Runtime event'leri deterministik sequence ve hash tabanlı kod ile sıralanır.
+  Terminal run resetlenmez; geçmiş korunur ve replay gerekir. Focused testler
+  lifecycle, pause, hızlar, replay determinismi, input/snapshot izolasyonu,
+  sıralama ve ana operasyon tablolarına sıfır yazımı doğruladı.
+- Bu görev gerçek BNG senaryosu, alarm/outage/impact/compensation, API, UI veya
+  evidence entegrasyonu eklemez. Sonraki görev: `MAIN-077`.
