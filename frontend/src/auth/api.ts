@@ -266,6 +266,85 @@ export type TopologySummary = {
   } | null
 }
 
+export type SimulationAnchorType = 'network_device' | 'network_link' | 'line_connection'
+export type SimulationRunStatus = 'draft' | 'ready' | 'running' | 'paused' | 'completed' | 'failed' | 'stopped'
+
+export type SimulationRun = {
+  run_code: string
+  comparison_role: 'baseline' | 'candidate'
+  status: SimulationRunStatus
+  source_snapshot: { id: number; snapshot_key: string }
+  scenario_code: string
+  baseline_run_code: string | null
+  replay_of_run_code: string | null
+  replay_identity: string
+  virtual_clock: string
+  speed_multiplier: 1 | 10 | 60
+  event_count: number
+  result_ready: boolean
+  error_code: string | null
+}
+
+export type SimulationResult = {
+  source: Record<string, unknown>
+  scenario: Record<string, unknown>
+  run: Record<string, unknown>
+  effective_input: Record<string, unknown>
+  event: {
+    source_event_code?: string | null
+    anchor_type?: SimulationAnchorType | null
+    anchor_code?: string | null
+    failure_type?: string | null
+    started_at?: string | null
+    ended_at?: string | null
+    duration_seconds?: number | null
+    outage_classification?: string | null
+  }
+  historical_evidence: Record<string, unknown>
+  projection: {
+    basis?: string | null
+    connection_basis?: string | null
+    assumptions?: Record<string, unknown>
+    potential_subscription_scope?: number | null
+    potential_customer_scope?: number | null
+    projected_affected_subscriptions?: number | null
+    projected_affected_customers?: number | null
+    projected_protected_no_impact_subscriptions?: number | null
+    projected_unknown_subscriptions?: number | null
+    failover_classification?: string | null
+  }
+  rule_selection: Record<string, unknown> | null
+  compensation: {
+    status?: string | null
+    eligibility?: string | null
+    amount?: string | number | null
+    currency?: string | null
+    eligible_subscription_count?: number | null
+    manual_review_reason?: string | null
+    selected_rule_version?: Record<string, unknown> | null
+  }
+  operational: Record<string, unknown>
+  comparison: Record<string, unknown> | null
+}
+
+export type SimulationEvent = {
+  sequence: number
+  event_code: string
+  event_type: string
+  virtual_occurred_at: string
+  context: Record<string, unknown>
+}
+
+export type SimulationScenarioInput = {
+  source_snapshot_identifier: string
+  scenario_code: string
+  name: string
+  anchor_type: SimulationAnchorType
+  anchor_code: string
+  failure_type: string
+  default_parameters: Record<string, unknown>
+}
+
 const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
 
 function csrfCookie() {
@@ -428,4 +507,109 @@ export async function getEvidenceRecordList() {
     data: { evidence_records: EvidenceRecordListItem[] }
   }>('/api/orchestration/evidence-records/')
   return response.data.evidence_records
+}
+
+async function simulationPost<T>(path: string, payload: Record<string, unknown> = {}) {
+  await ensureCsrf()
+  return request<T>(path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfCookie() ?? '',
+    },
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function validateSimulationScenario(payload: Omit<SimulationScenarioInput, 'scenario_code' | 'name'>) {
+  const response = await simulationPost<{
+    data: {
+      valid: boolean
+      source_snapshot_identifier: string
+      definition: Pick<SimulationScenarioInput, 'anchor_type' | 'anchor_code' | 'failure_type'>
+      default_parameters: Record<string, unknown>
+    }
+  }>('/api/simulation/scenarios/validate/', payload)
+  return response.data
+}
+
+export async function createSimulationScenario(payload: SimulationScenarioInput) {
+  const response = await simulationPost<{ data: { scenario: Omit<SimulationScenarioInput, 'failure_type'> & { definition: Record<string, unknown> } } }>(
+    '/api/simulation/scenarios/',
+    payload,
+  )
+  return response.data.scenario
+}
+
+export async function createBaselineSimulationRun(payload: {
+  source_snapshot_identifier: string
+  scenario_code: string
+  deterministic_seed: string
+  virtual_start: string
+  speed: 1 | 10 | 60
+  baseline_overrides?: Record<string, unknown>
+}) {
+  const response = await simulationPost<{ data: { run: SimulationRun } }>('/api/simulation/runs/baseline/', payload)
+  return response.data.run
+}
+
+export async function createCandidateSimulationRun(payload: {
+  source_snapshot_identifier: string
+  baseline_run_code: string
+  candidate_overrides: Record<string, unknown>
+  speed?: 1 | 10 | 60
+}) {
+  const response = await simulationPost<{ data: { run: SimulationRun } }>('/api/simulation/runs/candidate/', payload)
+  return response.data.run
+}
+
+export async function startSimulationRun(runCode: string) {
+  const response = await simulationPost<{ data: { run: SimulationRun; result: SimulationResult } }>(`/api/simulation/runs/${encodeURIComponent(runCode)}/start/`)
+  return response.data
+}
+
+export async function simulationLifecycleAction(
+  runCode: string,
+  action: 'pause' | 'resume' | 'stop',
+) {
+  const response = await simulationPost<{ data: { run: SimulationRun } }>(`/api/simulation/runs/${encodeURIComponent(runCode)}/${action}/`)
+  return response.data.run
+}
+
+export async function replaySimulationRun(runCode: string) {
+  const response = await simulationPost<{ data: { run: SimulationRun } }>(`/api/simulation/runs/${encodeURIComponent(runCode)}/replay/`)
+  return response.data.run
+}
+
+export async function getSimulationRunStatus(runCode: string) {
+  const response = await request<{ data: { run: SimulationRun } }>(`/api/simulation/runs/${encodeURIComponent(runCode)}/status/`)
+  return response.data.run
+}
+
+export async function getSimulationRunResult(runCode: string) {
+  const response = await request<{ data: { result: SimulationResult } }>(`/api/simulation/runs/${encodeURIComponent(runCode)}/result/`)
+  return response.data.result
+}
+
+export async function getSimulationRunEvents({
+  runCode,
+  cursor,
+  limit = 25,
+}: {
+  runCode: string
+  cursor?: number | null
+  limit?: number
+}) {
+  const params = new URLSearchParams({ limit: String(limit) })
+  if (cursor !== null && cursor !== undefined) params.set('cursor', String(cursor))
+  const response = await request<{
+    data: {
+      run_code: string
+      events: SimulationEvent[]
+      result_count: number
+      next_cursor: number | null
+      has_more: boolean
+    }
+  }>(`/api/simulation/runs/${encodeURIComponent(runCode)}/events/?${params}`)
+  return response.data
 }

@@ -479,3 +479,15 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   offset pagination or complete timeline reloads. No simulation API path writes
   operational source tables; migration unchanged. Focused API/runtime suite:
   22 passed. Next: MAIN-079 ProcessTwin frontend.
+
+## MAIN-079 ProcessTwin frontend (2026-08-17)
+
+- Replaced the static ProcessTwin placeholder with a snapshot-local scenario
+  form and baseline/candidate result workspace. It reuses the MAIN-078 API and
+  introduces no backend endpoint, migration, simulation-core change, evidence
+  persistence, or graph runtime.
+- The UI presents historical persisted evidence and hypothetical projection as
+  distinct contracts, preserves null RuleVersion and manual-review values, uses
+  persisted cursor timeline pages, and follows baseline-first candidate replay.
+  Synchronous execution is represented as request loading only; it is not
+  presented as live background simulation. Next: MAIN-080 simulation evidence.

@@ -836,3 +836,20 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   ve diff check geçti. Migration yoktur. API simulation-local kayıtlar dışında
   CausalEvent, Alarm, Incident, Outage, CustomerImpactAssessment veya
   CompensationEvaluation yazmaz. Sonraki görev: `MAIN-079` frontend.
+
+## MAIN-079 ProcessTwin Workspace (2026-08-17)
+
+- Statik ProcessTwin placeholder'ı, authenticated mevcut `/api/simulation/`
+  contract'ını kullanan baseline/candidate workspace'e dönüştürüldü. Kullanıcı
+  exact snapshot, desteklenen generic anchor (`network_device`, `network_link`,
+  `line_connection`), virtual start, deterministic seed, 1x/10x/60x hız ve
+  explicit candidate override ile scenario/run oluşturabilir.
+- UI yalnız persisted canonical result'ı gösterir. Historical evidence ve
+  hypothetical projection ayrı bölümlerdedir; projected değerler verified veya
+  production fact olarak sunulmaz, unknown sıfıra dönüştürülmez ve null
+  RuleVersion/manual-review sonucu fallback olmadan korunur.
+- Candidate replay önce bağlı baseline replay'ini, sonra candidate replay'ini
+  başlatır. Timeline cursor ile append edilir (`sequence > cursor`); synchronous
+  start nedeniyle sahte canlı clock/progress/stream yoktur. Device topology
+  summary yalnız read-only bağlam olarak opsiyoneldir; yeni graph/backend
+  endpointi eklenmedi. Sonraki görev: `MAIN-080` simulation evidence.
