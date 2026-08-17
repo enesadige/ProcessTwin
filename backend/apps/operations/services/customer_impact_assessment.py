@@ -44,6 +44,19 @@ class CustomerImpactAssessmentSummary:
     reason_code_counts: dict[str, int]
 
 
+@dataclass(frozen=True)
+class ReadOnlyCustomerImpactAssessment:
+    """A non-persisted result using the authoritative assessment rules."""
+
+    subscription_connection_id: int
+    subscription_id: int
+    customer_id: int
+    status: str
+    reasons: list[str]
+    evidence_session_event_codes: list[str]
+    metadata: dict
+
+
 class CustomerImpactAssessmentService:
     """Persist one idempotent assessment per CausalEvent and connection."""
 
@@ -159,6 +172,63 @@ class CustomerImpactAssessmentService:
                 batch_size=batch_size,
             )
         return assessments, self.summarize(causal_event=causal_event, snapshot=snapshot)
+
+    def evaluate_read_only(
+        self,
+        *,
+        causal_event: CausalEvent,
+        snapshot: DataSnapshot,
+        evaluation_time=None,
+    ) -> list[ReadOnlyCustomerImpactAssessment]:
+        """Classify an event without materializing assessment rows.
+
+        ProcessTwin uses this deliberately narrow adapter so its simulation
+        runtime shares the production session/failover semantics without ever
+        writing ``CustomerImpactAssessment`` records.
+        """
+        self._validate_inputs(causal_event=causal_event, snapshot=snapshot)
+        window_end = causal_event.ended_at or evaluation_time or causal_event.started_at
+        connections = self._get_potential_connections(
+            causal_event=causal_event, snapshot=snapshot, window_end=window_end
+        )
+        backup_ids_by_subscription = self._backup_ids_by_subscription(
+            snapshot=snapshot,
+            subscription_ids={connection.subscription_id for connection in connections},
+        )
+        events_by_connection = self._events_by_connection(
+            snapshot=snapshot,
+            causal_event=causal_event,
+            window_end=window_end,
+            connections=connections,
+            extra_connection_ids={
+                connection_id
+                for connection_ids in backup_ids_by_subscription.values()
+                for connection_id in connection_ids
+            },
+            session_events=None,
+        )
+        results = []
+        for connection in connections:
+            status, reasons, evidence_codes, metadata = self._evaluate_connection(
+                causal_event=causal_event,
+                connection=connection,
+                window_end=window_end,
+                events=events_by_connection.get(connection.id, []),
+                events_by_connection=events_by_connection,
+                backup_ids_by_subscription=backup_ids_by_subscription,
+            )
+            results.append(
+                ReadOnlyCustomerImpactAssessment(
+                    subscription_connection_id=connection.id,
+                    subscription_id=connection.subscription_id,
+                    customer_id=connection.subscription.customer_id,
+                    status=status.value,
+                    reasons=[reason.value for reason in reasons],
+                    evidence_session_event_codes=evidence_codes,
+                    metadata=metadata,
+                )
+            )
+        return results
 
     def summarize(
         self, *, causal_event: CausalEvent, snapshot: DataSnapshot

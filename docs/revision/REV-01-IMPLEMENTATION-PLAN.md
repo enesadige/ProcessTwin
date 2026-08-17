@@ -402,3 +402,16 @@ frontend işleri; final polish, geniş regresyon ve demo hazırlığı.
   sıralanır. Focused testler lifecycle, speed, replay, reset, input/snapshot
   isolation ve CausalEvent/Alarm/Outage/impact/compensation tablolarına yazım
   yapılmadığını doğruladı. Sonraki görev: `MAIN-077`.
+
+## 2026-08-17 — MAIN-077 Canonical BNG Baseline/Candidate
+
+- `CanonicalBNGSimulationService`, source snapshot'taki canonical CausalEvent
+  ve SessionEvent kanıtlarını read-only değerlendirerek simulation-local BNG
+  failure → alarm → incident → outage/degradation → impact → compensation
+  timeline'ı üretir.
+- Baseline/candidate yalnız scenario defaults ve explicit candidate override ile
+  ayrışır. Typed result contract; scope, verified/protected/unknown impact,
+  strict virtual-time RuleVersion seçimi, compensation ve SLA metadata'sını
+  run context'inde saklar; karşılaştırma delta'larını deterministik üretir.
+- Focused testler replay, candidate isolation ve gerçek operasyon tablolarına
+  sıfır yazımı doğruladı. Sonraki görev: `MAIN-078`.

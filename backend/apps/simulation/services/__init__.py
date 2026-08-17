@@ -1,3 +1,4 @@
+from .bng import CanonicalBNGResult, CanonicalBNGSimulationError, CanonicalBNGSimulationService
 from .runtime import (
     SimulationLifecycleError,
     SimulationRuntimeError,
@@ -8,4 +9,7 @@ __all__ = [
     "SimulationLifecycleError",
     "SimulationRuntimeError",
     "SimulationService",
+    "CanonicalBNGResult",
+    "CanonicalBNGSimulationError",
+    "CanonicalBNGSimulationService",
 ]

@@ -743,3 +743,16 @@ PRE-061 is not promoted to complete and MAIN-061 remains blocked.
   sıralama ve ana operasyon tablolarına sıfır yazımı doğruladı.
 - Bu görev gerçek BNG senaryosu, alarm/outage/impact/compensation, API, UI veya
   evidence entegrasyonu eklemez. Sonraki görev: `MAIN-077`.
+
+## MAIN-077 Canonical BNG Baseline/Candidate (2026-08-17)
+
+- `apps.simulation.services.CanonicalBNGSimulationService`, snapshot-local
+  source CausalEvent/SessionEvent kanıtını `evaluate_read_only()` ile üretim
+  impact semantiğinden sapmadan sınıflandırır. Simulation yalnız
+  `SimulationRun`/`SimulationRunEvent` kayıtlarını yazar.
+- Baseline ile candidate aynı snapshot/scenario/seed/başlangıç clock'tan
+  başlar; candidate yalnız deep-merged explicit override kullanır. Canonical
+  result, virtual-time strict RuleVersion, impact/protection/unknown sayıları,
+  compensation cost ve SLA bilgisini taşıyıp deterministic delta üretir.
+- MAIN-078 API/event-stream, MAIN-079 UI ve MAIN-080 evidence entegrasyonu
+  kapsam dışıdır. Focused tests passed; sonraki görev: `MAIN-078`.

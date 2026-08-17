@@ -331,6 +331,31 @@ class CompensationService:
             RuleActionType.CAP_FLOOR,
         }:
             return policy_manual_review("missing_price_basis", ["price_basis_amount"])
+        if action_type == RuleActionType.LEGACY_MONTHLY_PRICE_PERCENTAGE:
+            formula = parse_refund_formula(action_config)
+            if formula["status"] != "supported":
+                return policy_manual_review(formula["reason_code"], formula["missing_fields"])
+            amount = calculate_refund_amount(
+                monthly_price=price, refund_rate=formula["refund_rate"]
+            )
+            return PolicyAmountResult(
+                status="eligible",
+                reason_code="rule_matched",
+                unrounded_amount=amount,
+                final_amount=amount,
+                currency=formula["currency"],
+                calculation_trace=[
+                    self._trace(
+                        "amount_calculation",
+                        "calculated",
+                        monthly_price=str(price),
+                        refund_rate=str(formula["refund_rate"]),
+                        amount=str(amount),
+                        currency=formula["currency"],
+                    )
+                ],
+                manual_review_reasons=[],
+            )
         if action_type == RuleActionType.INELIGIBLE:
             return policy_zero("ineligible", action_config.get("reason_code", "ineligible"))
         if action_type == RuleActionType.MANUAL_REVIEW:

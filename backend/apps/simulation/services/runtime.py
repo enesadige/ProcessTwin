@@ -173,6 +173,42 @@ class SimulationService:
             self._append_event(run, event_type="runtime_stopped")
             return run
 
+    def record_domain_event(
+        self,
+        simulation_run: SimulationRun,
+        *,
+        event_type: str,
+        occurred_at: datetime,
+        context: dict[str, Any],
+    ) -> SimulationRunEvent:
+        """Append a simulation-local domain event at an explicit virtual time."""
+        with transaction.atomic():
+            run = self._lock_run(simulation_run)
+            if run.status != SimulationRunStatus.RUNNING:
+                raise SimulationLifecycleError("Only running simulations can record domain events.")
+            if occurred_at < run.virtual_clock:
+                raise SimulationRuntimeError("Domain events cannot precede the virtual clock.")
+            return self._append_event(
+                run,
+                event_type=event_type,
+                context=copy.deepcopy(context),
+                occurred_at=occurred_at,
+            )
+
+    def complete(self, simulation_run: SimulationRun, *, completed_at: datetime) -> SimulationRun:
+        """Complete a run at a deterministic virtual timestamp."""
+        with transaction.atomic():
+            run = self._lock_run(simulation_run)
+            if run.status != SimulationRunStatus.RUNNING:
+                raise SimulationLifecycleError("Only running simulations can be completed.")
+            if completed_at < run.virtual_clock:
+                raise SimulationRuntimeError("Completion cannot precede the virtual clock.")
+            run.virtual_clock = completed_at
+            run.status = SimulationRunStatus.COMPLETED
+            run.save(update_fields=["virtual_clock", "status", "updated_at"])
+            self._append_event(run, event_type="runtime_completed")
+            return run
+
     def advance(
         self,
         simulation_run: SimulationRun,
@@ -284,6 +320,7 @@ class SimulationService:
         *,
         event_type: str,
         context: dict[str, Any] | None = None,
+        occurred_at: datetime | None = None,
     ) -> SimulationRunEvent:
         last_sequence = run.events.order_by("-sequence").values_list("sequence", flat=True).first()
         sequence = (last_sequence or 0) + 1
@@ -297,7 +334,7 @@ class SimulationService:
             "seed": run.deterministic_seed,
             "sequence": sequence,
             "event_type": event_type,
-            "virtual_occurred_at": run.virtual_clock.isoformat(),
+            "virtual_occurred_at": (occurred_at or run.virtual_clock).isoformat(),
             "effective_input_fingerprint": event_context["effective_input_fingerprint"],
         }
         return SimulationRunEvent.objects.create(
@@ -305,7 +342,7 @@ class SimulationService:
             sequence=sequence,
             event_code=f"SIM-EVT-{self._fingerprint(identity)[:24].upper()}",
             event_type=event_type,
-            virtual_occurred_at=run.virtual_clock,
+            virtual_occurred_at=occurred_at or run.virtual_clock,
             event_context=event_context,
         )
 
