@@ -391,6 +391,10 @@ class ValidatedResponseBuilder:
                 contract[1],
                 query_run.structured_query,
             )
+            structured_compensation_claim_plan = self._uses_structured_compensation_claim_plan(
+                contract[1],
+                query_run.structured_query,
+            )
             if structured_analytics_claim_plan:
                 narrative, synthesis_audit = self._structured_analytics_claim_narrative(
                     active_provider,
@@ -454,8 +458,42 @@ class ValidatedResponseBuilder:
                         selected_statements[statement_id] for statement_id in completed_ids
                     )
                 response.narrative_synthesis_audit = synthesis_audit
+            elif structured_compensation_claim_plan:
+                narrative, synthesis_audit = self._structured_analytics_claim_narrative(
+                    active_provider,
+                    original_query=query_run.original_query,
+                    selected_statements=selected_statements,
+                    analytics_support={},
+                    claim_plan_subject="telafi/kural/DecisionEvidence",
+                    no_claims_reason="no_supported_compensation_claims",
+                )
+                required_ids = self._required_compensation_statement_ids(
+                    selected_statements,
+                    contract[1].get("compensation_statement_ids", {}),
+                    query_run.structured_query,
+                )
+                completed_ids, missing_ids = self._complete_structured_required_claims(
+                    synthesis_audit.get("backend_effective_statement_ids", []),
+                    selected_statements=selected_statements,
+                    required_ids=required_ids,
+                )
+                synthesis_audit["required_statement_ids"] = required_ids
+                synthesis_audit["missing_required_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_count"] = len(missing_ids)
+                if missing_ids:
+                    synthesis_audit["backend_effective_statement_ids"] = completed_ids
+                    synthesis_audit["rendered_fact_types"] = ["canonical"] * len(completed_ids)
+                    narrative = " ".join(
+                        selected_statements[statement_id] for statement_id in completed_ids
+                    )
+                response.narrative_synthesis_audit = synthesis_audit
             if getattr(active_provider, "supports_grounded_narrative", False):
-                if not (structured_analytics_claim_plan or structured_failover_claim_plan):
+                if not (
+                    structured_analytics_claim_plan
+                    or structured_failover_claim_plan
+                    or structured_compensation_claim_plan
+                ):
                     narrative, synthesis_audit = self._safe_grounded_narrative(
                         active_provider,
                         original_query=query_run.original_query,
@@ -487,7 +525,11 @@ class ValidatedResponseBuilder:
                     synthesis_audit["deterministic_fill_count"] = coverage_fill_count
                     response.narrative_synthesis_audit = synthesis_audit
             else:
-                if not structured_analytics_claim_plan:
+                if not (
+                    structured_analytics_claim_plan
+                    or structured_failover_claim_plan
+                    or structured_compensation_claim_plan
+                ):
                     response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
                     response.warnings = sorted(
                         {
@@ -849,6 +891,30 @@ class ValidatedResponseBuilder:
             and statement_contract.get("outage_classification_statement_ids")
         )
 
+    @staticmethod
+    def _uses_structured_compensation_claim_plan(
+        statement_contract: Mapping[str, Any],
+        structured_query: Mapping[str, Any] | None,
+    ) -> bool:
+        """Constrain deterministic compensation facts without changing other evidence paths."""
+        if not isinstance(structured_query, Mapping):
+            return False
+        intent = str(structured_query.get("intent", ""))
+        dimensions = {
+            str(value) for value in structured_query.get("semantic_dimensions", [])
+        }
+        compensation_ids = statement_contract.get("compensation_statement_ids", {})
+        if not isinstance(compensation_ids, Mapping) or not any(
+            isinstance(value, list) and value for value in compensation_ids.values()
+        ):
+            return False
+        if intent == "compensation_evaluation":
+            return True
+        return bool(
+            intent == "rule_evidence"
+            and dimensions & {"rule_version", "decision_evidence"}
+        )
+
     @classmethod
     def _structured_analytics_claim_narrative(
         cls,
@@ -1016,6 +1082,57 @@ class ValidatedResponseBuilder:
             for statement_id in outage_classification_statement_ids
             if isinstance(statement_id, str) and statement_id in selected_statements
         ]
+
+    @staticmethod
+    def _required_compensation_statement_ids(
+        selected_statements: Mapping[str, str],
+        compensation_statement_ids: object,
+        structured_query: Mapping[str, Any] | None,
+    ) -> list[str]:
+        """Return only requested deterministic compensation obligations."""
+        if not isinstance(compensation_statement_ids, Mapping):
+            return []
+        requested = set()
+        dimensions = set()
+        intent = ""
+        if isinstance(structured_query, Mapping):
+            requested = {str(value) for value in structured_query.get("requested_outputs", [])}
+            dimensions = {
+                str(value) for value in structured_query.get("semantic_dimensions", [])
+            }
+            intent = str(structured_query.get("intent", ""))
+
+        roles: list[str] = []
+
+        def require(*values: str) -> None:
+            for value in values:
+                if value not in roles:
+                    roles.append(value)
+
+        if "eligibility" in requested:
+            require("compensation_status", "compensation_eligibility")
+        if "compensation_amount" in requested or "summary" in requested:
+            require("compensation_status", "compensation_amount")
+        if "rule_version" in dimensions:
+            require("rule_version")
+        if "decision_evidence" in dimensions:
+            require("decision_evidence")
+        if intent == "compensation_evaluation" and "evidence" in requested:
+            require("rule_version", "decision_evidence")
+
+        required: list[str] = []
+        for role in roles:
+            statement_ids = compensation_statement_ids.get(role, [])
+            if not isinstance(statement_ids, list):
+                continue
+            required.extend(
+                statement_id
+                for statement_id in statement_ids
+                if isinstance(statement_id, str)
+                and statement_id in selected_statements
+                and statement_id not in required
+            )
+        return required
 
     @staticmethod
     def _complete_structured_required_claims(
@@ -1630,6 +1747,7 @@ class ValidatedResponseBuilder:
         analytics_requested_statement_ids: list[str] = []
         outage_classification_statement_ids: list[str] = []
         analytics_support_metadata: dict[str, dict[str, object]] = {}
+        compensation_statement_ids: dict[str, list[str]] = {}
 
         analytics_summaries = result.analytics_summaries or (
             [result.analytics_summary] if result.analytics_summary else []
@@ -1643,6 +1761,11 @@ class ValidatedResponseBuilder:
         def add(text: str) -> str:
             statement_id = f"S{len(statements) + 1}"
             statements[statement_id] = text
+            return statement_id
+
+        def add_compensation(text: str, role: str) -> str:
+            statement_id = add(text)
+            compensation_statement_ids.setdefault(role, []).append(statement_id)
             return statement_id
 
         analytics = result.analytics_summary
@@ -1965,31 +2088,60 @@ class ValidatedResponseBuilder:
         compensation = result.compensation_summary
         rule = None if compensation and compensation.rule_versions else result.rule_summary
         if rule and rule.rule_versions:
-            add("Doğrulanmış kural sürümü: " + ", ".join(rule.rule_versions) + ".")
+            add_compensation(
+                "Doğrulanmış kural sürümü: " + ", ".join(rule.rule_versions) + ".",
+                "rule_version",
+            )
         if rule and rule.evidence_references:
-            add("Doğrulanmış karar kanıtı: " + ", ".join(rule.evidence_references) + ".")
+            add_compensation(
+                "Doğrulanmış karar kanıtı: " + ", ".join(rule.evidence_references) + ".",
+                "decision_evidence",
+            )
         if compensation and compensation.status:
-            add(f"Telafi durumu: {compensation.status}.")
+            add_compensation(f"Telafi durumu: {compensation.status}.", "compensation_status")
         if compensation and compensation.total_amount and compensation.currency:
-            add(
-                f"Doğrulanmış tazminat tutarı: {compensation.total_amount} {compensation.currency}."
+            add_compensation(
+                "Doğrulanmış tazminat tutarı: "
+                f"{compensation.total_amount} {compensation.currency}.",
+                "compensation_amount",
             )
         if compensation and compensation.considered is not None:
-            add(f"Telafi değerlendirmesi yapılan: {compensation.considered} kayıt.")
+            add_compensation(
+                f"Telafi değerlendirmesi yapılan: {compensation.considered} kayıt.",
+                "compensation_eligibility",
+            )
         if compensation and compensation.eligible is not None:
-            add(f"Tazminata uygun: {compensation.eligible} kayıt.")
+            add_compensation(
+                f"Tazminata uygun: {compensation.eligible} kayıt.",
+                "compensation_eligibility",
+            )
         if compensation and compensation.ineligible_pending is not None:
-            add(f"Uygun olmayan veya bekleyen: {compensation.ineligible_pending} kayıt.")
+            add_compensation(
+                f"Uygun olmayan veya bekleyen: {compensation.ineligible_pending} kayıt.",
+                "compensation_eligibility",
+            )
             if compensation.ineligible_pending > 0:
-                add("Karar: eksik doğrulama nedeniyle manuel inceleme bekleniyor.")
+                add_compensation(
+                    "Karar: eksik doğrulama nedeniyle manuel inceleme bekleniyor.",
+                    "compensation_status",
+                )
         if compensation and compensation.rule_versions:
-            add("Doğrulanmış RuleVersion: " + ", ".join(sorted(compensation.rule_versions)) + ".")
+            add_compensation(
+                "Doğrulanmış RuleVersion: " + ", ".join(sorted(compensation.rule_versions)) + ".",
+                "rule_version",
+            )
         if compensation and compensation.evidence_references:
-            add(
-                "Doğrulanmış DecisionEvidence: " + ", ".join(compensation.evidence_references) + "."
+            add_compensation(
+                "Doğrulanmış DecisionEvidence: "
+                + ", ".join(compensation.evidence_references)
+                + ".",
+                "decision_evidence",
             )
         if compensation and compensation.scope == "verified_impact":
-            add("Tazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.")
+            add_compensation(
+                "Tazminat kararı yalnız doğrulanmış etki üzerinden değerlendirilmiştir.",
+                "compensation_scope",
+            )
         if result.retrieval_sources:
             source_labels = []
             for source in result.retrieval_sources:
@@ -2028,6 +2180,12 @@ class ValidatedResponseBuilder:
                 *statement_concepts[statement_id],
                 "analytics_requested_fact",
             ]
+        for role, statement_ids in compensation_statement_ids.items():
+            for statement_id in statement_ids:
+                statement_concepts[statement_id] = [
+                    *statement_concepts[statement_id],
+                    role,
+                ]
         schema = {
             "type": "object",
             "properties": {
@@ -2099,6 +2257,7 @@ class ValidatedResponseBuilder:
             "validated_relationships": validated_relationships,
             "analytics_requested_statement_ids": analytics_requested_statement_ids,
             "outage_classification_statement_ids": outage_classification_statement_ids,
+            "compensation_statement_ids": compensation_statement_ids,
             "analytics_has_typed_requirements": bool(
                 analytics_answer_support.requirements.requirements
             ),

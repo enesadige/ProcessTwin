@@ -1840,6 +1840,53 @@ def _failover_run(snapshot, *, full_outage):
     return run
 
 
+def _compensation_structured_query(snapshot_identifier):
+    return {
+        "snapshot_identifier": snapshot_identifier,
+        "intent": "compensation_evaluation",
+        "requested_outputs": ["eligibility", "evidence", "summary"],
+        "semantic_dimensions": ["decision_evidence", "rule_version", "summary"],
+    }
+
+
+def _compensation_run(snapshot, *, result=None):
+    run = completed_run(
+        "response-structured-compensation",
+        snapshot=snapshot,
+        result=result or valid_result(snapshot.snapshot_key),
+        original_query=(
+            "Kesinti için telafi değerlendirmesi nedir, hangi RuleVersion uygulandı "
+            "ve DecisionEvidence kaydını göster."
+        ),
+    )
+    run.structured_query = _compensation_structured_query(snapshot.snapshot_key)
+    run.save(update_fields=["structured_query"])
+    return run
+
+
+def _compensation_required_ids(run):
+    result = ValidatedExecutionResult.model_validate(run.final_result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=run.structured_query,
+    )
+    selection = ValidatedResponseBuilder._deterministic_answer_plan(
+        contract,
+        run.structured_query,
+    )
+    selected_statements = {
+        statement_id: contract["statements"][statement_id]
+        for statement_id in selection["selected_statement_ids"]
+    }
+    required_ids = ValidatedResponseBuilder._required_compensation_statement_ids(
+        selected_statements,
+        contract["compensation_statement_ids"],
+        run.structured_query,
+    )
+    return contract, selected_statements, required_ids
+
+
 @pytest.mark.django_db
 def test_explicit_failover_uses_structured_claim_plan_without_impact_prose():
     snapshot = create_snapshot("response-structured-failover-true")
@@ -1952,6 +1999,196 @@ def test_unknown_failover_classification_does_not_enable_structured_failover_cla
     assert not ValidatedResponseBuilder._uses_structured_failover_claim_plan(
         contract,
         run.structured_query,
+    )
+
+
+@pytest.mark.django_db
+def test_compensation_uses_structured_claim_plan_for_requested_canonical_facts():
+    snapshot = create_snapshot("response-structured-compensation-eligible")
+    run = _compensation_run(snapshot)
+    _contract, _selected, required_ids = _compensation_required_ids(run)
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": statement_id, "role": "primary"} for statement_id in required_ids]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert len(provider.requests) == 1
+    assert response.narrative_synthesis_audit["mode"] == "structured_claim_plan"
+    assert response.narrative_synthesis_audit["fallback_used"] is False
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 0
+    assert "Tazminata uygun: 1 kayıt." in response.response_text
+    assert "Doğrulanmış tazminat tutarı: 10.00 TRY." in response.response_text
+    assert "Doğrulanmış kural sürümü: REFUND-001:v2." in response.response_text
+    assert "Doğrulanmış karar kanıtı: EVIDENCE-001." in response.response_text
+    assert "başka kayıt" not in response.response_text.casefold()
+    assert "uygulanabilir" not in response.response_text.casefold()
+
+
+@pytest.mark.django_db
+def test_compensation_completes_only_omitted_required_amount():
+    snapshot = create_snapshot("response-structured-compensation-amount")
+    run = _compensation_run(snapshot)
+    contract, _selected, required_ids = _compensation_required_ids(run)
+    amount_id = contract["compensation_statement_ids"]["compensation_amount"][0]
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [
+            {"statement_id": statement_id, "role": "primary"}
+            for statement_id in required_ids
+            if statement_id != amount_id
+        ]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    audit = response.narrative_synthesis_audit
+    assert audit["missing_required_statement_ids"] == [amount_id]
+    assert audit["deterministic_fill_statement_ids"] == [amount_id]
+    assert audit["deterministic_fill_count"] == 1
+    assert response.response_text.endswith("Doğrulanmış tazminat tutarı: 10.00 TRY.")
+
+
+@pytest.mark.django_db
+def test_compensation_completes_explicit_rule_and_decision_evidence():
+    snapshot = create_snapshot("response-structured-compensation-rule-evidence")
+    run = _compensation_run(snapshot)
+    contract, _selected, required_ids = _compensation_required_ids(run)
+    rule_id = contract["compensation_statement_ids"]["rule_version"][0]
+    evidence_id = contract["compensation_statement_ids"]["decision_evidence"][0]
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [
+            {"statement_id": statement_id, "role": "primary"}
+            for statement_id in required_ids
+            if statement_id not in {rule_id, evidence_id}
+        ]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    audit = response.narrative_synthesis_audit
+    assert audit["missing_required_statement_ids"] == [rule_id, evidence_id]
+    assert "REFUND-001:v2" in response.response_text
+    assert "EVIDENCE-001" in response.response_text
+
+
+@pytest.mark.django_db
+def test_compensation_rejects_unknown_claim_ids_with_canonical_fallback():
+    snapshot = create_snapshot("response-structured-compensation-unknown")
+    run = _compensation_run(snapshot)
+    provider = StructuredAnalyticsClaimPlanProvider([{"statement_id": "S999", "role": "primary"}])
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    audit = response.narrative_synthesis_audit
+    assert audit["fallback_used"] is True
+    assert audit["rejected_statement_ids"] == ["S999"]
+    assert "Doğrulanmış tazminat tutarı: 10.00 TRY." in response.response_text
+    assert "başka kayıt" not in response.response_text.casefold()
+
+
+@pytest.mark.django_db
+def test_compensation_preserves_pending_manual_review_without_zero_amount():
+    snapshot = create_snapshot("response-structured-compensation-pending")
+    base = valid_result(snapshot.snapshot_key)
+    pending = base.compensation_summary.model_copy(
+        update={
+            "status": "pending",
+            "considered": None,
+            "eligible": None,
+            "ineligible_pending": 1,
+            "total_amount": None,
+            "currency": None,
+            "evidence_references": [],
+        }
+    )
+    run = _compensation_run(
+        snapshot,
+        result=base.model_copy(update={"compensation_summary": pending}),
+    )
+    _contract, _selected, required_ids = _compensation_required_ids(run)
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": statement_id, "role": "primary"} for statement_id in required_ids]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert "Telafi durumu: pending." in response.response_text
+    assert "manuel inceleme bekleniyor" in response.response_text
+    assert "0.00 TRY" not in response.response_text
+
+
+@pytest.mark.django_db
+def test_compensation_keeps_decision_evidence_distinct_from_rule_evidence():
+    snapshot = create_snapshot("response-structured-compensation-evidence-distinction")
+    base = valid_result(snapshot.snapshot_key)
+    compensation = base.compensation_summary.model_copy(
+        update={
+            "rule_versions": {"COMPENSATION-RULE:v1": 1},
+            "evidence_references": ["COMPENSATION-EVIDENCE-HASH"],
+        }
+    )
+    run = _compensation_run(
+        snapshot,
+        result=base.model_copy(update={"compensation_summary": compensation}),
+    )
+    _contract, _selected, required_ids = _compensation_required_ids(run)
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": statement_id, "role": "primary"} for statement_id in required_ids]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert "COMPENSATION-RULE:v1" in response.response_text
+    assert "COMPENSATION-EVIDENCE-HASH" in response.response_text
+    assert "EVIDENCE-001" not in response.response_text
+
+
+@pytest.mark.django_db
+def test_rule_evidence_uses_structured_claims_only_with_deterministic_claims():
+    snapshot = create_snapshot("response-structured-rule-evidence")
+    run = _compensation_run(snapshot)
+    run.structured_query = {
+        "snapshot_identifier": snapshot.snapshot_key,
+        "intent": "rule_evidence",
+        "requested_outputs": ["evidence"],
+        "semantic_dimensions": ["rule_version", "decision_evidence"],
+    }
+    run.save(update_fields=["structured_query"])
+    contract, _selected, required_ids = _compensation_required_ids(run)
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": statement_id, "role": "primary"} for statement_id in required_ids]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert ValidatedResponseBuilder._uses_structured_compensation_claim_plan(
+        contract, run.structured_query
+    )
+    assert "REFUND-001:v2" in response.response_text
+    assert "EVIDENCE-001" in response.response_text
+
+
+def test_rule_document_retrieval_does_not_enable_structured_compensation_claims():
+    assert not ValidatedResponseBuilder._uses_structured_compensation_claim_plan(
+        {"compensation_statement_ids": {"rule_version": ["S1"]}},
+        {
+            "intent": "rule_document_retrieval",
+            "semantic_dimensions": ["rule_version"],
+        },
     )
 
 
