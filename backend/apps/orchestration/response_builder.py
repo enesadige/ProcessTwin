@@ -12,6 +12,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from apps.core.exceptions import ProcessTwinError
+from apps.orchestration.analytics_answer_support import AnalyticsAnswerSupportBuilder
 from apps.orchestration.models import QueryRun, QueryRunStatus
 from apps.orchestration.providers.base import LLMProvider, LLMProviderError
 from apps.orchestration.providers.registry import get_llm_descriptor
@@ -763,6 +764,7 @@ class ValidatedResponseBuilder:
             "analytics_direct_count",
             "unknown_exclusion",
             "operational_reference",
+            "analytics_requested_fact",
         }
         relevant_roles = set()
         if not requested and not dimensions:
@@ -793,6 +795,7 @@ class ValidatedResponseBuilder:
                 "analytics_included_count",
                 "analytics_direct_count",
                 "unknown_exclusion",
+                "analytics_requested_fact",
             }
         if requested & {"root_cause"} or dimensions & {
             "root_resource",
@@ -832,13 +835,27 @@ class ValidatedResponseBuilder:
         if not relevant_roles:
             relevant_roles = all_roles
 
-        selected_ids = [
+        requested_analytics_ids = data.get("analytics_requested_statement_ids", [])
+        has_typed_analytics_requirements = bool(data.get("analytics_has_typed_requirements"))
+        typed_analytics_ids = [
             statement_id
-            for statement_id, statement_text in statements.items()
-            if relevant_roles.intersection(concepts.get(statement_id, []))
-            or not concepts.get(statement_id)
+            for statement_id in requested_analytics_ids
+            if isinstance(statement_id, str) and statement_id in statements
         ]
-        if not selected_ids:
+        if intent == "operational_analytics" and has_typed_analytics_requirements:
+            # A typed operational-analytics request exposes only its requested
+            # canonical/derived facts. Other query intents own non-analytics support.
+            selected_ids = typed_analytics_ids
+        else:
+            selected_ids = [
+                statement_id
+                for statement_id, statement_text in statements.items()
+                if relevant_roles.intersection(concepts.get(statement_id, []))
+                or not concepts.get(statement_id)
+            ]
+        if not selected_ids and not (
+            intent == "operational_analytics" and has_typed_analytics_requirements
+        ):
             selected_ids = list(statements)
         selected_set = set(selected_ids)
         selected_relationships = [
@@ -1297,6 +1314,17 @@ class ValidatedResponseBuilder:
         """Build a closed-world contract for decomposition, relations and ordering."""
         statements: dict[str, str] = {}
         analytics_direct_count_statement_ids: set[str] = set()
+        analytics_requested_statement_ids: list[str] = []
+        analytics_support_metadata: dict[str, dict[str, object]] = {}
+
+        analytics_summaries = result.analytics_summaries or (
+            [result.analytics_summary] if result.analytics_summary else []
+        )
+        analytics_answer_support = AnalyticsAnswerSupportBuilder.build(
+            original_query=original_query,
+            structured_query=structured_query,
+            summaries=analytics_summaries,
+        )
 
         def add(text: str) -> str:
             statement_id = f"S{len(statements) + 1}"
@@ -1659,6 +1687,16 @@ class ValidatedResponseBuilder:
                         f"{source.excerpt}"
                     )
             add("Doğrulanmış kaynaklar: " + "; ".join(source_labels) + ".")
+        for support_statement in analytics_answer_support.statements:
+            statement_id = add(support_statement.text)
+            analytics_requested_statement_ids.append(statement_id)
+            analytics_support_metadata[statement_id] = {
+                "support_id": support_statement.support_id,
+                "kind": support_statement.kind.value,
+                "requirement_index": support_statement.requirement_index,
+                "requirement_kind": support_statement.requirement_kind.value,
+                "canonical_source_refs": list(support_statement.canonical_source_refs),
+            }
         if not statements:
             add(_UNCERTAINTY_STATEMENT)
         statement_concepts = {
@@ -1669,6 +1707,11 @@ class ValidatedResponseBuilder:
             statement_concepts[statement_id] = [
                 *statement_concepts[statement_id],
                 "analytics_direct_count",
+            ]
+        for statement_id in analytics_requested_statement_ids:
+            statement_concepts[statement_id] = [
+                *statement_concepts[statement_id],
+                "analytics_requested_fact",
             ]
         schema = {
             "type": "object",
@@ -1739,6 +1782,11 @@ class ValidatedResponseBuilder:
             "statements": statements,
             "statement_concepts": statement_concepts,
             "validated_relationships": validated_relationships,
+            "analytics_requested_statement_ids": analytics_requested_statement_ids,
+            "analytics_has_typed_requirements": bool(
+                analytics_answer_support.requirements.requirements
+            ),
+            "analytics_answer_support": analytics_support_metadata,
         }
 
     @staticmethod

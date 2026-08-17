@@ -1772,6 +1772,352 @@ def test_single_direct_analytics_count_uses_concise_deterministic_presentation(
     }
 
 
+def _analytics_structured_query(snapshot_identifier, *, specifications, locations):
+    return {
+        "snapshot_identifier": snapshot_identifier,
+        "intent": "operational_analytics",
+        "requested_outputs": ["summary", "analytics"],
+        "analytics": specifications[0],
+        "analytics_specs": specifications,
+        "analytics_locations": locations,
+        "time_window": {
+            "from_time": "2026-01-01T00:00:00+00:00",
+            "to_time": "2026-12-31T23:59:59+00:00",
+        },
+    }
+
+
+@pytest.mark.django_db
+def test_ranking_uses_requested_canonical_support_before_provider_synthesis():
+    snapshot = create_snapshot("response-analytics-ranking-support")
+    ranking = AnalyticsSummary(
+        metric="alarm_count",
+        aggregation="count",
+        group_by="alarm_type",
+        ranking_direction="desc",
+        limit=1,
+        filters={
+            "city": "İzmir",
+            "from_time": "2026-01-01T00:00:00+00:00",
+            "to_time": "2026-12-31T23:59:59+00:00",
+        },
+        rows=[{"label": "FAILOVER_UNSUCCESSFUL", "value": 17, "event_count": 7}],
+        included_event_count=7,
+        excluded_unknown_count=0,
+        deduplication_grain="alarm_occurrence",
+    )
+    result = valid_result(snapshot.snapshot_key).model_copy(
+        update={"analytics_summary": ranking, "analytics_summaries": [ranking]}
+    )
+    query = _analytics_structured_query(
+        snapshot.snapshot_key,
+        specifications=[
+            {
+                "metric": "alarm_count",
+                "aggregation": "count",
+                "group_by": "alarm_type",
+                "direction": "desc",
+                "limit": 1,
+                "comparison": False,
+            }
+        ],
+        locations=[{"city": "İzmir"}],
+    )
+    run = completed_run(
+        "response-analytics-ranking-support",
+        snapshot=snapshot,
+        result=result,
+        original_query="2026 yılında İzmir şehrinde en çok görülen alarm tipi nedir?",
+    )
+    run.structured_query = query
+    run.save(update_fields=["structured_query"])
+
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=query,
+    )
+    support = contract["analytics_answer_support"]
+    assert len(support) == 1
+    support_statement_id = contract["analytics_requested_statement_ids"][0]
+    support_statement = (support_statement_id, contract["statements"][support_statement_id])
+    assert "FAILOVER_UNSUCCESSFUL" in support_statement[1]
+    assert "17 alarm" in support_statement[1]
+    assert support[support_statement_id]["kind"] == "canonical"
+
+    provider = GroundedNarrativeProvider(
+        "2026 yılında İzmir'de en yüksek alarm tipi FAILOVER_UNSUCCESSFUL oldu "
+        "ve 17 alarm kaydedildi."
+    )
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=provider,
+    )
+
+    assert len(provider.requests) == 1
+    assert response.narrative_synthesis_audit["status"] == "accepted"
+    assert response.narrative_synthesis_audit["status"] != "skipped"
+
+
+@pytest.mark.django_db
+def test_requested_total_supports_constituents_and_derived_total_before_provider():
+    snapshot = create_snapshot("response-analytics-total-support")
+
+    def summary(city, value):
+        return AnalyticsSummary(
+            metric="alarm_count",
+            aggregation="count",
+            group_by="city",
+            ranking_direction="desc",
+            filters={
+                "city": city,
+                "from_time": "2026-01-01T00:00:00+00:00",
+                "to_time": "2026-12-31T23:59:59+00:00",
+            },
+            scope_label=city,
+            rows=[{"label": city, "value": value, "event_count": value}],
+            included_event_count=value,
+            excluded_unknown_count=0,
+            deduplication_grain="causal_event",
+        )
+
+    istanbul, izmir, ankara = summary("İstanbul", 72), summary("İzmir", 88), summary("Ankara", 99)
+    result = valid_result(snapshot.snapshot_key).model_copy(
+        update={"analytics_summary": istanbul, "analytics_summaries": [istanbul, izmir, ankara]}
+    )
+    query = _analytics_structured_query(
+        snapshot.snapshot_key,
+        specifications=[
+            {
+                "metric": "alarm_count",
+                "aggregation": "count",
+                "group_by": "city",
+                "direction": "desc",
+                "comparison": False,
+            }
+        ],
+        locations=[{"city": "İstanbul"}, {"city": "İzmir"}],
+    )
+    run = completed_run(
+        "response-analytics-total-support",
+        snapshot=snapshot,
+        result=result,
+        original_query="2026 yılında İzmir ve İstanbul şehirlerinde toplam kaç alarm oluştu?",
+    )
+    run.structured_query = query
+    run.save(update_fields=["structured_query"])
+
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=query,
+    )
+    support_text = [
+        contract["statements"][statement_id]
+        for statement_id in contract["analytics_requested_statement_ids"]
+    ]
+    assert any("72 alarm" in item for item in support_text)
+    assert any("88 alarm" in item for item in support_text)
+    assert any("160" in item for item in support_text)
+    assert all("99" not in item and "Ankara" not in item for item in support_text)
+    derived_support = [
+        item for item in contract["analytics_answer_support"].values() if item["kind"] == "derived"
+    ]
+    assert derived_support[0]["canonical_source_refs"] == [
+        "analytics_summary[0].rows[0]",
+        "analytics_summary[1].rows[0]",
+    ]
+
+    provider = GroundedNarrativeProvider(
+        "2026 yılında İstanbul'da 72, İzmir'de 88 alarm oluştu; toplam 160 alarm kaydedildi."
+    )
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=provider,
+    )
+
+    assert len(provider.requests) == 1
+    provider_facts = provider.requests[0]["contents"]
+    assert "72 alarm" in provider_facts
+    assert "88 alarm" in provider_facts
+    assert "160" in provider_facts
+    assert "Ankara" not in provider_facts
+    assert response.narrative_synthesis_audit["status"] == "accepted"
+
+
+def test_unknown_typed_analytics_fact_does_not_expose_zero_as_provider_support():
+    analytics = AnalyticsSummary(
+        metric="alarm_count",
+        aggregation="count",
+        ranking_direction="desc",
+        filters={
+            "city": "İzmir",
+            "from_time": "2026-01-01T00:00:00+00:00",
+            "to_time": "2026-12-31T23:59:59+00:00",
+        },
+        rows=[{"label": "Toplam", "value": 0, "event_count": 0}],
+        included_event_count=0,
+        excluded_unknown_count=1,
+        deduplication_grain="causal_event",
+    )
+    query = _analytics_structured_query(
+        "response-analytics-unknown-support",
+        specifications=[
+            {
+                "metric": "alarm_count",
+                "aggregation": "count",
+                "group_by": None,
+                "direction": "desc",
+                "comparison": False,
+            }
+        ],
+        locations=[{"city": "İzmir"}],
+    )
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        valid_result(query["snapshot_identifier"]).model_copy(
+            update={"analytics_summary": analytics, "analytics_summaries": [analytics]}
+        ),
+        original_query="2026 yılında İzmir şehrinde kaç alarm oluştu?",
+        structured_query=query,
+    )
+    selection = ValidatedResponseBuilder._deterministic_answer_plan(contract, query)
+
+    assert contract["analytics_has_typed_requirements"] is True
+    assert contract["analytics_requested_statement_ids"] == []
+    assert selection["selected_statement_ids"] == []
+
+
+@pytest.mark.django_db
+def test_multi_metric_provider_support_excludes_unrequested_sibling_metric():
+    snapshot = create_snapshot("response-analytics-multi-support")
+
+    def summary(metric, value):
+        return AnalyticsSummary(
+            metric=metric,
+            aggregation="count",
+            ranking_direction="desc",
+            filters={
+                "city": "İzmir",
+                "from_time": "2026-01-01T00:00:00+00:00",
+                "to_time": "2026-12-31T23:59:59+00:00",
+            },
+            rows=[{"label": "Toplam", "value": value, "event_count": value}],
+            included_event_count=value,
+            excluded_unknown_count=0,
+            deduplication_grain="causal_event",
+        )
+
+    alarm, outage, event = (
+        summary("alarm_count", 88),
+        summary("outage_count", 13),
+        summary("event_count", 101),
+    )
+    result = valid_result(snapshot.snapshot_key).model_copy(
+        update={"analytics_summary": alarm, "analytics_summaries": [alarm, outage, event]}
+    )
+    query = _analytics_structured_query(
+        snapshot.snapshot_key,
+        specifications=[
+            {
+                "metric": "alarm_count",
+                "aggregation": "count",
+                "group_by": None,
+                "direction": "desc",
+                "comparison": False,
+            },
+            {
+                "metric": "outage_count",
+                "aggregation": "count",
+                "group_by": None,
+                "direction": "desc",
+                "comparison": False,
+            },
+        ],
+        locations=[{"city": "İzmir"}],
+    )
+    run = completed_run(
+        "response-analytics-multi-support",
+        snapshot=snapshot,
+        result=result,
+        original_query="2026 yılında İzmir şehrinde kaç alarm ve kaç kesinti yaşandı?",
+    )
+    run.structured_query = query
+    run.save(update_fields=["structured_query"])
+    provider = GroundedNarrativeProvider("2026 yılında İzmir'de 88 alarm ve 13 kesinti kaydedildi.")
+
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=provider,
+    )
+
+    assert len(provider.requests) == 1
+    assert "101" not in provider.requests[0]["contents"]
+    assert response.narrative_synthesis_audit["status"] == "accepted"
+
+
+@pytest.mark.django_db
+def test_supported_comparison_uses_provider_without_derived_delta():
+    snapshot = create_snapshot("response-analytics-comparison-support")
+    comparison = AnalyticsSummary(
+        metric="outage_count",
+        aggregation="count",
+        group_by="time_bucket",
+        ranking_direction="desc",
+        time_grain="month",
+        comparison=True,
+        filters={
+            "from_time": "2026-01-01T00:00:00+00:00",
+            "to_time": "2026-12-31T23:59:59+00:00",
+        },
+        rows=[
+            {"label": "2026-06", "value": 13, "event_count": 13},
+            {"label": "2026-07", "value": 11, "event_count": 11},
+        ],
+        included_event_count=24,
+        excluded_unknown_count=0,
+        deduplication_grain="causal_event",
+    )
+    result = valid_result(snapshot.snapshot_key).model_copy(
+        update={"analytics_summary": comparison, "analytics_summaries": [comparison]}
+    )
+    query = _analytics_structured_query(
+        snapshot.snapshot_key,
+        specifications=[
+            {
+                "metric": "outage_count",
+                "aggregation": "count",
+                "group_by": "time_bucket",
+                "direction": "desc",
+                "time_grain": "month",
+                "comparison": True,
+            }
+        ],
+        locations=[],
+    )
+    run = completed_run(
+        "response-analytics-comparison-support",
+        snapshot=snapshot,
+        result=result,
+        original_query="Haziran 2026 ile Temmuz 2026 kesinti sayılarını karşılaştır.",
+    )
+    run.structured_query = query
+    run.save(update_fields=["structured_query"])
+    provider = GroundedNarrativeProvider("Haziran döneminde 13, Temmuz döneminde 11 kesinti vardı.")
+
+    response = ValidatedResponseBuilder().build(
+        run,
+        mode=ResponseGenerationMode.LLM_ASSISTED,
+        provider=provider,
+    )
+
+    assert len(provider.requests) == 1
+    assert response.narrative_synthesis_audit["status"] == "accepted"
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 0
+
+
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
     narrative, removed = ValidatedResponseBuilder._free_text_narrative(
         "Müşteri memnuniyeti olumsuz etkilendi.",
