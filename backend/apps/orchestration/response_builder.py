@@ -394,7 +394,32 @@ class ValidatedResponseBuilder:
                     selected_statements=selected_statements,
                     analytics_support=contract[1].get("analytics_answer_support", {}),
                 )
-                synthesis_audit["deterministic_fill_count"] = 0
+                completed_ids, missing_ids = self._complete_structured_analytics_claims(
+                    synthesis_audit.get("backend_effective_statement_ids", []),
+                    selected_statements=selected_statements,
+                    analytics_support=contract[1].get("analytics_answer_support", {}),
+                )
+                synthesis_audit["required_statement_ids"] = self._required_analytics_statement_ids(
+                    selected_statements,
+                    contract[1].get("analytics_answer_support", {}),
+                )
+                synthesis_audit["missing_required_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_count"] = len(missing_ids)
+                if missing_ids:
+                    synthesis_audit["backend_effective_statement_ids"] = completed_ids
+                    synthesis_audit["rendered_fact_types"] = [
+                        str(
+                            contract[1]
+                            .get("analytics_answer_support", {})
+                            .get(statement_id, {})
+                            .get("requirement_kind", "canonical")
+                        )
+                        for statement_id in completed_ids
+                    ]
+                    narrative = " ".join(
+                        selected_statements[statement_id] for statement_id in completed_ids
+                    )
                 response.narrative_synthesis_audit = synthesis_audit
             if getattr(active_provider, "supports_grounded_narrative", False):
                 if not structured_analytics_claim_plan:
@@ -883,6 +908,52 @@ class ValidatedResponseBuilder:
         if fallback_reason:
             audit["fallback_reason"] = fallback_reason
         return " ".join(selected_statements[statement_id] for statement_id in effective_ids), audit
+
+    @staticmethod
+    def _required_analytics_statement_ids(
+        selected_statements: Mapping[str, str],
+        analytics_support: Mapping[str, Mapping[str, object]],
+    ) -> list[str]:
+        """Return only typed answer obligations, never every available analytics row."""
+        required: list[str] = []
+        for statement_id in selected_statements:
+            support = analytics_support.get(statement_id, {})
+            requirement_kind = support.get("requirement_kind")
+            support_kind = support.get("kind")
+            if requirement_kind == "aggregate_total_request":
+                is_required = support_kind == "derived"
+            else:
+                is_required = requirement_kind in {
+                    "direct_value",
+                    "ranking_winner",
+                    "comparison",
+                }
+            if is_required:
+                required.append(statement_id)
+        return required
+
+    @classmethod
+    def _complete_structured_analytics_claims(
+        cls,
+        effective_statement_ids: object,
+        *,
+        selected_statements: Mapping[str, str],
+        analytics_support: Mapping[str, Mapping[str, object]],
+    ) -> tuple[list[str], list[str]]:
+        """Append only typed required facts omitted by an otherwise valid claim plan."""
+        effective_ids = [
+            statement_id
+            for statement_id in effective_statement_ids
+            if isinstance(statement_id, str) and statement_id in selected_statements
+        ] if isinstance(effective_statement_ids, list) else []
+        required_ids = cls._required_analytics_statement_ids(
+            selected_statements,
+            analytics_support,
+        )
+        missing_ids = [
+            statement_id for statement_id in required_ids if statement_id not in effective_ids
+        ]
+        return [*effective_ids, *missing_ids], missing_ids
 
     @staticmethod
     def _deterministic_answer_plan(

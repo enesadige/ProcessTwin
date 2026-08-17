@@ -1875,6 +1875,8 @@ def test_ranking_uses_requested_canonical_support_before_provider_synthesis():
     assert response.narrative_synthesis_audit["status"] == "accepted"
     assert response.narrative_synthesis_audit["status"] != "skipped"
     assert response.narrative_synthesis_audit["mode"] == "structured_claim_plan"
+    assert response.narrative_synthesis_audit["required_statement_ids"] == [support_statement_id]
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 0
     assert "FAILOVER_UNSUCCESSFUL" in response.response_text
     assert "17 alarm" in response.response_text
 
@@ -1950,8 +1952,8 @@ def test_requested_total_supports_constituents_and_derived_total_before_provider
 
     provider = StructuredAnalyticsClaimPlanProvider(
         [
-            {"statement_id": statement_id, "role": "primary" if index == 2 else "support"}
-            for index, statement_id in enumerate(contract["analytics_requested_statement_ids"])
+            {"statement_id": statement_id, "role": "primary" if index == 0 else "support"}
+            for index, statement_id in enumerate(contract["analytics_requested_statement_ids"][:2])
         ]
     )
     response = ValidatedResponseBuilder().build(
@@ -1968,6 +1970,11 @@ def test_requested_total_supports_constituents_and_derived_total_before_provider
     assert "Ankara" not in provider_facts
     assert response.narrative_synthesis_audit["status"] == "accepted"
     assert response.narrative_synthesis_audit["mode"] == "structured_claim_plan"
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 1
+    assert response.narrative_synthesis_audit["missing_required_statement_ids"] == [
+        contract["analytics_requested_statement_ids"][2]
+    ]
+    assert "160" in response.response_text
 
 
 def test_unknown_typed_analytics_fact_does_not_expose_zero_as_provider_support():
@@ -2254,6 +2261,92 @@ def test_structured_analytics_claim_plan_preserves_unknown_without_zero_renderin
     assert text == "Yeterli doğrulanmış bilgi yok."
     assert audit["fallback_reason"] == "no_supported_analytics_claims"
     assert "0" not in text
+
+
+def test_typed_analytics_completeness_restores_only_missing_aggregate_total():
+    selected_statements = {
+        "S1": "İstanbul 72 alarm.",
+        "S2": "İzmir 88 alarm.",
+        "S3": "Toplam 160 alarm.",
+    }
+    support = {
+        "S1": {"kind": "canonical", "requirement_kind": "aggregate_total_request"},
+        "S2": {"kind": "canonical", "requirement_kind": "aggregate_total_request"},
+        "S3": {"kind": "derived", "requirement_kind": "aggregate_total_request"},
+    }
+
+    effective_ids, missing_ids = ValidatedResponseBuilder._complete_structured_analytics_claims(
+        ["S1", "S2"],
+        selected_statements=selected_statements,
+        analytics_support=support,
+    )
+
+    assert effective_ids == ["S1", "S2", "S3"]
+    assert missing_ids == ["S3"]
+
+
+def test_typed_analytics_completeness_does_not_overfill_total_constituents():
+    selected_statements = {
+        "S1": "İstanbul 72 alarm.",
+        "S2": "İzmir 88 alarm.",
+        "S3": "Toplam 160 alarm.",
+    }
+    support = {
+        "S1": {"kind": "canonical", "requirement_kind": "aggregate_total_request"},
+        "S2": {"kind": "canonical", "requirement_kind": "aggregate_total_request"},
+        "S3": {"kind": "derived", "requirement_kind": "aggregate_total_request"},
+    }
+
+    effective_ids, missing_ids = ValidatedResponseBuilder._complete_structured_analytics_claims(
+        ["S3"],
+        selected_statements=selected_statements,
+        analytics_support=support,
+    )
+
+    assert effective_ids == ["S3"]
+    assert missing_ids == []
+
+
+def test_typed_analytics_completeness_restores_ranking_and_multimetric_requirements():
+    selected_statements = {
+        "S1": "FAILOVER_UNSUCCESSFUL alarmı 17 kez görüldü.",
+        "S2": "İzmir'de 88 alarm oluştu.",
+        "S3": "İzmir'de 13 kesinti yaşandı.",
+    }
+    support = {
+        "S1": {"kind": "canonical", "requirement_kind": "ranking_winner"},
+        "S2": {"kind": "canonical", "requirement_kind": "direct_value"},
+        "S3": {"kind": "canonical", "requirement_kind": "direct_value"},
+    }
+
+    ranking_ids, ranking_missing = ValidatedResponseBuilder._complete_structured_analytics_claims(
+        [],
+        selected_statements={"S1": selected_statements["S1"]},
+        analytics_support={"S1": support["S1"]},
+    )
+    multi_metric_ids, multi_metric_missing = (
+        ValidatedResponseBuilder._complete_structured_analytics_claims(
+            ["S2"],
+            selected_statements={"S2": selected_statements["S2"], "S3": selected_statements["S3"]},
+            analytics_support={"S2": support["S2"], "S3": support["S3"]},
+        )
+    )
+
+    assert ranking_ids == ["S1"]
+    assert ranking_missing == ["S1"]
+    assert multi_metric_ids == ["S2", "S3"]
+    assert multi_metric_missing == ["S3"]
+
+
+def test_typed_analytics_completeness_does_not_fill_unknown_or_unrequested_rows():
+    effective_ids, missing_ids = ValidatedResponseBuilder._complete_structured_analytics_claims(
+        [],
+        selected_statements={},
+        analytics_support={},
+    )
+
+    assert effective_ids == []
+    assert missing_ids == []
 
 
 def test_free_text_narrative_allows_qualitative_impact_only_when_current_plan_supports_it():
