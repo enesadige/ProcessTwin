@@ -206,6 +206,10 @@ def apply_cli_overrides(args: argparse.Namespace, env: dict[str, str]) -> None:
 
     backend_port = env.get("BACKEND_PORT", "8000")
     frontend_port = env.get("FRONTEND_PORT", "5173")
+    if args.backend_port is not None:
+        # Stdio MCP processes are spawned by Django and call its internal API.
+        # Keep that target aligned with an explicitly overridden local backend port.
+        env["MCP_BACKEND_BASE_URL"] = f"http://127.0.0.1:{backend_port}"
     if args.api_base_url:
         env["VITE_API_BASE_URL"] = args.api_base_url
     else:

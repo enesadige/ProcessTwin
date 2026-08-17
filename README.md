@@ -180,3 +180,4 @@ Port override:
 ```
 
 Baslatici varsayilan olarak frontend'in `/api` isteklerini Vite proxy uzerinden secilen backend portuna yonlendirir. Bu, local browser oturumunun ayni-origin kalmasini ve CORS gerektirmemesini saglar. Farkli bir dogrudan API adresi gerekiyorsa `--api-base-url` ile acikca verilebilir.
+`--backend-port` kullanildiginda stdio MCP sureclerinin internal API hedefi de ayni local backend portuna ayarlanir.
