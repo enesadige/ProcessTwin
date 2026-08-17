@@ -819,6 +819,81 @@ def test_analytics_ranking_is_a_typed_deterministic_query_without_an_anchor():
 
 
 @pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("city_name", "plate_code", "question"),
+    [
+        (
+            "İzmir",
+            "35",
+            "2026 yılında İzmir şehrinde en çok görülen alarm tipi nedir?",
+        ),
+        (
+            "İstanbul",
+            "34",
+            "2026 yılında İstanbul'da en sık görülen alarm türü hangisidir?",
+        ),
+        (
+            "İzmir",
+            "35",
+            "2026 yılında İzmir'de hangi alarm tipi en fazla oluştu?",
+        ),
+    ],
+)
+def test_alarm_type_ranking_composes_alarm_count_analytics_intent(
+    city_name, plate_code, question
+):
+    snapshot = create_snapshot(f"analytics-alarm-type-ranking-{plate_code}")
+    city = City.objects.create(name=city_name, plate_code=plate_code)
+    district = District.objects.create(
+        city=city,
+        name=f"{city_name} Merkez",
+        profile_type=AreaProfileType.MIXED,
+    )
+    NetworkDevice.objects.create(
+        data_snapshot=snapshot,
+        code=f"AGG-{plate_code}-ALARM-RANKING-001",
+        name="Alarm ranking scope device",
+        device_type=NetworkDeviceType.METRO_AGGREGATION,
+        city=city,
+        district=district,
+    )
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query=question,
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.intent.value == "operational_analytics"
+    assert query.analytics is not None
+    assert query.analytics.metric == "alarm_count"
+    assert query.analytics.aggregation == "count"
+    assert query.analytics.group_by == "alarm_type"
+    assert query.analytics.direction == "desc"
+    assert query.analytics.limit == 1
+    assert query.location is not None
+    assert query.location.city == city_name
+    assert query.time_window is not None
+    assert query.clarification_required is False
+
+
+@pytest.mark.django_db
+def test_anchored_alarm_type_question_without_ranking_stays_outside_analytics():
+    snapshot = create_snapshot("anchored-alarm-type-question")
+    from apps.operations.tests.test_operations_models import create_maltepe_bng
+
+    create_maltepe_bng(snapshot, code="AGG-ANK-002")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query="AGG-ANK-002 cihazındaki alarm tipi nedir?",
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.intent.value != "operational_analytics"
+    assert query.analytics is None
+    assert query.device_code == "AGG-ANK-002"
+
+
+@pytest.mark.django_db
 def test_count_metric_uses_count_when_ranked_highest_to_lowest():
     snapshot = create_snapshot("analytics-ranked-city-count")
 

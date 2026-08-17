@@ -916,6 +916,8 @@ class DeterministicStructuredQueryParser:
             "en çok",
             "en cok",
             "en fazla",
+            "en sık",
+            "en sik",
             "en az",
             "en yüksek",
             "en yuksek",
@@ -992,6 +994,31 @@ class DeterministicStructuredQueryParser:
         metric = next(
             (key for key, terms in metric_terms if any(term in folded for term in terms)), None
         )
+        alarm_type_requested = any(
+            term in folded
+            for term in (
+                "alarm tipi",
+                "alarm tiplerine",
+                "alarm türü",
+                "alarm türlerine",
+                "alarm turu",
+                "alarm turlerine",
+            )
+        )
+        ranking_requested = any(
+            term in folded
+            for term in (
+                "en çok",
+                "en cok",
+                "en fazla",
+                "en sık",
+                "en sik",
+                "top ",
+                "ranking",
+            )
+        )
+        if metric is None and alarm_type_requested and ranking_requested:
+            metric = "alarm_count"
         if metric is None:
             return None
         count_only_metrics = {
@@ -1166,6 +1193,8 @@ class DeterministicStructuredQueryParser:
                         "en çok",
                         "en cok",
                         "en fazla",
+                        "en sık",
+                        "en sik",
                         "en az",
                         "en düşük",
                         "en dusuk",
