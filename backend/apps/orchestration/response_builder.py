@@ -387,6 +387,10 @@ class ValidatedResponseBuilder:
                 contract[1],
                 query_run.structured_query,
             )
+            structured_failover_claim_plan = self._uses_structured_failover_claim_plan(
+                contract[1],
+                query_run.structured_query,
+            )
             if structured_analytics_claim_plan:
                 narrative, synthesis_audit = self._structured_analytics_claim_narrative(
                     active_provider,
@@ -421,8 +425,37 @@ class ValidatedResponseBuilder:
                         selected_statements[statement_id] for statement_id in completed_ids
                     )
                 response.narrative_synthesis_audit = synthesis_audit
+            elif structured_failover_claim_plan:
+                narrative, synthesis_audit = self._structured_analytics_claim_narrative(
+                    active_provider,
+                    original_query=query_run.original_query,
+                    selected_statements=selected_statements,
+                    analytics_support={},
+                    claim_plan_subject="failover/kesinti sınıflandırması",
+                    no_claims_reason="no_supported_failover_claims",
+                )
+                required_ids = self._required_failover_statement_ids(
+                    selected_statements,
+                    contract[1].get("outage_classification_statement_ids", []),
+                )
+                completed_ids, missing_ids = self._complete_structured_required_claims(
+                    synthesis_audit.get("backend_effective_statement_ids", []),
+                    selected_statements=selected_statements,
+                    required_ids=required_ids,
+                )
+                synthesis_audit["required_statement_ids"] = required_ids
+                synthesis_audit["missing_required_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_count"] = len(missing_ids)
+                if missing_ids:
+                    synthesis_audit["backend_effective_statement_ids"] = completed_ids
+                    synthesis_audit["rendered_fact_types"] = ["canonical"] * len(completed_ids)
+                    narrative = " ".join(
+                        selected_statements[statement_id] for statement_id in completed_ids
+                    )
+                response.narrative_synthesis_audit = synthesis_audit
             if getattr(active_provider, "supports_grounded_narrative", False):
-                if not structured_analytics_claim_plan:
+                if not (structured_analytics_claim_plan or structured_failover_claim_plan):
                     narrative, synthesis_audit = self._safe_grounded_narrative(
                         active_provider,
                         original_query=query_run.original_query,
@@ -799,6 +832,23 @@ class ValidatedResponseBuilder:
             and statement_contract.get("analytics_has_typed_requirements")
         )
 
+    @staticmethod
+    def _uses_structured_failover_claim_plan(
+        statement_contract: Mapping[str, Any],
+        structured_query: Mapping[str, Any] | None,
+    ) -> bool:
+        """Constrain only explicit failover classification queries to canonical claims."""
+        if not isinstance(structured_query, Mapping):
+            return False
+        dimensions = {
+            str(value) for value in structured_query.get("semantic_dimensions", [])
+        }
+        return bool(
+            structured_query.get("intent") == "outage_impact"
+            and {"failover_status", "outage_classification"} <= dimensions
+            and statement_contract.get("outage_classification_statement_ids")
+        )
+
     @classmethod
     def _structured_analytics_claim_narrative(
         cls,
@@ -807,8 +857,10 @@ class ValidatedResponseBuilder:
         original_query: str,
         selected_statements: Mapping[str, str],
         analytics_support: Mapping[str, Mapping[str, object]],
+        claim_plan_subject: str = "operasyonel analytics",
+        no_claims_reason: str = "no_supported_analytics_claims",
     ) -> tuple[str, dict[str, Any]]:
-        """Ask the provider for ordering only, then render typed facts locally."""
+        """Ask the provider for closed-world statement ordering, never prose."""
         allowed_ids = list(selected_statements)
         if not allowed_ids:
             return _UNCERTAINTY_STATEMENT, {
@@ -821,13 +873,13 @@ class ValidatedResponseBuilder:
                 "backend_effective_statement_ids": [],
                 "rejected_statement_ids": [],
                 "fallback_used": True,
-                "fallback_reason": "no_supported_analytics_claims",
+                "fallback_reason": no_claims_reason,
                 "rendered_fact_types": [],
                 "validation_status": "valid",
             }
 
         prompt = (
-            "Bir operasyonel analytics cevap planı seç. Serbest metin, açıklama, sayı, "
+            f"Bir {claim_plan_subject} cevap planı seç. Serbest metin, açıklama, sayı, "
             "kimlik, ilişki veya ek alan üretme. Yalnız aşağıdaki JSON nesnesini döndür: "
             '{"claims":[{"statement_id":"S1","role":"primary"}]}. '
             "role yalnız primary veya support olabilir. Yalnız ALLOWED_CLAIMS içindeki "
@@ -850,12 +902,12 @@ class ValidatedResponseBuilder:
                     if not provider_code
                     else f"provider_call_failed:{provider_code}"
                 ),
-                "analytics claim-plan provider request failed",
+                "structured claim-plan provider request failed",
                 details={"failure_detail": type(exc).__name__},
             ) from exc
         if not isinstance(response, Mapping) or response.get("provider") != provider.provider_name:
             raise NarrativeSynthesisError(
-                "provider_response_invalid", "analytics claim-plan provider response is invalid"
+                "provider_response_invalid", "structured claim-plan provider response is invalid"
             )
         if response.get("model") != provider.model_name:
             raise NarrativeSynthesisError(
@@ -941,15 +993,42 @@ class ValidatedResponseBuilder:
         analytics_support: Mapping[str, Mapping[str, object]],
     ) -> tuple[list[str], list[str]]:
         """Append only typed required facts omitted by an otherwise valid claim plan."""
+        required_ids = cls._required_analytics_statement_ids(
+            selected_statements,
+            analytics_support,
+        )
+        return cls._complete_structured_required_claims(
+            effective_statement_ids,
+            selected_statements=selected_statements,
+            required_ids=required_ids,
+        )
+
+    @staticmethod
+    def _required_failover_statement_ids(
+        selected_statements: Mapping[str, str],
+        outage_classification_statement_ids: object,
+    ) -> list[str]:
+        """Require only backend-tagged outage classification facts for failover queries."""
+        if not isinstance(outage_classification_statement_ids, list):
+            return []
+        return [
+            statement_id
+            for statement_id in outage_classification_statement_ids
+            if isinstance(statement_id, str) and statement_id in selected_statements
+        ]
+
+    @staticmethod
+    def _complete_structured_required_claims(
+        effective_statement_ids: object,
+        *,
+        selected_statements: Mapping[str, str],
+        required_ids: list[str],
+    ) -> tuple[list[str], list[str]]:
         effective_ids = [
             statement_id
             for statement_id in effective_statement_ids
             if isinstance(statement_id, str) and statement_id in selected_statements
         ] if isinstance(effective_statement_ids, list) else []
-        required_ids = cls._required_analytics_statement_ids(
-            selected_statements,
-            analytics_support,
-        )
         missing_ids = [
             statement_id for statement_id in required_ids if statement_id not in effective_ids
         ]
@@ -1549,6 +1628,7 @@ class ValidatedResponseBuilder:
         statements: dict[str, str] = {}
         analytics_direct_count_statement_ids: set[str] = set()
         analytics_requested_statement_ids: list[str] = []
+        outage_classification_statement_ids: list[str] = []
         analytics_support_metadata: dict[str, dict[str, object]] = {}
 
         analytics_summaries = result.analytics_summaries or (
@@ -1795,7 +1875,8 @@ class ValidatedResponseBuilder:
                 add("Device Not Active için bu olayda doğrulanmış alarm kaydı yok.")
             if causal.full_outage is not None:
                 full_outage = "Evet" if causal.full_outage else "Hayır"
-                add(f"Tam hizmet kesintisi: {full_outage}.")
+                statement_id = add(f"Tam hizmet kesintisi: {full_outage}.")
+                outage_classification_statement_ids.append(statement_id)
             if causal.primary_status or causal.backup_status:
                 add(
                     "Bağlantı durumu: ana bağlantı "
@@ -2017,6 +2098,7 @@ class ValidatedResponseBuilder:
             "statement_concepts": statement_concepts,
             "validated_relationships": validated_relationships,
             "analytics_requested_statement_ids": analytics_requested_statement_ids,
+            "outage_classification_statement_ids": outage_classification_statement_ids,
             "analytics_has_typed_requirements": bool(
                 analytics_answer_support.requirements.requirements
             ),

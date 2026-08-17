@@ -1804,6 +1804,157 @@ def _analytics_structured_query(snapshot_identifier, *, specifications, location
     }
 
 
+def _failover_structured_query(snapshot_identifier):
+    return {
+        "snapshot_identifier": snapshot_identifier,
+        "intent": "outage_impact",
+        "requested_outputs": ["details", "impact", "summary"],
+        "semantic_dimensions": ["failover_status", "outage_classification"],
+    }
+
+
+def _failover_result(snapshot_identifier, *, full_outage):
+    base = valid_result(snapshot_identifier)
+    return base.model_copy(
+        update={
+            "causal_summary": base.causal_summary.model_copy(
+                update={"full_outage": full_outage}
+            ),
+            "impact_summary": None,
+        }
+    )
+
+
+def _failover_run(snapshot, *, full_outage):
+    run = completed_run(
+        f"response-structured-failover-{full_outage}",
+        snapshot=snapshot,
+        result=_failover_result(snapshot.snapshot_key, full_outage=full_outage),
+        original_query=(
+            "CE-MCR-0010 olayında ana bağlantı down ve yedek bağlantı active. "
+            "Bu tam kesinti mi?"
+        ),
+    )
+    run.structured_query = _failover_structured_query(snapshot.snapshot_key)
+    run.save(update_fields=["structured_query"])
+    return run
+
+
+@pytest.mark.django_db
+def test_explicit_failover_uses_structured_claim_plan_without_impact_prose():
+    snapshot = create_snapshot("response-structured-failover-true")
+    run = _failover_run(snapshot, full_outage=True)
+    result = ValidatedExecutionResult.model_validate(run.final_result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=run.structured_query,
+    )
+    required_id = contract["outage_classification_statement_ids"][0]
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": required_id, "role": "primary"}]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert len(provider.requests) == 1
+    assert response.response_text == "Tam hizmet kesintisi: Evet."
+    assert response.narrative_synthesis_audit["mode"] == "structured_claim_plan"
+    assert response.narrative_synthesis_audit["required_statement_ids"] == [required_id]
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 0
+    assert "müşteri" not in response.response_text.casefold()
+    assert "performans" not in response.response_text.casefold()
+
+
+@pytest.mark.django_db
+def test_explicit_failover_completes_only_missing_outage_classification():
+    snapshot = create_snapshot("response-structured-failover-completeness")
+    run = _failover_run(snapshot, full_outage=True)
+    result = ValidatedExecutionResult.model_validate(run.final_result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=run.structured_query,
+    )
+    required_id = contract["outage_classification_statement_ids"][0]
+    optional_id = next(
+        statement_id for statement_id in contract["statements"] if statement_id != required_id
+    )
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": optional_id, "role": "primary"}]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert response.narrative_synthesis_audit["missing_required_statement_ids"] == [required_id]
+    assert response.narrative_synthesis_audit["deterministic_fill_statement_ids"] == [required_id]
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 1
+    assert response.response_text.endswith("Tam hizmet kesintisi: Evet.")
+
+
+@pytest.mark.django_db
+def test_explicit_failover_rejects_unknown_claim_ids_with_canonical_fallback():
+    snapshot = create_snapshot("response-structured-failover-unknown-id")
+    run = _failover_run(snapshot, full_outage=True)
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": "S999", "role": "primary"}]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    audit = response.narrative_synthesis_audit
+    assert audit["fallback_used"] is True
+    assert audit["rejected_statement_ids"] == ["S999"]
+    assert "Tam hizmet kesintisi: Evet." in response.response_text
+    assert "kullanıcı" not in response.response_text.casefold()
+
+
+@pytest.mark.django_db
+def test_explicit_failover_renders_false_without_hard_coding_true():
+    snapshot = create_snapshot("response-structured-failover-false")
+    run = _failover_run(snapshot, full_outage=False)
+    result = ValidatedExecutionResult.model_validate(run.final_result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=run.structured_query,
+    )
+    required_id = contract["outage_classification_statement_ids"][0]
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": required_id, "role": "primary"}]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert response.response_text == "Tam hizmet kesintisi: Hayır."
+
+
+@pytest.mark.django_db
+def test_unknown_failover_classification_does_not_enable_structured_failover_claims():
+    snapshot = create_snapshot("response-structured-failover-unknown")
+    run = _failover_run(snapshot, full_outage=None)
+    result = ValidatedExecutionResult.model_validate(run.final_result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=run.structured_query,
+    )
+
+    assert contract["outage_classification_statement_ids"] == []
+    assert not ValidatedResponseBuilder._uses_structured_failover_claim_plan(
+        contract,
+        run.structured_query,
+    )
+
+
 @pytest.mark.django_db
 def test_ranking_uses_requested_canonical_support_before_provider_synthesis():
     snapshot = create_snapshot("response-analytics-ranking-support")
