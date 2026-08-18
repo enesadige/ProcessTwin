@@ -661,7 +661,7 @@ def test_snapshot_and_structured_query_idempotency_conflicts(settings, monkeypat
 
 def test_mcp_tool_counts_remain_unchanged():
     assert {server.value: len(tools) for server, tools in MCP_TOOL_REGISTRIES.items()} == {
-        "network": 11,
+        "network": 12,
         "customer": 7,
         "rule": 8,
         "compensation": 6,
