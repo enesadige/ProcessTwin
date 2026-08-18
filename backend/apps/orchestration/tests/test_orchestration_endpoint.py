@@ -246,6 +246,11 @@ def test_authenticated_analysis_endpoint_requires_analyst_role_and_uses_session(
             "unsupported_capability",
             "Bu sorgu mevcut analiz kapsamı tarafından desteklenmiyor.",
         ),
+        (
+            "2026 Ankara hava durumu nasıldı?",
+            "unsupported_capability",
+            "Bu sorgu mevcut analiz kapsamı tarafından desteklenmiyor.",
+        ),
     ],
 )
 def test_preflight_answerability_completes_without_provider_or_tools(

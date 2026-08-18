@@ -63,11 +63,49 @@ _REMEDIATION_TERMS = (
     "tam prosedür",
     "tam prosedur",
 )
+_SUPPORTED_OPERATIONAL_INTENT_TERMS = (
+    "kesinti",
+    "outage",
+    "alarm",
+    "cihaz",
+    "device",
+    "ağ",
+    "ag",
+    "network",
+    "müşteri",
+    "musteri",
+    "abonelik",
+    "subscription",
+    "etki",
+    "impact",
+    "failover",
+    "yedek",
+    "kök neden",
+    "kok neden",
+    "root cause",
+    "korelasyon",
+    "correlation",
+    "ilişki",
+    "iliski",
+    "tazminat",
+    "telafi",
+    "uygunluk",
+    "kural",
+    "ruleversion",
+    "decisionevidence",
+    "kanıt",
+    "kanit",
+    "evidence",
+)
 
 
 def classify_unsupported_capability(query: str) -> PreflightAnswerability | None:
     """Classify requests outside deterministic operational-analysis capabilities."""
     folded = query.casefold()
+    has_public_operational_reference = bool(_PUBLIC_IDENTIFIER_RE.search(query))
+    has_supported_operational_intent = any(
+        term in folded for term in _SUPPORTED_OPERATIONAL_INTENT_TERMS
+    )
     probability_forecast = (
         any(term in folded for term in ("olasılı", "olasil", "probability"))
         and any(
@@ -87,6 +125,7 @@ def classify_unsupported_capability(query: str) -> PreflightAnswerability | None
     if (
         any(term in folded for term in (*_FORECAST_TERMS, *_REMEDIATION_TERMS))
         or probability_forecast
+        or not (has_public_operational_reference or has_supported_operational_intent)
     ):
         return PreflightAnswerability(
             status=AnswerabilityStatus.UNSUPPORTED_CAPABILITY,

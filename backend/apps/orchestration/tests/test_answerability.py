@@ -22,6 +22,7 @@ from apps.orchestration.answerability import (
             "CE-MCR-0023 olayında hangi parçanın değiştirilmesi gerektiğini "
             "ve tam müdahale prosedürünü söyle."
         ),
+        "2026 Ankara hava durumu nasıldı?",
     ],
 )
 def test_unsupported_capabilities_are_classified_before_operational_analysis(query):
@@ -29,6 +30,19 @@ def test_unsupported_capabilities_are_classified_before_operational_analysis(que
 
     assert result is not None
     assert result.status == AnswerabilityStatus.UNSUPPORTED_CAPABILITY
+
+
+@pytest.mark.parametrize(
+    "query",
+    [
+        "2026 Ankara'da kaç kesinti yaşandı?",
+        "Ankara'da kaç alarm oluştu?",
+        "Ankara'daki kesintiden kaç müşteri etkilendi?",
+        "AGG-ANK-002 cihazında ne oldu?",
+    ],
+)
+def test_supported_operational_signals_are_not_classified_as_out_of_scope(query):
+    assert classify_unsupported_capability(query) is None
 
 
 def test_completed_result_is_partially_verified_when_root_cause_is_unverified():
