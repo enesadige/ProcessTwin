@@ -1959,6 +1959,143 @@ def _customer_impact_claims(run):
     return contract, selected_statements, claims, required_ids
 
 
+def _root_cause_structured_query(snapshot_identifier):
+    return {
+        "snapshot_identifier": snapshot_identifier,
+        "intent": "network_investigation",
+        "causal_event_code": "CE-MCR-0023",
+        "requested_outputs": ["summary", "details", "root_cause", "evidence"],
+        "semantic_dimensions": ["physical_root_cause", "summary"],
+    }
+
+
+def _root_cause_run(snapshot):
+    base = valid_result(snapshot.snapshot_key)
+    causal = base.causal_summary.model_copy(
+        update={
+            "causal_event_code": "CE-MCR-0023",
+            "root_resource_type": "failure_domain",
+            "root_resource_reference": "FD-SITE-459",
+            "root_cause_summary": None,
+            "root_cause_reason_codes": ["same_resource", "temporal_propagation"],
+            "propagation_summary": "Aday nedensel zincir bulundu; fiziksel kök neden doğrulanmadı.",
+            "root_alarm_types": ["DISTRIBUTION_CABLE_DOWN"],
+            "symptom_alarm_types": ["OLT_UNREACHABLE", "ONT_DISCONNECT_SURGE"],
+            "dying_gasp_classification": "symptom",
+            "device_not_active_classification": None,
+        }
+    )
+    run = completed_run(
+        "response-structured-root-cause",
+        snapshot=snapshot,
+        result=base.model_copy(update={"causal_summary": causal}),
+        original_query=(
+            "CE-MCR-0023 içindeki alarmlar arasında korelasyon var mı? "
+            "Hangisi kök neden, hangisi semptom?"
+        ),
+    )
+    run.structured_query = _root_cause_structured_query(snapshot.snapshot_key)
+    run.save(update_fields=["structured_query"])
+    return run
+
+
+def _root_cause_claims(run):
+    result = ValidatedExecutionResult.model_validate(run.final_result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=run.structured_query,
+    )
+    selection = ValidatedResponseBuilder._deterministic_answer_plan(
+        contract,
+        run.structured_query,
+    )
+    selected_statements = {
+        statement_id: contract["statements"][statement_id]
+        for statement_id in selection["selected_statement_ids"]
+    }
+    claims = ValidatedResponseBuilder._root_cause_claim_statements(
+        selected_statements,
+        contract["root_cause_statement_ids"],
+    )
+    required_ids = ValidatedResponseBuilder._required_root_cause_statement_ids(
+        claims,
+        contract["root_cause_statement_ids"],
+    )
+    return contract, claims, required_ids
+
+
+@pytest.mark.django_db
+def test_root_cause_uses_structured_claim_plan_without_reason_code_interpolation():
+    snapshot = create_snapshot("response-structured-root-cause")
+    run = _root_cause_run(snapshot)
+    _contract, claims, required_ids = _root_cause_claims(run)
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": statement_id, "role": "primary"} for statement_id in claims]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert len(provider.requests) == 1
+    assert response.narrative_synthesis_audit["mode"] == "structured_claim_plan"
+    assert response.narrative_synthesis_audit["fallback_used"] is False
+    assert response.narrative_synthesis_audit["required_statement_ids"] == required_ids
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 0
+    assert response.response_text.count("DISTRIBUTION_CABLE_DOWN") == 1
+    assert response.response_text.count("Dying Gasp alarmı kök neden değil, belirtidir.") == 1
+    assert "FD-SITE-459" in response.response_text
+    assert "same_resource" not in response.response_text
+    assert "temporal_propagation" not in response.response_text
+    assert "()" not in response.response_text
+    assert "OLT_UNREACHABLE" not in response.response_text
+    assert "ONT_DISCONNECT_SURGE" not in response.response_text
+
+
+@pytest.mark.django_db
+def test_root_cause_completes_only_missing_required_alarm_role():
+    snapshot = create_snapshot("response-structured-root-cause-completeness")
+    run = _root_cause_run(snapshot)
+    contract, claims, required_ids = _root_cause_claims(run)
+    root_alarm_id = contract["root_cause_statement_ids"]["root_alarm"][0]
+    alarm_role_id = contract["root_cause_statement_ids"]["alarm_role"][0]
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": root_alarm_id, "role": "primary"}]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    audit = response.narrative_synthesis_audit
+    assert required_ids == [root_alarm_id, alarm_role_id]
+    assert audit["missing_required_statement_ids"] == [alarm_role_id]
+    assert audit["deterministic_fill_statement_ids"] == [alarm_role_id]
+    assert audit["deterministic_fill_count"] == 1
+    assert response.response_text == " ".join(
+        claims[statement_id] for statement_id in [root_alarm_id, alarm_role_id]
+    )
+
+
+@pytest.mark.django_db
+def test_root_cause_rejects_unknown_claim_ids_with_canonical_fallback():
+    snapshot = create_snapshot("response-structured-root-cause-unknown")
+    run = _root_cause_run(snapshot)
+    provider = StructuredAnalyticsClaimPlanProvider([{"statement_id": "S999", "role": "primary"}])
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    audit = response.narrative_synthesis_audit
+    assert audit["fallback_used"] is True
+    assert audit["rejected_statement_ids"] == ["S999"]
+    assert "DISTRIBUTION_CABLE_DOWN" in response.response_text
+    assert "Dying Gasp alarmı kök neden değil, belirtidir." in response.response_text
+    assert "same_resource" not in response.response_text
+
+
 @pytest.mark.django_db
 def test_explicit_failover_uses_structured_claim_plan_without_impact_prose():
     snapshot = create_snapshot("response-structured-failover-true")

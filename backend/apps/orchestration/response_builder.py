@@ -401,6 +401,10 @@ class ValidatedResponseBuilder:
                     query_run.structured_query,
                 )
             )
+            structured_root_cause_claim_plan = self._uses_structured_root_cause_claim_plan(
+                contract[1],
+                query_run.structured_query,
+            )
             if structured_analytics_claim_plan:
                 narrative, synthesis_audit = self._structured_analytics_claim_narrative(
                     active_provider,
@@ -528,12 +532,46 @@ class ValidatedResponseBuilder:
                         customer_statements[statement_id] for statement_id in completed_ids
                     )
                 response.narrative_synthesis_audit = synthesis_audit
+            elif structured_root_cause_claim_plan:
+                root_cause_statements = self._root_cause_claim_statements(
+                    selected_statements,
+                    contract[1].get("root_cause_statement_ids", {}),
+                )
+                narrative, synthesis_audit = self._structured_analytics_claim_narrative(
+                    active_provider,
+                    original_query=query_run.original_query,
+                    selected_statements=root_cause_statements,
+                    analytics_support={},
+                    claim_plan_subject="kök neden/alarm rolü",
+                    no_claims_reason="no_supported_root_cause_claims",
+                )
+                required_ids = self._required_root_cause_statement_ids(
+                    root_cause_statements,
+                    contract[1].get("root_cause_statement_ids", {}),
+                )
+                completed_ids, missing_ids = self._complete_structured_required_claims(
+                    synthesis_audit.get("backend_effective_statement_ids", []),
+                    selected_statements=root_cause_statements,
+                    required_ids=required_ids,
+                )
+                synthesis_audit["required_statement_ids"] = required_ids
+                synthesis_audit["missing_required_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_count"] = len(missing_ids)
+                if missing_ids:
+                    synthesis_audit["backend_effective_statement_ids"] = completed_ids
+                    synthesis_audit["rendered_fact_types"] = ["canonical"] * len(completed_ids)
+                    narrative = " ".join(
+                        root_cause_statements[statement_id] for statement_id in completed_ids
+                    )
+                response.narrative_synthesis_audit = synthesis_audit
             if getattr(active_provider, "supports_grounded_narrative", False):
                 if not (
                     structured_analytics_claim_plan
                     or structured_failover_claim_plan
                     or structured_compensation_claim_plan
                     or structured_customer_impact_claim_plan
+                    or structured_root_cause_claim_plan
                 ):
                     narrative, synthesis_audit = self._safe_grounded_narrative(
                         active_provider,
@@ -571,6 +609,7 @@ class ValidatedResponseBuilder:
                     or structured_failover_claim_plan
                     or structured_compensation_claim_plan
                     or structured_customer_impact_claim_plan
+                    or structured_root_cause_claim_plan
                 ):
                     response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
                     response.warnings = sorted(
@@ -1012,6 +1051,81 @@ class ValidatedResponseBuilder:
         return {
             statement_id: selected_statements[statement_id] for statement_id in statement_ids
         }
+
+    @staticmethod
+    def _uses_structured_root_cause_claim_plan(
+        statement_contract: Mapping[str, Any],
+        structured_query: Mapping[str, Any] | None,
+    ) -> bool:
+        """Constrain anchored root-cause role answers to canonical statements."""
+        if not isinstance(structured_query, Mapping):
+            return False
+        root_cause_ids = statement_contract.get("root_cause_statement_ids", {})
+        if not isinstance(root_cause_ids, Mapping):
+            return False
+        has_role_facts = any(
+            isinstance(root_cause_ids.get(role), list) and root_cause_ids[role]
+            for role in ("root_alarm", "alarm_role")
+        )
+        requested_outputs = {
+            str(value) for value in structured_query.get("requested_outputs", [])
+        }
+        has_anchor = any(
+            isinstance(structured_query.get(field), str) and structured_query[field]
+            for field in ("causal_event_code", "outage_code", "device_code")
+        )
+        return bool(
+            structured_query.get("intent") == "network_investigation"
+            and "root_cause" in requested_outputs
+            and has_anchor
+            and has_role_facts
+        )
+
+    @staticmethod
+    def _root_cause_claim_statements(
+        selected_statements: Mapping[str, str],
+        root_cause_statement_ids: object,
+    ) -> dict[str, str]:
+        """Expose only typed root-cause facts, excluding unparameterized reason codes."""
+        if not isinstance(root_cause_statement_ids, Mapping):
+            return {}
+        statement_ids: list[str] = []
+        for role in ("physical_root_cause", "root_resource", "root_alarm", "alarm_role"):
+            role_ids = root_cause_statement_ids.get(role, [])
+            if not isinstance(role_ids, list):
+                continue
+            for statement_id in role_ids:
+                if (
+                    isinstance(statement_id, str)
+                    and statement_id in selected_statements
+                    and statement_id not in statement_ids
+                ):
+                    statement_ids.append(statement_id)
+        return {
+            statement_id: selected_statements[statement_id] for statement_id in statement_ids
+        }
+
+    @staticmethod
+    def _required_root_cause_statement_ids(
+        selected_statements: Mapping[str, str],
+        root_cause_statement_ids: object,
+    ) -> list[str]:
+        """Require only the root alarm and explicitly typed alarm-role conclusions."""
+        if not isinstance(root_cause_statement_ids, Mapping):
+            return []
+        required_ids: list[str] = []
+        for role in ("root_alarm", "alarm_role"):
+            role_ids = root_cause_statement_ids.get(role, [])
+            if not isinstance(role_ids, list):
+                continue
+            for statement_id in role_ids:
+                if (
+                    isinstance(statement_id, str)
+                    and statement_id in selected_statements
+                    and statement_id not in required_ids
+                ):
+                    required_ids.append(statement_id)
+        return required_ids
 
     @classmethod
     def _structured_analytics_claim_narrative(
@@ -1895,6 +2009,7 @@ class ValidatedResponseBuilder:
         analytics_support_metadata: dict[str, dict[str, object]] = {}
         compensation_statement_ids: dict[str, list[str]] = {}
         customer_impact_statement_ids: dict[str, list[str]] = {}
+        root_cause_statement_ids: dict[str, list[str]] = {}
 
         analytics_summaries = result.analytics_summaries or (
             [result.analytics_summary] if result.analytics_summary else []
@@ -1919,6 +2034,11 @@ class ValidatedResponseBuilder:
             statement_id = add(text)
             for role in roles:
                 customer_impact_statement_ids.setdefault(role, []).append(statement_id)
+            return statement_id
+
+        def add_root_cause(text: str, role: str) -> str:
+            statement_id = add(text)
+            root_cause_statement_ids.setdefault(role, []).append(statement_id)
             return statement_id
 
         analytics = result.analytics_summary
@@ -2125,30 +2245,48 @@ class ValidatedResponseBuilder:
                 and not _SCENARIO_CODE_RE.fullmatch(causal.root_cause_summary)
                 and not _UNCONFIRMED_ROOT_SUMMARY_RE.search(causal.propagation_summary or "")
             ):
-                add(f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.")
+                add_root_cause(
+                    f"Doğrulanmış ana kök neden: {causal.root_cause_summary}.",
+                    "physical_root_cause",
+                )
             elif causal.root_resource_reference:
-                add(
+                add_root_cause(
                     "Kök kaynak doğrulanmış, ancak fiziksel kök neden gerekçesi "
-                    "ayrıca doğrulanmadı."
+                    "ayrıca doğrulanmadı.",
+                    "physical_root_cause",
                 )
             if "root_cause_unverified" in causal.root_cause_reason_codes:
-                add(
+                add_root_cause(
                     "Kök neden kesin olarak doğrulanmadı; eksik kanıt nedeniyle "
-                    "manuel inceleme gerekir."
+                    "manuel inceleme gerekir.",
+                    "physical_root_cause",
                 )
             if causal.root_resource_reference:
                 resource_type = causal.root_resource_type or "kaynak"
-                add(f"Doğrulanmış kök kaynak: {resource_type} {causal.root_resource_reference}.")
+                add_root_cause(
+                    f"Doğrulanmış kök kaynak: {resource_type} {causal.root_resource_reference}.",
+                    "root_resource",
+                )
             if causal.root_alarm_types:
-                add("Kök neden alarmı: " + ", ".join(causal.root_alarm_types) + ".")
+                add_root_cause(
+                    "Kök neden alarmı: " + ", ".join(causal.root_alarm_types) + ".",
+                    "root_alarm",
+                )
             if causal.dying_gasp_classification == "symptom":
-                add("Dying Gasp alarmı kök neden değil, belirtidir.")
+                add_root_cause("Dying Gasp alarmı kök neden değil, belirtidir.", "alarm_role")
             elif causal.dying_gasp_classification == "not_observed":
-                add("Dying Gasp için bu olayda doğrulanmış alarm kaydı yok.")
+                add_root_cause(
+                    "Dying Gasp için bu olayda doğrulanmış alarm kaydı yok.", "alarm_role"
+                )
             if causal.device_not_active_classification == "symptom":
-                add("Device Not Active alarmı kök neden değil, belirtidir.")
+                add_root_cause(
+                    "Device Not Active alarmı kök neden değil, belirtidir.", "alarm_role"
+                )
             elif causal.device_not_active_classification == "not_observed":
-                add("Device Not Active için bu olayda doğrulanmış alarm kaydı yok.")
+                add_root_cause(
+                    "Device Not Active için bu olayda doğrulanmış alarm kaydı yok.",
+                    "alarm_role",
+                )
             if causal.full_outage is not None:
                 full_outage = "Evet" if causal.full_outage else "Hayır"
                 statement_id = add(f"Tam hizmet kesintisi: {full_outage}.")
@@ -2436,6 +2574,7 @@ class ValidatedResponseBuilder:
             "outage_classification_statement_ids": outage_classification_statement_ids,
             "compensation_statement_ids": compensation_statement_ids,
             "customer_impact_statement_ids": customer_impact_statement_ids,
+            "root_cause_statement_ids": root_cause_statement_ids,
             "analytics_has_typed_requirements": bool(
                 analytics_answer_support.requirements.requirements
             ),
