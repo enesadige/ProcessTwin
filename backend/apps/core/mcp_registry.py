@@ -18,6 +18,7 @@ _DESCRIPTORS = (
     MCPDescriptor("customer", "Customer MCP", "mcp_servers.customer", 7),
     MCPDescriptor("rules", "Rule MCP", "mcp_servers.rules", 8),
     MCPDescriptor("compensation", "Compensation MCP", "mcp_servers.compensation", 6),
+    MCPDescriptor("simulation", "Simulation MCP", "mcp_servers.simulation_mcp", 4),
 )
 
 

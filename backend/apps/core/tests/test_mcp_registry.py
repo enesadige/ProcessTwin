@@ -4,7 +4,7 @@ SERVICE_TOKEN = "test-internal-service-token"
 
 
 @override_settings(INTERNAL_API_SERVICE_TOKEN=SERVICE_TOKEN)
-def test_registry_lists_four_static_descriptors_without_probing(client, monkeypatch):
+def test_registry_lists_static_descriptors_without_probing(client, monkeypatch):
     called = False
 
     def probe(*_args, **_kwargs):
@@ -30,6 +30,7 @@ def test_registry_lists_four_static_descriptors_without_probing(client, monkeypa
         ("customer", "mcp_servers.customer", 7),
         ("rules", "mcp_servers.rules", 8),
         ("compensation", "mcp_servers.compensation", 6),
+        ("simulation", "mcp_servers.simulation_mcp", 4),
     ]
     assert all(service["status"] == "not_checked" for service in services)
     assert called is False
