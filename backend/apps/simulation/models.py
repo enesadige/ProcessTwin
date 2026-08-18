@@ -21,6 +21,10 @@ def generate_replay_identity() -> str:
     return f"RPL-{uuid4().hex.upper()}"
 
 
+def generate_simulation_evidence_code() -> str:
+    return f"SIM-EV-{uuid4().hex.upper()}"
+
+
 class SimulationRunStatus(models.TextChoices):
     DRAFT = "draft", "Draft"
     READY = "ready", "Ready"
@@ -328,3 +332,94 @@ class SimulationRunEvent(TimeStampedModel):
     def save(self, *args, **kwargs):
         self.full_clean(validate_unique=False, validate_constraints=False)
         return super().save(*args, **kwargs)
+
+
+class SimulationEvidence(TimeStampedModel):
+    """Immutable, snapshot-local provenance for one completed simulation run."""
+
+    source_snapshot = models.ForeignKey(
+        DataSnapshot,
+        on_delete=models.PROTECT,
+        related_name="simulation_evidence_records",
+    )
+    simulation_run = models.OneToOneField(
+        SimulationRun,
+        on_delete=models.PROTECT,
+        related_name="simulation_evidence",
+    )
+    evidence_code = models.CharField(max_length=48, default=generate_simulation_evidence_code)
+    evidence_hash = models.CharField(max_length=64)
+    payload = models.JSONField(default=dict)
+    finalized = models.BooleanField(default=False)
+    finalized_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "simulation_evidence"
+        ordering = ["-created_at", "evidence_code"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_snapshot", "evidence_code"],
+                name="simulation_evidence_snapshot_code_uniq",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(finalized=False, finalized_at__isnull=True)
+                    | models.Q(finalized=True, finalized_at__isnull=False)
+                ),
+                name="simulation_evidence_finalization_timestamp",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["source_snapshot", "finalized", "created_at"],
+                name="sim_evidence_snap_final_idx",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.evidence_code
+
+    def clean(self) -> None:
+        errors: dict[str, str] = {}
+        if self.simulation_run_id and self.source_snapshot_id:
+            if self.simulation_run.source_snapshot_id != self.source_snapshot_id:
+                errors["simulation_run"] = "Simulation evidence must use the run source snapshot."
+        if not isinstance(self.payload, dict):
+            errors["payload"] = "Simulation evidence payload must be an object."
+        if self.finalized and self.finalized_at is None:
+            errors["finalized_at"] = "Finalized simulation evidence requires finalized_at."
+        if not self.finalized and self.finalized_at is not None:
+            errors["finalized_at"] = "Only finalized simulation evidence can have finalized_at."
+        if self.pk:
+            existing = SimulationEvidence.objects.filter(pk=self.pk).values(
+                "source_snapshot_id",
+                "simulation_run_id",
+                "evidence_code",
+                "evidence_hash",
+                "payload",
+                "finalized",
+                "finalized_at",
+            ).first()
+            if existing and existing["finalized"]:
+                current = {
+                    "source_snapshot_id": self.source_snapshot_id,
+                    "simulation_run_id": self.simulation_run_id,
+                    "evidence_code": self.evidence_code,
+                    "evidence_hash": self.evidence_hash,
+                    "payload": self.payload,
+                    "finalized": self.finalized,
+                    "finalized_at": self.finalized_at,
+                }
+                if current != existing:
+                    errors["finalized"] = "Finalized simulation evidence records are immutable."
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.full_clean(validate_unique=False, validate_constraints=False)
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        if self.finalized:
+            raise ValidationError("Finalized simulation evidence records cannot be deleted.")
+        return super().delete(*args, **kwargs)

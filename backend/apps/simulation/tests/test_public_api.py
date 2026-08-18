@@ -196,6 +196,60 @@ def test_baseline_candidate_result_cursor_and_isolation_without_reexecution(monk
 
 
 @pytest.mark.django_db
+def test_simulation_evidence_detail_is_authenticated_snapshot_local_and_persisted(monkeypatch):
+    snapshot, device, _link, _line = _source_world("EVIDENCE")
+    client = _analyst_client()
+    assert _post(
+        client,
+        f"{API}scenarios/",
+        _scenario_payload(snapshot, anchor_type="network_device", anchor_code=device.code),
+    ).status_code == 201
+    baseline = _post(
+        client,
+        f"{API}runs/baseline/",
+        {
+            "source_snapshot_identifier": snapshot.snapshot_key,
+            "scenario_code": "SIM-API-001",
+            "deterministic_seed": "api-evidence-seed",
+            "virtual_start": CLOCK,
+        },
+    ).json()["data"]["run"]
+    before = _operational_counts(snapshot)
+    started = _post(client, f"{API}runs/{baseline['run_code']}/start/", {})
+    assert started.status_code == 200
+    evidence_reference = started.json()["data"]["result"]["evidence"]
+    assert evidence_reference and evidence_reference["finalized"] is True
+
+    anonymous = Client().get(
+        f"{API}runs/{baseline['run_code']}/evidence/",
+        {"snapshot_identifier": snapshot.snapshot_key},
+    )
+    assert anonymous.status_code == 401
+
+    def must_not_execute(*_args, **_kwargs):
+        raise AssertionError("Evidence GET must not execute the simulation core.")
+
+    monkeypatch.setattr(CanonicalFailureSimulationService, "execute", must_not_execute)
+    detail = client.get(
+        f"{API}runs/{baseline['run_code']}/evidence/",
+        {"snapshot_identifier": snapshot.snapshot_key},
+    )
+    assert detail.status_code == 200
+    evidence = detail.json()["data"]["evidence"]
+    assert evidence["evidence_code"] == evidence_reference["evidence_code"]
+    assert evidence["payload"]["source_snapshot"]["snapshot_key"] == snapshot.snapshot_key
+    assert evidence["payload"]["semantics"]["result_kind"] == "hypothetical_simulation_projection"
+    assert _operational_counts(snapshot) == before
+
+    other_snapshot, _other_device, _other_link, _other_line = _source_world("EVIDENCE-OTHER")
+    cross_snapshot = client.get(
+        f"{API}runs/{baseline['run_code']}/evidence/",
+        {"snapshot_identifier": other_snapshot.snapshot_key},
+    )
+    assert cross_snapshot.status_code == 404
+
+
+@pytest.mark.django_db
 def test_lifecycle_replay_and_cross_snapshot_candidate_rejection():
     snapshot, device, _link, _line = _source_world("LIFECYCLE")
     client = _analyst_client()

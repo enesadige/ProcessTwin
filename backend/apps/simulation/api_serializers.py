@@ -5,7 +5,12 @@ from __future__ import annotations
 from typing import Any
 
 from apps.network.models import LineConnection, NetworkDevice, NetworkDeviceType, NetworkLink
-from apps.simulation.models import SimulationRun, SimulationRunEvent, SimulationRunStatus
+from apps.simulation.models import (
+    SimulationEvidence,
+    SimulationRun,
+    SimulationRunEvent,
+    SimulationRunStatus,
+)
 
 SUPPORTED_ANCHOR_TYPES = frozenset({"network_device", "network_link", "line_connection"})
 MAX_EVENT_PAGE_SIZE = 100
@@ -122,6 +127,7 @@ def serialize_run(run: SimulationRun) -> dict[str, Any]:
         "result_ready": isinstance(result, dict)
         and run.status in {SimulationRunStatus.COMPLETED, SimulationRunStatus.FAILED},
         "error_code": run.lifecycle_context.get("error_code") or None,
+        "evidence": _evidence_reference(run),
     }
 
 
@@ -180,6 +186,34 @@ def serialize_result(run: SimulationRun, result: dict[str, Any], comparison: dic
         },
         "operational": result.get("operational", {}),
         "comparison": comparison,
+        "evidence": _evidence_reference(run),
+    }
+
+
+def serialize_evidence(evidence: SimulationEvidence) -> dict[str, Any]:
+    """Return the finalized, already-persisted simulation evidence contract."""
+    return {
+        "evidence_code": evidence.evidence_code,
+        "evidence_hash": evidence.evidence_hash,
+        "finalized": evidence.finalized,
+        "finalized_at": evidence.finalized_at.isoformat() if evidence.finalized_at else None,
+        "snapshot": {
+            "id": evidence.source_snapshot_id,
+            "key": evidence.source_snapshot.snapshot_key,
+        },
+        "payload": evidence.payload,
+    }
+
+
+def _evidence_reference(run: SimulationRun) -> dict[str, Any] | None:
+    try:
+        evidence = run.simulation_evidence
+    except SimulationEvidence.DoesNotExist:
+        return None
+    return {
+        "evidence_code": evidence.evidence_code,
+        "evidence_hash": evidence.evidence_hash,
+        "finalized": evidence.finalized,
     }
 
 

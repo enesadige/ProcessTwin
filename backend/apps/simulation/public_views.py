@@ -15,12 +15,18 @@ from apps.simulation.api_serializers import (
     MAX_EVENT_PAGE_SIZE,
     SimulationAPIError,
     serialize_event,
+    serialize_evidence,
     serialize_result,
     serialize_run,
     validate_anchor,
     validate_parameters,
 )
-from apps.simulation.models import SimulationComparisonRole, SimulationRun, SimulationScenario
+from apps.simulation.models import (
+    SimulationComparisonRole,
+    SimulationEvidence,
+    SimulationRun,
+    SimulationScenario,
+)
 from apps.simulation.services import (
     CanonicalFailureSimulationError,
     CanonicalFailureSimulationService,
@@ -121,7 +127,7 @@ def _scenario(snapshot, scenario_code: object):
 
 def _run(run_code: str):
     run = SimulationRun.objects.select_related(
-        "source_snapshot", "scenario", "baseline_run", "replay_of"
+        "source_snapshot", "scenario", "baseline_run", "replay_of", "simulation_evidence"
     ).filter(run_code=run_code).first()
     if run is None:
         raise SimulationAPIError("not_found", "Simulation run was not found.", status=404)
@@ -379,6 +385,35 @@ def run_result(request, run_code: str):
     except Exception as exc:
         return _error_response(exc)
     return JsonResponse({"data": {"result": serialize_result(run, result, comparison)}})
+
+
+@require_GET
+def run_evidence(request, run_code: str):
+    if response := _access_error(request):
+        return response
+    try:
+        run = _run(run_code)
+        snapshot_identifier = request.GET.get("snapshot_identifier", "").strip()
+        if not snapshot_identifier:
+            raise SimulationAPIError(
+                "validation_error", "snapshot_identifier is required for simulation evidence."
+            )
+        if snapshot_identifier != run.source_snapshot.snapshot_key:
+            raise SimulationAPIError(
+                "not_found",
+                "Simulation evidence was not found in the requested snapshot.",
+                status=404,
+            )
+        evidence = run.simulation_evidence
+    except SimulationEvidence.DoesNotExist:
+        return _error_response(
+            SimulationAPIError(
+                "evidence_not_ready", "Simulation evidence is not ready.", status=409
+            )
+        )
+    except Exception as exc:
+        return _error_response(exc)
+    return JsonResponse({"data": {"evidence": serialize_evidence(evidence)}})
 
 
 @require_GET

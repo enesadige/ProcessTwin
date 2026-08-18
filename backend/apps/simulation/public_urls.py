@@ -4,6 +4,7 @@ from apps.simulation.public_views import (
     baseline_create,
     candidate_create,
     run_events,
+    run_evidence,
     run_pause,
     run_replay,
     run_result,
@@ -27,5 +28,6 @@ urlpatterns = [
     path("runs/<str:run_code>/replay/", run_replay, name="simulation-run-replay"),
     path("runs/<str:run_code>/status/", run_status, name="simulation-run-status"),
     path("runs/<str:run_code>/result/", run_result, name="simulation-run-result"),
+    path("runs/<str:run_code>/evidence/", run_evidence, name="simulation-run-evidence"),
     path("runs/<str:run_code>/events/", run_events, name="simulation-run-events"),
 ]

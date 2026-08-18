@@ -269,6 +269,18 @@ export type TopologySummary = {
 export type SimulationAnchorType = 'network_device' | 'network_link' | 'line_connection'
 export type SimulationRunStatus = 'draft' | 'ready' | 'running' | 'paused' | 'completed' | 'failed' | 'stopped'
 
+export type SimulationEvidenceReference = {
+  evidence_code: string
+  evidence_hash: string
+  finalized: boolean
+}
+
+export type SimulationEvidence = SimulationEvidenceReference & {
+  finalized_at: string | null
+  snapshot: { id: number; key: string }
+  payload: Record<string, unknown>
+}
+
 export type SimulationRun = {
   run_code: string
   comparison_role: 'baseline' | 'candidate'
@@ -283,6 +295,7 @@ export type SimulationRun = {
   event_count: number
   result_ready: boolean
   error_code: string | null
+  evidence: SimulationEvidenceReference | null
 }
 
 export type SimulationResult = {
@@ -325,6 +338,7 @@ export type SimulationResult = {
   }
   operational: Record<string, unknown>
   comparison: Record<string, unknown> | null
+  evidence: SimulationEvidenceReference | null
 }
 
 export type SimulationEvent = {
@@ -589,6 +603,14 @@ export async function getSimulationRunStatus(runCode: string) {
 export async function getSimulationRunResult(runCode: string) {
   const response = await request<{ data: { result: SimulationResult } }>(`/api/simulation/runs/${encodeURIComponent(runCode)}/result/`)
   return response.data.result
+}
+
+export async function getSimulationRunEvidence(runCode: string, snapshotIdentifier: string) {
+  const params = new URLSearchParams({ snapshot_identifier: snapshotIdentifier })
+  const response = await request<{ data: { evidence: SimulationEvidence } }>(
+    `/api/simulation/runs/${encodeURIComponent(runCode)}/evidence/?${params}`,
+  )
+  return response.data.evidence
 }
 
 export async function getSimulationRunEvents({

@@ -150,6 +150,16 @@ function HistoricalPanel({ result }: { result: SimulationResult }) {
   </section>
 }
 
+function EvidencePanel({ run, result }: { run: SimulationRun; result: SimulationResult }) {
+  const evidence = result.evidence ?? run.evidence
+  if (!evidence) return null
+  return <section className="processtwin-result-section" aria-labelledby={`${run.run_code}-evidence-title`}>
+    <div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Persisted simulation provenance</p><h3 id={`${run.run_code}-evidence-title`}>Simulation Evidence</h3></div><span className="processtwin-source-tag">Hypothetical</span></div>
+    <p className="processtwin-note">Bu kanıt simulation-local ve persisted bir projection kaydıdır; historical verified müşteri etkisi veya production evidence değildir.</p>
+    <ResultPairs values={{ snapshot: run.source_snapshot.snapshot_key, scenario: run.scenario_code, run: run.run_code, comparison_role: run.comparison_role, baseline_run: run.baseline_run_code, replay_of: run.replay_of_run_code, virtual_clock: run.virtual_clock, evidence_code: evidence.evidence_code, evidence_hash: evidence.evidence_hash, finalized: evidence.finalized, selected_rule_version: result.rule_selection }} />
+  </section>
+}
+
 function ResultPanel({ title, run, result }: { title: string; run: SimulationRun | null; result: SimulationResult | null }) {
   if (!run || !result) return null
   const rule = result.rule_selection
@@ -164,6 +174,7 @@ function ResultPanel({ title, run, result }: { title: string; run: SimulationRun
     </div>
     <ProjectionPanel result={result} />
     <HistoricalPanel result={result} />
+    <EvidencePanel run={run} result={result} />
     <section className="processtwin-result-section"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Temporal rule and simulated compensation</p><h3>Rule ve telafi sonucu</h3></div></div><div className="processtwin-fact-grid"><FactCard label="Seçilmiş RuleVersion" value={rule ? formatValue(rule) : 'Seçilmiş RuleVersion yok'} muted={!rule} /><FactCard label="Telafi durumu" value={formatValue(compensation.status)} /><FactCard label="Uygunluk" value={formatValue(compensation.eligibility)} /><FactCard label="Simulated tutar" value={`${formatValue(compensation.amount)} ${compensation.currency ?? ''}`.trim()} /><FactCard label="Uygun abonelik" value={formatValue(compensation.eligible_subscription_count)} /><FactCard label="Manuel inceleme" value={formatValue(compensation.manual_review_reason)} muted={Boolean(compensation.manual_review_reason)} /></div></section>
     <section className="processtwin-result-section"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Operational result</p><h3>SLA ve operasyon sonucu</h3></div></div><ResultPairs values={result.operational} /></section>
   </section>

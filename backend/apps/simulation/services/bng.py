@@ -20,6 +20,7 @@ from apps.operations.services.customer_impact_assessment import CustomerImpactAs
 from apps.rules.services.evaluation import RuleEvaluationService
 from apps.rules.services.version_selection import select_rule_version_for_moment
 from apps.simulation.models import SimulationComparisonRole, SimulationRun, SimulationRunStatus
+from apps.simulation.services.evidence import SimulationEvidenceService
 from apps.simulation.services.runtime import SimulationRuntimeError, SimulationService
 
 
@@ -95,6 +96,7 @@ class CanonicalFailureSimulationService:
         impact_service: CustomerImpactAssessmentService | None = None,
         rule_service: RuleEvaluationService | None = None,
         compensation_service: CompensationService | None = None,
+        evidence_service: SimulationEvidenceService | None = None,
     ) -> None:
         self.runtime = runtime or SimulationService()
         self.impact_service = impact_service or CustomerImpactAssessmentService()
@@ -102,6 +104,7 @@ class CanonicalFailureSimulationService:
         self.compensation_service = compensation_service or CompensationService(
             rule_evaluation_service=self.rule_service
         )
+        self.evidence_service = evidence_service or SimulationEvidenceService()
 
     def execute(self, simulation_run: SimulationRun) -> CanonicalFailureResult:
         run = self.runtime._load_run(simulation_run)
@@ -210,7 +213,8 @@ class CanonicalFailureSimulationService:
             occurred_at=ended_at,
             context={"contract": "canonical_failure_projection_v1", "result": result.to_dict()},
         )
-        self.runtime.complete(run, completed_at=ended_at)
+        completed_run = self.runtime.complete(run, completed_at=ended_at)
+        self.evidence_service.materialize(completed_run)
         return result
 
     def compare(
