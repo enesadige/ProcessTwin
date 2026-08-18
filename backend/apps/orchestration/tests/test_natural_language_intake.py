@@ -1231,15 +1231,28 @@ def test_filtered_total_impact_does_not_group_by_incidental_event_wording():
 
 
 @pytest.mark.django_db
-def test_exact_event_compensation_total_is_not_misclassified_as_dataset_analytics():
+@pytest.mark.parametrize(
+    "original_query",
+    [
+        (
+            "CE-INTAKE-001 için telafi uygunluğu nedir; hangi kural sürümü uygulandı ve "
+            "DecisionEvidence kaydını belirt."
+        ),
+        (
+            "CE-INTAKE-001 olayı için telafi değerlendirmesi nedir? Uygun müşteri "
+            "sayısını, toplam tutarı, kullanılan RuleVersion'ı ve DecisionEvidence "
+            "bilgisini ver."
+        ),
+    ],
+)
+def test_exact_event_compensation_details_are_not_misclassified_as_dataset_analytics(
+    original_query,
+):
     snapshot = create_snapshot("anchored-compensation-total")
     create_causal_event(snapshot, code="CE-INTAKE-001")
 
     query = DeterministicStructuredQueryParser().parse(
-        original_query=(
-            "CE-INTAKE-001 için telafi uygunluğu nedir; hangi kural sürümü uygulandı ve "
-            "DecisionEvidence kaydını belirt."
-        ),
+        original_query=original_query,
         snapshot=snapshot,
     ).structured_query
 

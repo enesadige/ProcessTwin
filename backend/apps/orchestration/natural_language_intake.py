@@ -382,11 +382,14 @@ class DeterministicStructuredQueryParser:
         outage_code = self._extract_code(_OUTAGE_CODE_RE, text)
         subscription_reference = self._extract_code(_SUBSCRIPTION_RE, text)
         device_code = self._extract_device_code(snapshot, text)
+        anchored_compensation_request = bool(
+            (causal_event_code or outage_code)
+            and any(term in folded for term in ("tazminat", "telafi", "uygunluk"))
+        )
         if (
             analytics is not None
-            and analytics.metric == "compensation_amount"
+            and anchored_compensation_request
             and analytics.group_by is None
-            and (causal_event_code or outage_code)
             and not any(
                 term in folded
                 for term in (
@@ -406,7 +409,7 @@ class DeterministicStructuredQueryParser:
             )
         ):
             # An exact outage/event compensation request asks for that decision,
-            # even when the natural wording includes "toplam tutar". Dataset-wide
+            # even when detail wording overlaps with analytics metrics. Dataset-wide
             # aggregation requires an explicit grouping/ranking/trend signal.
             analytics = None
             analytics_specs = []
