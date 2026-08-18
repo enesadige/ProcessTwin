@@ -16,6 +16,7 @@ from apps.orchestration.natural_language_intake import (
     LLMSemanticDecomposer,
     NaturalLanguageQueryParseError,
     NaturalLanguageStructuredQueryParser,
+    customer_impact_evidence_gap_requested,
     query_requests_customer_impact,
 )
 from apps.orchestration.planner import DeterministicToolPlanner
@@ -26,6 +27,7 @@ from apps.orchestration.structured_query import (
     RequestedOutput,
     SemanticDimension,
     StructuredQuery,
+    StructuredQueryIntent,
 )
 
 
@@ -39,6 +41,21 @@ from apps.orchestration.structured_query import (
 )
 def test_customer_impact_intent_is_explicit_and_typed(query, expected):
     assert query_requests_customer_impact(query.casefold()) is expected
+
+
+def test_customer_impact_evidence_gap_requires_outage_context_and_impact_unit():
+    assert customer_impact_evidence_gap_requested(
+        "agg-ank-002 cihazindaki kesintide kaniti yetersiz baglanti sayisi nedir?",
+        intent=StructuredQueryIntent.OUTAGE_IMPACT,
+    )
+    assert not customer_impact_evidence_gap_requested(
+        "yetersiz bilgi var mi?",
+        intent=StructuredQueryIntent.OUTAGE_IMPACT,
+    )
+    assert not customer_impact_evidence_gap_requested(
+        "kaniti yetersiz baglanti sayisi nedir?",
+        intent=StructuredQueryIntent.NETWORK_INVESTIGATION,
+    )
 
 
 class RecordingProvider(LLMProvider):
@@ -614,6 +631,105 @@ def test_deterministic_parser_uses_a_snapshot_device_code_as_operational_scope()
     assert parsed.structured_query.outage_code == "OUT-DEVICE-002"
     assert parsed.structured_query.clarification_required is False
     assert parsed.missing_fields == ()
+
+
+@pytest.mark.django_db
+def test_deterministic_parser_marks_anchored_impact_evidence_gap_as_customer_impact():
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from apps.operations.models import (
+        Outage,
+        OutageStatus,
+        OutageType,
+        RootCauseCategory,
+        ServiceImpactClass,
+    )
+    from apps.operations.tests.test_operations_models import create_maltepe_bng
+
+    snapshot = create_snapshot("deterministic-impact-evidence-gap")
+    device = create_maltepe_bng(snapshot, code="AGG-ANK-002")
+    create_causal_event(snapshot, code="CE-INTAKE-001")
+    started_at = timezone.now() - timedelta(minutes=20)
+    Outage.objects.create(
+        data_snapshot=snapshot,
+        outage_code="OUT-IMPACT-GAP-002",
+        source_device=device,
+        outage_type=OutageType.DEVICE,
+        impact_type=ServiceImpactClass.FULL_OUTAGE,
+        status=OutageStatus.RESOLVED,
+        root_cause_category=RootCauseCategory.UNKNOWN,
+        detected_at=started_at,
+        started_at=started_at,
+        ended_at=started_at + timedelta(minutes=10),
+        resolved_at=started_at + timedelta(minutes=10),
+    )
+
+    parser = DeterministicStructuredQueryParser()
+    insufficient = parser.parse(
+        original_query=(
+            "AGG-ANK-002 cihazındaki kesintide kanıtı yetersiz bağlantı sayısı nedir?"
+        ),
+        snapshot=snapshot,
+    ).structured_query
+    verified = parser.parse(
+        original_query=(
+            "AGG-ANK-002 cihazındaki kesintiden kaç müşteri ve kaç abonelik "
+            "gerçekten etkilendi?"
+        ),
+        snapshot=snapshot,
+    ).structured_query
+    potential = parser.parse(
+        original_query=(
+            "AGG-ANK-002 cihazındaki kesintide potansiyel kapsam ile doğrulanmış "
+            "müşteri ve abonelik etkisini ayrı ayrı belirt."
+        ),
+        snapshot=snapshot,
+    ).structured_query
+    generic = parser.parse(
+        original_query="CE-INTAKE-001 için yetersiz bilgi var mı?",
+        snapshot=snapshot,
+    ).structured_query
+
+    assert insufficient.intent == StructuredQueryIntent.OUTAGE_IMPACT
+    assert insufficient.customer_impact_requested is True
+    assert SemanticDimension.EVIDENCE_GAP in insufficient.semantic_dimensions
+    assert insufficient.clarification_required is False
+    assert verified.customer_impact_requested is True
+    assert SemanticDimension.EVIDENCE_GAP not in verified.semantic_dimensions
+    assert potential.customer_impact_requested is True
+    assert SemanticDimension.EVIDENCE_GAP not in potential.semantic_dimensions
+    assert generic.customer_impact_requested is False
+    assert SemanticDimension.EVIDENCE_GAP not in generic.semantic_dimensions
+
+
+@pytest.mark.django_db
+def test_semantic_decomposition_preserves_deterministic_impact_evidence_gap():
+    snapshot = create_snapshot("intake-preserve-impact-evidence-gap")
+    query = StructuredQuery.model_validate(
+        {
+            "intent": "outage_impact",
+            "requested_outputs": ["summary", "impact"],
+            "snapshot_identifier": snapshot.snapshot_key,
+            "causal_event_code": "CE-INTAKE-001",
+            "customer_impact_requested": True,
+            "semantic_dimensions": ["evidence_gap"],
+        }
+    )
+
+    result = LLMSemanticDecomposer(
+        SemanticProvider(["verified_customer_impact"])
+    ).merge(
+        original_query="CE-INTAKE-001 için kanıtı yetersiz bağlantı sayısı nedir?",
+        deterministic_query=query,
+    )
+
+    assert result.accepted is True
+    assert set(result.structured_query.semantic_dimensions) == {
+        SemanticDimension.EVIDENCE_GAP,
+        SemanticDimension.VERIFIED_CUSTOMER_IMPACT,
+    }
 
 
 @pytest.mark.django_db

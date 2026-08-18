@@ -395,6 +395,12 @@ class ValidatedResponseBuilder:
                 contract[1],
                 query_run.structured_query,
             )
+            structured_customer_impact_claim_plan = (
+                self._uses_structured_customer_impact_claim_plan(
+                    contract[1],
+                    query_run.structured_query,
+                )
+            )
             if structured_analytics_claim_plan:
                 narrative, synthesis_audit = self._structured_analytics_claim_narrative(
                     active_provider,
@@ -488,11 +494,46 @@ class ValidatedResponseBuilder:
                         selected_statements[statement_id] for statement_id in completed_ids
                     )
                 response.narrative_synthesis_audit = synthesis_audit
+            elif structured_customer_impact_claim_plan:
+                customer_statements = self._customer_impact_claim_statements(
+                    selected_statements,
+                    contract[1].get("customer_impact_statement_ids", {}),
+                )
+                narrative, synthesis_audit = self._structured_analytics_claim_narrative(
+                    active_provider,
+                    original_query=query_run.original_query,
+                    selected_statements=customer_statements,
+                    analytics_support={},
+                    claim_plan_subject="müşteri etkisi",
+                    no_claims_reason="no_supported_customer_impact_claims",
+                )
+                required_ids = self._required_customer_impact_statement_ids(
+                    customer_statements,
+                    contract[1].get("customer_impact_statement_ids", {}),
+                    query_run.structured_query,
+                )
+                completed_ids, missing_ids = self._complete_structured_required_claims(
+                    synthesis_audit.get("backend_effective_statement_ids", []),
+                    selected_statements=customer_statements,
+                    required_ids=required_ids,
+                )
+                synthesis_audit["required_statement_ids"] = required_ids
+                synthesis_audit["missing_required_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_statement_ids"] = missing_ids
+                synthesis_audit["deterministic_fill_count"] = len(missing_ids)
+                if missing_ids:
+                    synthesis_audit["backend_effective_statement_ids"] = completed_ids
+                    synthesis_audit["rendered_fact_types"] = ["canonical"] * len(completed_ids)
+                    narrative = " ".join(
+                        customer_statements[statement_id] for statement_id in completed_ids
+                    )
+                response.narrative_synthesis_audit = synthesis_audit
             if getattr(active_provider, "supports_grounded_narrative", False):
                 if not (
                     structured_analytics_claim_plan
                     or structured_failover_claim_plan
                     or structured_compensation_claim_plan
+                    or structured_customer_impact_claim_plan
                 ):
                     narrative, synthesis_audit = self._safe_grounded_narrative(
                         active_provider,
@@ -529,6 +570,7 @@ class ValidatedResponseBuilder:
                     structured_analytics_claim_plan
                     or structured_failover_claim_plan
                     or structured_compensation_claim_plan
+                    or structured_customer_impact_claim_plan
                 ):
                     response.generation_mode = ResponseGenerationMode.DETERMINISTIC_FALLBACK
                     response.warnings = sorted(
@@ -915,6 +957,62 @@ class ValidatedResponseBuilder:
             and dimensions & {"rule_version", "decision_evidence"}
         )
 
+    @staticmethod
+    def _uses_structured_customer_impact_claim_plan(
+        statement_contract: Mapping[str, Any],
+        structured_query: Mapping[str, Any] | None,
+    ) -> bool:
+        """Constrain explicit customer-impact answers without absorbing outage analysis."""
+        if not isinstance(structured_query, Mapping):
+            return False
+        dimensions = {
+            str(value) for value in structured_query.get("semantic_dimensions", [])
+        }
+        customer_impact_ids = statement_contract.get("customer_impact_statement_ids", {})
+        if not isinstance(customer_impact_ids, Mapping) or not any(
+            isinstance(value, list) and value for value in customer_impact_ids.values()
+        ):
+            return False
+        explicit_failover = {"failover_status", "outage_classification"} <= dimensions
+        customer_dimensions = {
+            "verified_customer_impact",
+            "verified_subscription_impact",
+            "potential_scope",
+            "verified_no_impact",
+            "insufficient_evidence",
+            "evidence_gap",
+            "failover_protection",
+        }
+        return bool(
+            structured_query.get("intent") == "outage_impact"
+            and structured_query.get("customer_impact_requested") is True
+            and dimensions & customer_dimensions
+            and not explicit_failover
+        )
+
+    @staticmethod
+    def _customer_impact_claim_statements(
+        selected_statements: Mapping[str, str],
+        customer_impact_statement_ids: object,
+    ) -> dict[str, str]:
+        """Expose only selected typed customer-impact facts to the claim planner."""
+        if not isinstance(customer_impact_statement_ids, Mapping):
+            return {}
+        statement_ids: list[str] = []
+        for role_ids in customer_impact_statement_ids.values():
+            if not isinstance(role_ids, list):
+                continue
+            for statement_id in role_ids:
+                if (
+                    isinstance(statement_id, str)
+                    and statement_id in selected_statements
+                    and statement_id not in statement_ids
+                ):
+                    statement_ids.append(statement_id)
+        return {
+            statement_id: selected_statements[statement_id] for statement_id in statement_ids
+        }
+
     @classmethod
     def _structured_analytics_claim_narrative(
         cls,
@@ -1123,6 +1221,54 @@ class ValidatedResponseBuilder:
         required: list[str] = []
         for role in roles:
             statement_ids = compensation_statement_ids.get(role, [])
+            if not isinstance(statement_ids, list):
+                continue
+            required.extend(
+                statement_id
+                for statement_id in statement_ids
+                if isinstance(statement_id, str)
+                and statement_id in selected_statements
+                and statement_id not in required
+            )
+        return required
+
+    @staticmethod
+    def _required_customer_impact_statement_ids(
+        selected_statements: Mapping[str, str],
+        customer_impact_statement_ids: object,
+        structured_query: Mapping[str, Any] | None,
+    ) -> list[str]:
+        """Require only explicitly requested customer-impact fact types."""
+        if not isinstance(customer_impact_statement_ids, Mapping):
+            return []
+        dimensions = set()
+        if isinstance(structured_query, Mapping):
+            dimensions = {
+                str(value) for value in structured_query.get("semantic_dimensions", [])
+            }
+        roles: list[str] = []
+
+        def require(*values: str) -> None:
+            for value in values:
+                if value not in roles:
+                    roles.append(value)
+
+        if "verified_customer_impact" in dimensions:
+            require("verified_customer_impact")
+        if "verified_subscription_impact" in dimensions:
+            require("verified_subscription_impact")
+        if "potential_scope" in dimensions:
+            require("potential_scope")
+        if "verified_no_impact" in dimensions:
+            require("verified_no_impact")
+        if "failover_protection" in dimensions:
+            require("failover_protected")
+        if dimensions & {"insufficient_evidence", "evidence_gap"}:
+            require("insufficient_evidence")
+
+        required: list[str] = []
+        for role in roles:
+            statement_ids = customer_impact_statement_ids.get(role, [])
             if not isinstance(statement_ids, list):
                 continue
             required.extend(
@@ -1748,6 +1894,7 @@ class ValidatedResponseBuilder:
         outage_classification_statement_ids: list[str] = []
         analytics_support_metadata: dict[str, dict[str, object]] = {}
         compensation_statement_ids: dict[str, list[str]] = {}
+        customer_impact_statement_ids: dict[str, list[str]] = {}
 
         analytics_summaries = result.analytics_summaries or (
             [result.analytics_summary] if result.analytics_summary else []
@@ -1766,6 +1913,12 @@ class ValidatedResponseBuilder:
         def add_compensation(text: str, role: str) -> str:
             statement_id = add(text)
             compensation_statement_ids.setdefault(role, []).append(statement_id)
+            return statement_id
+
+        def add_customer_impact(text: str, *roles: str) -> str:
+            statement_id = add(text)
+            for role in roles:
+                customer_impact_statement_ids.setdefault(role, []).append(statement_id)
             return statement_id
 
         analytics = result.analytics_summary
@@ -2044,28 +2197,46 @@ class ValidatedResponseBuilder:
                 impact.affected_subscription_count is not None
                 and impact.affected_customer_count is not None
             ):
-                add(f"Potansiyel kapsam: {impact.potential} abonelik.")
-                add(
+                if impact.potential is not None:
+                    add_customer_impact(
+                        f"Potansiyel kapsam: {impact.potential} abonelik.",
+                        "potential_scope",
+                    )
+                add_customer_impact(
                     "Doğrulanmış etki: "
                     f"{impact.affected_subscription_count} abonelik / "
-                    f"{impact.affected_customer_count} müşteri."
+                    f"{impact.affected_customer_count} müşteri.",
+                    "verified_subscription_impact",
+                    "verified_customer_impact",
                 )
             else:
-                for label, value in (
-                    ("Potansiyel kapsam", impact.potential),
-                    ("Doğrulanmış etki", impact.verified_impacted),
-                    ("Doğrulanmış etkisizlik", impact.verified_no_impact),
-                    ("Kanıt yetersiz", impact.insufficient_evidence),
+                for label, value, role in (
+                    ("Potansiyel kapsam", impact.potential, "potential_scope"),
+                    ("Doğrulanmış etki", impact.verified_impacted, "verified_subscription_impact"),
+                    ("Doğrulanmış etkisizlik", impact.verified_no_impact, "verified_no_impact"),
+                    ("Kanıt yetersiz", impact.insufficient_evidence, "insufficient_evidence"),
                 ):
                     if value is not None:
-                        add(f"{label}: {value} bağlantı.")
+                        add_customer_impact(f"{label}: {value} bağlantı.", role)
+            if (
+                impact.affected_subscription_count is not None
+                and impact.affected_customer_count is not None
+                and impact.insufficient_evidence is not None
+            ):
+                add_customer_impact(
+                    f"Kanıt yetersiz: {impact.insufficient_evidence} bağlantı.",
+                    "insufficient_evidence",
+                )
             if impact.failover_protected is not None:
                 suffix = (
                     " tam hizmet kesintisi değildir."
                     if causal and causal.full_outage is False
                     else "."
                 )
-                add(f"Failover ile korunan: {impact.failover_protected} bağlantı{suffix}")
+                add_customer_impact(
+                    f"Failover ile korunan: {impact.failover_protected} bağlantı{suffix}",
+                    "failover_protected",
+                )
                 if causal and causal.full_outage is True and impact.failover_protected > 0:
                     add(
                         "Failover bazı bağlantıları korusa da bu olayda tam hizmet kesintisini "
@@ -2186,6 +2357,12 @@ class ValidatedResponseBuilder:
                     *statement_concepts[statement_id],
                     role,
                 ]
+        for role, statement_ids in customer_impact_statement_ids.items():
+            for statement_id in statement_ids:
+                statement_concepts[statement_id] = [
+                    *statement_concepts[statement_id],
+                    role,
+                ]
         schema = {
             "type": "object",
             "properties": {
@@ -2258,6 +2435,7 @@ class ValidatedResponseBuilder:
             "analytics_requested_statement_ids": analytics_requested_statement_ids,
             "outage_classification_statement_ids": outage_classification_statement_ids,
             "compensation_statement_ids": compensation_statement_ids,
+            "customer_impact_statement_ids": customer_impact_statement_ids,
             "analytics_has_typed_requirements": bool(
                 analytics_answer_support.requirements.requirements
             ),

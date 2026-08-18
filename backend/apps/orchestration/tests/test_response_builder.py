@@ -1887,6 +1887,78 @@ def _compensation_required_ids(run):
     return contract, selected_statements, required_ids
 
 
+def _customer_impact_structured_query(snapshot_identifier, *, dimensions=None):
+    return {
+        "snapshot_identifier": snapshot_identifier,
+        "intent": "outage_impact",
+        "requested_outputs": ["impact"],
+        "semantic_dimensions": dimensions
+        or ["verified_customer_impact", "verified_subscription_impact"],
+        "customer_impact_requested": True,
+    }
+
+
+def _customer_impact_result(snapshot_identifier):
+    base = valid_result(snapshot_identifier)
+    impact = base.impact_summary.model_copy(
+        update={
+            "potential": 572,
+            "verified_impacted": 429,
+            "affected_subscription_count": 429,
+            "affected_customer_count": 393,
+            "verified_no_impact": 0,
+            "insufficient_evidence": 143,
+            "failover_protected": 0,
+        }
+    )
+    return base.model_copy(update={"impact_summary": impact})
+
+
+def _customer_impact_run(snapshot, *, result=None, dimensions=None):
+    result = (
+        result if result is not None else _customer_impact_result(snapshot.snapshot_key)
+    )
+    run = completed_run(
+        "response-structured-customer-impact",
+        snapshot=snapshot,
+        result=result,
+        original_query="Kesintiden kaç müşteri ve kaç abonelik gerçekten etkilendi?",
+    )
+    run.structured_query = _customer_impact_structured_query(
+        snapshot.snapshot_key,
+        dimensions=dimensions,
+    )
+    run.save(update_fields=["structured_query"])
+    return run
+
+
+def _customer_impact_claims(run):
+    result = ValidatedExecutionResult.model_validate(run.final_result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=run.structured_query,
+    )
+    selection = ValidatedResponseBuilder._deterministic_answer_plan(
+        contract,
+        run.structured_query,
+    )
+    selected_statements = {
+        statement_id: contract["statements"][statement_id]
+        for statement_id in selection["selected_statement_ids"]
+    }
+    claims = ValidatedResponseBuilder._customer_impact_claim_statements(
+        selected_statements,
+        contract["customer_impact_statement_ids"],
+    )
+    required_ids = ValidatedResponseBuilder._required_customer_impact_statement_ids(
+        claims,
+        contract["customer_impact_statement_ids"],
+        run.structured_query,
+    )
+    return contract, selected_statements, claims, required_ids
+
+
 @pytest.mark.django_db
 def test_explicit_failover_uses_structured_claim_plan_without_impact_prose():
     snapshot = create_snapshot("response-structured-failover-true")
@@ -2189,6 +2261,170 @@ def test_rule_document_retrieval_does_not_enable_structured_compensation_claims(
             "intent": "rule_document_retrieval",
             "semantic_dimensions": ["rule_version"],
         },
+    )
+
+
+@pytest.mark.django_db
+def test_customer_impact_uses_structured_claims_for_verified_metrics_only():
+    snapshot = create_snapshot("response-structured-ci")
+    run = _customer_impact_run(snapshot)
+    contract, _selected, claims, required_ids = _customer_impact_claims(run)
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": statement_id, "role": "primary"} for statement_id in required_ids]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert len(provider.requests) == 1
+    assert response.narrative_synthesis_audit["mode"] == "structured_claim_plan"
+    assert response.narrative_synthesis_audit["fallback_used"] is False
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 0
+    assert response.response_text == "Doğrulanmış etki: 429 abonelik / 393 müşteri."
+    assert "572" not in response.response_text
+    assert "143" not in response.response_text
+    assert "sınırlı" not in response.response_text.casefold()
+    assert contract["customer_impact_statement_ids"]["potential_scope"] != required_ids
+    assert set(claims) == {
+        *contract["customer_impact_statement_ids"]["potential_scope"],
+        *contract["customer_impact_statement_ids"]["verified_customer_impact"],
+        *contract["customer_impact_statement_ids"]["insufficient_evidence"],
+        *contract["customer_impact_statement_ids"]["failover_protected"],
+    }
+
+
+@pytest.mark.django_db
+def test_customer_impact_completes_missing_verified_statement_only():
+    snapshot = create_snapshot("response-structured-ci-completeness")
+    run = _customer_impact_run(snapshot)
+    _contract, _selected, claims, required_ids = _customer_impact_claims(run)
+    optional_id = next(statement_id for statement_id in claims if statement_id not in required_ids)
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": optional_id, "role": "primary"}]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    audit = response.narrative_synthesis_audit
+    assert audit["missing_required_statement_ids"] == required_ids
+    assert audit["deterministic_fill_statement_ids"] == required_ids
+    assert audit["deterministic_fill_count"] == 1
+    assert response.response_text.endswith("Doğrulanmış etki: 429 abonelik / 393 müşteri.")
+    assert "143" not in response.response_text
+
+
+@pytest.mark.django_db
+def test_customer_impact_exposes_insufficient_evidence_only_when_explicitly_requested():
+    snapshot = create_snapshot("response-structured-ci-unknown")
+    run = _customer_impact_run(
+        snapshot,
+        dimensions=["verified_customer_impact", "evidence_gap"],
+    )
+    contract, _selected, claims, required_ids = _customer_impact_claims(run)
+    insufficient_id = contract["customer_impact_statement_ids"]["insufficient_evidence"][0]
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": insufficient_id, "role": "primary"}]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert insufficient_id in required_ids
+    assert "Kanıt yetersiz: 143 bağlantı." in response.response_text
+    assert "143 abonelik" not in response.response_text
+    assert "0 bağlantı" not in response.response_text
+    assert "Doğrulanmış etki: 429 abonelik / 393 müşteri." in response.response_text
+    assert set(claims) >= {insufficient_id}
+
+
+@pytest.mark.django_db
+def test_customer_impact_renders_canonical_verified_no_impact_without_verified_impact():
+    snapshot = create_snapshot("response-structured-ci-protected")
+    result = _customer_impact_result(snapshot.snapshot_key)
+    impact = result.impact_summary.model_copy(
+        update={
+            "affected_subscription_count": None,
+            "affected_customer_count": None,
+            "verified_impacted": None,
+            "verified_no_impact": 4,
+            "insufficient_evidence": None,
+        }
+    )
+    run = _customer_impact_run(
+        snapshot,
+        result=result.model_copy(update={"impact_summary": impact}),
+        dimensions=["verified_no_impact"],
+    )
+    contract, _selected, _claims, required_ids = _customer_impact_claims(run)
+    protected_id = contract["customer_impact_statement_ids"]["verified_no_impact"][0]
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": protected_id, "role": "primary"}]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    assert required_ids == [protected_id]
+    assert response.response_text == "Doğrulanmış etkisizlik: 4 bağlantı."
+    assert "429 abonelik" not in response.response_text
+    assert response.narrative_synthesis_audit["deterministic_fill_count"] == 0
+
+
+@pytest.mark.django_db
+def test_customer_impact_rejects_unrelated_outage_statement_ids():
+    snapshot = create_snapshot("response-structured-ci-unrelated")
+    run = _customer_impact_run(snapshot)
+    contract, selected_statements, _claims, required_ids = _customer_impact_claims(run)
+    unrelated_id = next(
+        statement_id
+        for statement_id in selected_statements
+        if statement_id not in contract["customer_impact_statement_ids"]["verified_customer_impact"]
+        and statement_id not in contract["customer_impact_statement_ids"]["potential_scope"]
+        and statement_id not in contract["customer_impact_statement_ids"]["insufficient_evidence"]
+        and statement_id not in contract["customer_impact_statement_ids"]["failover_protected"]
+    )
+    provider = StructuredAnalyticsClaimPlanProvider(
+        [{"statement_id": unrelated_id, "role": "primary"}]
+    )
+
+    response = ValidatedResponseBuilder().build(
+        run, mode=ResponseGenerationMode.LLM_ASSISTED, provider=provider
+    )
+
+    audit = response.narrative_synthesis_audit
+    assert audit["fallback_used"] is True
+    assert audit["rejected_statement_ids"] == [unrelated_id]
+    assert audit["required_statement_ids"] == required_ids
+    assert "kök neden" not in response.response_text.casefold()
+    assert "AGG-ANK" not in response.response_text
+
+
+@pytest.mark.django_db
+def test_customer_impact_gate_does_not_override_explicit_failover_gate():
+    snapshot = create_snapshot("response-structured-ci-failover")
+    run = _customer_impact_run(
+        snapshot,
+        dimensions=[
+            "verified_customer_impact",
+            "failover_status",
+            "outage_classification",
+        ],
+    )
+    result = ValidatedExecutionResult.model_validate(run.final_result)
+    _prompt, contract = ValidatedResponseBuilder._statement_contract(
+        result,
+        original_query=run.original_query,
+        structured_query=run.structured_query,
+    )
+
+    assert not ValidatedResponseBuilder._uses_structured_customer_impact_claim_plan(
+        contract,
+        run.structured_query,
     )
 
 

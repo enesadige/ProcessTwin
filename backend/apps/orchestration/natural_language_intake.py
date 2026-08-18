@@ -76,6 +76,22 @@ _CUSTOMER_IMPACT_REQUEST_TERMS = (
     "customer impact",
     "subscription impact",
 )
+_IMPACT_EVIDENCE_GAP_TERMS = (
+    "kanıtı yetersiz",
+    "kaniti yetersiz",
+    "yetersiz kanıt",
+    "yetersiz kanit",
+    "insufficient evidence",
+)
+_IMPACT_UNIT_TERMS = (
+    "baglantı",
+    "baglanti",
+    "musteri",
+    "abonelik",
+    "connection",
+    "customer",
+    "subscription",
+)
 
 
 class NaturalLanguageQueryParseError(Exception):
@@ -187,7 +203,10 @@ class LLMSemanticDecomposer:
             ):
                 raise ValueError("provider_response_invalid")
             candidate = _SemanticDecomposition.model_validate(json.loads(response["content"]))
-            dimensions = sorted(set(candidate.dimensions), key=lambda value: value.value)
+            dimensions = sorted(
+                set(deterministic_query.semantic_dimensions).union(candidate.dimensions),
+                key=lambda value: value.value,
+            )
             requested = set(deterministic_query.requested_outputs)
             allowed_outputs = self._allowed_outputs(deterministic_query)
             dimensions = [
@@ -327,6 +346,17 @@ def _fold(value: str) -> str:
 def query_requests_customer_impact(folded_query: str) -> bool:
     """Detect explicit customer/subscription impact intent, independent of LLM labels."""
     return any(term in folded_query for term in _CUSTOMER_IMPACT_REQUEST_TERMS)
+
+
+def customer_impact_evidence_gap_requested(
+    folded_query: str, *, intent: StructuredQueryIntent
+) -> bool:
+    """Recognize scoped impact-evidence gaps without treating generic uncertainty as impact."""
+    return bool(
+        intent == StructuredQueryIntent.OUTAGE_IMPACT
+        and any(term in folded_query for term in _IMPACT_EVIDENCE_GAP_TERMS)
+        and any(term in folded_query for term in _IMPACT_UNIT_TERMS)
+    )
 
 
 class DeterministicStructuredQueryParser:
@@ -495,6 +525,13 @@ class DeterministicStructuredQueryParser:
             MissingField.REQUESTED_OUTPUT: ClarificationReason.MISSING_REQUESTED_OUTPUT,
             MissingField.COMPENSATION_ANCHOR: ClarificationReason.COMPENSATION_ANCHOR_REQUIRED,
         }
+        impact_evidence_gap_requested = customer_impact_evidence_gap_requested(
+            folded,
+            intent=intent,
+        )
+        semantic_dimensions = (
+            [SemanticDimension.EVIDENCE_GAP] if impact_evidence_gap_requested else []
+        )
         query = StructuredQuery.model_validate(
             {
                 "intent": intent,
@@ -502,7 +539,10 @@ class DeterministicStructuredQueryParser:
                 "analytics": analytics.model_dump() if analytics else None,
                 "analytics_specs": [item.model_dump() for item in analytics_specs],
                 "analytics_locations": analytics_locations,
-                "customer_impact_requested": query_requests_customer_impact(folded),
+                "customer_impact_requested": (
+                    query_requests_customer_impact(folded) or impact_evidence_gap_requested
+                ),
+                "semantic_dimensions": semantic_dimensions,
                 "snapshot_identifier": snapshot.snapshot_key,
                 "causal_event_code": causal_event_code,
                 "comparison_causal_event_code": comparison_causal_event_code,
