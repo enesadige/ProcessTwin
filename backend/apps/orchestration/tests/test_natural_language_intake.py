@@ -1130,6 +1130,21 @@ def test_explicit_multi_month_analytics_trend_requires_no_operational_anchor():
 
 
 @pytest.mark.django_db
+def test_monthly_alarm_comparison_uses_month_time_grain():
+    snapshot = create_snapshot("analytics-monthly-alarm-comparison")
+
+    query = DeterministicStructuredQueryParser().parse(
+        original_query="2026 yılında aylara göre oluşan alarm sayılarını karşılaştır.",
+        snapshot=snapshot,
+    ).structured_query
+
+    assert query.analytics is not None
+    assert query.analytics.metric == "alarm_count"
+    assert query.analytics.group_by == "time_bucket"
+    assert query.analytics.time_grain == "month"
+
+
+@pytest.mark.django_db
 def test_analytics_comparison_without_period_remains_clarification_required():
     snapshot = create_snapshot("analytics-comparison-missing-period")
 

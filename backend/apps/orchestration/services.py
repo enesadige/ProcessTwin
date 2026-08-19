@@ -78,6 +78,7 @@ _IDENTIFIER_LABEL_RE = re.compile(
 _EMAIL_ADDRESS_RE = re.compile(r"\b[^\s@]+@[^\s@]+\.[^\s@]+\b")
 _PHONE_NUMBER_RE = re.compile(r"\b(?:\+?\d[\d\s().-]{7,}\d)\b")
 _DECIMAL_NUMBER_RE = re.compile(r"^\d+[.,]\d{1,2}$")
+_ISO_TIME_BUCKET_RE = re.compile(r"^\d{4}-(?:\d{2}|\d{2}-\d{2}|W\d{2})$")
 _ERROR_CODE_RE = re.compile(r"^[a-z][a-z0-9_]{0,79}$")
 
 
@@ -114,6 +115,7 @@ def sanitize_text(value: str | None) -> str:
         lambda match: (
             match.group(0)
             if _DECIMAL_NUMBER_RE.fullmatch(match.group(0))
+            or _ISO_TIME_BUCKET_RE.fullmatch(match.group(0))
             else "[REDACTED_PHONE]"
         ),
         text,

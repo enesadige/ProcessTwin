@@ -1201,7 +1201,9 @@ class DeterministicStructuredQueryParser:
             group_by = "time_bucket"
         grain = (
             "month"
-            if "aylara göre" in folded or len(month_mentions) > 1 or len(set(named_months)) > 1
+            if any(term in folded for term in ("aylara gore", "aylarina gore"))
+            or len(month_mentions) > 1
+            or len(set(named_months)) > 1
             else "week"
             if "haftalara göre" in folded
             else "day"

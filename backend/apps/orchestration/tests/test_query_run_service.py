@@ -46,6 +46,18 @@ def test_sanitize_text_preserves_decimal_money_but_redacts_phone_numbers():
     assert "[REDACTED_PHONE]" in text
 
 
+def test_sanitize_text_preserves_iso_time_buckets_but_redacts_phone_numbers():
+    text = sanitize_text(
+        "Dönemler: 2026-06, 2026-06-02 ve 2026-W23; telefon 0532 123 45 67."
+    )
+
+    assert "2026-06" in text
+    assert "2026-06-02" in text
+    assert "2026-W23" in text
+    assert "0532" not in text
+    assert "[REDACTED_PHONE]" in text
+
+
 @pytest.fixture
 def snapshot():
     return create_snapshot("query-run-seed-001")
