@@ -28,6 +28,7 @@ const TERMINAL_STATUSES = new Set<SimulationRunStatus>(['completed', 'failed', '
 
 type WorkspaceState = 'idle' | 'running' | 'ready' | 'error'
 type FailureKind = 'access' | 'not-found' | 'validation' | 'lifecycle' | 'retryable' | 'other'
+type ResultNavigationKey = 'controls' | 'topology' | 'baseline' | 'candidate' | 'comparison' | 'timeline'
 
 type ScenarioForm = {
   snapshotIdentifier: string
@@ -80,7 +81,25 @@ function formatValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return 'Belirtilmedi'
   if (typeof value === 'boolean') return value ? 'Evet' : 'Hayır'
   if (typeof value === 'number') return new Intl.NumberFormat('tr-TR').format(value)
-  if (typeof value === 'string') return value
+  if (typeof value === 'string') return ({
+    completed: 'Tamamlandı',
+    baseline: 'Referans',
+    candidate: 'Aday',
+    network_device: 'Ağ cihazı',
+    network_link: 'Ağ bağlantısı',
+    line_connection: 'Hat bağlantısı',
+    network_device_failure: 'Ağ cihazı arızası',
+    simulation_projection: 'Simülasyon tahmini',
+    hypothetical: 'Varsayımsal',
+    historical: 'Geçmiş',
+    manual_review: 'Manuel inceleme',
+    unknown: 'Bilinmiyor',
+    no_single_rule_version: 'Tek bir RuleVersion belirlenemedi',
+    eligible: 'Uygun',
+    ineligible: 'Uygun değil',
+    pending: 'Beklemede',
+    calculated: 'Hesaplandı',
+  } as Record<string, string>)[value] ?? value
   if (Array.isArray(value)) return value.length ? value.map(formatValue).join(', ') : 'Belirtilmedi'
   if (typeof value === 'object') {
     const record = value as Record<string, unknown>
@@ -111,7 +130,48 @@ function labelFor(key: string) {
     amount: 'Tutar',
     currency: 'Para birimi',
     manual_review_reason: 'Manuel inceleme nedeni',
+    potential_subscription_scope: 'Potansiyel abonelik kapsamı',
+    potential_customer_scope: 'Potansiyel müşteri kapsamı',
+    projected_affected_subscriptions: 'Tahmini etkilenen abonelik',
+    projected_affected_customers: 'Tahmini etkilenen müşteri',
+    projected_protected_no_impact_subscriptions: 'Tahmini korunan / etkisiz',
+    projected_unknown_subscriptions: 'Tahmini bilinmeyen',
+    projected_affected_customer_delta: 'Etkilenen müşteri farkı',
+    projected_affected_customers_delta: 'Etkilenen müşteri farkı',
+    projected_affected_subscription_delta: 'Etkilenen abonelik farkı',
+    projected_affected_subscriptions_delta: 'Etkilenen abonelik farkı',
+    projected_unknown_delta: 'Bilinmeyen farkı',
+    projected_unknown_subscriptions_delta: 'Bilinmeyen farkı',
+    projected_protected_no_impact_delta: 'Korunan / etkisiz farkı',
+    projected_protected_no_impact_subscriptions_delta: 'Korunan / etkisiz farkı',
+    compensation_amount_delta: 'Telafi tutarı farkı',
+    duration_seconds_delta: 'Süre farkı',
+    sla_target_seconds_delta: 'SLA hedefi farkı',
+    comparison_role: 'Karşılaştırma rolü',
+    run: 'Çalıştırma kodu',
+    evidence_code: 'Kanıt kodu',
+    evidence_hash: 'Kanıt parmak izi',
+    virtual_clock: 'Sanal saat',
+    scenario: 'Senaryo kodu',
+    snapshot: 'Snapshot',
+    finalized: 'Kesinleşti',
+    selected_rule_version: 'Seçilmiş RuleVersion',
+    failover_classification: 'Failover sınıflandırması',
+    failure_mode: 'Arıza modu',
+    protection_policy: 'Koruma politikası',
   } as Record<string, string>)[key] ?? key.replaceAll('_', ' ')
+}
+
+function simulationStatusLabel(status: SimulationRunStatus | undefined) {
+  return ({
+    draft: 'Taslak',
+    ready: 'Hazır',
+    running: 'Çalışıyor',
+    paused: 'Duraklatıldı',
+    completed: 'Tamamlandı',
+    failed: 'Başarısız',
+    stopped: 'Durduruldu',
+  } as Record<SimulationRunStatus, string>)[status ?? 'ready']
 }
 
 function FactCard({ label, value, muted = false }: { label: string; value: ReactNode; muted?: boolean }) {
@@ -127,26 +187,28 @@ function ResultPairs({ values }: { values: Record<string, unknown> }) {
 function ProjectionPanel({ result }: { result: SimulationResult }) {
   const projection = result.projection
   return <section className="processtwin-result-section processtwin-result-section--projection" aria-labelledby="projection-title">
-    <div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Simulation projection</p><h3 id="projection-title">Simülasyon tahmini / Projected</h3></div><span className="processtwin-source-tag">Hypothetical</span></div>
-    <p className="processtwin-note">Bu değerler source snapshot ve açık simulation varsayımlarından üretilmiştir; geçmiş doğrulanmış etki veya production fact değildir.</p>
+    <div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Simülasyon tahmini</p><h3 id="projection-title">Tahmini etki kapsamı</h3></div></div>
+    <p className="processtwin-note">Bu değerler simülasyon koşullarından üretilmiştir; geçmiş doğrulanmış etki veya üretim gerçeği değildir.</p>
     <div className="processtwin-fact-grid">
       <FactCard label="Potansiyel abonelik kapsamı" value={formatValue(projection.potential_subscription_scope)} />
       <FactCard label="Potansiyel müşteri kapsamı" value={formatValue(projection.potential_customer_scope)} />
-      <FactCard label="Projected etkilenen abonelik" value={formatValue(projection.projected_affected_subscriptions)} />
-      <FactCard label="Projected etkilenen müşteri" value={formatValue(projection.projected_affected_customers)} />
-      <FactCard label="Projected korunan / no-impact" value={formatValue(projection.projected_protected_no_impact_subscriptions)} />
-      <FactCard label="Projected unknown" value={formatValue(projection.projected_unknown_subscriptions)} muted={projection.projected_unknown_subscriptions === null || projection.projected_unknown_subscriptions === undefined} />
+      <FactCard label="Tahmini etkilenen abonelik" value={formatValue(projection.projected_affected_subscriptions)} />
+      <FactCard label="Tahmini etkilenen müşteri" value={formatValue(projection.projected_affected_customers)} />
+      <FactCard label="Tahmini korunan / etkisiz" value={formatValue(projection.projected_protected_no_impact_subscriptions)} />
+      <FactCard label="Tahmini bilinmeyen" value={formatValue(projection.projected_unknown_subscriptions)} muted={projection.projected_unknown_subscriptions === null || projection.projected_unknown_subscriptions === undefined} />
     </div>
-    <ResultPairs values={{ basis: projection.basis, connection_basis: projection.connection_basis, failover_classification: projection.failover_classification, ...projection.assumptions }} />
+    <details className="processtwin-technical-details"><summary>Teknik tahmin ayrıntıları</summary><ResultPairs values={{ basis: projection.basis, connection_basis: projection.connection_basis, failover_classification: projection.failover_classification, ...projection.assumptions }} /></details>
   </section>
 }
 
-function HistoricalPanel({ result }: { result: SimulationResult }) {
+function HistoricalPanel({ result, showNotice }: { result: SimulationResult; showNotice: boolean }) {
   const evidence = result.historical_evidence
   const hasEvidence = Object.keys(evidence).length > 0 && evidence.basis !== 'not_used_for_device_anchor'
+  if (!hasEvidence) return null
   return <section className="processtwin-result-section" aria-labelledby="historical-title">
-    <div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Persisted source evidence</p><h3 id="historical-title">Geçmiş doğrulanmış kanıt</h3></div><span className="processtwin-source-tag">Historical</span></div>
-    {hasEvidence ? <ResultPairs values={evidence} /> : <p className="processtwin-empty">Bu hypothetical anchor için ayrı bir historical verified impact sonucu kullanılmadı. Bu, sıfır historical impact anlamına gelmez.</p>}
+    <div className="processtwin-section-heading"><div><h3 id="historical-title">Geçmiş doğrulanmış kanıt</h3></div><span className="processtwin-source-tag">Geçmiş</span></div>
+    {showNotice ? <p className="processtwin-note">Simülasyon tahmini, geçmiş doğrulanmış müşteri etkisi değildir.</p> : null}
+    <details className="processtwin-technical-details"><summary>Kanıt ayrıntıları</summary><ResultPairs values={evidence} /></details>
   </section>
 }
 
@@ -154,9 +216,9 @@ function EvidencePanel({ run, result }: { run: SimulationRun; result: Simulation
   const evidence = result.evidence ?? run.evidence
   if (!evidence) return null
   return <section className="processtwin-result-section" aria-labelledby={`${run.run_code}-evidence-title`}>
-    <div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Persisted simulation provenance</p><h3 id={`${run.run_code}-evidence-title`}>Simulation Evidence</h3></div><span className="processtwin-source-tag">Hypothetical</span></div>
-    <p className="processtwin-note">Bu kanıt simulation-local ve persisted bir projection kaydıdır; historical verified müşteri etkisi veya production evidence değildir.</p>
-    <ResultPairs values={{ snapshot: run.source_snapshot.snapshot_key, scenario: run.scenario_code, run: run.run_code, comparison_role: run.comparison_role, baseline_run: run.baseline_run_code, replay_of: run.replay_of_run_code, virtual_clock: run.virtual_clock, evidence_code: evidence.evidence_code, evidence_hash: evidence.evidence_hash, finalized: evidence.finalized, selected_rule_version: result.rule_selection }} />
+    <div className="processtwin-section-heading"><div><h3 id={`${run.run_code}-evidence-title`}>Simülasyon kanıtı</h3></div><span className="processtwin-source-tag">Varsayımsal</span></div>
+    <div className="processtwin-fact-grid processtwin-fact-grid--compact"><FactCard label="Çalıştırma kodu" value={run.run_code} /><FactCard label="Kanıt kodu" value={evidence.evidence_code} /><FactCard label="Karşılaştırma rolü" value={formatValue(run.comparison_role)} /></div>
+    <details className="processtwin-technical-details"><summary>Teknik izlenebilirlik</summary><ResultPairs values={{ snapshot: run.source_snapshot.snapshot_key, scenario: run.scenario_code, baseline_run: run.baseline_run_code, replay_of: run.replay_of_run_code, virtual_clock: run.virtual_clock, evidence_hash: evidence.evidence_hash, finalized: evidence.finalized, selected_rule_version: result.rule_selection }} /></details>
   </section>
 }
 
@@ -164,37 +226,41 @@ function ResultPanel({ title, run, result }: { title: string; run: SimulationRun
   if (!run || !result) return null
   const rule = result.rule_selection
   const compensation = result.compensation
-  return <section className="processtwin-result" aria-labelledby={`${run.comparison_role}-result-title`}>
-    <header className="processtwin-result__header"><div><p className="processtwin-eyebrow">{run.comparison_role === 'baseline' ? 'Canonical baseline' : 'Explicit candidate override'}</p><h2 id={`${run.comparison_role}-result-title`}>{title}</h2><p>{result.event.anchor_type} · {result.event.anchor_code} · {result.event.failure_type}</p></div><span className={`processtwin-run-status processtwin-run-status--${run.status}`}>{run.status}</span></header>
-    <div className="processtwin-fact-grid">
-      <FactCard label="Virtual başlangıç" value={formatValue(result.event.started_at ?? run.virtual_clock)} />
-      <FactCard label="Süre" value={result.event.duration_seconds === null || result.event.duration_seconds === undefined ? 'Belirtilmedi' : `${formatValue(result.event.duration_seconds)} sn`} />
-      <FactCard label="Kesinti sınıfı" value={formatValue(result.event.outage_classification)} />
-      <FactCard label="Hız" value={`${run.speed_multiplier}x`} />
-    </div>
+  return <section className={`processtwin-result processtwin-result--${run.comparison_role}`} aria-labelledby={`${run.comparison_role}-result-title`}>
+    <header className="processtwin-result__header"><div><h2 id={`${run.comparison_role}-result-title`}>{title}</h2><p>{formatValue(result.event.anchor_type)} · {result.event.anchor_code} · {formatValue(result.event.failure_type)}</p></div></header>
     <ProjectionPanel result={result} />
-    <HistoricalPanel result={result} />
+    <HistoricalPanel result={result} showNotice={run.comparison_role === 'baseline'} />
     <EvidencePanel run={run} result={result} />
-    <section className="processtwin-result-section"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Temporal rule and simulated compensation</p><h3>Rule ve telafi sonucu</h3></div></div><div className="processtwin-fact-grid"><FactCard label="Seçilmiş RuleVersion" value={rule ? formatValue(rule) : 'Seçilmiş RuleVersion yok'} muted={!rule} /><FactCard label="Telafi durumu" value={formatValue(compensation.status)} /><FactCard label="Uygunluk" value={formatValue(compensation.eligibility)} /><FactCard label="Simulated tutar" value={`${formatValue(compensation.amount)} ${compensation.currency ?? ''}`.trim()} /><FactCard label="Uygun abonelik" value={formatValue(compensation.eligible_subscription_count)} /><FactCard label="Manuel inceleme" value={formatValue(compensation.manual_review_reason)} muted={Boolean(compensation.manual_review_reason)} /></div></section>
-    <section className="processtwin-result-section"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Operational result</p><h3>SLA ve operasyon sonucu</h3></div></div><ResultPairs values={result.operational} /></section>
+    <section className="processtwin-result-section processtwin-result-section--compensation"><div className="processtwin-section-heading"><div><h3>Kural ve telafi sonucu</h3></div></div><div className="processtwin-fact-grid"><FactCard label="Seçilmiş RuleVersion" value={rule ? formatValue(rule) : 'Seçilmiş RuleVersion yok'} muted={!rule} /><FactCard label="Telafi durumu" value={formatValue(compensation.status)} /><FactCard label="Uygunluk" value={formatValue(compensation.eligibility)} /><FactCard label="Simüle edilen tutar" value={`${formatValue(compensation.amount)} ${compensation.currency ?? ''}`.trim()} /><FactCard label="Uygun abonelik" value={formatValue(compensation.eligible_subscription_count)} /><FactCard label="Manuel inceleme nedeni" value={formatValue(compensation.manual_review_reason)} muted={Boolean(compensation.manual_review_reason)} /></div></section>
+    <section className="processtwin-result-section processtwin-result-section--operational"><div className="processtwin-section-heading"><div><h3>SLA ve operasyon sonucu</h3></div></div><ResultPairs values={result.operational} /></section>
   </section>
 }
 
 function ComparisonPanel({ result }: { result: SimulationResult | null }) {
   if (!result?.comparison) return null
-  return <section className="processtwin-comparison" aria-labelledby="comparison-title"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Canonical comparison</p><h2 id="comparison-title">Baseline / candidate delta</h2></div></div><ResultPairs values={result.comparison} /></section>
+  return <section className="processtwin-comparison" aria-labelledby="comparison-title"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Senaryo karşılaştırması</p><h2 id="comparison-title">Referans / aday farkı</h2></div></div><ResultPairs values={result.comparison} /></section>
+}
+
+function simulationEventLabel(eventType: string) {
+  return ({ runtime_started: 'Simülasyon başladı', bng_failure: 'BNG arızası', alarm: 'Alarm oluştu', incident: 'Olay oluştu', outage: 'Kesinti oluştu', customer_impact: 'Müşteri etkisi hesaplandı', compensation_evaluation: 'Telafi değerlendirildi', simulation_result: 'Simülasyon sonucu oluşturuldu', runtime_completed: 'Simülasyon tamamlandı' } as Record<string, string>)[eventType] ?? eventType.replaceAll('_', ' ')
 }
 
 function Timeline({ events, hasMore, onLoadMore, loading }: { events: SimulationEvent[]; hasMore: boolean; onLoadMore: () => void; loading: boolean }) {
-  return <section className="processtwin-timeline" aria-labelledby="timeline-title"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Persisted event trace</p><h2 id="timeline-title">Simulation event timeline</h2></div><span className="processtwin-source-tag">Cursor read</span></div><p className="processtwin-note">Bu gerçek zamanlı stream değildir. Timeline, tamamlanmış run’ın persisted simulation-local event kayıtlarından cursor ile okunur.</p>{events.length ? <ol>{events.map((event) => <li key={event.sequence}><span className="processtwin-timeline__sequence">{event.sequence}</span><div><strong>{event.event_type}</strong><p>{event.virtual_occurred_at}</p><small>{event.event_code}</small></div></li>)}</ol> : <p className="processtwin-empty">Bu cursor sayfasında event yok.</p>}{hasMore ? <button type="button" className="processtwin-secondary-button" onClick={onLoadMore} disabled={loading}>{loading ? 'Eventler yükleniyor' : 'Daha fazla event yükle'}</button> : null}</section>
+  return <section className="processtwin-timeline" aria-labelledby="timeline-title"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Simülasyon olay akışı</p><h2 id="timeline-title">Simülasyon zaman çizelgesi</h2></div></div>{events.length ? <ol>{events.map((event) => <li key={event.sequence}><span className="processtwin-timeline__sequence">{event.sequence}</span><div><strong>{simulationEventLabel(event.event_type)}</strong><p>{event.virtual_occurred_at}</p><small>{event.event_code}</small></div></li>)}</ol> : <p className="processtwin-empty">Bu cursor sayfasında event yok.</p>}{hasMore ? <button type="button" className="processtwin-secondary-button" onClick={onLoadMore} disabled={loading}>{loading ? 'Eventler yükleniyor' : 'Daha fazla event yükle'}</button> : null}</section>
+}
+
+function ProcessTwinTopologyDeviceList({ devices, emptyLabel }: { devices: TopologySummary['upstream_devices']; emptyLabel: string }) {
+  if (!devices.length) return <span className="processtwin-topology__empty">{emptyLabel}</span>
+  return <div className="processtwin-topology__device-list">{devices.map((device) => <div className="processtwin-topology__device" key={device.code}><strong>{device.code}</strong><span>{device.device_type_label} · {device.location}</span></div>)}</div>
 }
 
 function TopologyContext({ summary, state }: { summary: TopologySummary | null; state: 'idle' | 'loading' | 'ready' | 'unavailable' }) {
+  const [activePanel, setActivePanel] = useState<'upstream' | 'root' | 'downstream'>('root')
   if (state === 'idle') return null
   if (state === 'loading') return <section className="processtwin-topology" aria-live="polite">Cihaz topoloji bağlamı yükleniyor.</section>
   if (state === 'unavailable') return <section className="processtwin-topology">Cihaz topoloji bağlamı şu anda gösterilemiyor. Bu durum simulation sonucunu değiştirmez.</section>
   if (!summary) return null
-  return <section className="processtwin-topology"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Read-only context</p><h2>Topology summary</h2></div></div><div className="processtwin-topology__grid"><div><span>Seçili cihaz</span><strong>{summary.root_device.code}</strong><p>{summary.root_device.device_type_label} · {summary.root_device.location}</p></div><div><span>Upstream</span><strong>{summary.upstream_devices.length}</strong><p>{summary.upstream_devices.map((device) => device.code).join(', ') || 'Doğrulanmış upstream yok'}</p></div><div><span>Downstream erişim</span><strong>{summary.downstream_total}</strong><p>{summary.downstream_devices.map((device) => device.code).join(', ') || 'Doğrulanmış downstream yok'}</p></div></div><p className="processtwin-note">Bu özet yalnız read-only topology bağlamıdır; projected impact veya failover sonucu üretmez.</p></section>
+  return <section className="processtwin-topology"><div className="processtwin-section-heading"><div><h2>Topoloji özeti</h2></div></div><div className="processtwin-topology__flow" aria-label="Topoloji akışı"><button type="button" aria-pressed={activePanel === 'upstream'} onClick={() => setActivePanel('upstream')} className={activePanel === 'upstream' ? 'processtwin-topology__lane processtwin-topology__lane--upstream processtwin-topology__panel--active' : 'processtwin-topology__lane processtwin-topology__lane--upstream'}><div className="processtwin-topology__panel-title"><p>Üst akış<br />erişim</p></div><ProcessTwinTopologyDeviceList devices={summary.upstream_devices} emptyLabel="Doğrulanmış üst akış yok" /></button><button type="button" aria-pressed={activePanel === 'root'} onClick={() => setActivePanel('root')} className={activePanel === 'root' ? 'processtwin-topology__root processtwin-topology__panel--active' : 'processtwin-topology__root'}><span className="processtwin-topology__panel-icon processtwin-topology__panel-icon--root" aria-hidden="true" /><p>Seçili kök cihaz</p><strong>{summary.root_device.code}</strong><span>{summary.root_device.device_type_label} · {summary.root_device.location}</span></button><button type="button" aria-pressed={activePanel === 'downstream'} onClick={() => setActivePanel('downstream')} className={activePanel === 'downstream' ? 'processtwin-topology__lane processtwin-topology__lane--downstream processtwin-topology__panel--active' : 'processtwin-topology__lane processtwin-topology__lane--downstream'}><div className="processtwin-topology__panel-title"><p>Alt akış<br />erişim</p></div><ProcessTwinTopologyDeviceList devices={summary.downstream_devices} emptyLabel="Doğrulanmış alt akış yok" /></button></div></section>
 }
 
 export function ProcessTwinPage() {
@@ -213,6 +279,7 @@ export function ProcessTwinPage() {
   const [timelineLoading, setTimelineLoading] = useState(false)
   const [topologySummary, setTopologySummary] = useState<TopologySummary | null>(null)
   const [topologyState, setTopologyState] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
+  const [activeResultSection, setActiveResultSection] = useState<ResultNavigationKey>('controls')
 
   const candidateOverrides = useMemo(() => {
     const overrides: Record<string, unknown> = {}
@@ -235,6 +302,7 @@ export function ProcessTwinPage() {
     setHasMoreEvents(false)
     setTopologySummary(null)
     setTopologyState('idle')
+    setActiveResultSection('controls')
   }
 
   const readTimeline = async (runCode: string, cursor?: number | null, append = false) => {
@@ -363,35 +431,43 @@ export function ProcessTwinPage() {
   const canPause = candidateRun?.status === 'running'
   const canResume = candidateRun?.status === 'paused'
   const canStop = candidateRun?.status === 'ready' || candidateRun?.status === 'running' || candidateRun?.status === 'paused'
+  const resultNavigation = [
+    { key: 'controls' as const, label: 'Çalıştırma kontrolleri', available: Boolean(candidateRun || baselineRun) },
+    { key: 'topology' as const, label: 'Topoloji özeti', available: topologyState !== 'idle' },
+    { key: 'baseline' as const, label: 'Referans senaryo', available: Boolean(baselineResult) },
+    { key: 'candidate' as const, label: 'Aday senaryo', available: Boolean(candidateResult) },
+    { key: 'comparison' as const, label: 'Senaryo karşılaştırması', available: Boolean(candidateResult?.comparison) },
+    { key: 'timeline' as const, label: 'Simülasyon olay akışı', available: Boolean(candidateRun) },
+  ].filter((item) => item.available)
 
   return <section className="processtwin-page">
-    <header className="processtwin-page__header"><div><p className="processtwin-eyebrow">Hypothetical operations workspace</p><h1>ProcessTwin</h1><p>Snapshot-local source world üzerinde baseline ve explicit candidate koşullarını karşılaştırın.</p></div><span className="processtwin-source-tag">Simulation-local</span></header>
+    <header className="processtwin-page__header"><div><h1>Süreç Simülasyonu</h1></div></header>
 
     <form className="processtwin-form" onSubmit={execute}>
-      <div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Scenario input</p><h2>Baseline ve candidate koşulları</h2></div>{scenarioCode ? <span className="processtwin-form__code">Scenario {scenarioCode}</span> : null}</div>
+      <div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Senaryo girdisi</p><h2>Senaryo koşulları</h2></div>{scenarioCode ? <span className="processtwin-form__code">Scenario {scenarioCode}</span> : null}</div>
       <div className="processtwin-form__grid">
-        <label className="processtwin-field processtwin-field--wide"><span>Exact source snapshot</span><input value={form.snapshotIdentifier} onChange={(event) => update('snapshotIdentifier', event.target.value)} required /></label>
-        <label className="processtwin-field"><span>Anchor türü</span><select value={form.anchorType} onChange={(event) => update('anchorType', event.target.value as SimulationAnchorType)}><option value="network_device">Network device</option><option value="network_link">Network link</option><option value="line_connection">Line connection</option></select></label>
-        <label className="processtwin-field"><span>Exact anchor code</span><input value={form.anchorCode} onChange={(event) => update('anchorCode', event.target.value)} required /></label>
-        <label className="processtwin-field"><span>Virtual başlangıç</span><input value={form.virtualStart} onChange={(event) => update('virtualStart', event.target.value)} placeholder="2026-07-01T00:00:00+00:00" required /></label>
-        <label className="processtwin-field"><span>Deterministic seed</span><input value={form.deterministicSeed} onChange={(event) => update('deterministicSeed', event.target.value)} required /></label>
-        <fieldset className="processtwin-speed"><legend>Hız</legend>{SPEEDS.map((speed) => <label key={speed}><input type="radio" name="speed" checked={form.speed === speed} onChange={() => update('speed', speed)} />{speed}x</label>)}</fieldset>
+        <label className="processtwin-field"><span>Hedef türü</span><select value={form.anchorType} onChange={(event) => update('anchorType', event.target.value as SimulationAnchorType)}><option value="network_device">Ağ cihazı</option><option value="network_link">Ağ bağlantısı</option><option value="line_connection">Hat bağlantısı</option></select></label>
+        <label className="processtwin-field"><span>Hedef kodu</span><input value={form.anchorCode} onChange={(event) => update('anchorCode', event.target.value)} required /></label>
+        <label className="processtwin-field"><span>Sanal başlangıç zamanı</span><input value={form.virtualStart} onChange={(event) => update('virtualStart', event.target.value)} placeholder="2026-07-01T00:00:00+00:00" required /></label>
+        <fieldset className="processtwin-speed"><legend>Simülasyon hızı</legend>{SPEEDS.map((speed) => <label key={speed}><input type="radio" name="speed" checked={form.speed === speed} onChange={() => update('speed', speed)} />{speed}x</label>)}</fieldset>
       </div>
       <div className="processtwin-parameter-grid">
-        <section><h3>Baseline parametreleri</h3><label className="processtwin-field"><span>Süre (saniye)</span><input type="number" min="1" value={form.baselineDuration} onChange={(event) => update('baselineDuration', event.target.value)} required /></label><label className="processtwin-field"><span>SLA hedefi (saniye)</span><input type="number" min="1" value={form.baselineSlaTarget} onChange={(event) => update('baselineSlaTarget', event.target.value)} required /></label></section>
-        <section><h3>Explicit candidate override</h3><label className="processtwin-field"><span>Süre override (opsiyonel)</span><input type="number" min="1" value={form.candidateDuration} onChange={(event) => update('candidateDuration', event.target.value)} /></label><label className="processtwin-field"><span>SLA hedefi override (opsiyonel)</span><input type="number" min="1" value={form.candidateSlaTarget} onChange={(event) => update('candidateSlaTarget', event.target.value)} /></label><p>Candidate yalnız bu açık override alanlarıyla baseline’dan ayrılır.</p></section>
+        <section><h3>Referans senaryo (Baseline)</h3><label className="processtwin-field"><span>Süre</span><input type="number" min="1" value={form.baselineDuration} onChange={(event) => update('baselineDuration', event.target.value)} required /></label><label className="processtwin-field"><span>SLA hedefi</span><input type="number" min="1" value={form.baselineSlaTarget} onChange={(event) => update('baselineSlaTarget', event.target.value)} required /></label></section>
+        <section><h3>Aday senaryo</h3><label className="processtwin-field"><span>Süre değişikliği (isteğe bağlı)</span><input type="number" min="1" value={form.candidateDuration} onChange={(event) => update('candidateDuration', event.target.value)} /></label><label className="processtwin-field"><span>SLA hedefi değişikliği (isteğe bağlı)</span><input type="number" min="1" value={form.candidateSlaTarget} onChange={(event) => update('candidateSlaTarget', event.target.value)} /></label><p>Aday senaryo yalnız burada belirtilen değişikliklerle referans senaryodan ayrılır.</p></section>
       </div>
-      <div className="processtwin-form__actions"><button className="processtwin-primary-button" type="submit" disabled={workspaceState === 'running'}>{workspaceState === 'running' ? 'Simulation isteği çalışıyor' : 'Baseline ve candidate çalıştır'}</button><p>Start endpoint’i senkrondur; ekranda sahte canlı progress veya clock üretilmez.</p></div>
+      <div className="processtwin-form__technical-meta" aria-label="Teknik senaryo bilgisi"><span><strong>Kaynak snapshot</strong><code>{form.snapshotIdentifier}</code></span><span><strong>Seed</strong><code>{form.deterministicSeed}</code></span></div>
+      <div className="processtwin-form__actions"><button className="analysis-submit" type="submit" disabled={workspaceState === 'running'}>{workspaceState === 'running' ? 'Simülasyon çalışıyor...' : 'Senaryoları karşılaştır'}</button></div>
     </form>
 
     {workspaceState === 'error' ? <section className="processtwin-state processtwin-state--error" role="alert"><h2>{failureTitle(errorKind)}</h2><p>{error}</p><button type="button" className="processtwin-secondary-button" onClick={() => setWorkspaceState('idle')}>Scenario girdisini düzenle</button></section> : null}
     {workspaceState === 'running' ? <section className="processtwin-state" aria-live="polite"><h2>Simulation isteği işleniyor</h2><p>Backend senkron canonical sonucu hazırlıyor. Tamamlanınca persisted result ve timeline okunacak.</p></section> : null}
 
-    {candidateRun || baselineRun ? <section className="processtwin-run-controls"><div><p className="processtwin-eyebrow">Persisted run status</p><h2>Run kontrolleri</h2><p>Baseline: {baselineRun?.status ?? 'Belirtilmedi'} · Candidate: {candidateRun?.status ?? 'Belirtilmedi'} · Candidate virtual clock: {candidateRun?.virtual_clock ?? 'Belirtilmedi'}</p></div><div className="processtwin-run-controls__actions"><button type="button" className="processtwin-secondary-button" onClick={() => void refreshStatus()} disabled={!candidateRun || workspaceState === 'running'}>Durumu yenile</button><button type="button" className="processtwin-secondary-button" onClick={() => void lifecycleAction('pause')} disabled={!canPause}>Pause</button><button type="button" className="processtwin-secondary-button" onClick={() => void lifecycleAction('resume')} disabled={!canResume}>Resume</button><button type="button" className="processtwin-secondary-button" onClick={() => void lifecycleAction('stop')} disabled={!canStop}>Stop</button><button type="button" className="processtwin-primary-button" onClick={() => void replay()} disabled={!candidateRun || !candidateTerminal || workspaceState === 'running'}>Replay</button></div></section> : null}
-
-    <TopologyContext summary={topologySummary} state={topologyState} />
-    <div className="processtwin-results"><ResultPanel title="Baseline sonucu" run={baselineRun} result={baselineResult} /><ResultPanel title="Candidate sonucu" run={candidateRun} result={candidateResult} /></div>
-    <ComparisonPanel result={candidateResult} />
-    {candidateRun ? <Timeline events={events} hasMore={hasMoreEvents} loading={timelineLoading} onLoadMore={() => { if (nextCursor !== null) void readTimeline(candidateRun.run_code, nextCursor, true) }} /> : null}
+    {resultNavigation.length ? <nav className="processtwin-section-nav" aria-label="Simülasyon sonuç bölümleri">{resultNavigation.map((item) => <button type="button" key={item.key} className={activeResultSection === item.key ? 'processtwin-section-nav__item processtwin-section-nav__item--active' : 'processtwin-section-nav__item'} onClick={() => setActiveResultSection(item.key)}>{item.label}</button>)}</nav> : null}
+    {activeResultSection === 'controls' && (candidateRun || baselineRun) ? <section className="processtwin-run-controls"><div><h2>Çalıştırma kontrolleri</h2><p>Referans: {simulationStatusLabel(baselineRun?.status)} · Aday: {simulationStatusLabel(candidateRun?.status)} · Aday sanal saati: {candidateRun?.virtual_clock ?? 'Belirtilmedi'}</p></div><div className="processtwin-run-controls__actions"><button type="button" className="processtwin-secondary-button" onClick={() => void refreshStatus()} disabled={!candidateRun || workspaceState === 'running'}>Durumu yenile</button><button type="button" className="processtwin-secondary-button" onClick={() => void lifecycleAction('pause')} disabled={!canPause}>Duraklat</button><button type="button" className="processtwin-secondary-button" onClick={() => void lifecycleAction('resume')} disabled={!canResume}>Devam et</button><button type="button" className="processtwin-secondary-button" onClick={() => void lifecycleAction('stop')} disabled={!canStop}>Durdur</button><button type="button" className="processtwin-primary-button" onClick={() => void replay()} disabled={!candidateRun || !candidateTerminal || workspaceState === 'running'}>Yeniden çalıştır</button></div></section> : null}
+    {activeResultSection === 'topology' ? <TopologyContext summary={topologySummary} state={topologyState} /> : null}
+    {activeResultSection === 'baseline' ? <ResultPanel title="Referans senaryo" run={baselineRun} result={baselineResult} /> : null}
+    {activeResultSection === 'candidate' ? <ResultPanel title="Aday senaryo" run={candidateRun} result={candidateResult} /> : null}
+    {activeResultSection === 'comparison' ? <ComparisonPanel result={candidateResult} /> : null}
+    {activeResultSection === 'timeline' && candidateRun ? <Timeline events={events} hasMore={hasMoreEvents} loading={timelineLoading} onLoadMore={() => { if (nextCursor !== null) void readTimeline(candidateRun.run_code, nextCursor, true) }} /> : null}
   </section>
 }

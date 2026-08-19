@@ -5,29 +5,10 @@ import type { UserRole } from '../../auth/api'
 import './AppLayout.css'
 
 type NavItem = { label: string; to: string; marker: string; roles?: UserRole[] }
-const navGroups: { label: string; items: NavItem[] }[] = [
-  {
-    label: 'Workspace',
-    items: [
-      { label: 'AI Analysis', to: '/ai-analysis', marker: 'AI', roles: ['analyst', 'admin'] },
-      { label: 'Operations', to: '/', marker: 'OP' },
-      { label: 'ProcessTwin', to: '/processtwin', marker: 'PT', roles: ['analyst', 'admin'] },
-    ],
-  },
-  {
-    label: 'Operations',
-    items: [
-      { label: 'Network', to: '/network', marker: 'NW', roles: ['engineer', 'admin'] },
-      { label: 'Customers', to: '/customers', marker: 'CU' },
-    ],
-  },
-  {
-    label: 'Governance',
-    items: [
-      { label: 'Rules', to: '/rules', marker: 'RL', roles: ['admin'] },
-      { label: 'Decision Evidence', to: '/evidence', marker: 'EV' },
-    ],
-  },
+const navItems: NavItem[] = [
+  { label: 'AI Analizi', to: '/ai-analysis', marker: 'AI', roles: ['analyst', 'admin'] },
+  { label: 'Süreç Simülasyonu', to: '/processtwin', marker: 'PT', roles: ['analyst', 'admin'] },
+  { label: 'Karar Kanıtları', to: '/evidence', marker: 'EV' },
 ]
 
 export function AppLayout() {
@@ -42,36 +23,28 @@ export function AppLayout() {
           <img className="app-brand__logo" src="/turkcell.png" alt="Turkcell" />
         </div>
         <nav className="app-nav" aria-label="Primary navigation">
-          {navGroups.map((group) => (
-            <div className="app-nav__group" key={group.label}>
-              <p className="app-nav__group-label">{group.label}</p>
-              {group.items.filter((item) => canSee(item.roles)).map((item) => (
-                <NavLink
-                  className={({ isActive }) =>
-                    isActive ? 'app-nav__link app-nav__link--active' : 'app-nav__link'
-                  }
-                  end={item.to === '/'}
-                  key={item.to}
-                  to={item.to}
-                >
-                  <span className="app-nav__marker" aria-hidden="true">{item.marker}</span>
-                  <span>{item.label}</span>
-                </NavLink>
-              ))}
-            </div>
+          {navItems.filter((item) => canSee(item.roles)).map((item) => (
+            <NavLink
+              className={({ isActive }) =>
+                isActive ? 'app-nav__link app-nav__link--active' : 'app-nav__link'
+              }
+              end={item.to === '/'}
+              key={item.to}
+              to={item.to}
+            >
+              <span className="app-nav__marker" aria-hidden="true">{item.marker}</span>
+              <span>{item.label}</span>
+            </NavLink>
           ))}
         </nav>
         <div className="app-sidebar__footer">
-          {canSee(['admin']) && <NavLink className="app-nav__link" to="/settings">
-            <span className="app-nav__marker" aria-hidden="true">ST</span><span>Settings</span>
-          </NavLink>}
           <div className="auth-shell" aria-label="Signed-in workspace">
             <span className="auth-shell__avatar" aria-hidden="true">{initials}</span>
             <span className="auth-shell__details">
               <strong>{user?.username}</strong>
-              <small>{user?.role} access</small>
+              <small>{user?.role}</small>
             </span>
-            <button className="auth-shell__logout" type="button" onClick={() => void signOut()} aria-label="Log out">Exit</button>
+            <button className="auth-shell__logout" type="button" onClick={() => void signOut()} aria-label="Çıkış yap">Çıkış</button>
           </div>
         </div>
       </aside>

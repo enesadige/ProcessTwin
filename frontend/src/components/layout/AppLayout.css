@@ -1,6 +1,7 @@
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: var(--color-bg);
 }
 
@@ -8,18 +9,19 @@
   display: flex;
   flex: 0 0 248px;
   flex-direction: column;
-  min-height: 100vh;
-  padding: var(--space-5) var(--space-3) var(--space-4);
+  height: 100vh;
+  min-height: 0;
+  padding: 26px 16px 18px;
   border-right: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: linear-gradient(180deg, #ffffff 0%, #fbfbfa 100%);
 }
 
 .app-brand {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 72px;
-  padding: 0 var(--space-2) var(--space-5);
+  min-height: 94px;
+  padding: 0 var(--space-2) 30px;
 }
 
 .app-brand__logo {
@@ -31,57 +33,57 @@
 
 .app-nav {
   display: grid;
-  gap: var(--space-5);
-}
-
-.app-nav__group {
-  display: grid;
-  gap: 3px;
-}
-
-.app-nav__group-label {
-  margin: 0 0 var(--space-2);
-  padding: 0 var(--space-3);
-  color: var(--color-text-subtle);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  flex: 0 1 auto;
+  max-height: calc(100vh - 230px);
+  gap: 8px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid rgba(215, 217, 220, .76);
+  border-radius: 18px;
+  background: rgba(247, 248, 249, .82);
+  box-shadow: inset 1px 1px rgba(255, 255, 255, .92), 0 8px 20px rgba(38, 42, 50, .045);
 }
 
 .app-nav__link {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  min-height: 38px;
-  padding: 0 var(--space-3);
+  gap: 11px;
+  min-height: 44px;
+  padding: 0 12px;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: 13px;
   color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 700;
   text-decoration: none;
+  transition: color 160ms ease, background 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 .app-nav__link:hover {
   color: var(--color-text);
-  background: var(--color-surface-muted);
+  background: rgba(255, 255, 255, .84);
+  box-shadow: 0 5px 12px rgba(38, 42, 50, .06);
 }
 
 .app-nav__link--active {
-  border-color: rgba(31, 111, 235, 0.2);
-  color: var(--color-primary-strong);
-  background: rgba(31, 111, 235, 0.09);
+  border-color: rgba(197, 201, 207, .86);
+  color: #25272c;
+  background: #ffffff;
+  box-shadow: inset 1px 1px rgba(255, 255, 255, .98), 0 7px 16px rgba(39, 43, 51, .1);
+  transform: translateY(-1px);
 }
 
 .app-nav__marker {
   display: grid;
-  width: 25px;
-  height: 25px;
-  flex: 0 0 25px;
+  width: 27px;
+  height: 27px;
+  flex: 0 0 27px;
   place-items: center;
   border: 1px solid currentColor;
-  border-radius: 5px;
+  border-radius: 9px;
+  color: #68717e;
+  background: #fff;
+  box-shadow: inset 1px 1px rgba(255, 255, 255, .9);
   font-size: 9px;
   font-weight: 900;
   letter-spacing: 0.02em;
@@ -89,20 +91,22 @@
 
 .app-sidebar__footer {
   display: grid;
-  gap: var(--space-3);
+  flex: 0 0 auto;
+  gap: 12px;
   margin-top: auto;
-  padding-top: var(--space-5);
+  padding-top: 18px;
   border-top: 1px solid var(--color-border);
 }
 
 .auth-shell {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  background: var(--color-surface-muted);
+  gap: 9px;
+  padding: 10px;
+  border: 1px solid rgba(211, 214, 218, .9);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #f7f8f8, #eef0f1);
+  box-shadow: inset 1px 1px rgba(255, 255, 255, .88), 0 7px 15px rgba(38, 42, 50, .06);
 }
 
 .auth-shell__avatar {
@@ -112,8 +116,9 @@
   flex: 0 0 28px;
   place-items: center;
   border-radius: 50%;
-  color: var(--color-primary-strong);
-  background: rgba(31, 111, 235, 0.14);
+  color: #3d4655;
+  background: #fff;
+  box-shadow: 0 3px 8px rgba(35, 40, 48, .08);
   font-size: 10px;
   font-weight: 900;
 }
@@ -132,6 +137,7 @@
 }
 
 .auth-shell__details strong {
+  color: #24272d;
   font-size: 11px;
 }
 
@@ -150,8 +156,9 @@
 
 .auth-shell__logout {
   margin-left: auto;
-  padding: 3px 0;
+  padding: 5px 6px;
   border: 0;
+  border-radius: 8px;
   color: var(--color-text-muted);
   background: transparent;
   font-size: 10px;
@@ -162,8 +169,10 @@
 .auth-shell__logout:hover { color: var(--color-danger); }
 
 .app-content {
+  min-height: 0;
   min-width: 0;
   flex: 1;
+  overflow-y: auto;
 }
 
 .app-main {
@@ -247,9 +256,12 @@
 @media (max-width: 640px) {
   .app-shell {
     display: block;
+    height: auto;
+    overflow: visible;
   }
 
   .app-sidebar {
+    height: auto;
     min-height: auto;
     padding: var(--space-3);
     border-right: 0;
@@ -267,12 +279,6 @@
     padding-bottom: 2px;
   }
 
-  .app-nav__group {
-    display: flex;
-    gap: var(--space-1);
-  }
-
-  .app-nav__group-label,
   .app-sidebar__footer {
     display: none;
   }

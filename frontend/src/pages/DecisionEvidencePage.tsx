@@ -51,6 +51,8 @@ const DISPLAY_LABELS: Record<string, string> = {
   affected_customer_count: 'Etkilenen müşteri', affected_subscription_count: 'Etkilenen abonelik',
   potential_scope: 'Potansiyel kapsam', verified_impact: 'Doğrulanmış etki', protected_by_failover: 'Failover ile korunan',
   verified_unaffected: 'Doğrulanmış etkisiz', evidence_insufficient: 'Kanıt yetersiz',
+  scope: 'Kapsam', status: 'Durum', considered: 'Değerlendirmeye alınan', ineligible_pending: 'Uygun olmayan / beklemede',
+  rule_versions: 'Kural sürümleri', amount: 'Tutar', failed_failover: 'Başarısız failover',
 }
 
 const DISPLAY_VALUES: Record<string, string> = {
@@ -159,6 +161,30 @@ function DetailPairs({ values }: { values: Record<string, unknown> }) {
   return <dl className="evidence-detail__pairs">{entries.map(([key, value]) => <div key={key}><dt>{formatDisplayLabel(key)}</dt><dd><DisplayValue value={value} fieldKey={key} /></dd></div>)}</dl>
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
+}
+
+function CalculationValue({ value, fieldKey }: { value: unknown; fieldKey?: string }): ReactNode {
+  if (Array.isArray(value)) {
+    const items = value.filter(hasPresentationValue)
+    if (!items.length) return null
+    if (items.every(isRecord)) return <div className="evidence-detail__calculation-rows">{items.map((item, index) => <article key={index}><span>Sonuç {index + 1}</span><CalculationFields values={item} nested /></article>)}</div>
+    return <ul className="evidence-detail__calculation-values">{items.map((item, index) => <li key={index}><CalculationValue value={item} /></li>)}</ul>
+  }
+  if (isRecord(value)) return <div className="evidence-detail__calculation-object"><CalculationFields values={value} nested /></div>
+  return <DisplayValue value={value} fieldKey={fieldKey} />
+}
+
+function CalculationFields({ values, nested = false }: { values: Record<string, unknown>; nested?: boolean }) {
+  const entries = Object.entries(values).filter(([, value]) => hasPresentationValue(value))
+  if (!entries.length) return null
+  return <dl className={`evidence-detail__calculation-fields${nested ? ' is-nested' : ''}`}>{entries.map(([key, value]) => {
+    const complex = Array.isArray(value) || isRecord(value)
+    return <div className={complex ? 'is-complex' : ''} key={key}><dt>{formatDisplayLabel(key)}</dt><dd><CalculationValue value={value} fieldKey={key} /></dd></div>
+  })}</dl>
+}
+
 function ProvenanceCard({
   title,
   image,
@@ -216,15 +242,19 @@ function GeneralEvidenceDetailView({ detail }: { detail: EvidenceRecordDetail })
   const calculations = dedupeAnalyticsCalculations(detail.calculations)
   const provenance = detail.provenance
   const [activeProvenance, setActiveProvenance] = useState<'llm' | 'embedding' | 'parser'>('llm')
-  const [activeDetailSection, setActiveDetailSection] = useState<'provenance' | 'timeline' | 'calculations'>('provenance')
+  const [activeDetailSection, setActiveDetailSection] = useState<'provenance' | 'timeline' | 'calculations' | 'rules' | 'warnings' | 'rag'>('provenance')
   const detailSections = [
     { id: 'provenance' as const, label: 'Çalışma izlenebilirliği', available: Object.keys(provenance).length > 0, icon: 'provenance' },
     { id: 'timeline' as const, label: 'İşlem adımları', available: detail.tool_timeline.length > 0, icon: 'timeline' },
     { id: 'calculations' as const, label: 'Deterministik hesaplamalar', available: calculations.length > 0, icon: 'calculations' },
+    { id: 'rules' as const, label: 'Kural referansları', available: detail.rule_references.length > 0, icon: 'rules' },
+    { id: 'warnings' as const, label: 'Uyarılar', available: detail.warnings.length > 0, icon: 'warnings' },
+    { id: 'rag' as const, label: 'RAG kaynakları', available: detail.rag_references.length > 0, icon: 'rag' },
   ]
-  const selectedDetailSection = detailSections.some((section) => section.id === activeDetailSection && section.available)
+  const availableDetailSections = detailSections.filter((section) => section.available)
+  const selectedDetailSection = availableDetailSections.some((section) => section.id === activeDetailSection)
     ? activeDetailSection
-    : detailSections.find((section) => section.available)?.id
+    : availableDetailSections[0]?.id
   return <>
     <section className="evidence-detail__summary">
       <div><span>Kanıt kodu</span><strong>{detail.evidence_code}</strong></div>
@@ -232,7 +262,7 @@ function GeneralEvidenceDetailView({ detail }: { detail: EvidenceRecordDetail })
       <div><span>Son durum</span><strong>{formatTerminalStatus(detail.query_run.terminal_status)}</strong></div>
       <div><span>Kesinleşme</span><strong>{detail.finalized_at ? <time dateTime={detail.finalized_at} title={detail.finalized_at}>{formatTimestamp(detail.finalized_at)}</time> : 'Belirtilmedi'}</strong></div>
     </section>
-    {detailSections.some((section) => section.available) ? <nav className="evidence-detail__navigator" aria-label="Kanıt ayrıntıları bölümleri">{detailSections.map((section) => <button type="button" key={section.id} className={selectedDetailSection === section.id ? 'is-active' : ''} disabled={!section.available} aria-pressed={selectedDetailSection === section.id} onClick={() => setActiveDetailSection(section.id)}><span className={`evidence-detail__navigator-icon evidence-detail__navigator-icon--${section.icon}`} aria-hidden="true" /><span>{section.label}</span></button>)}</nav> : null}
+    {availableDetailSections.length ? <nav className="evidence-detail__navigator" aria-label="Kanıt ayrıntıları bölümleri">{availableDetailSections.map((section) => <button type="button" key={section.id} className={selectedDetailSection === section.id ? 'is-active' : ''} aria-pressed={selectedDetailSection === section.id} onClick={() => setActiveDetailSection(section.id)}><span className={`evidence-detail__navigator-icon evidence-detail__navigator-icon--${section.icon}`} aria-hidden="true" /><span>{section.label}</span></button>)}</nav> : null}
     {selectedDetailSection === 'provenance' && Object.keys(provenance).length ? <section className="evidence-detail__section evidence-detail__primary-panel evidence-provenance"><h2>Çalışma izlenebilirliği</h2><div className="evidence-provenance__grid">
       <ProvenanceCard title="LLM" image="/evidence-llm.png" fields={[
         ['resolved_llm_provider', provenance.resolved_llm_provider],
@@ -254,10 +284,10 @@ function GeneralEvidenceDetailView({ detail }: { detail: EvidenceRecordDetail })
       {tool.result_summary ? <section className="evidence-detail__tool-summary"><h3>Doğrulanmış sonuç özeti</h3><ToolResultSummary value={tool.result_summary} /></section> : null}
       {tool.error_code ? <p className="evidence-detail__tool-error"><span>Hata kodu:</span> {tool.error_code}</p> : null}
     </li>)}</ol></section> : null}
-    {selectedDetailSection === 'calculations' && calculations.length ? <section className="evidence-detail__section evidence-detail__primary-panel evidence-detail__calculations"><h2>Deterministik hesaplamalar</h2><div className="evidence-detail__calculation-list">{calculations.map((calculation) => <article className="evidence-detail__calculation-card" key={calculation.sequence}><h3>{calculation.sequence}. {formatDisplayLabel(calculation.calculation_code)}</h3>{hasPresentationValue(calculation.inputs) ? <section className="evidence-detail__calculation-inputs"><h4>Girdiler</h4><DetailPairs values={calculation.inputs} /></section> : null}{hasPresentationValue(calculation.outputs) ? <section className="evidence-detail__calculation-outputs"><h4>Çıktılar</h4><DetailPairs values={calculation.outputs} /></section> : null}</article>)}</div></section> : null}
-    {detail.rule_references.length ? <section className="evidence-detail__section"><h2>Seçilmiş RuleVersion referansları</h2><ul>{detail.rule_references.map((rule) => <li key={`${rule.rule_code}-${rule.version}-${rule.reference_role}`}><strong>{rule.rule_code} v{rule.version}</strong> · {formatSafeValue(rule.reference_role)}</li>)}</ul></section> : null}
-    {detail.rag_references.length ? <section className="evidence-detail__section"><h2>RAG erişim kaynakları</h2><p className="evidence-detail__hint">Bu kaynaklar erişim ve alıntı izlenebilirliği içindir; operasyonel sayı veya karar hesabını üretmez.</p><ul>{detail.rag_references.map((source, index) => <li key={`${source.document_code}-${source.document_version}-${index}`}><strong>{source.document_code} v{source.document_version}</strong>{source.chunk_heading ? ` · ${source.chunk_heading}` : ''}{source.section_path.length ? ` · ${source.section_path.join(' / ')}` : ''}{source.retrieval_score === null ? '' : ` · skor ${source.retrieval_score}`}</li>)}</ul></section> : null}
-    <DetailList title="Uyarılar" values={detail.warnings} />
+    {selectedDetailSection === 'calculations' && calculations.length ? <section className="evidence-detail__section evidence-detail__primary-panel evidence-detail__calculations"><h2>Deterministik hesaplamalar</h2><div className="evidence-detail__calculation-list">{calculations.map((calculation) => <article className="evidence-detail__calculation-card" key={calculation.sequence}><h3>{calculation.sequence}. {formatDisplayLabel(calculation.calculation_code)}</h3>{hasPresentationValue(calculation.inputs) ? <section className="evidence-detail__calculation-inputs"><h4>Girdiler</h4><CalculationFields values={calculation.inputs} /></section> : null}{hasPresentationValue(calculation.outputs) ? <section className="evidence-detail__calculation-outputs"><h4>Çıktılar</h4><CalculationFields values={calculation.outputs} /></section> : null}</article>)}</div></section> : null}
+    {selectedDetailSection === 'rules' && detail.rule_references.length ? <section className="evidence-detail__section evidence-detail__primary-panel evidence-detail__rule-references"><h2>Kural referansları</h2><ul>{detail.rule_references.map((rule) => <li key={`${rule.rule_code}-${rule.version}-${rule.reference_role}`}><strong>{rule.rule_code} v{rule.version}</strong><span>{formatSafeValue(rule.reference_role)}</span></li>)}</ul></section> : null}
+    {selectedDetailSection === 'warnings' ? <DetailList title="Uyarılar" values={detail.warnings} /> : null}
+    {selectedDetailSection === 'rag' && detail.rag_references.length ? <section className="evidence-detail__section evidence-detail__primary-panel"><h2>RAG kaynakları</h2><p className="evidence-detail__hint">Bu kaynaklar erişim ve alıntı izlenebilirliği içindir; operasyonel sayı veya karar hesabını üretmez.</p><ul>{detail.rag_references.map((source, index) => <li key={`${source.document_code}-${source.document_version}-${index}`}><strong>{source.document_code} v{source.document_version}</strong>{source.chunk_heading ? ` · ${source.chunk_heading}` : ''}{source.section_path.length ? ` · ${source.section_path.join(' / ')}` : ''}{source.retrieval_score === null ? '' : ` · skor ${source.retrieval_score}`}</li>)}</ul></section> : null}
   </>
 }
 
