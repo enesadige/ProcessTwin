@@ -17,39 +17,16 @@
 .app-brand {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  justify-content: center;
+  min-height: 72px;
   padding: 0 var(--space-2) var(--space-5);
 }
 
-.app-brand__mark {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border-radius: 8px;
-  color: #fff;
-  background: var(--color-primary-strong);
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-}
-
-.app-brand__name,
-.app-brand__meta,
-.app-topbar__eyebrow,
-.app-topbar__title {
-  margin: 0;
-}
-
-.app-brand__name {
-  font-size: 16px;
-  font-weight: 800;
-}
-
-.app-brand__meta {
-  margin-top: 2px;
-  color: var(--color-text-muted);
-  font-size: 11px;
+.app-brand__logo {
+  width: 68px;
+  height: 68px;
+  flex: 0 0 68px;
+  object-fit: contain;
 }
 
 .app-nav {
@@ -163,8 +140,7 @@
   font-size: 10px;
 }
 
-.auth-shell__status,
-.app-topbar__status-dot {
+.auth-shell__status {
   width: 7px;
   height: 7px;
   flex: 0 0 7px;
@@ -188,39 +164,6 @@
 .app-content {
   min-width: 0;
   flex: 1;
-}
-
-.app-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 74px;
-  padding: 0 var(--space-6);
-  border-bottom: 1px solid var(--color-border);
-  background: rgba(255, 255, 255, 0.88);
-}
-
-.app-topbar__eyebrow {
-  color: var(--color-primary);
-  font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.app-topbar__title {
-  margin-top: 2px;
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
-
-.app-topbar__status {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 700;
 }
 
 .app-main {
@@ -295,7 +238,6 @@
     flex-basis: 205px;
   }
 
-  .app-topbar,
   .app-main {
     padding-right: var(--space-4);
     padding-left: var(--space-4);
@@ -339,14 +281,6 @@
     min-width: max-content;
     padding-right: var(--space-2);
     padding-left: var(--space-2);
-  }
-
-  .app-topbar {
-    min-height: 64px;
-  }
-
-  .app-topbar__status {
-    display: none;
   }
 
   .app-main {

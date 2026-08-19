@@ -1,22 +1,42 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import { useAuth } from '../auth/AuthContext'
-import { AnalysisRequestError, getAnalysisStatus, getTopologySummary, submitAnalysis, type AnalysisStatus, type AnalyticsSummary, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type TopologyDevice, type TopologySummary, type ViewMode } from '../auth/api'
+import { AnalysisRequestError, getAnalysisStatus, getTopologySummary, submitAnalysis, type AnalysisStatus, type AnalyticsSummary, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type TopologyDevice, type TopologySummary } from '../auth/api'
 import './AIAnalysisPage.css'
 
 const SNAPSHOT_IDENTIFIER =
   'multi-city-realism-v3-repair-r1-multi-city-realism-snapshot-v3-repair-r1'
 const MAX_QUERY_LENGTH = 10000
-const EXAMPLES = [
-  'AGG-ANK-002 cihazındaki kesintiden kaç müşteri ve kaç abonelik gerçekten etkilendi?',
-  'CE-MCR-0010 olayında ana bağlantı down ve yedek bağlantı active. Bu tam kesinti mi?',
-  '6 Haziran 2026 tarihinde Konak ilçesinde kaç kesinti yaşandı?',
-]
-
 type Lifecycle = 'idle' | 'submitting' | 'success' | 'clarification' | 'failed'
 type FailureKind = 'retryable' | 'access' | 'not-found' | 'other' | null
 type TopologyState = 'idle' | 'loading' | 'ready' | 'unavailable'
+type ProviderOption = { value: ProviderName; label: string }
+
+function ProviderPicker({ label, value, options, onChange }: { label: string; value: ProviderName; options: ProviderOption[]; onChange: (value: ProviderName) => void }) {
+  const selected = options.find((option) => option.value === value) ?? options[0]
+
+  return <details className="analysis-provider">
+    <summary>
+      <span>{label}</span>
+      <strong>{selected.label}</strong>
+    </summary>
+    <div className="analysis-provider__menu" role="listbox" aria-label={`${label} sağlayıcısı`}>
+      {options.map((option) => <button
+        type="button"
+        role="option"
+        aria-selected={option.value === value}
+        className={option.value === value ? 'analysis-provider__option analysis-provider__option--selected' : 'analysis-provider__option'}
+        key={option.value}
+        onClick={(event) => {
+          onChange(option.value)
+          event.currentTarget.closest('details')?.removeAttribute('open')
+        }}
+      >
+        <span aria-hidden="true">{option.value === value ? '✓' : ''}</span>{option.label}
+      </button>)}
+    </div>
+  </details>
+}
 
 function failureKind(status?: number, code?: string): Exclude<FailureKind, null> {
   if (status === 401 || status === 403 || code === 'authentication_required' || code === 'permission_denied') return 'access'
@@ -26,11 +46,11 @@ function failureKind(status?: number, code?: string): Exclude<FailureKind, null>
 }
 
 function FactCard({ label, value, tone = '' }: { label: string; value: ReactNode; tone?: string }) {
-  return <div className={`analysis-fact ${tone ? `analysis-fact--${tone}` : ''}`}><span>{label}</span><strong>{value}</strong></div>
+  return <div className={`analysis-fact ${tone ? `analysis-fact--${tone}` : ''}`}><span className="analysis-fact__label">{label}</span><strong className="analysis-fact__value">{value}</strong></div>
 }
 
-function FactGroup({ title, children }: { title: string; children: ReactNode }) {
-  return <section className="analysis-fact-group"><h3>{title}</h3><div className="analysis-fact-grid">{children}</div></section>
+function FactGroup({ title, children, tone = '' }: { title: string; children: ReactNode; tone?: string }) {
+  return <section className={`analysis-fact-group ${tone ? `analysis-fact-group--${tone}` : ''}`}><h3>{title}</h3><div className="analysis-fact-grid">{children}</div></section>
 }
 
 function correlationDuration(seconds: number) {
@@ -66,13 +86,13 @@ function TopologySummaryPanel({ summary }: { summary: TopologySummary }) {
   const primary = summary.connection_roles.primary ?? 0
   const backup = summary.connection_roles.backup ?? 0
   return <section className="topology-summary" aria-label="Ağ topoloji özeti">
-    <div className="topology-summary__heading"><div><p className="analysis-page__eyebrow">Snapshot-local ağ görünümü</p><h2>Topoloji özeti</h2></div><span>{summary.snapshot_key}</span></div>
+    <div className="topology-summary__heading"><div><p className="analysis-page__eyebrow">Snapshot-local ağ görünümü</p><h2>Topoloji özeti</h2></div><span className="topology-summary__snapshot">{summary.snapshot_key}</span></div>
     <div className="topology-summary__flow">
       <div className="topology-summary__lane"><p>Upstream</p><TopologyDeviceList devices={summary.upstream_devices} emptyLabel="Doğrulanmış upstream bağlantı yok" /></div>
       <div className="topology-summary__root"><p>Seçili kök cihaz</p><strong>{summary.root_device.code}</strong><span>{summary.root_device.device_type_label} · {summary.root_device.location}</span></div>
       <div className="topology-summary__lane"><p>Downstream erişim</p><TopologyDeviceList devices={summary.downstream_devices} emptyLabel="Doğrulanmış downstream bağlantı yok" />{summary.downstream_total > summary.downstream_devices.length ? <span className="topology-summary__more">+{summary.downstream_total - summary.downstream_devices.length} cihaz daha</span> : null}</div>
     </div>
-    {summary.links.length ? <div className="topology-summary__links">{summary.links.map((link) => <span key={link.code}>{link.source_device_code} → {link.target_device_code}{link.link_layer ? ` · ${link.link_layer}` : ''}</span>)}</div> : null}
+    {summary.links.length ? <div className="topology-summary__links" aria-label="Doğrulanmış bağlantılar">{summary.links.map((link) => <span key={link.code}><strong>{link.source_device_code} <b aria-hidden="true">→</b> {link.target_device_code}</strong>{link.link_layer ? <small>{link.link_layer}</small> : null}</span>)}</div> : null}
     {(scope || primary || backup) ? <div className="topology-summary__facts">
       {scope ? <><FactCard label="Potansiyel bağlantı kapsamı" value={scope.potential_connection_count} /><FactCard label="Doğrulanmış etki bağlantısı" value={scope.verified_connection_count} /><FactCard label="Doğrulanmış abonelik" value={scope.verified_subscription_count} /><FactCard label="Doğrulanmış müşteri" value={scope.verified_customer_count} /></> : null}
       {primary ? <FactCard label="Aktif primary bağlantı" value={primary} /> : null}
@@ -140,7 +160,7 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
       <FactCard
         key={`decision-evidence-${reference}`}
         label="DecisionEvidence"
-        value={evidenceLink ? <Link className="analysis-fact__link" to={evidenceLink}>{evidenceLabel}</Link> : evidenceLabel}
+        value={evidenceLink ? <span className="analysis-evidence-link"><Link className="analysis-fact__link" to={evidenceLink}>Kanıtı görüntüle</Link><small>{evidenceLabel}</small></span> : evidenceLabel}
       />,
     )
   })
@@ -196,8 +216,8 @@ function VerifiedResultCards({ result, technical }: { result: StructuredVerified
     {impactCards.length ? <FactGroup title="Müşteri etkisi">{impactCards}</FactGroup> : null}
     {outageCards.length ? <FactGroup title="Kesinti ve ağ">{outageCards}</FactGroup> : null}
     {technical && rootCards.length ? <FactGroup title="Kök neden">{rootCards}</FactGroup> : null}
-    {decisionCards.length ? <FactGroup title="Telafi ve karar">{decisionCards}</FactGroup> : null}
-    {provenanceCards.length ? <FactGroup title="Kural ve kaynak kanıtları">{provenanceCards}</FactGroup> : null}
+    {decisionCards.length ? <FactGroup title="Telafi ve karar" tone="decision">{decisionCards}</FactGroup> : null}
+    {provenanceCards.length ? <FactGroup title="Kural ve kaynak kanıtları" tone="evidence">{provenanceCards}</FactGroup> : null}
     {correlationCards.length ? <FactGroup title="Korelasyon kanıtı">{correlationCards}</FactGroup> : null}
     {analyticsCards.length ? <FactGroup title={analyticsSummaries.length > 1 ? 'Operasyon analitiği' : analytics ? `${metricLabelsForTitle(analytics.metric)} analitiği` : 'Analitik'}>{analyticsCards}</FactGroup> : null}
     {!impactCards.length && !outageCards.length && !rootCards.length && !decisionCards.length && !provenanceCards.length && !correlationCards.length && !analyticsCards.length ? <p className="analysis-message">Bu sorgu için yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}
@@ -209,11 +229,9 @@ function metricLabelsForTitle(metric: string) {
 }
 
 export function AIAnalysisPage() {
-  const { user } = useAuth()
   const [query, setQuery] = useState('')
   const [llmProvider, setLlmProvider] = useState<ProviderName>('ollama')
   const [embeddingProvider, setEmbeddingProvider] = useState<ProviderName>('ollama')
-  const [viewMode, setViewMode] = useState<ViewMode>('management')
   const [lifecycle, setLifecycle] = useState<Lifecycle>('idle')
   const [result, setResult] = useState<Awaited<ReturnType<typeof submitAnalysis>> | null>(null)
   const [error, setError] = useState('')
@@ -342,52 +360,57 @@ export function AIAnalysisPage() {
       <div className="analysis-page__header">
         <div>
           <p className="analysis-page__eyebrow">Workspace / AI Analysis</p>
-          <h1 id="analysis-title">Operasyon sorusu</h1>
-          <p>Doğal dilde bir soru sorun; doğrulanmış operasyon kayıtları üzerinden yanıt alın.</p>
+          <h1 id="analysis-title">AI Analysis</h1>
         </div>
-        <span className="analysis-page__role">{user?.role} workspace</span>
       </div>
 
       <div className="analysis-grid">
-        <form className="analysis-composer" onSubmit={(event) => { event.preventDefault(); void submit() }}>
-          <div className="analysis-composer__topline"><h2>Sorgu oluştur</h2><span>{query.length}/{MAX_QUERY_LENGTH}</span></div>
-          <label htmlFor="analysis-query">Doğal dil sorusu</label>
-          <textarea
-            id="analysis-query"
-            value={query}
-            maxLength={MAX_QUERY_LENGTH}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Örn. AGG-ANK-002 cihazındaki kesintide kaç müşteri etkilendi?"
-            rows={8}
-          />
-          <div className="analysis-options">
-            <label>LLM provider<select value={llmProvider} onChange={(event) => setLlmProvider(event.target.value as ProviderName)}><option value="ollama">Local Gemma</option><option value="gemini">Gemini</option><option value="nvidia">NVIDIA GLM-5.2</option><option value="groq">Groq GPT-OSS 120B</option></select></label>
-            <label>Embedding provider<select value={embeddingProvider} onChange={(event) => setEmbeddingProvider(event.target.value as ProviderName)}><option value="ollama">Local Qwen</option><option value="gemini">Gemini Embedding</option></select></label>
-            <fieldset><legend>Görünüm</legend><label><input type="radio" checked={viewMode === 'management'} onChange={() => setViewMode('management')} /> Yönetim</label><label><input type="radio" checked={viewMode === 'technical'} onChange={() => setViewMode('technical')} /> Teknik</label></fieldset>
-          </div>
-          <button className="analysis-submit" type="submit" disabled={!query.trim() || lifecycle === 'submitting'}>{lifecycle === 'submitting' ? 'Analiz çalışıyor...' : 'Analizi çalıştır'}</button>
-        </form>
-
-        <aside className="analysis-examples" aria-label="Örnek sorular">
-          <p className="analysis-page__eyebrow">Başlangıç soruları</p>
-          <h2>Gerçek kapsamdan örnekler</h2>
-          <p>Bir örneği seçerek sorgu alanına taşıyın.</p>
-          {EXAMPLES.map((example) => <button type="button" key={example} onClick={() => setQuery(example)}>{example}</button>)}
-        </aside>
+        <div className="analysis-composer-stage">
+          <form className="analysis-composer" onSubmit={(event) => { event.preventDefault(); void submit() }}>
+            <h2 className="analysis-composer__sr-only">Sorgu oluştur</h2>
+            <div className="analysis-composer__input">
+              <label className="analysis-composer__sr-only" htmlFor="analysis-query">Doğal dil sorusu</label>
+              <textarea
+                id="analysis-query"
+                value={query}
+                maxLength={MAX_QUERY_LENGTH}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Operasyon verilerinde neyi incelemek istiyorsunuz?"
+                rows={4}
+              />
+              <span className="analysis-composer__count">{query.length}/{MAX_QUERY_LENGTH}</span>
+            </div>
+            <div className="analysis-composer__footer">
+              <div className="analysis-options">
+                <ProviderPicker label="LLM" value={llmProvider} onChange={setLlmProvider} options={[{ value: 'ollama', label: 'Local Gemma' }, { value: 'gemini', label: 'Gemini' }, { value: 'nvidia', label: 'NVIDIA GLM-5.2' }, { value: 'groq', label: 'Groq GPT-OSS 120B' }]} />
+                <ProviderPicker label="Embedding" value={embeddingProvider} onChange={setEmbeddingProvider} options={[{ value: 'ollama', label: 'Local Qwen' }, { value: 'gemini', label: 'Gemini Embedding' }]} />
+              </div>
+              <button className="analysis-submit" type="submit" disabled={!query.trim() || lifecycle === 'submitting'}>{lifecycle === 'submitting' ? 'Analiz çalışıyor...' : 'Analizi çalıştır >'}</button>
+            </div>
+          </form>
+        </div>
       </div>
 
       {(lifecycle === 'submitting' || runStatus) && <section className="analysis-progress" aria-live="polite" aria-label="Analiz işlem durumu">
-        <div className="analysis-progress__header"><div><p className="analysis-page__eyebrow">Gerçek işlem durumu</p><h2>{lifecycle === 'submitting' ? (phaseLabels[currentPhase] ?? 'Sorgu çalışıyor') : lifecycle === 'success' ? 'Tamamlandı' : lifecycle === 'failed' ? 'İşlem başarısız' : 'İşlem sonucu'}</h2></div><span>{runStatus?.elapsed_ms ? Math.round(runStatus.elapsed_ms / 1000) : elapsedSeconds}s</span></div>
-        <ol className="analysis-progress__steps">{phaseOrder.map((phase, index) => { const currentIndex = phaseOrder.indexOf(currentPhase); const state = lifecycle !== 'submitting' && phase === 'completed' ? 'complete' : index < currentIndex ? 'complete' : phase === currentPhase ? 'current' : 'pending'; return <li className={`analysis-progress__step analysis-progress__step--${state}`} key={phase}><span aria-hidden="true">{state === 'complete' ? '✓' : index + 1}</span>{phaseLabels[phase]}</li> })}</ol>
-        {runStatus && runStatus.planned_tool_count > 0 && <p className="analysis-progress__tools">Servis durumu: {runStatus.succeeded_tool_count}/{runStatus.planned_tool_count} başarılı</p>}
+        <div className="analysis-progress__header"><div><p className="analysis-page__eyebrow">Gerçek işlem durumu</p><h2>{lifecycle === 'submitting' ? (phaseLabels[currentPhase] ?? 'Sorgu çalışıyor') : lifecycle === 'success' ? 'Tamamlandı' : lifecycle === 'failed' ? 'İşlem başarısız' : 'İşlem sonucu'}</h2></div><span className="analysis-progress__duration">{runStatus?.elapsed_ms ? Math.round(runStatus.elapsed_ms / 1000) : elapsedSeconds}s</span></div>
+        <ol className="analysis-progress__steps">{phaseOrder.map((phase, index) => { const currentIndex = phaseOrder.indexOf(currentPhase); const state = lifecycle !== 'submitting' && phase === 'completed' ? 'complete' : index < currentIndex ? 'complete' : phase === currentPhase ? 'current' : 'pending'; return <li className={`analysis-progress__step analysis-progress__step--${state}`} key={phase}><span className="analysis-progress__step-marker" aria-hidden="true">{state === 'complete' ? '✓' : index + 1}</span><span className="analysis-progress__step-label">{phaseLabels[phase]}</span></li> })}</ol>
+        {runStatus && runStatus.planned_tool_count > 0 && <p className="analysis-progress__tools"><span>MCP servis durumu</span><strong>{runStatus.succeeded_tool_count}/{runStatus.planned_tool_count} başarılı</strong></p>}
         {runStatus?.failed_tool_count ? <p className="analysis-message analysis-message--error">İşlem güvenli şekilde başarısız oldu: {runStatus.error_code ?? 'tool_error'}</p> : null}
       </section>}
 
-      {lifecycle === 'failed' && <section className="analysis-state" role="alert" aria-live="assertive"><h2>{failure === 'access' ? 'Erişim gerekiyor' : failure === 'not-found' ? 'Kayıt bulunamadı' : failure === 'retryable' ? 'İşlem geçici olarak tamamlanamadı' : 'Analiz isteği tamamlanamadı'}</h2><p>{error}</p>{failure === 'retryable' ? <button type="button" onClick={() => void submit()}>Tekrar dene</button> : null}{failure === 'not-found' ? <button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button> : null}{failure === 'access' ? <Link to="/login">Oturuma git</Link> : null}</section>}
+      {lifecycle === 'failed' && <section className="analysis-state" role="alert" aria-live="assertive"><p className="analysis-page__eyebrow">İşlem durumu</p><h2>{failure === 'access' ? 'Erişim gerekiyor' : failure === 'not-found' ? 'Kayıt bulunamadı' : failure === 'retryable' ? 'İşlem geçici olarak tamamlanamadı' : 'Analiz isteği tamamlanamadı'}</h2><p>{error}</p>{failure === 'retryable' ? <button type="button" onClick={() => void submit()}>Tekrar dene</button> : null}{failure === 'not-found' ? <button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button> : null}{failure === 'access' ? <Link to="/login">Oturuma git</Link> : null}</section>}
 
-      {result?.response && <section className="analysis-result" aria-live="polite"><div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>{viewMode === 'technical' ? 'Teknik görünüm' : 'Yönetim görünümü'}</span></div><div className="analysis-result__answer"><p className="analysis-page__eyebrow">Analiz yanıtı</p><h2>Yanıt</h2><p>{result.response.response_text}</p></div>{result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} technical={viewMode === 'technical'} /> : !isUnsupported ? <p className="analysis-message">Bu yanıtta yapılandırılmış doğrulanmış alan bulunmuyor.</p> : null}{topologyState === 'loading' ? <section className="topology-summary__state" aria-live="polite">Topoloji özeti yükleniyor.</section> : null}{topologySummary ? <TopologySummaryPanel summary={topologySummary} /> : null}{topologyState === 'unavailable' ? <section className="topology-summary__state" role="status">Topoloji özeti bu doğrulanmış kaynak için şu anda gösterilemiyor.</section> : null}{result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}</section>}
-      {result?.clarification && <section className="analysis-result analysis-result--clarification" aria-live="polite"><h2>Ek bilgi gerekiyor</h2><p>{result.clarification.message}</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
-      {isUnsupported && <section className="analysis-result analysis-result--clarification" aria-live="polite"><h2>Desteklenmeyen istek</h2><p>Bu istek mevcut analiz kapsamı dışında kalıyor.</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
+      {result?.response && !isUnsupported && <section className="analysis-result" aria-live="polite">
+        <div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span><span>{result.response.provider} / {result.response.model}</span><span>Yönetim görünümü</span></div>
+        <div className="analysis-result__answer"><div><p className="analysis-page__eyebrow">Analiz yanıtı</p><h2>Doğrulanmış sonuç</h2></div><p>{result.response.response_text}</p></div>
+        {result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} technical={false} /> : <p className="analysis-message">Bu yanıtta yapılandırılmış doğrulanmış alan bulunmuyor.</p>}
+        {topologyState === 'loading' ? <section className="topology-summary__state" aria-live="polite">Topoloji özeti yükleniyor.</section> : null}
+        {topologySummary ? <TopologySummaryPanel summary={topologySummary} /> : null}
+        {topologyState === 'unavailable' ? <section className="topology-summary__state" role="status">Topoloji özeti bu doğrulanmış kaynak için şu anda gösterilemiyor.</section> : null}
+        {result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}
+      </section>}
+      {result?.clarification && <section className="analysis-result analysis-result--clarification" aria-live="polite"><p className="analysis-page__eyebrow">Ek seçim gerekiyor</p><h2>Doğru kaydı seçmemize yardımcı olun</h2><p>{result.clarification.message}</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
+      {isUnsupported && <section className="analysis-result analysis-result--unsupported" aria-live="polite"><p className="analysis-page__eyebrow">Analiz kapsamı</p><h2>Bu istek şu an desteklenmiyor</h2><p>Operasyon verileriyle doğrulanabilecek bir kapsam bulunamadı.</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}
     </section>
   )
 }

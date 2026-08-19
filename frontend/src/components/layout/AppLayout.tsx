@@ -39,11 +39,7 @@ export function AppLayout() {
     <div className="app-shell">
       <aside className="app-sidebar">
         <div className="app-brand">
-          <div className="app-brand__mark" aria-hidden="true">PT</div>
-          <div>
-            <p className="app-brand__name">ProcessTwin</p>
-            <p className="app-brand__meta">Operations intelligence</p>
-          </div>
+          <img className="app-brand__logo" src="/turkcell.png" alt="Turkcell" />
         </div>
         <nav className="app-nav" aria-label="Primary navigation">
           {navGroups.map((group) => (
@@ -80,16 +76,6 @@ export function AppLayout() {
         </div>
       </aside>
       <div className="app-content">
-        <header className="app-topbar">
-          <div>
-            <p className="app-topbar__eyebrow">ProcessTwin AI</p>
-            <p className="app-topbar__title">Telecom operations workspace</p>
-          </div>
-          <div className="app-topbar__status">
-            <span className="app-topbar__status-dot" aria-hidden="true" />
-            <span>Workspace ready</span>
-          </div>
-        </header>
         <main className="app-main"><Outlet /></main>
       </div>
     </div>
