@@ -423,7 +423,7 @@ export function AIAnalysisPage() {
   return (
     <section className="analysis-page" aria-labelledby="analysis-title">
       <div className="analysis-page__header">
-        <h1 id="analysis-title">AI Analysis</h1>
+        <h1 id="analysis-title">AI Analizi</h1>
       </div>
 
       <div className="analysis-grid">

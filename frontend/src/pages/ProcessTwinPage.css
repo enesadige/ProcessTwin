@@ -20,13 +20,11 @@
 }
 
 .processtwin-page__header > div {
-  padding: 14px 32px;
-  border: 1px solid rgba(211, 217, 228, .92);
-  border-radius: 22px;
-  background: rgba(255, 255, 255, .74);
-  box-shadow: inset 1px 1px rgba(255, 255, 255, .9), 0 14px 30px rgba(42, 48, 59, .08);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  padding: 9px 18px;
+  border: 1px solid #d8dce3;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .82);
+  box-shadow: 0 7px 16px rgba(42, 48, 59, .06);
 }
 
 .processtwin-page__header h1,
@@ -41,7 +39,12 @@
 }
 
 .processtwin-page__header h1 {
-  font-size: 26px;
+  color: #1b222d;
+  font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif;
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: .03em;
+  line-height: 1.15;
 }
 
 .processtwin-page__header p:not(.processtwin-eyebrow),

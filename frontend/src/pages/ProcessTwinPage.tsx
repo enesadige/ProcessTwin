@@ -13,7 +13,6 @@ import {
   simulationLifecycleAction,
   startSimulationRun,
   validateSimulationScenario,
-  type SimulationAnchorType,
   type SimulationEvent,
   type SimulationResult,
   type SimulationRun,
@@ -23,7 +22,8 @@ import {
 import './ProcessTwinPage.css'
 
 const SNAPSHOT_IDENTIFIER = 'multi-city-realism-v3-repair-r1-multi-city-realism-snapshot-v3-repair-r1'
-const SPEEDS = [1, 10, 60] as const
+const FIXED_ANCHOR_TYPE = 'network_device' as const
+const FIXED_SIMULATION_SPEED = 10 as const
 const TERMINAL_STATUSES = new Set<SimulationRunStatus>(['completed', 'failed', 'stopped'])
 
 type WorkspaceState = 'idle' | 'running' | 'ready' | 'error'
@@ -32,11 +32,9 @@ type ResultNavigationKey = 'controls' | 'topology' | 'baseline' | 'candidate' | 
 
 type ScenarioForm = {
   snapshotIdentifier: string
-  anchorType: SimulationAnchorType
   anchorCode: string
   virtualStart: string
   deterministicSeed: string
-  speed: 1 | 10 | 60
   baselineDuration: string
   baselineSlaTarget: string
   candidateDuration: string
@@ -45,11 +43,9 @@ type ScenarioForm = {
 
 const initialForm: ScenarioForm = {
   snapshotIdentifier: SNAPSHOT_IDENTIFIER,
-  anchorType: 'network_device',
   anchorCode: 'BNG-İZM-002',
   virtualStart: '2026-07-01T00:00:00+00:00',
   deterministicSeed: 'processtwin-ui-seed',
-  speed: 10,
   baselineDuration: '600',
   baselineSlaTarget: '300',
   candidateDuration: '',
@@ -212,16 +208,6 @@ function HistoricalPanel({ result, showNotice }: { result: SimulationResult; sho
   </section>
 }
 
-function EvidencePanel({ run, result }: { run: SimulationRun; result: SimulationResult }) {
-  const evidence = result.evidence ?? run.evidence
-  if (!evidence) return null
-  return <section className="processtwin-result-section" aria-labelledby={`${run.run_code}-evidence-title`}>
-    <div className="processtwin-section-heading"><div><h3 id={`${run.run_code}-evidence-title`}>Simülasyon kanıtı</h3></div><span className="processtwin-source-tag">Varsayımsal</span></div>
-    <div className="processtwin-fact-grid processtwin-fact-grid--compact"><FactCard label="Çalıştırma kodu" value={run.run_code} /><FactCard label="Kanıt kodu" value={evidence.evidence_code} /><FactCard label="Karşılaştırma rolü" value={formatValue(run.comparison_role)} /></div>
-    <details className="processtwin-technical-details"><summary>Teknik izlenebilirlik</summary><ResultPairs values={{ snapshot: run.source_snapshot.snapshot_key, scenario: run.scenario_code, baseline_run: run.baseline_run_code, replay_of: run.replay_of_run_code, virtual_clock: run.virtual_clock, evidence_hash: evidence.evidence_hash, finalized: evidence.finalized, selected_rule_version: result.rule_selection }} /></details>
-  </section>
-}
-
 function ResultPanel({ title, run, result }: { title: string; run: SimulationRun | null; result: SimulationResult | null }) {
   if (!run || !result) return null
   const rule = result.rule_selection
@@ -230,7 +216,6 @@ function ResultPanel({ title, run, result }: { title: string; run: SimulationRun
     <header className="processtwin-result__header"><div><h2 id={`${run.comparison_role}-result-title`}>{title}</h2><p>{formatValue(result.event.anchor_type)} · {result.event.anchor_code} · {formatValue(result.event.failure_type)}</p></div></header>
     <ProjectionPanel result={result} />
     <HistoricalPanel result={result} showNotice={run.comparison_role === 'baseline'} />
-    <EvidencePanel run={run} result={result} />
     <section className="processtwin-result-section processtwin-result-section--compensation"><div className="processtwin-section-heading"><div><h3>Kural ve telafi sonucu</h3></div></div><div className="processtwin-fact-grid"><FactCard label="Seçilmiş RuleVersion" value={rule ? formatValue(rule) : 'Seçilmiş RuleVersion yok'} muted={!rule} /><FactCard label="Telafi durumu" value={formatValue(compensation.status)} /><FactCard label="Uygunluk" value={formatValue(compensation.eligibility)} /><FactCard label="Simüle edilen tutar" value={`${formatValue(compensation.amount)} ${compensation.currency ?? ''}`.trim()} /><FactCard label="Uygun abonelik" value={formatValue(compensation.eligible_subscription_count)} /><FactCard label="Manuel inceleme nedeni" value={formatValue(compensation.manual_review_reason)} muted={Boolean(compensation.manual_review_reason)} /></div></section>
     <section className="processtwin-result-section processtwin-result-section--operational"><div className="processtwin-section-heading"><div><h3>SLA ve operasyon sonucu</h3></div></div><ResultPairs values={result.operational} /></section>
   </section>
@@ -238,7 +223,20 @@ function ResultPanel({ title, run, result }: { title: string; run: SimulationRun
 
 function ComparisonPanel({ result }: { result: SimulationResult | null }) {
   if (!result?.comparison) return null
-  return <section className="processtwin-comparison" aria-labelledby="comparison-title"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Senaryo karşılaştırması</p><h2 id="comparison-title">Referans / aday farkı</h2></div></div><ResultPairs values={result.comparison} /></section>
+  const fieldOrder = [
+    'projected_affected_customer_delta',
+    'projected_affected_subscription_delta',
+    'projected_unknown_delta',
+    'projected_protected_no_impact_delta',
+    'compensation_amount_delta',
+    'duration_seconds_delta',
+    'sla_target_seconds_delta',
+    'sla_breached',
+  ]
+  const comparisonValues = Object.fromEntries(fieldOrder
+    .filter((key) => result.comparison?.[key] !== null && result.comparison?.[key] !== undefined && result.comparison?.[key] !== '')
+    .map((key) => [key, result.comparison?.[key]]))
+  return <section className="processtwin-comparison" aria-labelledby="comparison-title"><div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Senaryo karşılaştırması</p><h2 id="comparison-title">Referans / aday farkı</h2></div></div><ResultPairs values={comparisonValues} /></section>
 }
 
 function simulationEventLabel(eventType: string) {
@@ -318,7 +316,6 @@ export function ProcessTwinPage() {
   }
 
   const loadDeviceTopology = async () => {
-    if (form.anchorType !== 'network_device') return
     setTopologyState('loading')
     try {
       const summary = await getTopologySummary({ snapshotIdentifier: form.snapshotIdentifier.trim(), deviceCode: form.anchorCode.trim() })
@@ -344,9 +341,9 @@ export function ProcessTwinPage() {
       }
       const scenarioInput = {
         source_snapshot_identifier: form.snapshotIdentifier.trim(),
-        anchor_type: form.anchorType,
+        anchor_type: FIXED_ANCHOR_TYPE,
         anchor_code: form.anchorCode.trim(),
-        failure_type: `${form.anchorType}_failure`,
+        failure_type: `${FIXED_ANCHOR_TYPE}_failure`,
         default_parameters: defaults,
       }
       await validateSimulationScenario(scenarioInput)
@@ -357,7 +354,7 @@ export function ProcessTwinPage() {
         scenario_code: scenarioPrefix,
         deterministic_seed: form.deterministicSeed.trim(),
         virtual_start: form.virtualStart.trim(),
-        speed: form.speed,
+        speed: FIXED_SIMULATION_SPEED,
       })
       setBaselineRun(baseline)
       const candidate = await createCandidateSimulationRun({
@@ -446,16 +443,13 @@ export function ProcessTwinPage() {
     <form className="processtwin-form" onSubmit={execute}>
       <div className="processtwin-section-heading"><div><p className="processtwin-eyebrow">Senaryo girdisi</p><h2>Senaryo koşulları</h2></div>{scenarioCode ? <span className="processtwin-form__code">Scenario {scenarioCode}</span> : null}</div>
       <div className="processtwin-form__grid">
-        <label className="processtwin-field"><span>Hedef türü</span><select value={form.anchorType} onChange={(event) => update('anchorType', event.target.value as SimulationAnchorType)}><option value="network_device">Ağ cihazı</option><option value="network_link">Ağ bağlantısı</option><option value="line_connection">Hat bağlantısı</option></select></label>
-        <label className="processtwin-field"><span>Hedef kodu</span><input value={form.anchorCode} onChange={(event) => update('anchorCode', event.target.value)} required /></label>
         <label className="processtwin-field"><span>Sanal başlangıç zamanı</span><input value={form.virtualStart} onChange={(event) => update('virtualStart', event.target.value)} placeholder="2026-07-01T00:00:00+00:00" required /></label>
-        <fieldset className="processtwin-speed"><legend>Simülasyon hızı</legend>{SPEEDS.map((speed) => <label key={speed}><input type="radio" name="speed" checked={form.speed === speed} onChange={() => update('speed', speed)} />{speed}x</label>)}</fieldset>
+        <label className="processtwin-field"><span>Hedef kodu</span><input value={form.anchorCode} onChange={(event) => update('anchorCode', event.target.value)} required /></label>
       </div>
       <div className="processtwin-parameter-grid">
         <section><h3>Referans senaryo (Baseline)</h3><label className="processtwin-field"><span>Süre</span><input type="number" min="1" value={form.baselineDuration} onChange={(event) => update('baselineDuration', event.target.value)} required /></label><label className="processtwin-field"><span>SLA hedefi</span><input type="number" min="1" value={form.baselineSlaTarget} onChange={(event) => update('baselineSlaTarget', event.target.value)} required /></label></section>
         <section><h3>Aday senaryo</h3><label className="processtwin-field"><span>Süre değişikliği (isteğe bağlı)</span><input type="number" min="1" value={form.candidateDuration} onChange={(event) => update('candidateDuration', event.target.value)} /></label><label className="processtwin-field"><span>SLA hedefi değişikliği (isteğe bağlı)</span><input type="number" min="1" value={form.candidateSlaTarget} onChange={(event) => update('candidateSlaTarget', event.target.value)} /></label><p>Aday senaryo yalnız burada belirtilen değişikliklerle referans senaryodan ayrılır.</p></section>
       </div>
-      <div className="processtwin-form__technical-meta" aria-label="Teknik senaryo bilgisi"><span><strong>Kaynak snapshot</strong><code>{form.snapshotIdentifier}</code></span><span><strong>Seed</strong><code>{form.deterministicSeed}</code></span></div>
       <div className="processtwin-form__actions"><button className="analysis-submit" type="submit" disabled={workspaceState === 'running'}>{workspaceState === 'running' ? 'Simülasyon çalışıyor...' : 'Senaryoları karşılaştır'}</button></div>
     </form>
 

@@ -1,7 +1,7 @@
 .analysis-page { display: grid; gap: var(--space-5); }
-.analysis-page__header { justify-self: center; padding: 11px 23px; border: 1px solid rgba(210, 216, 227, .8); border-radius: 19px; background: rgba(255, 255, 255, .62); box-shadow: inset 1px 1px rgba(255, 255, 255, .9), 0 11px 24px rgba(37, 50, 77, .07); text-align: center; backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); }
+.analysis-page__header { justify-self: center; padding: 8px 16px; border: 1px solid #d8dce3; border-radius: 10px; background: rgba(255, 255, 255, .82); box-shadow: 0 7px 16px rgba(37, 50, 77, .06); text-align: center; }
 .analysis-page__eyebrow { margin: 0 0 4px; color: var(--color-primary); font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
-.analysis-page__header h1 { margin: 0; color: #202733; font-size: 24px; }
+.analysis-page__header h1 { margin: 0; color: #1b222d; font-family: "Avenir Next", "Helvetica Neue", Arial, sans-serif; font-size: 20px; font-weight: 500; letter-spacing: .035em; line-height: 1.15; }
 .analysis-grid { display: grid; grid-template-columns: minmax(0, 1fr); }
 .analysis-composer-stage { display: grid; box-sizing: border-box; width: min(100%, 1120px); justify-self: center; padding: 34px 60px; }
 .analysis-composer, .analysis-result { padding: var(--space-5); border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); box-shadow: var(--shadow-panel); }
