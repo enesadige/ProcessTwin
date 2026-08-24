@@ -1,44 +1,91 @@
 # ProcessTwin
 
-ProcessTwin, sentetik telekom operasyon verisi üzerinde iki ana iş akışı sunan bir Django + React uygulamasıdır:
+ProcessTwin is an explainable telecom operations platform built around two complementary workflows:
 
-- **AI Analizi:** Türkçe operasyon sorularını belirleyici servisler, MCP araçları ve gerektiğinde LLM destekli açıklama ile yanıtlar.
-- **Süreç Simülasyonu:** Bir ağ arızasının referans ve aday koşullardaki varsayımsal etkisini, kaynak veriyi değiştirmeden karşılaştırır.
+- **AI Analysis** answers Turkish operational questions about alarms, outages, network topology, verified customer impact, root-cause correlation, compensation, rules, and evidence.
+- **ProcessTwin** compares a baseline and a candidate what-if scenario for a simulated network failure without changing the source operational world.
 
-> **Veri ve güvenlik:** Bu depodaki veri üreticisi, RAG dokümanları ve demo senaryoları sentetiktir. Gerçek müşteri, kurum, ticari politika veya erişim anahtarı içermez. `.env`, veritabanı dosyaları, `node_modules` ve sanal ortam git tarafından izlenmez.
+All business facts come from deterministic backend and domain services. An LLM can help interpret bounded language and produce a grounded narrative, but it does **not** calculate operational facts, select a `RuleVersion`, determine customer impact, or invent evidence.
 
-## Mimari Özeti
+> **Synthetic-data notice:** the repository contains a deterministic, multi-city synthetic telecom dataset and synthetic rule/procedure documents. It contains no production network connection, real customer data, or real commercial policy.
+
+## Main Capabilities
+
+- **AI Analysis:** deterministic structured-query parsing, orchestration, clarification, and safe fallback behavior for Turkish operational requests.
+- **MCP tool layer:** Network, Customer, Rules, Compensation, and Simulation adapters expose bounded backend capabilities without duplicating business logic.
+- **Deterministic operations domain:** customer/subscription impact, topology traversal, path diversity and failover classification, alarm correlation, root-cause ranking, and compensation evaluation.
+- **RAG for approved documents:** rule and procedure sources are ingested as versioned documents, chunks, and embeddings; retrieval preserves source provenance.
+- **Evidence:** `QueryRun`, `EvidenceRecord`, and `DecisionEvidence` preserve execution provenance and deterministic calculation references.
+- **ProcessTwin simulation:** deterministic baseline/candidate runs, virtual time, projected impact, SLA comparison, simulated compensation, replay lineage, and `SimulationEvidence`.
+- **Snapshot-based data world:** exact snapshot selection prevents cross-snapshot mixing and makes the synthetic data generation reproducible.
+
+## Architecture
 
 ```text
-React / Vite (127.0.0.1:5173)
+React + Vite frontend
         |
-        | /api Vite proxy
+        | /api through the Vite proxy
         v
-Django REST API (127.0.0.1:8000)
+Django REST API
         |
-        +-- Deterministik domain servisleri ve PostgreSQL / pgvector
-        +-- Orchestration -> doğrudan MCP adapter -> dahili Django API
-        +-- RAG indeksleme ve embedding sağlayıcısı
-        +-- İsteğe bağlı LLM sağlayıcısı (Groq, Gemini, NVIDIA veya Ollama)
+        +-- Orchestration and deterministic tool planning
+        |       |
+        |       +-- MCP adapter/tool boundary
+        |               |
+        |               +-- authenticated internal Django API
+        |
+        +-- Domain services -> PostgreSQL + pgvector
+        +-- RAG indexing/retrieval -> approved document corpus
+        +-- LLM provider -> grounded narration only
 ```
 
-Normal geliştirme ve sunum akışında MCP sunucularını 8101-8106 portlarında sürekli çalıştırmak gerekmez. Varsayılan `ORCHESTRATION_MCP_TRANSPORT=direct` değeri, araç çağrılarını uygulama içindeki adapter üzerinden dahili API'ye taşır. `stdio` modu yalnız yerel/acceptance senaryoları için desteklenir.
+MCP is an adapter boundary, not a separate source of business truth and not a direct database access layer. In normal runtime, `ORCHESTRATION_MCP_TRANSPORT=direct` routes the tool call through the application adapter and the internal API. The allowlisted `stdio` transport is supported for local/acceptance scenarios; persistent MCP listeners on ports 8101-8106 are **not** the normal application runtime model.
 
-## Gereksinimler
+RAG is used for approved synthetic rule/procedure documents. It does not calculate alarm counts, customer impact, compensation amounts, or simulation results. LLM provider output is validated against backend-produced canonical facts before it reaches the user.
 
-- macOS veya Linux
+## Technology Stack
+
+| Area | Technology |
+| --- | --- |
+| Backend | Python 3.12, Django, Django REST Framework |
+| Frontend | React, TypeScript, Vite |
+| Primary data store | PostgreSQL with pgvector |
+| Background support | Redis and Celery (optional for the interactive presentation flow) |
+| RAG | `SourceDocument`, deterministic chunking, pgvector/full-text retrieval, provider-specific embeddings |
+| LLM providers | Groq GPT-OSS, Gemini, NVIDIA, Ollama; mock provider for tests only |
+| Integration boundary | MCP SDK adapters with authenticated internal Django API calls |
+
+## Dataset and Snapshots
+
+The main application dataset is a deterministic **multi-city synthetic telecom world**. It models network devices, links, subscriptions, alarms, causal events, outages, verified impact assessments, rules, compensation evaluations, and simulation-local records.
+
+`DatasetVersion` stores generator/version/seed metadata. `DataSnapshot` represents an exact immutable source-data view. The frontend sends an exact snapshot identifier; services do not silently substitute another active snapshot. ProcessTwin reads a source snapshot and writes only simulation-local scenario/run/evidence records.
+
+The canonical presentation snapshot is built in three deterministic stages:
+
+1. base multi-city dataset,
+2. checkpointed V3 candidate built from that base snapshot,
+3. V3 repair revision used by the frontend.
+
+The repository intentionally does not ship a database dump. A clean clone creates the schema and synthetic data with the commands below.
+
+## Local Setup
+
+### Prerequisites
+
+- macOS or Linux
 - Python **3.12**
-- Node.js **20+** ve npm
-- PostgreSQL **16+** ve `pgvector` eklentisi
+- Node.js **20+** and npm
+- PostgreSQL **16+** with the `pgvector` extension available
 - Git
-- RAG için Gemini embedding veya Ollama + `qwen3-embedding:4b`
-- AI Analizi için desteklenen bir LLM sağlayıcısının erişim anahtarı. Sunumda önerilen seçenek Groq GPT-OSS'tur (`GROQ_API_KEY`).
+- A supported LLM API key for live AI narration (Groq GPT-OSS is the recommended presentation configuration)
+- One embedding option for semantic RAG:
+  - Gemini embedding with `GEMINI_API_KEY`, or
+  - Ollama with `qwen3-embedding:4b`
 
-Redis ve Celery kuyruklu işler için desteklenir; aşağıdaki etkileşimli sunum başlatma akışında Celery başlatılmaz. Redis de o akışın zorunlu bir parçası değildir.
+Redis is needed when you run Celery-backed work. It is not required for the normal interactive presentation startup sequence below, where Celery is intentionally not started.
 
-> Gemma indirmek zorunda değilsiniz. Ollama LLM adaptörü eski/alternatif yerel çalışma seçeneğidir; Groq GPT-OSS ile LLM çalıştırıp yalnız Qwen embedding'i yerelde kullanabilirsiniz.
-
-## 1. Depoyu İndirme ve Bağımlılıkları Kurma
+### Clone and Install
 
 ```bash
 git clone https://github.com/enesadige/ProcessTwin.git
@@ -53,86 +100,80 @@ npm ci
 cd ..
 ```
 
-Python paketleri `requirements.txt` içinde, frontend paketleri ise kilitli `frontend/package-lock.json` içinde tanımlıdır. Yeni paket gerekmedikçe `npm install` yerine `npm ci` kullanın.
+Python packages are pinned in `requirements.txt`; frontend dependencies are locked in `frontend/package-lock.json`. Prefer `npm ci` for a clean, reproducible frontend installation.
 
-## 2. PostgreSQL ve pgvector Hazırlığı
+### PostgreSQL and pgvector
 
-Yerel PostgreSQL sunucunuz çalışır durumda olmalıdır. Aşağıdaki örnek, mevcut macOS/Linux kullanıcınız için boş bir veritabanı oluşturur:
+Create an empty local database and enable pgvector. Adjust the commands and the connection string for your PostgreSQL user, password, host, and port.
 
 ```bash
 createdb processtwin
 psql processtwin -c 'CREATE EXTENSION IF NOT EXISTS vector;'
 ```
 
-Farklı PostgreSQL kullanıcısı, parola veya port kullanıyorsanız bir sonraki bölümdeki `DATABASE_URL` değerini buna göre değiştirin. `pgvector`, RAG embedding vektörlerinin PostgreSQL içinde aranması için gereklidir.
-
-## 3. Ortam Değişkenleri
-
-Örnek dosyayı kopyalayın. Gerçek `.env` dosyasını **asla** git'e eklemeyin.
+### Environment Configuration
 
 ```bash
 cp .env.example .env
 chmod 600 .env
 ```
 
-`.env` içindeki aşağıdaki alanları doldurun. Örnek değerler şablondur; secret değerleri yalnız kendi bilgisayarınızda kalmalıdır.
+Set the following values in `.env`. Do not commit that file or any real secret.
 
 ```env
-DJANGO_SECRET_KEY=<uzun-rastgele-django-secret>
-DATABASE_URL=postgres://<kullanici>:<parola>@127.0.0.1:5432/processtwin
+DJANGO_SECRET_KEY=<long-random-django-secret>
+DATABASE_URL=postgres://<user>:<password>@127.0.0.1:5432/processtwin
 
-# Sunum için önerilen LLM: Groq GPT-OSS
+# Recommended presentation LLM: fixed Groq GPT-OSS provider/model contract.
 LLM_PROVIDER=groq
 GROQ_API_KEY=<groq-api-key>
 
-# LLM'den bağımsız RAG embedding tercihi
+# LLM and embeddings are intentionally independent choices.
 RAG_EMBEDDING_PROVIDER=ollama
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 
-# Dahili MCP -> Django çağrıları için aynı, rastgele ve gizli değer kullanılmalı.
-INTERNAL_API_SERVICE_TOKEN=<uzun-rastgele-servis-tokeni>
-MCP_BACKEND_SERVICE_TOKEN=<ayni-servis-tokeni>
+# These two values must be the same long random secret.
+INTERNAL_API_SERVICE_TOKEN=<long-random-service-token>
+MCP_BACKEND_SERVICE_TOKEN=<same-service-token>
 MCP_BACKEND_BASE_URL=http://127.0.0.1:8000
 ORCHESTRATION_MCP_TRANSPORT=direct
 ```
 
-| Amaç | Ayar | Gereken |
-| --- | --- | --- |
-| Sunum LLM'i | `LLM_PROVIDER=groq` | `GROQ_API_KEY`; model sabit olarak `openai/gpt-oss-120b` kullanılır. |
-| Bulut embedding | `RAG_EMBEDDING_PROVIDER=gemini` | `GEMINI_API_KEY` |
-| Yerel embedding | `RAG_EMBEDDING_PROVIDER=ollama` | Ollama ve `qwen3-embedding:4b` |
-| Yerel LLM (isteğe bağlı) | `LLM_PROVIDER=ollama` | Ollama'da projenin allowlist'inde bulunan Gemma modeli |
+Provider choices:
 
-Yerel embedding seçeneği için yalnız embedding modelini indirin:
+| Use case | Configuration | Requirement |
+| --- | --- | --- |
+| Groq GPT-OSS narration | `LLM_PROVIDER=groq` | `GROQ_API_KEY`; the provider uses the allowlisted `openai/gpt-oss-120b` model. |
+| Gemini embeddings | `RAG_EMBEDDING_PROVIDER=gemini` | `GEMINI_API_KEY` |
+| Local Qwen embeddings | `RAG_EMBEDDING_PROVIDER=ollama` | Ollama plus `qwen3-embedding:4b` |
+| Local LLM, optional | `LLM_PROVIDER=ollama` | The allowlisted Gemma model in Ollama |
+
+Gemma is **not** required when using Groq GPT-OSS. To use local Qwen embeddings only, install the embedding model:
 
 ```bash
 ollama pull qwen3-embedding:4b
 ```
 
-`VITE_API_BASE_URL` değerini `.env` içinde ayarlamayın. Frontend aşağıdaki başlatma komutunda `/api` isteklerini Vite proxy ile backend'e iletir; bu sayede tarayıcı oturumu aynı origin'de kalır ve CORS riski oluşmaz.
+Do not export `VITE_API_BASE_URL` for the normal local flow. The frontend startup command below deliberately unsets it and uses the same-origin Vite `/api` proxy.
 
-## 4. Şema, Sentetik Veri ve RAG Kurulumu
+### Database Schema and Deterministic Seed
 
-Bu depoda PostgreSQL dump bulunmaz. Temiz bir klonda şema ve demo verisi aşağıdaki komutlarla üretilir. Veri üretimi belirleyicidir; aynı seed ve sürüm aynı kaynak veri dünyasını yeniden kurmayı hedefler.
-
-### 4.1 Django şeması
+Apply migrations first:
 
 ```bash
 ./.venv/bin/python backend/manage.py migrate
 ```
 
-### 4.2 Kanonik sentetik veri zinciri
-
-Kullanıcı arayüzü, `multi-city-realism-v3-repair-r1` anlık görüntüsünü kullanır. Bu anlık görüntü; temel çok-şehirli veriden, checkpoint'li V3 adayından ve son onarım sürümünden oluşur. Komutları sırayla çalıştırın.
+Then build the synthetic data chain in order. The Maltepe seed below is a legacy synthetic compatibility prerequisite for the current RAG corpus validation; it is not the main application dataset or the presentation scenario.
 
 ```bash
-# RAG corpusunun Maltepe referanslarını doğrulayabilmesi için gerekir.
+# Compatibility seed required by the current RAG corpus validator.
 ./.venv/bin/python backend/manage.py seed_maltepe_mvp
 
-# Çok-şehirli temel sentetik veri dünyası.
+# Main multi-city source world.
 ./.venv/bin/python backend/manage.py seed_multicity_realism
 
-# Temel anlık görüntünün kimliğini dinamik olarak alır; sabit DB id'si varsaymaz.
+# Resolve IDs dynamically: do not assume a fixed database primary key.
 BASE_SNAPSHOT_ID=$(./.venv/bin/python backend/manage.py shell -c \
   "from apps.datasets.models import DataSnapshot; print(DataSnapshot.objects.get(dataset_version__slug='multi-city-realism-v1').pk)")
 
@@ -146,7 +187,7 @@ V3_SNAPSHOT_ID=$(./.venv/bin/python backend/manage.py shell -c \
   --repair-v3 --repair-source-snapshot-id "$V3_SNAPSHOT_ID"
 ```
 
-Uzun checkpoint'li bir seed işlemi kesilirse, aynı kaynak anlık görüntüsüyle aşağıdaki komutlardan uygun olanını kullanın:
+If a checkpointed seed is interrupted, resume it with the corresponding command:
 
 ```bash
 ./.venv/bin/python backend/manage.py seed_multicity_realism \
@@ -156,49 +197,51 @@ Uzun checkpoint'li bir seed işlemi kesilirse, aynı kaynak anlık görüntüsü
   --repair-v3 --repair-resume --repair-source-snapshot-id "$V3_SNAPSHOT_ID"
 ```
 
-İsteğe bağlı doğrulama:
+Optional validation:
 
 ```bash
 ./.venv/bin/python backend/manage.py seed_multicity_realism \
   --dataset-slug multi-city-realism-v3-repair-r1 --validate-only
 ```
 
-### 4.3 RAG corpusunu indeksleme
+### RAG Corpus, Indexing, and Embeddings
 
-RAG corpusundaki dokümanlar depoda, `documents/` altında bulunur; veritabanında `SourceDocument`, `DocumentChunk` ve embedding kayıtları olarak üretilmeleri gerekir.
+The source Markdown files required by the RAG manifest are versioned under `documents/`. Ingest them into `SourceDocument`, create `DocumentChunk` records, and generate embeddings:
 
 ```bash
 ./.venv/bin/python backend/manage.py seed_rag_corpus
 ./.venv/bin/python backend/manage.py index_rag_documents
 
-# Yerel Qwen embedding profili ile tüm etkin dokümanları vektörleştirir.
+# Local Qwen embedding profile.
 ./.venv/bin/python backend/manage.py generate_rag_embeddings \
   --provider ollama --embedding-profile ollama-qwen3-4b
 ```
 
-Gemini embedding kullanıyorsanız son komutu aşağıdaki gibi değiştirin:
+For Gemini embeddings, use:
 
 ```bash
 ./.venv/bin/python backend/manage.py generate_rag_embeddings --provider gemini
 ```
 
-### 4.4 Yerel demo kullanıcıları
+### Local Users
+
+Create or reset the local demo accounts with a password of your choice:
 
 ```bash
-./.venv/bin/python backend/manage.py seed_demo_users --password '<en-az-8-karakterli-parola>'
+./.venv/bin/python backend/manage.py seed_demo_users --password '<at-least-8-characters>'
 ```
 
-Bu komut `demo_viewer`, `demo_analyst`, `demo_engineer` ve `demo_admin` kullanıcılarını oluşturur/günceller. Django yönetim arayüzü için ayrıca kendi yönetici hesabınızı oluşturun:
+This prepares `demo_viewer`, `demo_analyst`, `demo_engineer`, and `demo_admin`. For Django's `/admin/` interface, create a Django superuser separately:
 
 ```bash
 ./.venv/bin/python backend/manage.py createsuperuser
 ```
 
-## 5. Güvenilir Sunum Başlatma Sırası
+## Presentation Cold Start
 
-Bu akış backend'i önce başlatır, ardından MCP hazır oluşunu ve Vite proxy'yi doğrular. Celery ve kalıcı MCP port süreçleri bu interaktif sunum için gerekmez.
+Start the backend first. Do not start Celery or persistent MCP listener processes for this interactive flow.
 
-### 5.1 Eski uygulama süreçlerini kontrol edin
+### 1. Check Existing Processes
 
 ```bash
 for port in 8000 5173 11434 6379; do
@@ -207,25 +250,25 @@ for port in 8000 5173 11434 6379; do
 done
 ```
 
-Yalnız bu projeye ait eski Django veya Vite süreçleri varsa zarif biçimde kapatın. PostgreSQL, Ollama ya da başka bir uygulamaya ait süreçleri öldürmeyin.
+Only stop stale Django or Vite processes that belong to this project. Do not stop PostgreSQL, Ollama, Redis, or unrelated applications without identifying them first.
 
-### 5.2 Backend'i başlatın
+### 2. Start Django
 
-Bir terminalde:
+In terminal one:
 
 ```bash
 ./.venv/bin/python backend/manage.py runserver 127.0.0.1:8000
 ```
 
-Başka bir terminalden health kontrolü başarılı olmadan frontend'e geçmeyin:
+Wait for a successful health response before starting the frontend:
 
 ```bash
 curl -fsS http://127.0.0.1:8000/api/health/
 ```
 
-### 5.3 Dahili MCP hazır oluşunu kontrol edin
+### 3. Verify MCP Readiness
 
-Token değeri terminale yazdırılmadan `.env` dosyasından alınır:
+Load the local environment without printing its values, then call the authenticated internal health endpoint:
 
 ```bash
 set -a
@@ -237,11 +280,11 @@ curl -fsS \
   "http://127.0.0.1:8000/api/internal/v1/mcp/health/?timeout_seconds=5"
 ```
 
-Yanıtta Network, Customer, Rules, Compensation ve Simulation descriptor/probe durumları başarılı görünmelidir. Başarısız olursa önce backend health sonucunu, `MCP_BACKEND_BASE_URL` değerini ve iki servis tokenının boş olmadığını/eşit olduğunu kontrol edin. Token değerini paylaşmayın.
+The response should report readiness for Network, Customer, Rules, Compensation, and Simulation descriptors/probes. If it fails, verify backend health, `MCP_BACKEND_BASE_URL`, and that both service-token variables are non-empty and equal. Never print or share the token values.
 
-### 5.4 Frontend'i proxy modunda başlatın
+### 4. Start Vite in Proxy Mode
 
-Ayrı bir terminalde:
+In terminal two:
 
 ```bash
 cd frontend
@@ -250,9 +293,7 @@ env -u VITE_API_BASE_URL \
   npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
-Bu komut, `VITE_API_BASE_URL` değişkenini özellikle kaldırır ve `/api` isteklerini backend'e proxy'ler. Doğrudan cross-origin backend URL'si kullanmak CSRF/CORS hatalarına yol açabilir.
-
-### 5.5 Readiness kontrolleri
+### 5. Readiness Checks
 
 ```bash
 curl -fsS http://127.0.0.1:8000/api/health/
@@ -261,40 +302,36 @@ curl -sS -o /dev/null -w "Vite proxy CSRF status: %{http_code}\n" \
   http://127.0.0.1:5173/api/auth/csrf/
 ```
 
-Beklenen sonuçlar backend health için başarılı yanıt, frontend için `200` ve Vite proxy CSRF kontrolü için `200` değeridir. Ardından tarayıcıdan `http://127.0.0.1:5173` adresini açın. Giriş, AI Analizi, Süreç Simülasyonu ve Karar Kanıtları ekranlarını kontrol edin.
+Expected results: backend health succeeds, the frontend returns `200`, and the proxy CSRF request returns `200`. Open `http://127.0.0.1:5173` in a browser.
 
-## Sorun Giderme
+## Troubleshooting
 
-| Belirti | Önce kontrol edin | Muhtemel çözüm |
+| Symptom | Check first | Typical resolution |
 | --- | --- | --- |
-| `Failed to fetch` | `GET /api/health/`, Vite terminali | Backend'i önce başlatın; frontend'i proxy komutuyla yeniden başlatın. |
-| CORS/CSRF hatası | `VITE_API_BASE_URL` | Bu değişkeni unset bırakın ve `/api` Vite proxy kullanın. |
-| MCP health başarısız | Backend health, dahili base URL, servis tokenları | `MCP_BACKEND_BASE_URL=http://127.0.0.1:8000` olmalı; iki token aynı ve boş olmamalı. |
-| RAG sonucu boş | RAG seed, index ve embedding kayıtları | `seed_rag_corpus`, `index_rag_documents`, `generate_rag_embeddings` adımlarını tamamlayın. |
-| Ollama embedding hatası | Ollama servisi/modeli | `ollama serve` çalıştığından ve `qwen3-embedding:4b` indirildiğinden emin olun. |
-| `relation` veya `vector` hatası | Migration ve pgvector | `migrate` çalıştırın; PostgreSQL'de `CREATE EXTENSION vector` komutunu uygulayın. |
-| Port kullanımda | `lsof` | Sadece bu projeye ait eski Django/Vite sürecini kapatın. |
+| `Failed to fetch` | Backend health and Vite terminal | Start Django first, then restart Vite with the proxy command. |
+| CORS or CSRF issue | `VITE_API_BASE_URL` | Keep it unset and use the Vite `/api` proxy. |
+| MCP readiness failure | backend health, internal URL, service tokens | Use `http://127.0.0.1:8000`; both service tokens must be non-empty and equal. |
+| Empty RAG result | corpus, chunks, embeddings | Run corpus seed, indexing, and embedding generation in order. |
+| Ollama embedding failure | Ollama process/model | Ensure Ollama is running and `qwen3-embedding:4b` is installed. |
+| PostgreSQL `vector` or relation error | migrations and pgvector | Run migrations and enable `CREATE EXTENSION vector`. |
+| Port conflict | `lsof` output | Stop only a confirmed stale ProcessTwin Django/Vite process. |
 
-## Geliştirme Komutları
+## Development Checks
 
 ```bash
-# Django yapı denetimi
 ./.venv/bin/python backend/manage.py check
-
-# Backend testleri
 ./.venv/bin/pytest -q
 
-# Frontend tip denetimi ve üretim build'i
 cd frontend
 npm run typecheck
 npm run build
 ```
 
-`scripts/dev.py` backend, frontend ve Celery'yi birlikte yönetebilen bir yardımcıdır. Sunum için yukarıdaki manuel sıra tercih edilir: Celery zorunlu değildir ve launcher'da bir alt sürecin bitmesi diğer süreçleri de kapatabilir.
+`scripts/dev.py` can orchestrate backend, frontend, and Celery for development. The manual cold-start sequence above is preferred for presentation use because Celery is not needed and the launcher stops related child processes when one exits.
 
-## Gizli Bilgi Kontrolü ve Katkı
+## Security and Contribution Notes
 
-Commit öncesinde aşağıdaki kontrolleri çalıştırın:
+Before committing, check the worktree and make sure secret files remain ignored:
 
 ```bash
 git status --short
@@ -302,8 +339,8 @@ git check-ignore -v .env
 git diff --check
 ```
 
-`.env.example` yalnız değişken adlarını ve güvenli varsayımları içerir. Gerçek API anahtarlarını, Django secret'ını, servis tokenlarını, veritabanı yedeklerini ve kişisel verileri commit etmeyin.
+Do not commit `.env`, API keys, service tokens, database backups, local virtual environments, `node_modules`, or personal data. `.env.example` contains only variable names and safe placeholders.
 
-## Lisans ve Kapsam
+## Scope
 
-Bu proje eğitim/demonstrasyon amaçlı sentetik telekom operasyon verisi kullanır. Üretim ağına bağlanmaz, üretim ağ cihazlarını kontrol etmez ve gerçek müşteri verisi içermez.
+ProcessTwin is an educational/demonstration project. It does not operate a production network, control network equipment, or process real subscriber data.

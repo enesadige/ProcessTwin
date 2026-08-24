@@ -37,3 +37,13 @@ pnpm-debug.log*
 # Logs
 *.log
 logs/
+
+# Local/private engineering notes. Keep the RAG corpus documents tracked.
+/docs/
+/documents/039_5_realism_gate_report.md
+/documents/bekleyen_is_ve_senaryo_kararlari.md
+/documents/deterministic_core_audit.md
+/documents/ertelenen_teknik_notlar.md
+/documents/kontrol_kapisi_a_audit.md
+/documents/native_servis_notlari.md
+/documents/synthetic_review_pack_export.md
