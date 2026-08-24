@@ -36,10 +36,8 @@ export function LoginPage() {
   return (
     <main className="login-page">
       <section className="login-panel" aria-labelledby="login-title">
-        <div className="login-brand"><span aria-hidden="true">PT</span><strong>ProcessTwin</strong></div>
-        <p className="login-eyebrow">Operations intelligence</p>
+        <img className="login-logo" src="/turkcell.png" alt="Turkcell" />
         <h1 id="login-title">Çalışma alanına giriş yapın</h1>
-        <p className="login-copy">Yetkili hesabınızla operasyon görünümünü açın.</p>
         <form onSubmit={submit} className="login-form">
           <label htmlFor="username">Kullanıcı adı veya e-posta</label>
           <input id="username" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required />

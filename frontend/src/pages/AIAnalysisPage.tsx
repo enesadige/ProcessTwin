@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 
-import { AnalysisRequestError, getAnalysisStatus, getTopologySummary, submitAnalysis, type AnalysisStatus, type AnalyticsSummary, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type TopologyDevice, type TopologySummary } from '../auth/api'
+import { AnalysisRequestError, getAnalysisStatus, getEvidenceRecordList, getTopologySummary, submitAnalysis, type AnalysisStatus, type AnalyticsSummary, type CausalSummary, type CompensationSummary, type CrossIncidentCorrelationSummary, type ImpactSummary, type ProviderName, type RuleSummary, type StructuredVerifiedResult, type TopologyDevice, type TopologySummary } from '../auth/api'
 import './AIAnalysisPage.css'
 
 const SNAPSHOT_IDENTIFIER =
@@ -139,7 +139,7 @@ function TopologySummaryPanel({ summary }: { summary: TopologySummary }) {
   </section>
 }
 
-function VerifiedResultCards({ result, topologySummary, topologyState }: { result: StructuredVerifiedResult; topologySummary: TopologySummary | null; topologyState: TopologyState }) {
+function VerifiedResultCards({ result, executionEvidenceCode, topologySummary, topologyState }: { result: StructuredVerifiedResult; executionEvidenceCode: string | null; topologySummary: TopologySummary | null; topologyState: TopologyState }) {
   const causal: CausalSummary | undefined = result.causal_summary
   const impact: ImpactSummary | undefined = result.impact_summary
   const compensation: CompensationSummary | undefined = result.compensation_summary
@@ -189,8 +189,8 @@ function VerifiedResultCards({ result, topologySummary, topologyState }: { resul
   if (ruleCodes.length) provenanceCards.push(<FactCard key="rule-codes" label="Kural kodu" value={ruleCodes.join(', ')} />)
   if (ruleVersions.length) provenanceCards.push(<FactCard key="rule-versions" label="Seçilmiş RuleVersion" value={ruleVersions.join(', ')} />)
   evidenceReferences.forEach((reference) => {
-    const evidenceLink = result.snapshot_identifier
-      ? `/evidence?${new URLSearchParams({ evidence_hash: reference, snapshot_identifier: result.snapshot_identifier })}`
+    const evidenceLink = result.snapshot_identifier && executionEvidenceCode
+      ? `/evidence?${new URLSearchParams({ evidence_code: executionEvidenceCode, snapshot_identifier: result.snapshot_identifier })}`
       : null
     const evidenceLabel = reference.length > 12 ? reference.slice(0, 12) : reference
     provenanceCards.push(
@@ -303,6 +303,7 @@ export function AIAnalysisPage() {
   const [runStartedAt, setRunStartedAt] = useState<number | null>(null)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [runStatus, setRunStatus] = useState<AnalysisStatus | null>(null)
+  const [executionEvidenceCode, setExecutionEvidenceCode] = useState<string | null>(null)
   const [topologySummary, setTopologySummary] = useState<TopologySummary | null>(null)
   const [topologyState, setTopologyState] = useState<TopologyState>('idle')
 
@@ -333,6 +334,24 @@ export function AIAnalysisPage() {
   }, [runStartedAt])
 
   const causalSummary = result?.response?.structured_result?.causal_summary
+  const resultSnapshotIdentifier = result?.response?.structured_result?.snapshot_identifier ?? result?.snapshot_identifier
+
+  useEffect(() => {
+    const queryRunCode = result?.query_run_code
+    if (!queryRunCode || !resultSnapshotIdentifier) {
+      setExecutionEvidenceCode(null)
+      return
+    }
+    let cancelled = false
+    void getEvidenceRecordList().then((records) => {
+      const record = records.find((item) => item.query_run.code === queryRunCode && item.snapshot.key === resultSnapshotIdentifier)
+      if (!cancelled) setExecutionEvidenceCode(record?.evidence_code ?? null)
+    }).catch(() => {
+      if (!cancelled) setExecutionEvidenceCode(null)
+    })
+    return () => { cancelled = true }
+  }, [result?.query_run_code, resultSnapshotIdentifier])
+
   useEffect(() => {
     const deviceCode = causalSummary?.root_resource_type === 'device' ? causalSummary.root_resource_reference : undefined
     if (!deviceCode) {
@@ -367,6 +386,7 @@ export function AIAnalysisPage() {
     setError('')
     setFailure(null)
     setResult(null)
+    setExecutionEvidenceCode(null)
     setTopologySummary(null)
     setTopologyState('idle')
     const idempotencyKey = crypto.randomUUID()
@@ -465,7 +485,7 @@ export function AIAnalysisPage() {
       {result?.response && !isUnsupported && <section className="analysis-result" aria-live="polite">
         <div className="analysis-result__meta"><span>QueryRun {result.query_run_code}</span></div>
         <div className="analysis-result__answer"><div><p className="analysis-page__eyebrow">Doğrulanmış yanıt</p><h2>Analiz sonucu</h2></div><p>{result.response.response_text}</p></div>
-        {result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} topologySummary={topologySummary} topologyState={topologyState} /> : <p className="analysis-message">Bu yanıtta yapılandırılmış doğrulanmış alan bulunmuyor.</p>}
+        {result.response.structured_result ? <VerifiedResultCards result={result.response.structured_result} executionEvidenceCode={executionEvidenceCode} topologySummary={topologySummary} topologyState={topologyState} /> : <p className="analysis-message">Bu yanıtta yapılandırılmış doğrulanmış alan bulunmuyor.</p>}
         {result.response.warnings?.length ? <p className="analysis-message">Uyarı: {result.response.warnings.join(', ')}</p> : null}
       </section>}
       {result?.clarification && <section className="analysis-result analysis-result--clarification" aria-live="polite"><p className="analysis-page__eyebrow">Ek seçim gerekiyor</p><h2>Doğru kaydı seçmemize yardımcı olun</h2><p>{result.clarification.message}</p><button type="button" onClick={() => setLifecycle('idle')}>Soruyu düzenle</button></section>}

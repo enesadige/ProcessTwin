@@ -21,6 +21,7 @@ export type AnalysisRequest = {
 export type AnalysisResponse = {
   query_run_code?: string
   status: string
+  snapshot_identifier?: string
   response?: {
     response_text: string
     generation_mode: string
